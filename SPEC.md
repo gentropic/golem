@@ -262,6 +262,7 @@ Adding to the calendar needs no Google API and no network. golem fills the field
 | Dial, message, email | `ACTION_DIAL`, `ACTION_SENDTO` | none |
 | New contact | `ContactsContract.Intents.Insert` | none |
 | Share a result | `ACTION_SEND` | none |
+| Voice input | the lead-acid `speech` plugin: the phone's on-device recognizer only, never the networked one; see `auditable/spec_inbox/lead-acid_and_friends/speech-plugin-spec.md` | `RECORD_AUDIO` (runtime) |
 
 Default to the user-confirms route: the app then requests no dangerous permissions.
 
