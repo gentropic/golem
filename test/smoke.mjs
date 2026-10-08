@@ -28,14 +28,14 @@ const STEPS = [
   ['write me a poem about kriging', 'no reading', 'I do not guess'],
   ['why', 'context', 'grammar: no rule matched'],
   ['new session', null, null],
-  ['vario of cu', 'no reading', 'vario means variogram'],
-  ['vario means variogram', 'grammar', 'Learned'],
-  ['vario of cu', 'taught', 'No table is open'],
-  ['yes', 'taught', 'Composite to what length'],
-  ['2', 'taught', 'composites'],
-  ['histogram of cu', 'grammar', 'median'],
+  ['dens of chalcopyrite', 'no reading', 'dens means density'],
+  ['dens means density', 'grammar', 'Learned'],
+  ['dens of chalcopyrite', 'taught', '4.1–4.3'],
+  ['histogram of cu', 'grammar', 'No table is open'],
+  ['yes', 'grammar', 'median'],
+  ['histogram of au', 'grammar', 'median'],
   ['log scale', 'context', 'log scale'],
-  ['export as script', 'grammar', 'drillhole.composite']
+  ['export as script', 'grammar', 'plot.hist']
 ];
 
 const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
@@ -56,14 +56,14 @@ for (const [q, rung, text] of STEPS) {
   console.log(`${ok ? 'ok  ' : 'FAIL'} ${q}${ok ? '' : `\n       wanted [${rung}] …${text}…\n       got    [${got && got.rung}] ${got && got.text.slice(0, 160)}`}`);
 }
 const name = await page.textContent('#sname');
-const nameOk = name === 'assays.csv: Cu histogram, Cu variogram';
+const nameOk = name === 'assays.csv: Au histogram, Cu histogram';
 console.log(`${nameOk ? 'ok  ' : 'FAIL'} session auto-name: ${name}`);
 await page.reload(); await page.waitForSelector('#stream .card');
 const kept = await page.locator('#stream .card').count();
-console.log(`${kept === 6 ? 'ok  ' : 'FAIL'} session replays after reload: ${kept} cards`);
+console.log(`${kept === 7 ? 'ok  ' : 'FAIL'} session replays after reload: ${kept} cards`);
 const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 console.log(`${overflow <= 0 ? 'ok  ' : 'FAIL'} no horizontal overflow at 420 px`);
 errors.forEach(e => console.log('FAIL ' + e));
 await browser.close();
-if (failed || !nameOk || kept !== 6 || overflow > 0 || errors.length) { console.log('\nsmoke test failed'); process.exit(1); }
+if (failed || !nameOk || kept !== 7 || overflow > 0 || errors.length) { console.log('\nsmoke test failed'); process.exit(1); }
 console.log('\nsmoke test passed');

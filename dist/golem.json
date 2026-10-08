@@ -43,9 +43,6 @@
         "histogram": [
           "histogram",
           "hist"
-        ],
-        "variogram": [
-          "variogram"
         ]
       },
       "generic": [
@@ -55,9 +52,6 @@
       "words_pt": {
         "histogram": [
           "histograma"
-        ],
-        "variogram": [
-          "variograma"
         ]
       },
       "generic_pt": [

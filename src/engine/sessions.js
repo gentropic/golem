@@ -15,9 +15,9 @@ export const spec = c => ({ id: c.id, raw: c.raw, tool: c.tool, args: c.args, ru
 // what a card contributes to its session's name: [label, weight], from the tool's declaration
 export function tagOf(c) { const d = toolByName(c.tool); return d && d.topic ? d.topic(c.args) : null; }
 export function autoName(cards) {
-  const table = cards.some(c => ['open', 'hist', 'vario'].includes(c.tool)), w = new Map();
+  const table = cards.some(c => ['open', 'hist'].includes(c.tool)), w = new Map();
   cards.forEach((c, i) => {
-    if (table && !['hist', 'vario'].includes(c.tool)) return;
+    if (table && c.tool !== 'hist') return;
     const t = tagOf(c); if (t) w.set(t[0], (w.get(t[0]) || 0) + t[1] + i * 1e-3);
   });
   const top = [...w.entries()].sort((x, y) => y[1] - x[1]).map(x => x[0]);

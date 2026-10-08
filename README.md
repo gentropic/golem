@@ -12,7 +12,7 @@ This repository holds the specification and a working mock.
 Open `dist/golem.html`, then:
 
 - Tap the dashed `045/30 as dip direction/dip` slot on the thickness card. The reading flips to strike/dip and the answer recomputes.
-- Run `vario of cu`. It has no reading and offers `vario means variogram`. Tap that, then run `vario of cu` again and answer its questions.
+- Run `dens of chalcopyrite`. It has no reading and offers `dens means density`. Tap that, then run `dens of chalcopyrite` again.
 - Type `why` after any card, or `export as script`.
 - Open the menu (top left) for sessions and history search.
 - Tap *sleep* (top right) to put golem to sleep; nothing runs until you tap *wake*.
@@ -29,7 +29,7 @@ npm run test:engine  # the engine alone, in Node: the 27 queries, replay, slots,
 npm test             # build, engine tests, then drive the page through the same 27 queries
 ```
 
-The build is concatenation: `src/shell/index.html` with the two typefaces embedded, then the shell, engine and vendored modules in import order inside one `<script>`, with the `import` and `export` keywords dropped. No bundler, no transforms. The modules share one scope, so the build refuses duplicate top-level names. It also writes `dist/golem.json`, the parser ontology the engine derives from its tool declarations. The built page makes no network request; the one external link is the library reader, opened on tap.
+The build is concatenation: `src/shell/index.html` with the two typefaces embedded, then the shell, engine and vendored modules in import order inside one `<script>`, with the `import` and `export` keywords dropped. No bundler, no transforms. The modules share one scope, so the build refuses duplicate top-level names and turns export aliases into plain declarations. It also writes `dist/golem.json`, the parser ontology the engine derives from its tool declarations. The built page makes no network request; the one external link is the library reader, opened on tap.
 
 If Playwright has no browser installed, run `npx playwright install chromium` or point `CHROMIUM_PATH` at one.
 
@@ -49,14 +49,14 @@ src/engine/                  no DOM, no storage: everything that reads and compu
   sessions.js                sessions, replay, auto-naming, serialize and hydrate
   engine.js                  submit, rerun, slot flips, answers, undo
   index.js                   the surface Node tests import
-src/vendor/                  copies, never edited here: @gcu/dispatch (the clause parser), the lead-acid shim
+src/vendor/                  copies, never edited here: @gcu/dispatch (the parser), @gcu/bearing, @gcu/sadpan, the lead-acid shim
 src/shell/                   the browser: markup, rendering, wiring, storage
   index.html                 markup, Switchboard tokens, styles, bench notes
   fonts/                     Barlow and Space Mono (OFL), embedded by the build
   render.js                  blocks and plots to markup
   main.js                    tabs, drawer, storage, the sleep switch
 test/engine.test.mjs         engine tests, Node only
-test/oracle.test.mjs         golem's arithmetic against @gcu/units, bearing, gsjs, sadpan, drillhole
+test/oracle.test.mjs         golem's arithmetic against the GCU packages it does not vendor
 test/smoke.mjs               browser smoke test on the built file
 dist/golem.html              the built mock (committed, so it opens without a build)
 ```

@@ -22,7 +22,7 @@ export function ontology() {
     nouns: [
       { type: 'variable', needsId: true, words: Object.fromEntries(Object.entries(COL).map(([k, v]) => [v, [k, k === 'cu' ? 'copper' : 'gold']])), generic: ['grade', 'grades', 'column', 'columns'],
         words_pt: { Cu: ['cu', 'cobre'], Au: ['au', 'ouro'] }, generic_pt: ['teor', 'teores', 'coluna', 'colunas'] },
-      { type: 'plot', words: { histogram: ['histogram', 'hist'], variogram: ['variogram'] }, generic: ['plot', 'chart'], words_pt: { histogram: ['histograma'], variogram: ['variograma'] }, generic_pt: ['gráfico', 'grafico'] },
+      { type: 'plot', words: { histogram: ['histogram', 'hist'] }, generic: ['plot', 'chart'], words_pt: { histogram: ['histograma'] }, generic_pt: ['gráfico', 'grafico'] },
       { type: 'mineral', words: Object.fromEntries(Object.keys(MIN).map(k => [k, [k]])), generic: ['mineral', 'minerals', 'rock', 'sample'],
         words_pt: Object.fromEntries(Object.keys(MIN).map(k => [k, [MIN_PT[k]]])), generic_pt: ['mineral', 'minerais', 'rocha', 'amostra'] },
       { type: 'country', words: Object.fromEntries(FB.map(r => [r[0], [r[0].toLowerCase()]])), generic: ['country', 'countries', 'nation', 'nations'],

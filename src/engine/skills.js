@@ -33,4 +33,4 @@ export const examples = () => skills().flatMap(s => s.examples);
 let VOCAB = null;
 export const vocab = () => VOCAB || (VOCAB = new Set(examples().filter(e => !/ means /.test(e)).join(' ').toLowerCase().split(/[^a-z]+/).filter(w => w.length > 3)));
 // the example chips in the dock
-export const SUGGESTIONS = ['vario means variogram', 'variogram of cu', 'histogram of cu', 'log scale', 'identify a mineral', 'population density of mongolia in people per square mile', 'and chile', 'set a timer for 5 min', 'what is a skiplist', 'why', 'export as script', 'undo'];
+export const SUGGESTIONS = ['dens means density', 'histogram of cu', 'log scale', 'identify a mineral', 'population density of mongolia in people per square mile', 'and chile', 'set a timer for 5 min', 'what is a skiplist', 'why', 'export as script', 'undo'];

@@ -40,7 +40,13 @@ export function bundle(entry) {
       if (names.has(m[1])) throw new Error(`build: top-level name "${m[1]}" is declared in both src/${names.get(m[1])} and src/${rel}`);
       names.set(m[1], rel);
     }
-    const stripped = code.replace(/^\s*import\s[^\n]*\n/gm, '').replace(/^\s*export\s*\{[^}]*\};?[^\n]*\n/gm, '').replace(/^export\s+/gm, '');
+    // an export block disappears, except that `name as alias` entries become `const alias = name` so the
+    // alias exists in the shared scope (vendored bundles export their namespaces that way)
+    const stripped = code.replace(/^\s*import\s[^\n]*\n/gm, '').replace(/^\s*export\s*\{([^}]*)\};?[^\n]*\n/gm, (_, inner) => {
+      const aliases = inner.split(',').map(e => e.trim()).map(e => /^([\w$]+)\s+as\s+([\w$]+)$/.exec(e)).filter(Boolean);
+      for (const [, , alias] of aliases) { if (names.has(alias)) throw new Error(`build: top-level name "${alias}" is declared in both src/${names.get(alias)} and src/${rel}`); names.set(alias, rel); }
+      return aliases.map(([, name, alias]) => `const ${alias} = ${name};`).join('\n') + (aliases.length ? '\n' : '');
+    }).replace(/^export\s+/gm, '');
     return `/* ==== src/${rel} ==== */\n${stripped.trim()}\n`;
   });
   return parts.join('\n');

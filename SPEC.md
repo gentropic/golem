@@ -25,6 +25,7 @@ Sections 1 to 11 describe the target. Section 12 says what the mock does today. 
 - Open-ended prose: essays, summaries in its own words, general translation, common-sense chat.
 - An agent loop with open-ended search. The plan space is bounded by declared tools and their preconditions.
 - A replacement for explicit UI. golem sits beside the tools; a failed reading degrades to a list of skills.
+- Geostatistics. No variograms, kriging, simulation or resource estimation in golem, by decision (8 Oct 2026). Descriptive statistics of a table are fine.
 
 ---
 
@@ -83,7 +84,7 @@ Operations on the session plan, resolved before anything else:
 | explain | `why`, `show the plan` | New card listing the steps and inputs of the previous card |
 | repeat | `again` | Resubmits the last query |
 | undo | `undo` | Removes the last card from the plan |
-| teach | `vario means variogram` | Adds a rewrite to the device lexicon |
+| teach | `dens means density` | Adds a rewrite to the device lexicon |
 | session | `new session`, `name this session …`, `history` | See section 8 |
 | export | `export as script` | Emits the session plan as adder source |
 
@@ -128,7 +129,7 @@ Two properties matter and must survive the rewrite:
 
 ```ts
 type ToolDecl = {
-  name: string;                       // 'table.variogram'
+  name: string;                       // 'table.histogram'
   args: Record<string, ArgType>;      // typed, with units where they apply
   pre:  Condition[];                  // e.g. table.open, samples.equalLength
   post: Condition[];                  // what holds afterwards
@@ -148,9 +149,9 @@ type ToolDecl = {
 A tool whose precondition is unmet does not fail. The planner does one of two things:
 
 - **Another tool can establish it** (no table open → `table.open`): add that step to the plan. Ask first when the step has a choice in it.
-- **A value is missing** (mixed sample lengths → a composite length is needed): ask, with options. The answer is stored in `args` and becomes an editable slot on the card.
+- **A value is missing** (the mineral key needs an attribute): ask, with options. The answer is stored in `args` and becomes an editable slot on the card.
 
-The mock implements this by hand in two places (`needData()` and the composite question in `T.vario`). The target is a small STRIPS-style search over declared `pre`/`post` conditions: bounded depth, deterministic tie-breaking, and a plan the user sees before anything irreversible runs. The plan DAG is a UI object: every unbound parameter is editable.
+The mock implements this by hand in two places (`needData()` and the questions in the mineral key). The target is a small STRIPS-style search over declared `pre`/`post` conditions: bounded depth, deterministic tie-breaking, and a plan the user sees before anything irreversible runs. The plan DAG is a UI object: every unbound parameter is editable.
 
 ---
 
@@ -164,15 +165,14 @@ Status: **mock** = works in `src/` today; **planned** = named, not built.
 | Compute | Arithmetic, trig in degrees | mock (own parser) | `@gcu/expr` if it fits, else keep the parser |
 | Compute | Dates: day counts, weekdays | mock | built in |
 | Compute | Step-by-step algebra | planned | new package; nothing symbolic was found in the monorepo |
-| Field | True thickness from intercept, hole and plane | mock (checked against `@gcu/bearing`) | `@gcu/bearing` |
-| Field | Stereonet: planes, poles, lines | mock (own SVG, projection checked against `@gcu/bearing`) | `@gcu/bearing`, `@gcu/stereonet` |
+| Field | True thickness from intercept, hole and plane | `@gcu/bearing` vendored | `@gcu/bearing` |
+| Field | Stereonet: planes, poles, lines | `@gcu/bearing` vendored (projection); own SVG | `@gcu/bearing`, `@gcu/stereonet` |
 | Field | Mineral identification key | mock | minerals pack; question choice could use `@gcu/learn` trees |
 | Field | Compass capture from phone sensors | planned | lead-acid sensor route (does not exist yet) |
 | Field | Colour from camera to Munsell | planned | swatch (not found under `ext/`) |
 | Field | Kinematic slope check | planned | daylight / `@gcu/bearing` |
 | Table | Open, type and validate a table | mock (synthetic data) | `@gcu/recon`, `@gcu/sadpan`, `@gcu/sluice`, `@gcu/dm` |
-| Table | Histogram and summary | mock (statistics checked against `@gcu/sadpan`) | `@gcu/sadpan`, `@gcu/plot` |
-| Table | Downhole variogram after compositing | mock (composites checked against `@gcu/drillhole`, variogram against `@gcu/gsjs`) | `@gcu/drillhole`, `@gcu/gsjs`, `@gcu/gslib` as oracle |
+| Table | Histogram and summary | `@gcu/sadpan` vendored (statistics); own bars | `@gcu/sadpan`, `@gcu/plot` |
 | Table | Transform by example | planned | new package |
 | Table | Report paragraph from plan parameters | planned | templates; see [Open decisions](#14-open-decisions) on output English |
 | Knowledge | Record lookup, conversion, filter, rank | mock (14-row sample) | factbook pack, `@gcu/sift` |
@@ -241,7 +241,7 @@ Mock weights, to be tuned on real use:
 
 | Weight | Tools |
 |---|---|
-| 3 | histogram, variogram, true thickness, mineral key |
+| 3 | histogram, true thickness, mineral key |
 | 2 | stereonet, record lookup, record list, mineral properties, definition, style check, calendar event |
 | 1 | unit conversion, timer, alarm, notes |
 | 0.5 | arithmetic, dates |
@@ -297,7 +297,7 @@ Default to the user-confirms route: the app then requests no dangerous permissio
 
 `dist/golem.html` is a working mock: a phone-shaped app plus bench notes. `npm test` drives it through 27 queries.
 
-**Real, computed in the page:** unit conversion with dimension checks; arithmetic by recursive descent (no `eval`); dates; true thickness and the equal-area stereonet; histogram; length-weighted compositing and the downhole variogram; the mineral key (asks the attribute that splits the remaining candidates most); the Strunk checker (15 patterns from rules 11 to 13 of the 1918 edition); every reading, amendment, taught word, note, session, name and replay.
+**Real, computed in the page:** unit conversion with dimension checks; arithmetic by recursive descent (no `eval`); dates; true thickness and the equal-area stereonet; histogram; the mineral key (asks the attribute that splits the remaining candidates most); the Strunk checker (15 patterns from rules 11 to 13 of the 1918 edition); every reading, amendment, taught word, note, session, name and replay.
 
 **Sample data:** `assays.csv` is synthetic (seeded generator, 8 holes, mixed 1 m and 2 m samples). The Factbook is 14 countries with rounded figures. The ODS entry is a hand-made index of 7 terms that gives the chapter and section, not the passage. The mineral pack is 12 minerals typed in by hand; check the values before they ship anywhere.
 
@@ -336,8 +336,8 @@ In order. Each step leaves something that runs.
 2. **Tool declarations as data.** Done 8 Oct 2026: `tool()` and `frame()` declarations; the catalog, amendments, session names and the ontology derive from them. The declaration shape is still JS (readers and amendment matchers are regexes); the ontology they produce is JSON.
 3. **Real grammar.** Begun 8 Oct 2026: the clause parser is vendored and reads first; the regex rules read what it cannot yet. To finish, the grammar needs free-text roles, dates, orientations and amendments through ellipsis (listed in `ext/dispatch/SPEC.md`), then the regex rules go. The parser is now the grammar rung of `@gcu/dispatch` (`ext/dispatch/src/grammar/`). clause reads imperatives, bare phrases and closed questions against an ontology; `ext/dispatch/bench/golem.json` is the starting ontology for golem's register and `ext/dispatch/bench/golem-corpus.mjs` its hand corpus. Still outside the grammar and needing their own reading: free-text arguments (`remember that …`, `check: …`, `X means Y`, event titles), absolute dates and clock times, orientations like `270/60`, and arithmetic (a token-shape check routes it to the expression parser). Amendments (`in feet`, `and chile`) can move into clause's ellipsis machinery.
 4. **Rung 4.** Generate dispatch tool declarations and a corpus from golem's tool declarations, train on start, gate on margin and assembly.
-5. **Real packages under the tools.** The check is done (8 Oct 2026, `test/oracle.test.mjs`, run against the sibling clone): golem's conversions, thickness factor, equal-area projection, length-weighted composites, downhole variogram and summary statistics reproduce `@gcu/units`, `@gcu/bearing`, `@gcu/drillhole`, `@gcu/gsjs` and `@gcu/sadpan`. Two findings for the monorepo: `@gcu/units` rounds its factors to six figures where golem's are exact, and it lacks troy/avoirdupois ounces, imperial pressure, temperature and square miles, so golem keeps its own table for those. Whether to vendor the packages (about 400 kB of bundles for arithmetic that is a few kilobytes here) is an open decision; the oracle test keeps the two from drifting either way. Still to check: `@gcu/recon` for table typing, `@gcu/plot`, `@gcu/librarian` for definitions.
-6. **Planner.** Preconditions and effects on the declarations; replace `needData()` and the composite question.
+5. **Real packages under the tools.** Checked 8 Oct 2026 (`test/oracle.test.mjs`, against the sibling clone): golem's conversions, thickness factor, equal-area projection and summary statistics reproduce `@gcu/units`, `@gcu/bearing` and `@gcu/sadpan`. `bearing` and `sadpan` are vendored and in use under the field and table tools. `units` is not yet: it rounds its factors to six figures where golem's are exact, and it lacks troy and avoirdupois ounces, imperial pressure, temperature and square miles; golem keeps its own table until the package is fixed upstream, and the oracle test says when that happens. Still to check: `@gcu/recon` for table typing, `@gcu/plot`, `@gcu/librarian` for definitions.
+6. **Planner.** Preconditions and effects on the declarations; replace `needData()` and the key's hand-coded questions.
 7. **Real files.** Open CSV and `.dm` through the file picker or the lead-acid file bridge.
 8. **Packs.** Install from a registry, define the `golem` facet, build it for `factbook`, `ods` and `elements-of-style`.
 9. **Session store** on `@gcu/vfs`; export and import a session as a file.

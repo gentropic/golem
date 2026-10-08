@@ -1,6 +1,7 @@
-// The open table: a synthetic drillhole set, a histogram and a downhole variogram after compositing.
+// The open table: a synthetic drillhole set and a histogram with summary statistics.
 // Sample data, labelled as such in every result it reaches.
 import { S, tool, frame, fmt } from './core.js';
+import { series } from '../vendor/sadpan.js';
 
 function mulberry(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 export function makeData() {
@@ -21,39 +22,12 @@ export function makeData() {
   }
   return rows;
 }
+// summary statistics through @gcu/sadpan (vendored): sample standard deviation, median of the sorted values
 export function stats(v) {
-  const s = [...v].sort((a, b) => a - b), n = s.length, mean = s.reduce((a, b) => a + b, 0) / n, va = s.reduce((a, b) => a + (b - mean) ** 2, 0) / (n - 1);
-  return { n, mean, sd: Math.sqrt(va), va, min: s[0], med: n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2, max: s[n - 1] };
+  const s = series(v), sd = s.std();
+  return { n: s.count(), mean: s.mean(), sd, va: sd * sd, min: s.min(), med: s.median(), max: s.max() };
 }
 export const UNIT = { cu: '%', au: 'g/t' }, COL = { cu: 'Cu', au: 'Au' };
-// fixed-length downhole composites, length weighted, from the top of each hole; a composite needs at
-// least half its length covered by positive samples. Returns { comps: { hole: [value | null] }, nc, all }.
-export function composite(data, col, L) {
-  const byHole = {};
-  data.forEach(r => { if (r[col] > 0) (byHole[r.hole] = byHole[r.hole] || []).push(r); });
-  const comps = {}; let nc = 0; const all = [];
-  Object.entries(byHole).forEach(([h, rs]) => {
-    const end = Math.max(...rs.map(r => r.to)), out = [];
-    for (let k = 0; (k + 1) * L <= end; k++) {
-      let w = 0, sum = 0;
-      rs.forEach(r => { const o = Math.min(r.to, (k + 1) * L) - Math.max(r.from, k * L); if (o > 0) { w += o; sum += o * r[col]; } });
-      out.push(w >= L / 2 ? sum / w : null);
-      if (w >= L / 2) { nc++; all.push(sum / w); }
-    }
-    comps[h] = out;
-  });
-  return { comps, nc, all };
-}
-// the experimental downhole semivariogram: pairs of composites k steps apart down each hole, 12 lags
-export function downhole(comps, L, nlags = 12) {
-  const lags = [];
-  for (let k = 1; k <= nlags; k++) {
-    let s2 = 0, np = 0;
-    Object.values(comps).forEach(c => { for (let i = 0; i + k < c.length; i++) if (c[i] != null && c[i + k] != null) { s2 += (c[i] - c[i + k]) ** 2; np++; } });
-    if (np) lags.push({ h: k * L, g: s2 / (2 * np), np });
-  }
-  return lags;
-}
 const colOf = w => w[0] === 'c' ? 'cu' : 'au';
 // the precondition "a table is open": asked once, then satisfied as a plan step the args remember
 function needData(a, trace) {
@@ -104,41 +78,13 @@ tool({
       body: [
         { t: 'bars', label: `Histogram of ${COL[a.col]}`, bins, ticks: [0, .5, 1].map(t => fmt(inv(lo + t * (hi - lo)), 2)) },
         { t: 'kv', rows: [['n', String(st.n)], ['mean', `${fmt(st.mean, 3)} ${UNIT[a.col]}`], ['median', `${fmt(st.med, 3)} ${UNIT[a.col]}`], ['cv', fmt(st.sd / st.mean, 3)], ['range', `${fmt(st.min, 3)} to ${fmt(st.max, 3)} ${UNIT[a.col]}`]] },
-        { t: 'src', text: 'sadpan · sample-count weighted, not declustered' }
+        { t: 'src', text: '@gcu/sadpan · vendored · sample-count weighted' }
       ],
       trace, py: `plot.hist(dh["${a.col}"][dh["${a.col}"] > 0], bins=${nb}${a.log ? ', log=True' : ''})`
     };
   }
 });
-tool({
-  name: 'vario', rank: 52,
-  skill: { group: 'Table', title: 'Variogram', on: '@gcu/drillhole · gsjs', about: 'A missing precondition becomes a question, then a step in the plan.', examples: ['variogram of cu'] },
-  read: (text, q) => { const m = /^(?:downhole )?variogram (?:of )?(cu|au|copper|gold)(?: at (\d) ?m)?$/.exec(q); return m ? { col: colOf(m[1]), comp: m[2] ? +m[2] : undefined } : null; },
-  topic: a => [COL[a.col] + ' variogram', 3],
-  run: a => {
-    const trace = [], read = ['downhole variogram of', { v: COL[a.col] }];
-    let ask = needData(a, trace);
-    if (!ask && !a.comp) {
-      const n1 = S.data.filter(r => r.to - r.from === 1).length;
-      ask = { prompt: `A variogram needs samples of equal length. This table has ${n1} samples of 1 m and ${S.data.length - n1} of 2 m. Composite to what length?`, options: [2, 3, 4].map(v => ({ label: v + ' m', value: v })), set: (x, v) => { x.comp = v; } };
-    }
-    if (ask) return { read, ask, body: [], trace: ['blocked: precondition not met'] };
-    read.push('composited to', { v: a.comp + ' m', key: 'comp', alts: [2, 3, 4], cur: a.comp });
-    const L = a.comp, { comps, nc, all } = composite(S.data, a.col, L), sill = stats(all).va, lags = downhole(comps, L);
-    const hx = lags[lags.length - 1].h, gy = Math.max(sill, ...lags.map(l => l.g)) * 1.1;
-    trace.push(`drop non-positive ${a.col} values`, `composite to ${L} m, length weighted, keep ≥ 50% coverage → ${nc} composites`, `pair composites down each hole at lags of ${L} m → ${lags.length} lags`);
-    return {
-      read,
-      body: [
-        { t: 'curve', label: `Downhole variogram of ${COL[a.col]}`, points: lags.map(l => ({ x: l.h, y: l.g })), xmax: hx, ymax: gy, ylabel: fmt(gy, 2), ref: { y: sill, label: `variance ${fmt(sill, 3)}` }, xticks: [lags[0].h, lags[Math.floor(lags.length / 2)].h, hx].map(h => ({ x: h, label: `${h} m` })) },
-        { t: 'kv', rows: [['composites', `${nc} at ${L} m`], ['first lag', `γ(${L} m) = ${fmt(lags[0].g, 3)}, ${fmt(lags[0].g / sill * 100, 3)}% of the variance, ${lags[0].np} pairs`], ['last lag', `γ(${hx} m) = ${fmt(lags[lags.length - 1].g, 3)}, ${lags[lags.length - 1].np} pairs`]] },
-        { t: 'src', text: '@gcu/drillhole → gsjs · experimental only, no model fitted' }
-      ],
-      trace, py: `comp = drillhole.composite(dh[dh["${a.col}"] > 0], ${L})\ngsjs.variogram(comp, "${a.col}", direction="downhole", lag=${L}, nlags=12)`
-    };
-  }
-});
-// "histogram of cu", "plot a histogram of gold in log scale", "variogram of cu"
+// "histogram of cu", "plot a histogram of gold in log scale"
 frame({
   name: 'plot', label: 'Plot', words: ['plot', 'draw', 'show', 'display'], elidable: true,
   theme: ['plot'], required: ['theme', 'of'], roles: { of: { preps: ['of', 'for'], types: ['variable'] }, scale: { preps: ['in', 'on', 'with'], types: ['scale'] } },
@@ -146,8 +92,6 @@ frame({
   bind: c => {
     const kind = c.theme[0] && c.theme[0].value, v = c.roles.of && c.roles.of[0]; if (!kind || !v || !v.value) return null;
     const col = v.value.toLowerCase();
-    if (kind === 'histogram') return { tool: 'hist', args: { col, log: !!(c.roles.scale && c.roles.scale[0].value === 'log') } };
-    if (kind === 'variogram') return { tool: 'vario', args: { col } };
-    return null;
+    return kind === 'histogram' ? { tool: 'hist', args: { col, log: !!(c.roles.scale && c.roles.scale[0].value === 'log') } } : null;
   }
 });

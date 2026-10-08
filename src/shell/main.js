@@ -5,7 +5,7 @@ import { submit, flipSlot, answer, seedExamples } from '../engine/engine.js';
 import { sessions, current, newSession, openSession, renameSession, deleteSession, searchHistory, serialize, hydrate, onChange } from '../engine/sessions.js';
 import { skills, PACKS, SUGGESTIONS } from '../engine/skills.js';
 import { shell } from '../vendor/leadacid.js';
-import { esc, pad, cardEl } from './render.js';
+import { escHtml, pad, cardEl } from './render.js';
 
 const $ = id => document.getElementById(id);
 const KEY = 'golem.mock.v2';
@@ -53,17 +53,17 @@ function run(raw) {
 function renderSkills() {
   const rows = skills(), live = rows.filter(s => s.live).length; let h = `<div class="sub">${live} skills run in this mock. ${rows.length - live} more are planned from packages that already exist or are named here. Tap an example to run it.</div>`, g = '';
   rows.forEach(s => {
-    if (s.group !== g) { h += `<div class="lbl">${esc(s.group)}</div>`; g = s.group; }
-    h += `<div class="item"><h3>${esc(s.title)} <span class="tag ${s.live ? 'live' : 'plan'}">${s.live ? 'in mock' : 'planned'}</span></h3><p>${esc(s.about)}</p><div class="from">${esc(s.on)}</div>${s.examples.length ? `<div class="opts">${s.examples.map(x => `<button class="chip" type="button" data-q="${esc(x)}" style="white-space:normal;text-align:left">${esc(x)}</button>`).join('')}</div>` : ''}</div>`;
+    if (s.group !== g) { h += `<div class="lbl">${escHtml(s.group)}</div>`; g = s.group; }
+    h += `<div class="item"><h3>${escHtml(s.title)} <span class="tag ${s.live ? 'live' : 'plan'}">${s.live ? 'in mock' : 'planned'}</span></h3><p>${escHtml(s.about)}</p><div class="from">${escHtml(s.on)}</div>${s.examples.length ? `<div class="opts">${s.examples.map(x => `<button class="chip" type="button" data-q="${escHtml(x)}" style="white-space:normal;text-align:left">${escHtml(x)}</button>`).join('')}</div>` : ''}</div>`;
   });
   $('v-skills').innerHTML = h;
 }
 function renderPacks() {
   const lab = { live: 'in mock', samp: 'sample in mock', plan: 'not wired' };
   let h = '<div class="sub">golem knows what its installed packs hold. These are the gcu-library entries plus packs worth adding.</div><div class="lbl">Library</div>';
-  PACKS.forEach(([id, name, meta, st, d]) => { h += `<div class="item"><h3>${esc(name)} <span class="tag ${st}">${lab[st]}</span></h3><p>${esc(d)}</p><div class="from">${esc(id)} · ${esc(meta)}</div></div>`; });
+  PACKS.forEach(([id, name, meta, st, d]) => { h += `<div class="item"><h3>${escHtml(name)} <span class="tag ${st}">${lab[st]}</span></h3><p>${escHtml(d)}</p><div class="from">${escHtml(id)} · ${escHtml(meta)}</div></div>`; });
   const al = Object.entries(S.aliases);
-  h += `<div class="lbl">On this device</div><div class="item"><h3>Taught words</h3><p>${al.length ? al.map(([k, v]) => `${esc(k)} → ${esc(v)}`).join('<br>') : 'None yet. Try “vario means variogram”.'}</p></div><div class="item"><h3>Notes</h3><p>${S.facts.length ? S.facts.map(esc).join('<br>') : 'None yet. Try “remember that …”.'}</p></div><div class="item"><h3>Open table</h3><p>${S.data ? `assays.csv · ${S.data.length} rows` : 'None.'}</p></div>`;
+  h += `<div class="lbl">On this device</div><div class="item"><h3>Taught words</h3><p>${al.length ? al.map(([k, v]) => `${escHtml(k)} → ${escHtml(v)}`).join('<br>') : 'None yet. Try “vario means variogram”.'}</p></div><div class="item"><h3>Notes</h3><p>${S.facts.length ? S.facts.map(esc).join('<br>') : 'None yet. Try “remember that …”.'}</p></div><div class="item"><h3>Open table</h3><p>${S.data ? `assays.csv · ${S.data.length} rows` : 'None.'}</p></div>`;
   $('v-packs').innerHTML = h;
 }
 
@@ -74,10 +74,10 @@ function renderDrawer() {
   const q = $('hq').value.trim(); let h;
   if (q) {
     const hits = searchHistory(q);
-    h = `<div class="lbl">${hits.length} match${hits.length === 1 ? '' : 'es'} in history</div>` + hits.slice(0, 40).map(({ session: s, card: c }) => `<div class="srow"><button class="open" type="button" data-s="${s.id}" data-c="${c.id}" style="font:13px var(--mono)">&gt; ${esc(c.raw)}</button><div class="meta"><span>${esc(s.name)}</span></div></div>`).join('');
+    h = `<div class="lbl">${hits.length} match${hits.length === 1 ? '' : 'es'} in history</div>` + hits.slice(0, 40).map(({ session: s, card: c }) => `<div class="srow"><button class="open" type="button" data-s="${s.id}" data-c="${c.id}" style="font:13px var(--mono)">&gt; ${escHtml(c.raw)}</button><div class="meta"><span>${escHtml(s.name)}</span></div></div>`).join('');
   } else {
     const cur = current();
-    h = '<div class="lbl">Sessions</div>' + [...sessions()].sort((x, y) => y.updated - x.updated || y.id - x.id).map(s => `<div class="srow" aria-current="${s === cur}">${ren === s.id ? `<input class="ren" data-id="${s.id}" value="${esc(s.name)}" aria-label="Session name. Leave empty to name it automatically.">` : `<button class="open" type="button" data-s="${s.id}">${esc(s.name)}</button>`}<div class="meta"><span>${s.cards.length} card${s.cards.length === 1 ? '' : 's'} · ${when(s.updated)}</span>${s.auto ? '<span class="tag plan">auto name</span>' : ''}${s.example ? '<span class="tag samp">example</span>' : ''}<button class="link" type="button" data-ren="${s.id}">rename</button><button class="link" type="button" data-del="${s.id}">${del === s.id ? 'confirm delete' : 'delete'}</button></div></div>`).join('');
+    h = '<div class="lbl">Sessions</div>' + [...sessions()].sort((x, y) => y.updated - x.updated || y.id - x.id).map(s => `<div class="srow" aria-current="${s === cur}">${ren === s.id ? `<input class="ren" data-id="${s.id}" value="${escHtml(s.name)}" aria-label="Session name. Leave empty to name it automatically.">` : `<button class="open" type="button" data-s="${s.id}">${escHtml(s.name)}</button>`}<div class="meta"><span>${s.cards.length} card${s.cards.length === 1 ? '' : 's'} · ${when(s.updated)}</span>${s.auto ? '<span class="tag plan">auto name</span>' : ''}${s.example ? '<span class="tag samp">example</span>' : ''}<button class="link" type="button" data-ren="${s.id}">rename</button><button class="link" type="button" data-del="${s.id}">${del === s.id ? 'confirm delete' : 'delete'}</button></div></div>`).join('');
   }
   $('dlist').innerHTML = h;
   const i = $('dlist').querySelector('.ren'); if (i) { i.focus(); i.select(); }
@@ -134,7 +134,7 @@ $('dlist').addEventListener('click', e => {
     deleteSession(id); del = null; renderStream(); renderDrawer();
   }
 });
-$('sugg').innerHTML = SUGGESTIONS.map(x => `<button class="chip" type="button" data-q="${esc(x)}">${esc(x)}</button>`).join('');
+$('sugg').innerHTML = SUGGESTIONS.map(x => `<button class="chip" type="button" data-q="${escHtml(x)}">${escHtml(x)}</button>`).join('');
 
 /* ── start: restore saved sessions, or seed two examples ── */
 renderSkills();

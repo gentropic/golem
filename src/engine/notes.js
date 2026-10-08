@@ -22,7 +22,7 @@ tool({
 });
 tool({
   name: 'teach', rank: 10,
-  skill: { group: 'Session', title: 'Teach a word', on: 'lexicon', about: 'Stays on the device.', examples: ['vario means variogram'] },
+  skill: { group: 'Session', title: 'Teach a word', on: 'lexicon', about: 'Stays on the device.', examples: ['dens means density'] },
   read: (text, q) => { const m = /^(.+?) means (.+)$/.exec(q); return m ? { word: m[1], means: m[2] } : null; },
   run: a => {
     S.aliases[a.word] = a.means;

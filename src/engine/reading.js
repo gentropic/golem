@@ -20,7 +20,7 @@ export function clauseRead(text, rung) {
   const cmd = r.commands[0], f = FRAMES.find(x => x.name === cmd.verb), b = f && f.bind(cmd);
   if (!b) return { verdict: r };
   const res = T[b.tool](b.args); if (!res) return { verdict: r };
-  res.trace.unshift(`clause: ${r.echo}`);
+  res.trace.unshift(`clause: ${r.echo}`, ...r.diag.notes.map(n => `clause: ${n}`));
   return { tool: b.tool, args: b.args, rung, res };
 }
 const describeVerdict = r => `clause: ${r.status}${r.reasons ? ' — ' + r.reasons.join('; ') : r.readings ? ' — ' + r.readings.join(' | ') : ''}`;

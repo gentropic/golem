@@ -27,14 +27,14 @@ export const STEPS = [
   ['write me a poem about kriging', 'no reading', 'I do not guess'],
   ['why', 'context', 'grammar: no rule matched'],
   ['new session', null, null],
-  ['vario of cu', 'no reading', 'vario means variogram'],
-  ['vario means variogram', 'grammar', 'Learned'],
-  ['vario of cu', 'taught', 'No table is open'],
-  ['yes', 'taught', 'Composite to what length'],
-  ['2', 'taught', 'composites'],
-  ['histogram of cu', 'grammar', 'median'],
+  ['dens of chalcopyrite', 'no reading', 'dens means density'],
+  ['dens means density', 'grammar', 'Learned'],
+  ['dens of chalcopyrite', 'taught', '4.1–4.3'],
+  ['histogram of cu', 'grammar', 'No table is open'],
+  ['yes', 'grammar', 'median'],
+  ['histogram of au', 'grammar', 'median'],
   ['log scale', 'context', 'log scale'],
-  ['export as script', 'grammar', 'drillhole.composite']
+  ['export as script', 'grammar', 'plot.hist']
 ];
 const RUNG = { grammar: 'grammar', context: 'context', taught: 'taught', none: 'no reading' };
 const last = () => g.S.cards[g.S.cards.length - 1];
@@ -49,7 +49,7 @@ test('the smoke queries read and compute as the browser test expects', () => {
     assert.equal(RUNG[c.rung], rung, `rung of "${q}"`);
     assert.ok(g.textOf(c).includes(text), `"${q}" → …${text}… in: ${g.textOf(c).slice(0, 200)}`);
   }
-  assert.equal(g.current().name, 'assays.csv: Cu histogram, Cu variogram');
+  assert.equal(g.current().name, 'assays.csv: Au histogram, Cu histogram');
 });
 
 test('a session replays from its specs through serialize and hydrate', () => {
@@ -58,9 +58,9 @@ test('a session replays from its specs through serialize and hydrate', () => {
   assert.ok(saved.ss[1].cards.every(c => !('res' in c)), 'results are not stored');
   g.reset();
   assert.ok(g.hydrate(saved));
-  assert.equal(g.S.cards.length, 6);
-  assert.equal(g.S.aliases.vario, 'variogram');
-  assert.equal(g.current().name, 'assays.csv: Cu histogram, Cu variogram');
+  assert.equal(g.S.cards.length, 7);
+  assert.equal(g.S.aliases.dens, 'density');
+  assert.equal(g.current().name, 'assays.csv: Au histogram, Cu histogram');
   assert.ok(g.textOf(g.S.cards[4]).includes('median'));
 });
 
@@ -76,16 +76,20 @@ test('a slot flip recomputes the card in place', () => {
 });
 
 test('an open question is answered by option, and args carry the answer', () => {
-  g.reset(); g.submit('variogram of cu');
+  g.reset(); g.submit('histogram of cu');
   const c = last();
-  assert.ok(c.res.ask, 'asks to open the table');
+  assert.ok(c.res.ask && /No table is open/.test(c.res.ask.prompt), 'asks to open the table');
   g.answer(c, 0);
   assert.equal(c.args.auto, true);
-  assert.ok(c.res.ask && /Composite/.test(c.res.ask.prompt), 'then asks the composite length');
-  g.answer(c, 1);
-  assert.equal(c.args.comp, 3);
   assert.ok(!c.res.ask);
-  assert.ok(g.textOf(c).includes('composites'));
+  assert.ok(g.textOf(c).includes('median'));
+  g.submit('identify a mineral');
+  const k = last();
+  assert.ok(k.res.ask, 'the key asks its first question');
+  const first = k.res.ask.prompt;
+  g.answer(k, 0);
+  assert.equal(Object.keys(k.args.ans).length, 1, 'the answer lives in args');
+  assert.ok(k.res.ask && k.res.ask.prompt !== first, 'then asks the next most splitting attribute');
 });
 
 test('undo, again, rename and the no-reading card', () => {
@@ -118,9 +122,9 @@ test('the clock can be pinned, and dates follow it', () => {
 
 test('declarations drive the catalog, the names and the amendments', () => {
   const rows = g.skills();
-  assert.equal(rows.length, 28);
+  assert.equal(rows.length, 27);
   assert.deepEqual([...new Set(rows.map(r => r.group))], ['Compute', 'Field', 'Table', 'Knowledge', 'Device', 'Session']);
-  assert.equal(rows.filter(r => r.live).length, 20);
+  assert.equal(rows.filter(r => r.live).length, 19);
   for (const name of Object.keys(g.T)) assert.ok(g.toolByName(name), `a declaration for ${name}`);
   assert.deepEqual(g.tagOf({ tool: 'hist', args: { col: 'au' } }), ['Au histogram', 3]);
   assert.ok(g.toolByName('convert').amend.length === 1 && g.toolByName('fact').amend.length === 2);
@@ -137,7 +141,7 @@ test('the ontology derives from the declarations and is plain JSON', () => {
 
 test('the clause parser reads the bare phrases and closed questions; the regex rules keep the rest', () => {
   g.reset();
-  const byClause = new Set(['0.35 oz per short ton in g/t', '2.7 g/cm3 in lb/ft3', '5 km in kg', '25 c in f', 'population density of mongolia in people per square mile', 'landlocked countries by population', 'density of chalcopyrite', 'what is a skiplist', 'histogram of cu', 'export as script', 'vario of cu']);
+  const byClause = new Set(['0.35 oz per short ton in g/t', '2.7 g/cm3 in lb/ft3', '5 km in kg', '25 c in f', 'population density of mongolia in people per square mile', 'landlocked countries by population', 'density of chalcopyrite', 'what is a skiplist', 'histogram of au', 'export as script', 'dens of chalcopyrite', 'histogram of cu']);
   for (const [q, rung] of STEPS) {
     const o = g.submit(q);
     if (rung === null || o.kind !== 'card' || o.card.rung === 'none' || o.card.rung === 'context') continue;
