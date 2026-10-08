@@ -8590,7 +8590,7 @@ tool({
     if ((m = new RegExp(`^(?:how old is|when was|when is|age of|dates? of|bounds of)(?: the)? ${UNITRE}$`).exec(q))) return { unit: m[1] };
     if ((m = new RegExp(`^(?:how long (?:was|is|did)|duration of|length of)(?: the)? ${UNITRE}(?: last)?$`).exec(q))) return { unit: m[1], ask: 'duration' };
     if ((m = new RegExp(`^(?:what|which) (?:came|comes|was|is) (before|after)(?: the)? ${UNITRE}$`).exec(q))) return { unit: m[2], ask: m[1] };
-    if ((m = new RegExp(`^(?:stages|ages|epochs|periods|eras|series|systems|subdivisions|parts|divisions) of(?: the)? ${UNITRE}$`).exec(q))) return { unit: m[1], ask: 'children' };
+    if ((m = new RegExp(`^(stages|ages|epochs|periods|eras|series|systems|subdivisions|parts|divisions) of(?: the)? ${UNITRE}$`).exec(q))) { const r = { stages: 'age', ages: 'age', epochs: 'epoch', series: 'epoch', periods: 'period', systems: 'period', eras: 'era' }[m[1]]; return { unit: m[2], ask: 'children', ...(r ? { rank: r } : {}) }; }
     if ((m = /^(?:(?:what|which) (?:period|epoch|era|eon|age|stage|unit|time) (?:is|was|contains|had) )?(\d+(?:\.\d+)?) ?(ma|myr|ga|million years(?: ago)?|billion years(?: ago)?)$/.exec(q))) return { age: +m[1] * (/^(ga|billion)/.test(m[2]) ? 1000 : 1) };
     return null;
   },
@@ -8608,7 +8608,8 @@ tool({
       return { read: ['timescale unit', { v: a.unit }], body: [{ t: 'note', kind: 'err', text: `"${a.unit}" is not a unit on the chart: ${why}.` }, SRC], trace: ['timescale.find → none; a known old name'] };
     }
     const read = [{ v: a.ask || 'age', key: 'ask', alts: ['age', 'duration', 'before', 'after', 'children'], cur: a.ask || 'age' }, 'of', { v: u.n }];
-    const kids = childrenOf(u), chain = chainOf(u), bef = beforeOf(u), aft = afterOf(u), dur = u.b - u.t;
+    // "stages of the triassic" asks for a rank; "subdivisions of" takes the next rank down
+    const kids = a.rank ? TIMESCALE.filter(x => x.r === a.rank && ri(x) > ri(u) && within(x, u)).sort((x, y) => y.b - x.b) : childrenOf(u), chain = chainOf(u), bef = beforeOf(u), aft = afterOf(u), dur = u.b - u.t;
     const trace = [`timescale.find("${a.unit}") → ${u.n} (${u.r}, ${span(u)})`, `within: ${chain.map(p => p.n).join(' > ') || 'nothing above'} (by containment)`];
     if (a.ask === 'duration') return { read, value: dur, body: [{ t: 'big', v: fmt(dur, 4), unit: 'Myr' }, { t: 'kv', rows: [['from', `${fmt(u.b)} Ma`], ['to', `${fmt(u.t)} Ma`], ['rank', u.r]] }, SRC], trace: [...trace, `${fmt(u.b)} − ${fmt(u.t)} = ${fmt(dur, 5)} Myr`], py: `data("timescale")["${u.n}"].duration` };
     if (a.ask === 'before' || a.ask === 'after') {
