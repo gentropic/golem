@@ -149,9 +149,9 @@ type ToolDecl = {
 A tool whose precondition is unmet does not fail. The planner does one of two things:
 
 - **Another tool can establish it** (no table open → `table.open`): add that step to the plan. Ask first when the step has a choice in it.
-- **A value is missing** (the mineral key needs an attribute): ask, with options. The answer is stored in `args` and becomes an editable slot on the card.
+- **A value is missing** (a timer with no duration, a table question naming no column): ask, with options. The answer is stored in `args` and becomes an editable slot on the card.
 
-The mock implements this by hand in two places (`needData()` and the questions in the mineral key). The target is a small STRIPS-style search over declared `pre`/`post` conditions: bounded depth, deterministic tie-breaking, and a plan the user sees before anything irreversible runs. The plan DAG is a UI object: every unbound parameter is editable.
+The mock implements this by hand (`needTable()` for the open table, and the parser's clarify for a missing value). The target is a small STRIPS-style search over declared `pre`/`post` conditions: bounded depth, deterministic tie-breaking, and a plan the user sees before anything irreversible runs. The plan DAG is a UI object: every unbound parameter is editable.
 
 ---
 
@@ -169,7 +169,7 @@ Status: **mock** = works in `src/` today; **planned** = named, not built.
 | Field | Stereonet: planes, poles, lines | `@gcu/bearing` vendored (projection); own SVG | `@gcu/bearing`, `@gcu/stereonet` |
 | Field | Structural geometry: apparent dip, three-point plane, intersection of planes, rake, oriented core, Fisher mean | `@gcu/bearing` vendored (8 Oct 2026); rotation and rose diagrams planned | `@gcu/bearing` |
 | Field | Magnetic declination, magnetic and true bearings | `@gcu/wmm` vendored (8 Oct 2026); grid north needs UTM, planned | `@gcu/wmm` |
-| Field | Mineral identification key | mock | minerals pack; question choice could use `@gcu/learn` trees |
+| Field | Mineral identification key | removed 8 Oct 2026 until a mineral dataset with a clear licence is chosen | minerals pack; question choice could use `@gcu/learn` trees |
 | Field | Compass capture from phone sensors | planned | lead-acid sensor route (does not exist yet) |
 | Field | Colour from camera to Munsell | planned | swatch (not found under `ext/`) |
 | Field | Kinematic slope check | planned | daylight / `@gcu/bearing` |
@@ -217,7 +217,7 @@ The facet is inert data: reviewable, versioned, and covered by the pack's SRI ha
 
 ### Proposed packs
 
-`minerals` (properties and a key; 12 minerals in the mock), a gazetteer (GeoNames), a Wikidata subset, USGS commodity summaries, WordNet for parser synonyms. Licences must be verified before any of these enters the registry; none has been checked.
+The geologic timescale (ICS chart, attribution carried in the pack; accepted 8 Oct 2026), `minerals` (properties and a key; the hand-typed sample was removed 8 Oct 2026, a licensed source is still to be chosen), a gazetteer (GeoNames), a Wikidata subset, USGS commodity summaries, WordNet for parser synonyms. Licences must be verified before any of these enters the registry; none has been checked.
 
 ---
 
@@ -243,8 +243,8 @@ Mock weights, to be tuned on real use:
 
 | Weight | Tools |
 |---|---|
-| 3 | histogram, true thickness, mineral key |
-| 2 | stereonet, record lookup, record list, mineral properties, definition, style check, calendar event |
+| 3 | histogram, true thickness |
+| 2 | stereonet, record lookup, record list, definition, style check, calendar event, table questions, structural geometry, declination |
 | 1 | unit conversion, timer, alarm, notes |
 | 0.5 | arithmetic, dates |
 | none | teach, explain, export, no reading |
@@ -300,9 +300,9 @@ Default to the user-confirms route: the app then requests no dangerous permissio
 
 `dist/golem.html` is a working mock: a phone-shaped app plus bench notes. `npm test` drives it through 27 queries.
 
-**Real, computed in the page:** unit conversion with dimension checks; arithmetic by recursive descent (no `eval`); dates; true thickness and the equal-area stereonet; histogram; the mineral key (asks the attribute that splits the remaining candidates most); the Strunk checker (15 patterns from rules 11 to 13 of the 1918 edition); every reading, amendment, taught word, note, session, name and replay.
+**Real, computed in the page:** unit conversion with dimension checks; arithmetic by recursive descent (no `eval`); dates; true thickness and the equal-area stereonet; histogram; the Strunk checker (15 patterns from rules 11 to 13 of the 1918 edition); every reading, amendment, taught word, note, session, name and replay.
 
-**Sample data:** `assays.csv` is synthetic (seeded generator, 8 holes, mixed 1 m and 2 m samples). The Factbook is 14 countries with rounded figures. The ODS entry is a hand-made index of 7 terms that gives the chapter and section, not the passage. The mineral pack is 12 minerals typed in by hand; check the values before they ship anywhere.
+**Sample data:** `assays.csv` is synthetic (seeded generator, 8 holes, mixed 1 m and 2 m samples). The Factbook is 14 countries with rounded figures. The ODS entry is a hand-made index of 7 terms that gives the chapter and section, not the passage.
 
 **Simulated:** all device hand-offs. The timer counts down in the page.
 

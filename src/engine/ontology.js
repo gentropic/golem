@@ -4,9 +4,8 @@
 import { FRAMES, S } from './core.js';
 import { UNITS, COMPOUNDS, DIM, parseUnit, dimName } from './units.js';
 import { ELEMENT } from './table.js';
-import { MIN, FB, ODS, ODSA } from './knowledge.js';
+import { FB, ODS, ODSA } from './knowledge.js';
 
-const MIN_PT = { pyrite: 'pirita', chalcopyrite: 'calcopirita', galena: 'galena', magnetite: 'magnetita', hematite: 'hematita', molybdenite: 'molibdenita', gold: 'ouro', sphalerite: 'esfalerita', quartz: 'quartzo', calcite: 'calcita', fluorite: 'fluorita', malachite: 'malaquita' };
 const FB_PT = { Australia: ['austrália', 'australia'], Brazil: ['brasil'], Canada: ['canadá', 'canada'], Chile: ['chile'], Germany: ['alemanha'], Indonesia: ['indonésia', 'indonesia'], Ireland: ['irlanda'], Japan: ['japão', 'japao'], Kazakhstan: ['cazaquistão', 'cazaquistao'], Mongolia: ['mongólia', 'mongolia'], Peru: ['peru'], Portugal: ['portugal'], 'South Africa': ['áfrica do sul', 'africa do sul'], Zambia: ['zâmbia', 'zambia'] };
 const uniq = a => [...new Set(a)];
 function variables() {
@@ -28,8 +27,6 @@ export function ontology() {
       { type: 'variable', needsId: true, words: variables(), generic: ['grade', 'grades', 'column', 'columns'],
         words_pt: variables(), generic_pt: ['teor', 'teores', 'coluna', 'colunas'] },
       { type: 'plot', words: { histogram: ['histogram', 'hist'] }, generic: ['plot', 'chart'], words_pt: { histogram: ['histograma'] }, generic_pt: ['gráfico', 'grafico'] },
-      { type: 'mineral', words: Object.fromEntries(Object.keys(MIN).map(k => [k, [k]])), generic: ['mineral', 'minerals', 'rock', 'sample'],
-        words_pt: Object.fromEntries(Object.keys(MIN).map(k => [k, [MIN_PT[k]]])), generic_pt: ['mineral', 'minerais', 'rocha', 'amostra'] },
       { type: 'country', words: Object.fromEntries(FB.map(r => [r[0], [r[0].toLowerCase()]])), generic: ['country', 'countries', 'nation', 'nations'],
         words_pt: Object.fromEntries(FB.map(r => [r[0], FB_PT[r[0]]])), generic_pt: ['país', 'pais', 'países', 'paises'] },
       { type: 'property', words: { density: ['density'], hardness: ['hardness'], formula: ['formula'], streak: ['streak'], capital: ['capital'], population: ['population'], area: ['area'], 'population density': ['population density'] }, generic: ['property', 'value'],

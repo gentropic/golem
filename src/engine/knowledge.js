@@ -1,4 +1,4 @@
-// Knowledge from packs: a Factbook sample, minerals with an identification key, an ODS term index,
+// Knowledge from packs: a Factbook sample, an ODS term index,
 // and a style check from The Elements of Style (1918). All sample data, labelled as such.
 import { T, tool, frame, fmt } from './core.js';
 import { parseUnit } from './units.js';
@@ -52,58 +52,6 @@ tool({
   }
 });
 
-/* ── minerals: properties + identification key ─────────────── */
-export const MIN = {
-  pyrite: ['FeS₂', '6–6.5', '4.9–5.2', 'greenish black', 'm', 'dark', 3, 'n', 'n', 'yellow'], chalcopyrite: ['CuFeS₂', '3.5–4', '4.1–4.3', 'greenish black', 'm', 'dark', 2, 'n', 'n', 'yellow'],
-  galena: ['PbS', '2.5', '7.4–7.6', 'lead grey', 'm', 'dark', 2, 'n', 'n', 'grey'], magnetite: ['Fe₃O₄', '5.5–6.5', '5.2', 'black', 'm', 'dark', 3, 'y', 'n', 'black'],
-  hematite: ['Fe₂O₃', '5.5–6.5', '5.3', 'red-brown', 'm', 'red', 3, 'n', 'n', 'grey'], molybdenite: ['MoS₂', '1–1.5', '4.6–4.7', 'bluish grey', 'm', 'dark', 1, 'n', 'n', 'grey'],
-  gold: ['Au', '2.5–3', '19.3 when pure', 'golden yellow', 'm', 'gold', 2, 'n', 'n', 'yellow'], sphalerite: ['ZnS', '3.5–4', '3.9–4.1', 'brown to pale yellow', 'n', 'brown', 2, 'n', 'n', 'brown'],
-  quartz: ['SiO₂', '7', '2.65', 'white', 'n', 'white', 3, 'n', 'n', 'clear'], calcite: ['CaCO₃', '3', '2.71', 'white', 'n', 'white', 2, 'n', 'y', 'clear'],
-  fluorite: ['CaF₂', '4', '3.18', 'white', 'n', 'white', 2, 'n', 'n', 'clear'], malachite: ['Cu₂CO₃(OH)₂', '3.5–4', '3.6–4.0', 'light green', 'n', 'green', 2, 'n', 'y', 'green']
-};
-const MATTR = { lus: 4, st: 5, hard: 6, mag: 7, hcl: 8, col: 9 };
-const KEYQ = {
-  lus: ['What is the lustre?', { m: 'metallic', n: 'non-metallic' }],
-  st: ['What colour is the streak on a porcelain plate?', { dark: 'black or dark grey', red: 'red-brown', gold: 'golden yellow', white: 'white', green: 'green', brown: 'brown to pale yellow' }],
-  hard: ['How hard is it?', { 1: 'a fingernail scratches it', 2: 'a knife scratches it', 3: 'a knife does not scratch it' }],
-  col: ['What colour is a fresh surface?', { yellow: 'brass or golden yellow', grey: 'grey to silver', black: 'black', clear: 'colourless or pale', brown: 'brown', green: 'green' }],
-  mag: ['Does a magnet pick it up?', { y: 'yes', n: 'no' }], hcl: ['Does it fizz in dilute HCl?', { y: 'yes', n: 'no' }]
-};
-const MPROPS = ['formula', 'hardness', 'density', 'streak'];
-const minCard = n => { const m = MIN[n]; return [{ t: 'kv', rows: [['formula', m[0]], ['hardness', `${m[1]} Mohs`], ['density', `${m[2]} g/cm³`], ['streak', m[3]], ['lustre', m[4] === 'm' ? 'metallic' : 'non-metallic']] }, { t: 'src', text: 'minerals pack (proposed) · 12 minerals in this mock' }]; };
-tool({
-  name: 'mineral', rank: 71,
-  read: (text, q) => { const m = /^(?:what is |what's )?(?:the )?(density|hardness|formula|streak) of (\w+)$/.exec(q); return m ? { prop: m[1], name: m[2] } : null; },
-  topic: a => [a.name, 2],
-  run: a => {
-    const m = MIN[a.name]; if (!m) return null;
-    const i = MPROPS.indexOf(a.prop), unit = a.prop === 'density' ? 'g/cm³' : a.prop === 'hardness' ? 'Mohs' : undefined;
-    if (i < 0) return { read: ['describe mineral', { v: a.name }], body: minCard(a.name), trace: [`minerals.get("${a.name}")`], py: `data("minerals")["${a.name}"]` };
-    return { read: [a.prop, 'of mineral', { v: a.name }], body: [{ t: 'big', v: m[i], unit }, { t: 'src', text: 'minerals pack (proposed)' }], trace: [`minerals.get("${a.name}").${a.prop}`], py: `data("minerals")["${a.name}"].${a.prop}` };
-  }
-});
-tool({
-  name: 'key', rank: 73,
-  skill: { group: 'Field', title: 'Mineral key', on: 'minerals pack', about: 'golem asks the questions and narrows the candidates.', examples: ['identify a mineral', 'density of chalcopyrite'] },
-  read: (text, q) => /^(?:identify|key out|id)(?: a| this| the)? (?:mineral|rock|sample)$|^what mineral is this$/.test(q) ? {} : null,
-  topic: () => ['Mineral key', 3],
-  run: a => {
-    a.ans = a.ans || {};
-    const cand = Object.keys(MIN).filter(n => Object.entries(a.ans).every(([k, v]) => String(MIN[n][MATTR[k]]) === String(v)));
-    const read = ['identify a mineral', ...Object.entries(a.ans).map(([k, v]) => ({ v: KEYQ[k][1][v] }))];
-    const trace = [`minerals pack → ${Object.keys(MIN).length} candidates`, ...Object.entries(a.ans).map(([k, v]) => `keep ${k} = ${v}`), `${cand.length} left`];
-    let best = null, bn = 1;
-    Object.keys(MATTR).forEach(k => { if (k in a.ans) return; const n = new Set(cand.map(c => MIN[c][MATTR[k]])).size; if (n > bn) { bn = n; best = k; } });
-    if (cand.length > 1 && best) {
-      const vals = [...new Set(cand.map(c => String(MIN[c][MATTR[best]])))];
-      return { read, trace, body: [{ t: 'sub', text: `${cand.length} candidates: ${cand.join(', ')}` }],
-        ask: { prompt: KEYQ[best][0], options: vals.map(v => ({ label: KEYQ[best][1][v], value: v })), set: (x, v) => { x.ans = { ...x.ans, [best]: v }; } } };
-    }
-    const n = Object.keys(a.ans).length;
-    return { read, trace, body: [{ t: 'big', v: cand.join(' or ') }, { t: 'sub', text: `Reached in ${n} question${n === 1 ? '' : 's'}. Each question was the one that split the remaining candidates most.` }, ...(cand.length === 1 ? minCard(cand[0]) : [])], py: `key("minerals").identify(${JSON.stringify(a.ans)})` };
-  }
-});
-
 /* ── text: ODS term index + Strunk (1918) check ────────────── */
 export const ODS = { skiplist: ['4 Skiplists', '4.1 The Basic Structure'], 'hash table': ['5 Hash Tables', '5.1 ChainedHashTable'], 'binary heap': ['10 Heaps', '10.1 BinaryHeap'], treap: ['7 Random Binary Search Trees', '7.2 Treap'], 'scapegoat tree': ['8 Scapegoat Trees', '8.1 ScapegoatTree'], 'red-black tree': ['9 Red-Black Trees', '9.2 RedBlackTree'], 'b-tree': ['14 External Memory Searching', '14.2 B-Trees'] };
 export const ODSA = { 'skip list': 'skiplist', heap: 'binary heap', 'red black tree': 'red-black tree', btree: 'b-tree', 'b tree': 'b-tree', hashtable: 'hash table' };
@@ -120,7 +68,6 @@ tool({
         { t: 'actions', items: [{ href: 'https://gentropic.github.io/gcu-library/read.html?book=ods', label: 'Open in the library reader' }] }, { t: 'src', text: 'ods pack · CC BY 2.5 · Pat Morin · sample term index' }],
       trace: [`index.lookup("${k}") across installed packs`, 'hit: ods, glossary facet'], py: `library.define("${k}")`
     };
-    if (MIN[t]) return T.mineral({ name: t });
     return null;
   }
 });
@@ -152,23 +99,22 @@ tool({
 });
 
 /* ── clause frames over this knowledge ── */
-// "density of chalcopyrite", "what is the capital of brazil", "population density of mongolia in people per square mile"
+// "what is the capital of brazil", "population density of mongolia in people per square mile"
 frame({
   name: 'lookup', label: 'Look up', words: ['lookup', 'look up', 'get', 'find'], elidable: true,
-  theme: ['property'], required: ['theme', 'of'], roles: { of: { preps: ['of', 'for'], types: ['mineral', 'country'] }, unit: { preps: ['in', 'as'], types: ['unit'] } },
+  theme: ['property'], required: ['theme', 'of'], roles: { of: { preps: ['of', 'for'], types: ['country'] }, unit: { preps: ['in', 'as'], types: ['unit'] } },
   words_pt: ['consultar', 'consulta', 'buscar', 'busca'], label_pt: 'Consultar',
   bind: c => {
     const p = c.theme[0] && c.theme[0].value, of = c.roles.of && c.roles.of[0], unit = c.roles.unit && c.roles.unit[0]; if (!p || !of) return null;
     const field = p === 'population density' ? 'density' : p;
     if (of.type === 'country' && FIELDS.includes(field)) return { tool: 'fact', args: { field, country: of.value.toLowerCase(), unit: unit ? unit.unit : undefined } };
-    if (of.type === 'mineral' && MPROPS.includes(p)) return { tool: 'mineral', args: { prop: p, name: of.value } };
     return null;
   }
 });
-// "what is a skiplist", "define treap", "chalcopyrite"
+// "what is a skiplist", "define treap", "treap"
 frame({
   name: 'define', label: 'Define', words: ['define', 'explain', 'describe'], elidable: true,
-  theme: ['term', 'mineral'], required: ['theme'], roles: {},
+  theme: ['term'], required: ['theme'], roles: {},
   words_pt: ['definir', 'define', 'defina', 'explicar', 'explica', 'descrever', 'descreve'], label_pt: 'Definir',
   bind: c => { const t = c.theme[0]; return t && t.value ? { tool: 'define', args: { term: t.value } } : null; }
 });
@@ -182,9 +128,4 @@ frame({
     if (by && by !== 'area' && by !== 'population') return null;
     return { tool: 'factList', args: { by: by || 'area' } };
   }
-});
-frame({
-  name: 'identify', label: 'Identify', words: ['identify', 'key out', 'id'], theme: ['mineral'], required: ['theme'], roles: {},
-  words_pt: ['identificar', 'identifica'], label_pt: 'Identificar',
-  bind: c => { const t = c.theme[0]; return t && t.generic ? { tool: 'key', args: {} } : null; }
 });

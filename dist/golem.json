@@ -60,97 +60,6 @@
       ]
     },
     {
-      "type": "mineral",
-      "words": {
-        "pyrite": [
-          "pyrite"
-        ],
-        "chalcopyrite": [
-          "chalcopyrite"
-        ],
-        "galena": [
-          "galena"
-        ],
-        "magnetite": [
-          "magnetite"
-        ],
-        "hematite": [
-          "hematite"
-        ],
-        "molybdenite": [
-          "molybdenite"
-        ],
-        "gold": [
-          "gold"
-        ],
-        "sphalerite": [
-          "sphalerite"
-        ],
-        "quartz": [
-          "quartz"
-        ],
-        "calcite": [
-          "calcite"
-        ],
-        "fluorite": [
-          "fluorite"
-        ],
-        "malachite": [
-          "malachite"
-        ]
-      },
-      "generic": [
-        "mineral",
-        "minerals",
-        "rock",
-        "sample"
-      ],
-      "words_pt": {
-        "pyrite": [
-          "pirita"
-        ],
-        "chalcopyrite": [
-          "calcopirita"
-        ],
-        "galena": [
-          "galena"
-        ],
-        "magnetite": [
-          "magnetita"
-        ],
-        "hematite": [
-          "hematita"
-        ],
-        "molybdenite": [
-          "molibdenita"
-        ],
-        "gold": [
-          "ouro"
-        ],
-        "sphalerite": [
-          "esfalerita"
-        ],
-        "quartz": [
-          "quartzo"
-        ],
-        "calcite": [
-          "calcita"
-        ],
-        "fluorite": [
-          "fluorita"
-        ],
-        "malachite": [
-          "malaquita"
-        ]
-      },
-      "generic_pt": [
-        "mineral",
-        "minerais",
-        "rocha",
-        "amostra"
-      ]
-    },
-    {
       "type": "country",
       "words": {
         "Australia": [
@@ -1125,7 +1034,6 @@
             "for"
           ],
           "types": [
-            "mineral",
             "country"
           ]
         },
@@ -1157,8 +1065,7 @@
       ],
       "elidable": true,
       "theme": [
-        "term",
-        "mineral"
+        "term"
       ],
       "required": [
         "theme"
@@ -1206,27 +1113,6 @@
         "ordena"
       ],
       "label_pt": "Listar"
-    },
-    {
-      "name": "identify",
-      "label": "Identify",
-      "words": [
-        "identify",
-        "key out",
-        "id"
-      ],
-      "theme": [
-        "mineral"
-      ],
-      "required": [
-        "theme"
-      ],
-      "roles": {},
-      "words_pt": [
-        "identificar",
-        "identifica"
-      ],
-      "label_pt": "Identificar"
     },
     {
       "name": "timer",

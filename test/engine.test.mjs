@@ -19,7 +19,7 @@ export const STEPS = [
   ['and chile', 'context', '64.1'],
   ['in people per km2', 'context', '24.7'],
   ['landlocked countries by population', 'grammar', 'Zambia'],
-  ['density of chalcopyrite', 'grammar', '4.1–4.3'],
+  ['capital of brazil', 'grammar', 'Brasília'],
   ['what is a skiplist', 'grammar', 'ch. 4 Skiplists'],
   ['check: owing to the fact that the samples were lost by the lab', 'grammar', 'Omit needless words'],
   ['remember that hole 12 collar was resurveyed in march', 'grammar', 'Stored on this device'],
@@ -27,9 +27,9 @@ export const STEPS = [
   ['write me a poem about kriging', 'no reading', 'I do not guess'],
   ['why', 'context', 'grammar: no rule matched'],
   ['new session', null, null],
-  ['dens of chalcopyrite', 'no reading', 'dens means density'],
-  ['dens means density', 'grammar', 'Learned'],
-  ['dens of chalcopyrite', 'taught', '4.1–4.3'],
+  ['pop of mongolia', 'no reading', 'pop means population'],
+  ['pop means population', 'grammar', 'Learned'],
+  ['pop of mongolia', 'taught', '3,300,000'],
   ['histogram of cu', 'grammar', 'No table is open'],
   ['yes', 'grammar', 'median'],
   ['histogram of au', 'grammar', 'median'],
@@ -59,7 +59,7 @@ test('a session replays from its specs through serialize and hydrate', () => {
   g.reset();
   assert.ok(g.hydrate(saved));
   assert.equal(g.S.cards.length, 7);
-  assert.equal(g.S.aliases.dens, 'density');
+  assert.equal(g.S.aliases.pop, 'population');
   assert.equal(g.current().name, 'assays.csv: Au histogram, Cu histogram');
   assert.ok(g.textOf(g.S.cards[4]).includes('median'));
 });
@@ -83,13 +83,6 @@ test('an open question is answered by option, and args carry the answer', () => 
   assert.equal(c.args.auto, true);
   assert.ok(!c.res.ask);
   assert.ok(g.textOf(c).includes('median'));
-  g.submit('identify a mineral');
-  const k = last();
-  assert.ok(k.res.ask, 'the key asks its first question');
-  const first = k.res.ask.prompt;
-  g.answer(k, 0);
-  assert.equal(Object.keys(k.args.ans).length, 1, 'the answer lives in args');
-  assert.ok(k.res.ask && k.res.ask.prompt !== first, 'then asks the next most splitting attribute');
 });
 
 test('undo, again, rename and the no-reading card', () => {
@@ -122,9 +115,9 @@ test('the clock can be pinned, and dates follow it', () => {
 
 test('declarations drive the catalog, the names and the amendments', () => {
   const rows = g.skills();
-  assert.equal(rows.length, 30);
+  assert.equal(rows.length, 29);
   assert.deepEqual([...new Set(rows.map(r => r.group))], ['Compute', 'Field', 'Table', 'Knowledge', 'Device', 'Session']);
-  assert.equal(rows.filter(r => r.live).length, 22);
+  assert.equal(rows.filter(r => r.live).length, 21);
   for (const name of Object.keys(g.T)) assert.ok(g.toolByName(name), `a declaration for ${name}`);
   assert.deepEqual(g.tagOf({ tool: 'hist', args: { col: 'au' } }), ['Au histogram', 3]);
   assert.ok(g.toolByName('convert').amend.length === 1 && g.toolByName('fact').amend.length === 2);
@@ -133,24 +126,24 @@ test('declarations drive the catalog, the names and the amendments', () => {
 test('the ontology derives from the declarations and is plain JSON', () => {
   const o = g.ontology();
   assert.equal(JSON.stringify(JSON.parse(JSON.stringify(o))), JSON.stringify(o));
-  assert.deepEqual(o.verbs.map(v => v.name).sort(), ['convert', 'define', 'export', 'identify', 'list', 'lookup', 'open', 'plot', 'timer']);
+  assert.deepEqual(o.verbs.map(v => v.name).sort(), ['convert', 'define', 'export', 'list', 'lookup', 'open', 'plot', 'timer']);
   assert.ok(o.verbs.every(v => !('bind' in v)), 'bind functions stay in the engine');
   assert.ok(o.units.some(u => u.unit === 'oz per short ton'));
-  assert.ok(o.nouns.find(n => n.type === 'mineral').words.chalcopyrite);
+  assert.ok(o.nouns.find(n => n.type === 'country').words.Mongolia);
 });
 
 test('the clause parser reads the bare phrases and closed questions; the regex rules keep the rest', () => {
   g.reset();
-  const byClause = new Set(['0.35 oz per short ton in g/t', '2.7 g/cm3 in lb/ft3', '5 km in kg', '25 c in f', 'population density of mongolia in people per square mile', 'landlocked countries by population', 'density of chalcopyrite', 'what is a skiplist', 'histogram of au', 'export as script', 'dens of chalcopyrite', 'histogram of cu']);
+  const byClause = new Set(['0.35 oz per short ton in g/t', '2.7 g/cm3 in lb/ft3', '5 km in kg', '25 c in f', 'population density of mongolia in people per square mile', 'landlocked countries by population', 'capital of brazil', 'what is a skiplist', 'histogram of au', 'export as script', 'pop of mongolia', 'histogram of cu']);
   for (const [q, rung] of STEPS) {
     const o = g.submit(q);
     if (rung === null || o.kind !== 'card' || o.card.rung === 'none' || o.card.rung === 'context') continue;
     const viaClause = o.card.res.trace.some(t => t.startsWith('clause: '));
     assert.equal(viaClause, byClause.has(q), `"${q}" read by ${viaClause ? 'clause' : 'the regex rules'}: ${o.card.res.trace[0]}`);
   }
-  const asked = g.submit('what is the density of chalcopyrite?').card;
-  assert.equal(asked.tool, 'mineral');
-  assert.ok(g.textOf(asked).includes('4.1–4.3'));
+  const asked = g.submit('what is the capital of brazil?').card;
+  assert.equal(asked.tool, 'fact');
+  assert.ok(g.textOf(asked).includes('Brasília'));
   const which = g.submit('which countries are landlocked').card;
   assert.equal(which.tool, 'factList');
   const none = g.submit('write me a poem about kriging').card;

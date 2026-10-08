@@ -12,7 +12,7 @@ This repository holds the specification and a working mock.
 Open `dist/golem.html`, then:
 
 - Tap the dashed `045/30 as dip direction/dip` slot on the thickness card. The reading flips to strike/dip and the answer recomputes.
-- Run `dens of chalcopyrite`. It has no reading and offers `dens means density`. Tap that, then run `dens of chalcopyrite` again.
+- Run `pop of mongolia`. It has no reading and offers `pop means population`. Tap that, then run `pop of mongolia` again.
 - Type `why` after any card, or `export as script`.
 - Open the menu (top left) for sessions and history search.
 - Try `apparent dip of 000/30 on a section at 045`, `intersection of 090/45 and 270/45`, `core alpha 40 beta 230 in hole 270/60`, `declination at -19.92, -43.94`.
