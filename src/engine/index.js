@@ -1,9 +1,10 @@
 // The engine's surface, for Node tests and anything else that wants golem without a shell.
-export { S, T, clock, fmt } from './core.js';
+export { S, T, TOOLS, FRAMES, clock, fmt, toolByName } from './core.js';
 export { submit, rerun, flipSlot, answer, undo, addCard, seedExamples } from './engine.js';
 export { sessions, current, newSession, openSession, renameSession, deleteSession, searchHistory, autoName, tagOf, serialize, hydrate, reset, onChange, spec, load } from './sessions.js';
-export { SKILLS, PACKS, ALLEX, VOCAB, SUGGESTIONS } from './skills.js';
-export { norm, grammar, context, taught } from './reading.js';
+export { skills, examples, vocab, PACKS, SUGGESTIONS } from './skills.js';
+export { norm, grammar, context, taught, clauseRead, clauseEngine } from './reading.js';
+export { ontology } from './ontology.js';
 
 // the words of a result, in reading order: what a person would see on the card
 export function textOf(c) {

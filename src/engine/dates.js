@@ -1,5 +1,5 @@
 // Dates and times: day counts, weekdays, and the parsers the calendar tools share.
-import { T, clock, iso } from './core.js';
+import { tool, clock, iso } from './core.js';
 
 const MON = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'], DOW = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 const MONRE = '(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sept|sep|oct|nov|dec)';
@@ -37,12 +37,23 @@ export function findTime(s) {
   if (h > 23 || mi > 59) return null;
   return { h, mi, m };
 }
-T.daysUntil = a => {
-  const f = findDate(a.s); if (!f) return null;
-  const n = Math.round((f.d - today()) / 864e5);
-  return { read: ['days from', { v: 'today' }, 'to', { v: fmtDate(f.d) }], value: n, body: [{ t: 'big', v: String(n), unit: `day${Math.abs(n) === 1 ? '' : 's'}` }, { t: 'sub', text: `${Math.floor(Math.abs(n) / 7)} weeks and ${Math.abs(n) % 7} days` }], trace: [`dates.parse("${a.s}") → ${f.d.toDateString()}`, 'difference in whole days'], py: `(date("${iso(f.d)}") - date.today()).days` };
-};
-T.weekday = a => {
-  const f = findDate(a.s); if (!f) return null;
-  return { read: ['weekday of', { v: fmtDate(f.d) }], body: [{ t: 'big', v: f.d.toLocaleDateString('en-GB', { weekday: 'long' }) }], trace: [`dates.parse("${a.s}")`, 'Gregorian weekday'], py: `date("${iso(f.d)}").strftime("%A")` };
-};
+tool({
+  name: 'daysUntil', rank: 90,
+  skill: { group: 'Compute', title: 'Dates', on: 'built in', about: 'Day counts and weekdays.', examples: ['days until 25 december', 'what day is 15 nov 2027'] },
+  read: (text, q) => { const m = /^(?:how many )?days (?:until|till|to|before) (.+)$/.exec(q); return m ? { s: m[1] } : null; },
+  topic: () => ['Dates', .5],
+  run: a => {
+    const f = findDate(a.s); if (!f) return null;
+    const n = Math.round((f.d - today()) / 864e5);
+    return { read: ['days from', { v: 'today' }, 'to', { v: fmtDate(f.d) }], value: n, body: [{ t: 'big', v: String(n), unit: `day${Math.abs(n) === 1 ? '' : 's'}` }, { t: 'sub', text: `${Math.floor(Math.abs(n) / 7)} weeks and ${Math.abs(n) % 7} days` }], trace: [`dates.parse("${a.s}") → ${f.d.toDateString()}`, 'difference in whole days'], py: `(date("${iso(f.d)}") - date.today()).days` };
+  }
+});
+tool({
+  name: 'weekday', rank: 91,
+  read: (text, q) => { const m = /^what (?:day|weekday) (?:is|was|will be) (.+)$/.exec(q); return m ? { s: m[1] } : null; },
+  topic: () => ['Dates', .5],
+  run: a => {
+    const f = findDate(a.s); if (!f) return null;
+    return { read: ['weekday of', { v: fmtDate(f.d) }], body: [{ t: 'big', v: f.d.toLocaleDateString('en-GB', { weekday: 'long' }) }], trace: [`dates.parse("${a.s}")`, 'Gregorian weekday'], py: `date("${iso(f.d)}").strftime("%A")` };
+  }
+});

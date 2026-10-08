@@ -1,5 +1,5 @@
 // Arithmetic by recursive descent. No eval, no Function. Trigonometry in degrees.
-import { T, fmt, rad, deg } from './core.js';
+import { tool, fmt, rad, deg } from './core.js';
 
 const FN = { sqrt: Math.sqrt, abs: Math.abs, exp: Math.exp, ln: Math.log, log: Math.log10, sin: x => Math.sin(rad(x)), cos: x => Math.cos(rad(x)), tan: x => Math.tan(rad(x)), asin: x => deg(Math.asin(x)), acos: x => deg(Math.acos(x)), atan: x => deg(Math.atan(x)) };
 export function calc(src) {
@@ -29,8 +29,14 @@ export function calc(src) {
   if (i < s.length) throw 0;
   return v;
 }
-T.calc = a => {
-  let v; try { v = calc(a.x); } catch (e) { return null; }
-  if (typeof v !== 'number' || isNaN(v)) return null;
-  return { read: ['evaluate', { v: a.x }, 'trig in degrees'], value: v, body: [{ t: 'big', v: fmt(v, 10) }], trace: [`expr.parse("${a.x}")`, `evaluate → ${v}`], py: a.x.replace(/\^/g, '**') };
-};
+tool({
+  name: 'calc', rank: 110,
+  skill: { group: 'Compute', title: 'Arithmetic', on: '@gcu/expr', about: 'Parsed and evaluated, never eval. Trigonometry in degrees.', examples: ['14 * cos(22) + 3^2', 'sqrt(2) * 84'] },
+  read: (text, q) => { const m = /^(?:what is |what's |calc(?:ulate)? |compute )?([-+*/^().,\d\sa-z×÷]+)$/.exec(q); return m && /\d/.test(m[1]) ? { x: m[1].trim() } : null; },
+  topic: () => ['Arithmetic', .5],
+  run: a => {
+    let v; try { v = calc(a.x); } catch (e) { return null; }
+    if (typeof v !== 'number' || isNaN(v)) return null;
+    return { read: ['evaluate', { v: a.x }, 'trig in degrees'], value: v, body: [{ t: 'big', v: fmt(v, 10) }], trace: [`expr.parse("${a.x}")`, `evaluate → ${v}`], py: a.x.replace(/\^/g, '**') };
+  }
+});

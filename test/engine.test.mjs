@@ -116,6 +116,43 @@ test('the clock can be pinned, and dates follow it', () => {
   g.clock.now = () => new Date();
 });
 
+test('declarations drive the catalog, the names and the amendments', () => {
+  const rows = g.skills();
+  assert.equal(rows.length, 28);
+  assert.deepEqual([...new Set(rows.map(r => r.group))], ['Compute', 'Field', 'Table', 'Knowledge', 'Device', 'Session']);
+  assert.equal(rows.filter(r => r.live).length, 20);
+  for (const name of Object.keys(g.T)) assert.ok(g.toolByName(name), `a declaration for ${name}`);
+  assert.deepEqual(g.tagOf({ tool: 'hist', args: { col: 'au' } }), ['Au histogram', 3]);
+  assert.ok(g.toolByName('convert').amend.length === 1 && g.toolByName('fact').amend.length === 2);
+});
+
+test('the ontology derives from the declarations and is plain JSON', () => {
+  const o = g.ontology();
+  assert.equal(JSON.stringify(JSON.parse(JSON.stringify(o))), JSON.stringify(o));
+  assert.deepEqual(o.verbs.map(v => v.name).sort(), ['convert', 'define', 'export', 'identify', 'list', 'lookup', 'open', 'plot', 'timer']);
+  assert.ok(o.verbs.every(v => !('bind' in v)), 'bind functions stay in the engine');
+  assert.ok(o.units.some(u => u.unit === 'oz per short ton'));
+  assert.ok(o.nouns.find(n => n.type === 'mineral').words.chalcopyrite);
+});
+
+test('the clause parser reads the bare phrases and closed questions; the regex rules keep the rest', () => {
+  g.reset();
+  const byClause = new Set(['0.35 oz per short ton in g/t', '2.7 g/cm3 in lb/ft3', '5 km in kg', '25 c in f', 'population density of mongolia in people per square mile', 'landlocked countries by population', 'density of chalcopyrite', 'what is a skiplist', 'histogram of cu', 'export as script', 'vario of cu']);
+  for (const [q, rung] of STEPS) {
+    const o = g.submit(q);
+    if (rung === null || o.kind !== 'card' || o.card.rung === 'none' || o.card.rung === 'context') continue;
+    const viaClause = o.card.res.trace.some(t => t.startsWith('clause: '));
+    assert.equal(viaClause, byClause.has(q), `"${q}" read by ${viaClause ? 'clause' : 'the regex rules'}: ${o.card.res.trace[0]}`);
+  }
+  const asked = g.submit('what is the density of chalcopyrite?').card;
+  assert.equal(asked.tool, 'mineral');
+  assert.ok(g.textOf(asked).includes('4.1–4.3'));
+  const which = g.submit('which countries are landlocked').card;
+  assert.equal(which.tool, 'factList');
+  const none = g.submit('write me a poem about kriging').card;
+  assert.ok(none.res.trace.some(t => /^clause: reject/.test(t)), 'the no-reading card records the parser verdict');
+});
+
 test('every result is plain data: no HTML strings, args survive JSON', () => {
   g.reset();
   for (const [q] of STEPS) g.submit(q);

@@ -3,7 +3,8 @@
 import { S } from '../engine/core.js';
 import { submit, flipSlot, answer, seedExamples } from '../engine/engine.js';
 import { sessions, current, newSession, openSession, renameSession, deleteSession, searchHistory, serialize, hydrate, onChange } from '../engine/sessions.js';
-import { SKILLS, PACKS, SUGGESTIONS } from '../engine/skills.js';
+import { skills, PACKS, SUGGESTIONS } from '../engine/skills.js';
+import { shell } from '../vendor/leadacid.js';
 import { esc, pad, cardEl } from './render.js';
 
 const $ = id => document.getElementById(id);
@@ -50,10 +51,10 @@ function run(raw) {
 
 /* ── catalog and packs ── */
 function renderSkills() {
-  const live = SKILLS.filter(s => s[3]).length; let h = `<div class="sub">${live} skills run in this mock. ${SKILLS.length - live} more are planned from packages that already exist or are named here. Tap an example to run it.</div>`, g = '';
-  SKILLS.forEach(([grp, name, from, on, d, ex]) => {
-    if (grp !== g) { h += `<div class="lbl">${esc(grp)}</div>`; g = grp; }
-    h += `<div class="item"><h3>${esc(name)} <span class="tag ${on ? 'live' : 'plan'}">${on ? 'in mock' : 'planned'}</span></h3><p>${esc(d)}</p><div class="from">${esc(from)}</div>${ex.length ? `<div class="opts">${ex.map(x => `<button class="chip" type="button" data-q="${esc(x)}" style="white-space:normal;text-align:left">${esc(x)}</button>`).join('')}</div>` : ''}</div>`;
+  const rows = skills(), live = rows.filter(s => s.live).length; let h = `<div class="sub">${live} skills run in this mock. ${rows.length - live} more are planned from packages that already exist or are named here. Tap an example to run it.</div>`, g = '';
+  rows.forEach(s => {
+    if (s.group !== g) { h += `<div class="lbl">${esc(s.group)}</div>`; g = s.group; }
+    h += `<div class="item"><h3>${esc(s.title)} <span class="tag ${s.live ? 'live' : 'plan'}">${s.live ? 'in mock' : 'planned'}</span></h3><p>${esc(s.about)}</p><div class="from">${esc(s.on)}</div>${s.examples.length ? `<div class="opts">${s.examples.map(x => `<button class="chip" type="button" data-q="${esc(x)}" style="white-space:normal;text-align:left">${esc(x)}</button>`).join('')}</div>` : ''}</div>`;
   });
   $('v-skills').innerHTML = h;
 }
@@ -137,6 +138,7 @@ $('sugg').innerHTML = SUGGESTIONS.map(x => `<button class="chip" type="button" d
 
 /* ── start: restore saved sessions, or seed two examples ── */
 renderSkills();
+if (shell.present) $('st-where').textContent = 'in the lead-acid shell';
 if (!restore()) seedExamples();
 renderStream();
 $('status').textContent = '';

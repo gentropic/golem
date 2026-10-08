@@ -1,8 +1,6 @@
 // Sessions: stored as plans (card specs), replayed on open, named from the tools that ran.
 // The shell persists whatever `serialize()` returns and feeds it back through `hydrate()`.
-import { S, T, p3, p2 } from './core.js';
-import { COL } from './table.js';
-import { fbFind } from './knowledge.js';
+import { S, T, toolByName } from './core.js';
 
 export let SS = [], cur = null;
 let sid = 0;
@@ -14,30 +12,8 @@ const changed = () => listeners.forEach(f => f());
 // what a session keeps of a card: enough to recompute it, and nothing else
 export const spec = c => ({ id: c.id, raw: c.raw, tool: c.tool, args: c.args, rung: c.rung, amends: c.amends, ms: c.ms });
 
-// what a card contributes to its session's name: [label, weight]
-export function tagOf(c) {
-  const a = c.args;
-  switch (c.tool) {
-    case 'convert': return [a.from + ' → ' + a.to, 1];
-    case 'calc': return ['Arithmetic', .5];
-    case 'daysUntil': case 'weekday': return ['Dates', .5];
-    case 'thickness': return ['True thickness', 3];
-    case 'plane': return ['Stereonet ' + p3(a.a1) + '/' + p2(a.a2), 2];
-    case 'hist': return [COL[a.col] + ' histogram', 3];
-    case 'vario': return [COL[a.col] + ' variogram', 3];
-    case 'fact': return [fbFind(a.country)[0] + ' ' + a.field, 2];
-    case 'factList': return ['Landlocked countries', 2];
-    case 'mineral': return [a.name, 2];
-    case 'key': return ['Mineral key', 3];
-    case 'define': return [a.term, 2];
-    case 'lint': return ['Style check', 2];
-    case 'event': return [a.title, 2];
-    case 'timer': return ['Timer', 1];
-    case 'alarm': return ['Alarm', 1];
-    case 'remember': case 'recall': return ['Notes', 1];
-    default: return null;
-  }
-}
+// what a card contributes to its session's name: [label, weight], from the tool's declaration
+export function tagOf(c) { const d = toolByName(c.tool); return d && d.topic ? d.topic(c.args) : null; }
 export function autoName(cards) {
   const table = cards.some(c => ['open', 'hist', 'vario'].includes(c.tool)), w = new Map();
   cards.forEach((c, i) => {
@@ -56,7 +32,7 @@ export function touch() { cur.updated = Date.now(); if (cur.auto) cur.name = aut
 // open a session: clear the working state and recompute every card from its spec
 export function load(s) {
   cur = s; const specs = s.cards;
-  S.cards = []; s.cards = S.cards; S.data = null; S.n = 0;
+  S.cards = []; s.cards = S.cards; S.data = null; S.n = 0; S.clause = null;
   specs.forEach(c => {
     let res = null; try { res = T[c.tool](c.args); } catch (e) { res = null; }
     if (!res) return;
@@ -100,5 +76,5 @@ export function hydrate(d) {
 }
 // forget everything: sessions, device state, working state (tests start here)
 export function reset() {
-  SS = []; cur = null; sid = 0; S.cards = []; S.n = 0; S.aliases = {}; S.facts = []; S.data = null;
+  SS = []; cur = null; sid = 0; S.cards = []; S.n = 0; S.aliases = {}; S.facts = []; S.data = null; S.clause = null;
 }

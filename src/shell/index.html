@@ -1,6 +1,6 @@
 <title>GCU golem</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap">
 <style>
+/*__FONTS__*/
 /* Layout: one handset running the instrument on the left, the bench notes beside it; stacks on narrow screens.
    Tokens are @gcu/switchboard 1.3 (equipment gray / basalt). Barlow speaks to people, Space Mono is the machine. */
 :root{
@@ -166,7 +166,7 @@ svg text{font:10px var(--mono);fill:var(--au-fg-muted)}
     <section class="phone" id="phone" aria-label="golem app mock">
       <div class="bar">
         <button class="icon" id="menu" type="button" aria-label="Sessions and history"><svg width="18" height="14" viewBox="0 0 18 14" aria-hidden="true"><path d="M1 2h16M1 7h16M1 12h16"/></svg></button>
-        <div class="ttl"><button class="sbtn" id="sname" type="button" title="Sessions and history">New session</button><span class="stat">golem · <b id="st-on">awake</b> · offline · 0 requests</span></div>
+        <div class="ttl"><button class="sbtn" id="sname" type="button" title="Sessions and history">New session</button><span class="stat">golem · <b id="st-on">awake</b> · <span id="st-where">offline</span> · 0 requests</span></div>
         <button class="power" id="power" title="Put golem to sleep or wake it" aria-pressed="false">sleep</button>
       </div>
       <div class="scrim" id="scrim" hidden></div>

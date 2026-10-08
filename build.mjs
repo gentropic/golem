@@ -1,11 +1,12 @@
-// Build dist/golem.html: src/shell/index.html, then the shell and engine modules concatenated in import
-// order inside one classic <script>. No bundler and no transforms beyond dropping the import and export
-// keywords, so the output is the source you read. The modules therefore share one scope: the build
-// refuses duplicate top-level names, import cycles, and the module syntax a concatenation cannot carry
-// (default exports, namespace imports, re-exports, aliased imports, import.meta).
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+// Build dist/golem.html: src/shell/index.html with the fonts embedded, then the shell, engine and vendored
+// modules concatenated in import order inside one classic <script>. No bundler and no transforms beyond
+// dropping the import and export keywords, so the output is the source you read. The modules therefore
+// share one scope: the build refuses duplicate top-level names, import cycles, and the module syntax a
+// concatenation cannot carry (default exports, namespace imports, re-exports, aliased imports, import.meta).
+// It also writes dist/golem.json, the clause ontology the engine derives from its declarations.
+import { readFileSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const root = dirname(fileURLToPath(import.meta.url));
 const src = join(root, 'src');
@@ -45,13 +46,27 @@ export function bundle(entry) {
   return parts.join('\n');
 }
 
+// the two faces, embedded so the page makes no network request
+function fontFaces() {
+  const dir = join(src, 'shell', 'fonts');
+  return readdirSync(dir).filter(f => f.endsWith('.woff2')).sort().map(f => {
+    const [fam, w] = f.replace('.woff2', '').split(/-(?=\d)/);
+    const family = fam === 'barlow' ? 'Barlow' : 'Space Mono';
+    return `@font-face{font-family:'${family}';font-style:normal;font-weight:${w};font-display:swap;src:url(data:font/woff2;base64,${readFileSync(join(dir, f)).toString('base64')}) format('woff2')}`;
+  }).join('\n');
+}
+
 if (process.argv[1] && posix(process.argv[1]).endsWith('/build.mjs')) {
   const shell = readFileSync(join(src, 'shell', 'index.html'), 'utf8');
+  if (!shell.includes('/*__FONTS__*/')) throw new Error('build: src/shell/index.html needs a /*__FONTS__*/ marker inside a <style>');
   const js = bundle('shell/main.js');
-  // the shell file starts with <title>, fonts and <style>; everything from the first <div class="wrap"> on is the body
+  // the shell file starts with <title> and <style>; everything from the first <div class="wrap"> on is the body
   const cut = shell.indexOf('<div class="wrap">');
-  const out = `<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n${shell.slice(0, cut)}</head>\n<body>\n${shell.slice(cut)}\n<script>\n'use strict';\n${js}</script>\n</body>\n</html>\n`;
+  const head = shell.slice(0, cut).replace('/*__FONTS__*/', fontFaces());
+  const out = `<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n${head}</head>\n<body>\n${shell.slice(cut)}\n<script>\n'use strict';\n${js}</script>\n</body>\n</html>\n`;
   mkdirSync(join(root, 'dist'), { recursive: true });
   writeFileSync(join(root, 'dist', 'golem.html'), out);
-  console.log(`dist/golem.html  ${(out.length / 1024).toFixed(1)} kB  from ${js.split('/* ==== src/').length - 1} modules`);
+  const { ontology } = await import(pathToFileURL(join(src, 'engine', 'index.js')).href);
+  writeFileSync(join(root, 'dist', 'golem.json'), JSON.stringify(ontology(), null, 2) + '\n');
+  console.log(`dist/golem.html  ${(out.length / 1024).toFixed(1)} kB  from ${js.split('/* ==== src/').length - 1} modules · dist/golem.json written`);
 }

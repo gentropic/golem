@@ -17,7 +17,7 @@ Open `dist/golem.html`, then:
 - Open the menu (top left) for sessions and history search.
 - Tap *sleep* (top right) to put golem to sleep; nothing runs until you tap *wake*.
 
-The Skills tab lists everything that runs, with examples.
+The Skills tab lists everything that runs, with examples. Each skill is one declaration in `src/engine/`: the tool, the rule that reads it, the phrases that amend it, what it contributes to a session name, and the verb frame the clause parser reads it by.
 
 ## Build and test
 
@@ -28,7 +28,7 @@ npm run test:engine  # the engine alone, in Node: the 27 queries, replay, slots,
 npm test             # build, engine tests, then drive the page through the same 27 queries
 ```
 
-The build is concatenation: `src/shell/index.html`, then the shell and engine modules in import order inside one `<script>`, with the `import` and `export` keywords dropped. No bundler, no transforms. The modules share one scope, so the build refuses duplicate top-level names.
+The build is concatenation: `src/shell/index.html` with the two typefaces embedded, then the shell, engine and vendored modules in import order inside one `<script>`, with the `import` and `export` keywords dropped. No bundler, no transforms. The modules share one scope, so the build refuses duplicate top-level names. It also writes `dist/golem.json`, the parser ontology the engine derives from its tool declarations. The built page makes no network request; the one external link is the library reader, opened on tap.
 
 If Playwright has no browser installed, run `npx playwright install chromium` or point `CHROMIUM_PATH` at one.
 
@@ -38,17 +38,20 @@ If Playwright has no browser installed, run `npx playwright install chromium` or
 SPEC.md                      the specification
 build.mjs                    the build: modules concatenated in import order
 src/engine/                  no DOM, no storage: everything that reads and computes
-  core.js                    working state, the tool table, helpers
+  core.js                    working state, the tool table, declarations, helpers
   units.js calc.js dates.js  compute tools
   orientation.js table.js    field and table tools
   knowledge.js device.js     packs sample, device hand-offs
   notes.js skills.js         notes and taught words; the skills and packs catalog
-  reading.js                 the reading ladder: context, grammar, taught; none, why, export
+  reading.js                 the reading ladder: context, grammar (clause, then the rules), taught; none, why, export
+  ontology.js                the clause ontology, assembled from units, sample packs and frames
   sessions.js                sessions, replay, auto-naming, serialize and hydrate
   engine.js                  submit, rerun, slot flips, answers, undo
   index.js                   the surface Node tests import
+src/vendor/                  copies, never edited here: @gcu/dispatch (the clause parser), the lead-acid shim
 src/shell/                   the browser: markup, rendering, wiring, storage
   index.html                 markup, Switchboard tokens, styles, bench notes
+  fonts/                     Barlow and Space Mono (OFL), embedded by the build
   render.js                  blocks and plots to markup
   main.js                    tabs, drawer, storage, the sleep switch
 test/engine.test.mjs         engine tests, Node only

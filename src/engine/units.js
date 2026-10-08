@@ -1,8 +1,8 @@
 // Unit conversion with dimension checks. A small table until @gcu/units stands under it.
-import { T, fmt } from './core.js';
+import { tool, frame, fmt } from './core.js';
 
-const U = {};
-const u = (dim, f, ...n) => n.forEach(k => { U[k] = { dim, f, name: n[0] }; });
+export const U = {}, UNITS = [];
+const u = (dim, f, ...n) => { UNITS.push({ dim, f, name: n[0], words: n }); n.forEach(k => { U[k] = { dim, f, name: n[0] }; }); };
 u('L', 1, 'm', 'meter', 'metre'); u('L', 1000, 'km', 'kilometer', 'kilometre'); u('L', .01, 'cm'); u('L', .001, 'mm');
 u('L', .3048, 'ft', 'foot', 'feet'); u('L', .0254, 'inch', 'inches', '"'); u('L', 1609.344, 'mi', 'mile'); u('L', .9144, 'yd', 'yard');
 u('M', 1e-3, 'g', 'gram'); u('M', 1, 'kg', 'kilogram'); u('M', 1000, 't', 'tonne', 'metric ton'); u('M', .45359237, 'lb', 'lbs', 'pound');
@@ -16,13 +16,16 @@ u('V', .028316846592, 'ft³', 'ft3', 'cubic foot', 'cubic feet'); u('V', .003785
 u('P', 1, 'Pa', 'pa'); u('P', 1e3, 'kPa', 'kpa'); u('P', 1e6, 'MPa', 'mpa'); u('P', 6894.757293168, 'psi'); u('P', 1e5, 'bar');
 u('t', 1, 's', 'sec', 'second'); u('t', 60, 'min', 'minute'); u('t', 3600, 'h', 'hr', 'hour'); u('t', 86400, 'day');
 [['°C', 1, 273.15, 'c', '°c', 'celsius'], ['°F', 5 / 9, 459.67, 'f', '°f', 'fahrenheit'], ['K', 1, 0, 'k', 'kelvin']]
-  .forEach(([name, f, off, ...n]) => n.forEach(k => { U[k] = { dim: 'T', f, off, name }; }));
-const DIM = { L: 'length', M: 'mass', R: 'mass ratio', T: 'temperature', A: 'area', V: 'volume', P: 'pressure', t: 'time' };
+  .forEach(([name, f, off, ...n]) => { UNITS.push({ dim: 'T', f, off, name, words: n }); n.forEach(k => { U[k] = { dim: 'T', f, off, name }; }); });
+export const DIM = { L: 'length', M: 'mass', R: 'mass ratio', T: 'temperature', A: 'area', V: 'volume', P: 'pressure', t: 'time' };
+// compound units the parser should know as single words (parseUnit composes them from the table)
+export const COMPOUNDS = ['g/cm3', 'g/cc', 'lb/ft3', 'oz per short ton', 'oz/t', 'troy oz per short ton', 't/m3', 'kg/m3'];
+const byName = new Map(UNITS.map(x => [x.name, U[x.words[0]]]));
 
 function unit1(s, oz) {
   s = s.trim();
   if (/^(oz|ounces?)$/.test(s)) return { ...U[oz === 'av' ? 'oz (av)' : 'troy oz'], amb: true };
-  return U[s] || U[s.replace(/s$/, '')] || null;
+  return U[s] || byName.get(s) || U[s.replace(/s$/, '')] || null;
 }
 export function parseUnit(s, oz) {
   s = s.trim().replace(/\s+/g, ' ');
@@ -34,20 +37,33 @@ export function parseUnit(s, oz) {
   if (!a || !b || a.dim === 'T' || b.dim === 'T') return null;
   return { dim: a.dim === 'M' && b.dim === 'M' ? 'R' : a.dim + '/' + b.dim, f: a.f / b.f, off: 0, name: a.name + ' / ' + b.name, amb: a.amb || b.amb };
 }
-const dimName = d => DIM[d] || d.split('/').map(x => DIM[x] || x).join(' per ');
+export const dimName = d => DIM[d] || d.split('/').map(x => DIM[x] || x).join(' per ');
 
-T.convert = a => {
-  const oz = a.oz || (/ per |\//.test(a.from) ? 'troy' : 'av');
-  const f = parseUnit(a.from, oz), t = parseUnit(a.to, oz);
-  if (!f || !t) return null;
-  const read = ['convert', { v: fmt(a.v) }, { v: f.name }, 'to', { v: t.name }];
-  if (f.amb || t.amb) read.push({ v: 'oz = ' + (oz === 'troy' ? 'troy' : 'avoirdupois'), key: 'oz', alts: ['troy', 'av'], cur: oz });
-  if (f.dim !== t.dim) return { read, body: [{ t: 'note', kind: 'err', text: `${f.name} is a ${dimName(f.dim)} and ${t.name} is a ${dimName(t.dim)}. No conversion exists between them.` }], trace: ['units: dimension check failed'] };
-  const out = (a.v + f.off) * f.f / t.f - t.off;
-  return {
-    read, value: out, amend: 'unit',
-    body: [{ t: 'big', v: fmt(out), unit: t.name }, { t: 'src', text: `@gcu/units · exact factors · dimension: ${dimName(f.dim)}` }],
-    trace: [`units.parse("${a.from}") → ${dimName(f.dim)}, factor ${fmt(f.f, 9)}`, `units.parse("${a.to}") → factor ${fmt(t.f, 9)}`, `${fmt(a.v)} × ${fmt(f.f, 9)} ÷ ${fmt(t.f, 9)} = ${fmt(out, 9)}`],
-    py: `units.convert(${a.v}, "${f.name}", "${t.name}")`
-  };
-};
+tool({
+  name: 'convert', rank: 100,
+  skill: { group: 'Compute', title: 'Unit conversion', on: '@gcu/units', about: 'Grades, lengths, masses, areas, pressures, temperatures. Refuses mismatched dimensions.', examples: ['0.35 oz per short ton in g/t', '2.7 g/cm3 in lb/ft3', '1500 psi in mpa', '5 km in kg'] },
+  read: (text, q) => { const m = /^(?:convert )?(-?[\d.,]*\d) ?(.+?) (?:in|to|as|into) (.+)$/.exec(q); return m ? { v: parseFloat(m[1].replace(/,/g, '')), from: m[2], to: m[3] } : null; },
+  amend: [{ arg: 'to', match: /^(?:and |now |same (?:but )?)?(?:in|to|as) (.+)$/ }],
+  topic: a => [a.from + ' → ' + a.to, 1],
+  run: a => {
+    const oz = a.oz || (/ per |\//.test(a.from) ? 'troy' : 'av');
+    const f = parseUnit(a.from, oz), t = parseUnit(a.to, oz);
+    if (!f || !t) return null;
+    const read = ['convert', { v: fmt(a.v) }, { v: f.name }, 'to', { v: t.name }];
+    if (f.amb || t.amb) read.push({ v: 'oz = ' + (oz === 'troy' ? 'troy' : 'avoirdupois'), key: 'oz', alts: ['troy', 'av'], cur: oz });
+    if (f.dim !== t.dim) return { read, body: [{ t: 'note', kind: 'err', text: `${f.name} is a ${dimName(f.dim)} and ${t.name} is a ${dimName(t.dim)}. No conversion exists between them.` }], trace: ['units: dimension check failed'] };
+    const out = (a.v + f.off) * f.f / t.f - t.off;
+    return {
+      read, value: out,
+      body: [{ t: 'big', v: fmt(out), unit: t.name }, { t: 'src', text: `@gcu/units · exact factors · dimension: ${dimName(f.dim)}` }],
+      trace: [`units.parse("${a.from}") → ${dimName(f.dim)}, factor ${fmt(f.f, 9)}`, `units.parse("${a.to}") → factor ${fmt(t.f, 9)}`, `${fmt(a.v)} × ${fmt(f.f, 9)} ÷ ${fmt(t.f, 9)} = ${fmt(out, 9)}`],
+      py: `units.convert(${a.v}, "${f.name}", "${t.name}")`
+    };
+  }
+});
+frame({
+  name: 'convert', label: 'Convert', words: ['convert', 'change'], elidable: true,
+  theme: ['quantity:*'], required: ['theme', 'unit'], roles: { unit: { preps: ['in', 'to', 'as', 'into'], types: ['unit'] } },
+  words_pt: ['converter', 'converte', 'converta', 'passar', 'passa'], label_pt: 'Converter',
+  bind: c => { const q = c.theme[0], to = c.roles.unit && c.roles.unit[0]; return q && q.type === 'quantity' && to ? { tool: 'convert', args: { v: q.n, from: q.unit, to: to.unit } } : null; }
+});

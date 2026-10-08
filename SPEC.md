@@ -303,7 +303,13 @@ Default to the user-confirms route: the app then requests no dangerous permissio
 
 **Simulated:** all device hand-offs. The timer counts down in the page.
 
-**Absent:** rung 4 (dispatch), the planner (preconditions are hand-coded), real packs, pt-BR, any GCU package (the mock has no dependencies at all).
+**Absent:** rung 4 (the statistical dispatcher), the planner (preconditions are hand-coded), real packs, pt-BR in the shell.
+
+**Declarations** (since 8 Oct 2026): every tool is one declaration (`tool()` in `src/engine/core.js`) carrying its reader, its amendments, its session-name topic and its catalog row; verb frames (`frame()`) say how a parsed command becomes a tool call. The Skills tab, the amendment table, session names and the ontology derive from them.
+
+**The clause parser** (since 8 Oct 2026) is rung 2's first half: `@gcu/dispatch` is vendored under `src/vendor/`, the engine builds the parser from its own ontology, and a reading that binds to a frame becomes the card. The regex rules remain the second half for what the grammar does not cover yet: free text, dates, orientations, arithmetic. The trace says which half read the query.
+
+**Fonts** are embedded by the build; the page makes no network request.
 
 **Engine and shell** (since 8 Oct 2026): `src/engine/` reads and computes with no DOM, returning results as plain blocks (big value, note, key-values, table, list, steps, plot specs, actions); `src/shell/` renders them. The engine runs in Node, and `test/engine.test.mjs` drives it through the smoke queries, replay, slot flips, answers and undo.
 
@@ -319,7 +325,6 @@ Default to the user-confirms route: the app then requests no dangerous permissio
 - Replaying a session re-applies its `teach` cards, and a "no reading" card stays a "no reading" card even if the word was taught later.
 - Session names: the 40-character cap drops the second label often. Weights are first guesses.
 - The export script uses invented API names (`units.convert`, `bearing.true_thickness`, …). They are placeholders until the real packages decide.
-- The published web fonts load from Google Fonts. A shipped build must embed Barlow and Space Mono (the `.woff2` files are in `ext/switchboard/fonts/`) to keep the zero-network claim.
 
 ---
 
@@ -328,8 +333,8 @@ Default to the user-confirms route: the app then requests no dangerous permissio
 In order. Each step leaves something that runs.
 
 1. **Engine/shell split.** Done 8 Oct 2026: `src/engine/` with structured results, `src/shell/` rendering them, Node tests for the engine and the browser smoke test for the shell.
-2. **Tool declarations as data.** One declaration per tool (section 4.2). Derive the skills list, the amendment table and the session-name labels from it.
-3. **Real grammar.** Replace the regex table with the clause parser, now the grammar rung of `@gcu/dispatch` (`ext/dispatch/src/grammar/`). clause reads imperatives, bare phrases and closed questions against an ontology; `ext/dispatch/bench/golem.json` is the starting ontology for golem's register and `ext/dispatch/bench/golem-corpus.mjs` its hand corpus. Still outside the grammar and needing their own reading: free-text arguments (`remember that …`, `check: …`, `X means Y`, event titles), absolute dates and clock times, orientations like `270/60`, and arithmetic (a token-shape check routes it to the expression parser). Amendments (`in feet`, `and chile`) can move into clause's ellipsis machinery.
+2. **Tool declarations as data.** Done 8 Oct 2026: `tool()` and `frame()` declarations; the catalog, amendments, session names and the ontology derive from them. The declaration shape is still JS (readers and amendment matchers are regexes); the ontology they produce is JSON.
+3. **Real grammar.** Begun 8 Oct 2026: the clause parser is vendored and reads first; the regex rules read what it cannot yet. To finish, the grammar needs free-text roles, dates, orientations and amendments through ellipsis (listed in `ext/dispatch/SPEC.md`), then the regex rules go. The parser is now the grammar rung of `@gcu/dispatch` (`ext/dispatch/src/grammar/`). clause reads imperatives, bare phrases and closed questions against an ontology; `ext/dispatch/bench/golem.json` is the starting ontology for golem's register and `ext/dispatch/bench/golem-corpus.mjs` its hand corpus. Still outside the grammar and needing their own reading: free-text arguments (`remember that …`, `check: …`, `X means Y`, event titles), absolute dates and clock times, orientations like `270/60`, and arithmetic (a token-shape check routes it to the expression parser). Amendments (`in feet`, `and chile`) can move into clause's ellipsis machinery.
 4. **Rung 4.** Generate dispatch tool declarations and a corpus from golem's tool declarations, train on start, gate on margin and assembly.
 5. **Real packages under the tools.** `@gcu/units`, `@gcu/bearing`, `@gcu/recon` + `@gcu/sadpan`, `@gcu/drillhole`, `@gcu/gsjs`, `@gcu/plot`, `@gcu/librarian`. Check each mock result against the package result before deleting the mock code; `@gcu/gslib` is the oracle for the variogram.
 6. **Planner.** Preconditions and effects on the declarations; replace `needData()` and the composite question.
@@ -337,7 +342,7 @@ In order. Each step leaves something that runs.
 8. **Packs.** Install from a registry, define the `golem` facet, build it for `factbook`, `ods` and `elements-of-style`.
 9. **Session store** on `@gcu/vfs`; export and import a session as a file.
 10. **lead-acid.** The intent route in the shell; the web fallback in the page.
-11. **Release.** Embedded fonts, service worker, seal artifacts, licence attributions, pt-BR bank, store listing.
+11. **Release.** Service worker, seal artifacts, licence attributions, pt-BR bank, store listing. (Fonts are embedded since 8 Oct 2026.)
 
 ---
 
