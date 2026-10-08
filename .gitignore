@@ -10,3 +10,6 @@ GEMINI.md
 .cursor/
 .cursorrules
 .codex/
+
+# spec drafts stay local
+spec_inbox/
