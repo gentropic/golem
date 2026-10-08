@@ -14,6 +14,7 @@ tool({ name: 'mapdial', planned: true, skill: { group: 'Device', title: 'Map, di
 
 // Row: [id, name, size · licence, status (live | samp | plan), description]
 export const PACKS = [
+  ['timescale', 'International Chronostratigraphic Chart', 'ICS 2023 · Macrostrat · CC BY 4.0', 'live', 'Every unit of the chart: bounds, rank, parents, neighbours, subdivisions.'],
   ['factbook', 'CIA World Factbook', '2.8 MB · CC0', 'samp', 'Records: lookup, convert, filter, rank.'],
   ['factbook-full', 'Factbook, full profiles', '2.3 MB · CC0', 'plan', 'Deeper filters, such as exports and resources.'],
   ['ods', 'Open Data Structures', '1.9 MB · CC BY 2.5', 'samp', 'Term index into the reader. Listings can run in adder.'],

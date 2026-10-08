@@ -115,9 +115,9 @@ test('the clock can be pinned, and dates follow it', () => {
 
 test('declarations drive the catalog, the names and the amendments', () => {
   const rows = g.skills();
-  assert.equal(rows.length, 29);
+  assert.equal(rows.length, 30);
   assert.deepEqual([...new Set(rows.map(r => r.group))], ['Compute', 'Field', 'Table', 'Knowledge', 'Device', 'Session']);
-  assert.equal(rows.filter(r => r.live).length, 21);
+  assert.equal(rows.filter(r => r.live).length, 22);
   for (const name of Object.keys(g.T)) assert.ok(g.toolByName(name), `a declaration for ${name}`);
   assert.deepEqual(g.tagOf({ tool: 'hist', args: { col: 'au' } }), ['Au histogram', 3]);
   assert.ok(g.toolByName('convert').amend.length === 1 && g.toolByName('fact').amend.length === 2);
@@ -126,7 +126,7 @@ test('declarations drive the catalog, the names and the amendments', () => {
 test('the ontology derives from the declarations and is plain JSON', () => {
   const o = g.ontology();
   assert.equal(JSON.stringify(JSON.parse(JSON.stringify(o))), JSON.stringify(o));
-  assert.deepEqual(o.verbs.map(v => v.name).sort(), ['convert', 'define', 'export', 'list', 'lookup', 'open', 'plot', 'timer']);
+  assert.deepEqual(o.verbs.map(v => v.name).sort(), ['convert', 'date', 'define', 'export', 'list', 'lookup', 'open', 'plot', 'timer']);
   assert.ok(o.verbs.every(v => !('bind' in v)), 'bind functions stay in the engine');
   assert.ok(o.units.some(u => u.unit === 'oz per short ton'));
   assert.ok(o.nouns.find(n => n.type === 'country').words.Mongolia);

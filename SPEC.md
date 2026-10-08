@@ -179,6 +179,7 @@ Status: **mock** = works in `src/` today; **planned** = named, not built.
 | Table | Report paragraph from plan parameters | planned | templates; see [Open decisions](#14-open-decisions) on output English |
 | Knowledge | Record lookup, conversion, filter, rank | mock (14-row sample) | factbook pack, `@gcu/sift` |
 | Knowledge | Term definitions with reader hand-off | mock (locator only) | `@gcu/librarian`, `@gcu/reader-core` |
+| Knowledge | Geologic timescale: bounds, ranks, parents, neighbours, subdivisions, the unit at an age | built in (8 Oct 2026) from the ICS chart via Macrostrat, CC BY 4.0, 171 units | the first real records pack; the `golem` facet is this file |
 | Knowledge | Style check from a rule pack | mock | elements-of-style pack |
 | Knowledge | Search over the user's documents | planned | `@gcu/librarian`, `@gcu/vfs` |
 | Device | Calendar event | mock (simulated hand-off) | lead-acid intent route |
@@ -200,7 +201,7 @@ golem reads the same `.gcudat` packs as the Auditable Works reader, from the sam
 
 | Kind | Example | What golem does with it |
 |---|---|---|
-| Records | `factbook` (+ `factbook-full`) | Lookup, unit conversion, filter, rank, compute across records |
+| Records | `factbook` (+ `factbook-full`), the ICS timescale | Lookup, unit conversion, filter, rank, compute across records |
 | Text | `ods`, the ray-tracing books, `arcr` | Find where a term is defined, show the passage, open the reader there; run listings in adder |
 | Rules | `elements-of-style` (1918, public domain) | Compile rules into a checker that cites the rule |
 

@@ -15,6 +15,7 @@ Open `dist/golem.html`, then:
 - Run `pop of mongolia`. It has no reading and offers `pop means population`. Tap that, then run `pop of mongolia` again.
 - Type `why` after any card, or `export as script`.
 - Open the menu (top left) for sessions and history search.
+- Ask `how old is the permian`, `what period is 250 ma`, `stages of the triassic`: the ICS chart, 171 units, CC BY 4.0 via Macrostrat.
 - Try `apparent dip of 000/30 on a section at 045`, `intersection of 090/45 and 270/45`, `core alpha 40 beta 230 in hole 270/60`, `declination at -19.92, -43.94`.
 - Tap the paperclip and open a CSV of your own. `mean cu by lith where au > 0.1`, `how many rows where cu > 1`, `top 5 rows sorted by au descending`, `check intervals`, `histogram of fe`: the column names come from the file.
 - Tap *sleep* (top right) to put golem to sleep; nothing runs until you tap *wake*.

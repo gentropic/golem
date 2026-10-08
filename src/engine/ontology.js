@@ -5,6 +5,7 @@ import { FRAMES, S } from './core.js';
 import { UNITS, COMPOUNDS, DIM, parseUnit, dimName } from './units.js';
 import { ELEMENT } from './table.js';
 import { FB, ODS, ODSA } from './knowledge.js';
+import { TIMESCALE } from './data/timescale.js';
 
 const FB_PT = { Australia: ['austrália', 'australia'], Brazil: ['brasil'], Canada: ['canadá', 'canada'], Chile: ['chile'], Germany: ['alemanha'], Indonesia: ['indonésia', 'indonesia'], Ireland: ['irlanda'], Japan: ['japão', 'japao'], Kazakhstan: ['cazaquistão', 'cazaquistao'], Mongolia: ['mongólia', 'mongolia'], Peru: ['peru'], Portugal: ['portugal'], 'South Africa': ['áfrica do sul', 'africa do sul'], Zambia: ['zâmbia', 'zambia'] };
 const uniq = a => [...new Set(a)];
@@ -36,7 +37,10 @@ export function ontology() {
       { type: 'term', words: terms, generic: ['term', 'word'], words_pt: { ...terms, 'hash table': ['hash table', 'tabela hash'], 'b-tree': ['b-tree', 'btree', 'árvore b', 'arvore b'] }, generic_pt: ['termo', 'palavra'] },
       { type: 'table', words: { 'assays.csv': ['assays.csv', 'assays', 'sample table'] }, generic: ['table', 'file', 'csv'], words_pt: { 'assays.csv': ['assays.csv', 'assays', 'tabela de amostra'] }, generic_pt: ['tabela', 'arquivo'] },
       { type: 'format', words: { script: ['script', 'python', 'adder'], notebook: ['notebook'] }, words_pt: { script: ['script', 'python', 'adder'], notebook: ['notebook', 'caderno'] } },
-      { type: 'timer', words: { timer: ['timer', 'countdown'] }, words_pt: { timer: ['timer', 'cronômetro', 'cronometro', 'temporizador', 'contagem'] } }
+      { type: 'timer', words: { timer: ['timer', 'countdown'] }, words_pt: { timer: ['timer', 'cronômetro', 'cronometro', 'temporizador', 'contagem'] } },
+      // every unit of the chart, by name; the generic words let "what period is …" fail cleanly to the regex reader
+      { type: 'chron', words: Object.fromEntries(TIMESCALE.map(u => [u.n, [u.n.toLowerCase()]])), generic: ['period', 'epoch', 'era', 'eon', 'stage', 'series', 'system'],
+        words_pt: Object.fromEntries(TIMESCALE.map(u => [u.n, [u.n.toLowerCase()]])), generic_pt: ['período', 'periodo', 'época', 'epoca', 'era', 'éon', 'eon', 'andar', 'idade'] }
     ],
     units,
     compounds: [{ mod: 'filter', heads: ['country'], attr: 'filter', echo: true }, { mod: 'scale', heads: ['plot'], attr: 'scale', echo: true }],

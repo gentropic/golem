@@ -415,6 +415,1059 @@
           "contagem"
         ]
       }
+    },
+    {
+      "type": "chron",
+      "words": {
+        "Hadean": [
+          "hadean"
+        ],
+        "Archean": [
+          "archean"
+        ],
+        "Proterozoic": [
+          "proterozoic"
+        ],
+        "Phanerozoic": [
+          "phanerozoic"
+        ],
+        "Eoarchean": [
+          "eoarchean"
+        ],
+        "Paleoarchean": [
+          "paleoarchean"
+        ],
+        "Mesoarchean": [
+          "mesoarchean"
+        ],
+        "Neoarchean": [
+          "neoarchean"
+        ],
+        "Paleoproterozoic": [
+          "paleoproterozoic"
+        ],
+        "Mesoproterozoic": [
+          "mesoproterozoic"
+        ],
+        "Neoproterozoic": [
+          "neoproterozoic"
+        ],
+        "Paleozoic": [
+          "paleozoic"
+        ],
+        "Mesozoic": [
+          "mesozoic"
+        ],
+        "Cenozoic": [
+          "cenozoic"
+        ],
+        "Siderian": [
+          "siderian"
+        ],
+        "Rhyacian": [
+          "rhyacian"
+        ],
+        "Orosirian": [
+          "orosirian"
+        ],
+        "Statherian": [
+          "statherian"
+        ],
+        "Calymmian": [
+          "calymmian"
+        ],
+        "Ectasian": [
+          "ectasian"
+        ],
+        "Stenian": [
+          "stenian"
+        ],
+        "Tonian": [
+          "tonian"
+        ],
+        "Cryogenian": [
+          "cryogenian"
+        ],
+        "Ediacaran": [
+          "ediacaran"
+        ],
+        "Cambrian": [
+          "cambrian"
+        ],
+        "Ordovician": [
+          "ordovician"
+        ],
+        "Silurian": [
+          "silurian"
+        ],
+        "Devonian": [
+          "devonian"
+        ],
+        "Carboniferous": [
+          "carboniferous"
+        ],
+        "Permian": [
+          "permian"
+        ],
+        "Triassic": [
+          "triassic"
+        ],
+        "Jurassic": [
+          "jurassic"
+        ],
+        "Cretaceous": [
+          "cretaceous"
+        ],
+        "Paleogene": [
+          "paleogene"
+        ],
+        "Neogene": [
+          "neogene"
+        ],
+        "Quaternary": [
+          "quaternary"
+        ],
+        "Terreneuvian": [
+          "terreneuvian"
+        ],
+        "Series 2": [
+          "series 2"
+        ],
+        "Miaolingian": [
+          "miaolingian"
+        ],
+        "Furongian": [
+          "furongian"
+        ],
+        "Early Ordovician": [
+          "early ordovician"
+        ],
+        "Middle Ordovician": [
+          "middle ordovician"
+        ],
+        "Late Ordovician": [
+          "late ordovician"
+        ],
+        "Llandovery": [
+          "llandovery"
+        ],
+        "Wenlock": [
+          "wenlock"
+        ],
+        "Ludlow": [
+          "ludlow"
+        ],
+        "Pridoli": [
+          "pridoli"
+        ],
+        "Early Devonian": [
+          "early devonian"
+        ],
+        "Middle Devonian": [
+          "middle devonian"
+        ],
+        "Late Devonian": [
+          "late devonian"
+        ],
+        "Mississippian": [
+          "mississippian"
+        ],
+        "Pennsylvanian": [
+          "pennsylvanian"
+        ],
+        "Cisuralian": [
+          "cisuralian"
+        ],
+        "Guadalupian": [
+          "guadalupian"
+        ],
+        "Lopingian": [
+          "lopingian"
+        ],
+        "Early Triassic": [
+          "early triassic"
+        ],
+        "Middle Triassic": [
+          "middle triassic"
+        ],
+        "Late Triassic": [
+          "late triassic"
+        ],
+        "Early Jurassic": [
+          "early jurassic"
+        ],
+        "Middle Jurassic": [
+          "middle jurassic"
+        ],
+        "Late Jurassic": [
+          "late jurassic"
+        ],
+        "Early Cretaceous": [
+          "early cretaceous"
+        ],
+        "Late Cretaceous": [
+          "late cretaceous"
+        ],
+        "Paleocene": [
+          "paleocene"
+        ],
+        "Eocene": [
+          "eocene"
+        ],
+        "Oligocene": [
+          "oligocene"
+        ],
+        "Miocene": [
+          "miocene"
+        ],
+        "Pliocene": [
+          "pliocene"
+        ],
+        "Pleistocene": [
+          "pleistocene"
+        ],
+        "Holocene": [
+          "holocene"
+        ],
+        "Fortunian": [
+          "fortunian"
+        ],
+        "Stage 2": [
+          "stage 2"
+        ],
+        "Stage 3": [
+          "stage 3"
+        ],
+        "Stage 4": [
+          "stage 4"
+        ],
+        "Wuliuan": [
+          "wuliuan"
+        ],
+        "Drumian": [
+          "drumian"
+        ],
+        "Guzhangian": [
+          "guzhangian"
+        ],
+        "Paibian": [
+          "paibian"
+        ],
+        "Jiangshanian": [
+          "jiangshanian"
+        ],
+        "Stage 10": [
+          "stage 10"
+        ],
+        "Tremadocian": [
+          "tremadocian"
+        ],
+        "Floian": [
+          "floian"
+        ],
+        "Dapingian": [
+          "dapingian"
+        ],
+        "Darriwilian": [
+          "darriwilian"
+        ],
+        "Sandbian": [
+          "sandbian"
+        ],
+        "Katian": [
+          "katian"
+        ],
+        "Hirnantian": [
+          "hirnantian"
+        ],
+        "Rhuddanian": [
+          "rhuddanian"
+        ],
+        "Aeronian": [
+          "aeronian"
+        ],
+        "Telychian": [
+          "telychian"
+        ],
+        "Sheinwoodian": [
+          "sheinwoodian"
+        ],
+        "Homerian": [
+          "homerian"
+        ],
+        "Gorstian": [
+          "gorstian"
+        ],
+        "Ludfordian": [
+          "ludfordian"
+        ],
+        "Lochkovian": [
+          "lochkovian"
+        ],
+        "Pragian": [
+          "pragian"
+        ],
+        "Emsian": [
+          "emsian"
+        ],
+        "Eifelian": [
+          "eifelian"
+        ],
+        "Givetian": [
+          "givetian"
+        ],
+        "Frasnian": [
+          "frasnian"
+        ],
+        "Famennian": [
+          "famennian"
+        ],
+        "Tournaisian": [
+          "tournaisian"
+        ],
+        "Visean": [
+          "visean"
+        ],
+        "Serpukhovian": [
+          "serpukhovian"
+        ],
+        "Bashkirian": [
+          "bashkirian"
+        ],
+        "Moscovian": [
+          "moscovian"
+        ],
+        "Kasimovian": [
+          "kasimovian"
+        ],
+        "Gzhelian": [
+          "gzhelian"
+        ],
+        "Asselian": [
+          "asselian"
+        ],
+        "Sakmarian": [
+          "sakmarian"
+        ],
+        "Artinskian": [
+          "artinskian"
+        ],
+        "Kungurian": [
+          "kungurian"
+        ],
+        "Roadian": [
+          "roadian"
+        ],
+        "Wordian": [
+          "wordian"
+        ],
+        "Capitanian": [
+          "capitanian"
+        ],
+        "Wuchiapingian": [
+          "wuchiapingian"
+        ],
+        "Changhsingian": [
+          "changhsingian"
+        ],
+        "Induan": [
+          "induan"
+        ],
+        "Olenekian": [
+          "olenekian"
+        ],
+        "Anisian": [
+          "anisian"
+        ],
+        "Ladinian": [
+          "ladinian"
+        ],
+        "Carnian": [
+          "carnian"
+        ],
+        "Norian": [
+          "norian"
+        ],
+        "Rhaetian": [
+          "rhaetian"
+        ],
+        "Hettangian": [
+          "hettangian"
+        ],
+        "Sinemurian": [
+          "sinemurian"
+        ],
+        "Pliensbachian": [
+          "pliensbachian"
+        ],
+        "Toarcian": [
+          "toarcian"
+        ],
+        "Aalenian": [
+          "aalenian"
+        ],
+        "Bajocian": [
+          "bajocian"
+        ],
+        "Bathonian": [
+          "bathonian"
+        ],
+        "Callovian": [
+          "callovian"
+        ],
+        "Oxfordian": [
+          "oxfordian"
+        ],
+        "Kimmeridgian": [
+          "kimmeridgian"
+        ],
+        "Tithonian": [
+          "tithonian"
+        ],
+        "Berriasian": [
+          "berriasian"
+        ],
+        "Valanginian": [
+          "valanginian"
+        ],
+        "Hauterivian": [
+          "hauterivian"
+        ],
+        "Barremian": [
+          "barremian"
+        ],
+        "Aptian": [
+          "aptian"
+        ],
+        "Albian": [
+          "albian"
+        ],
+        "Cenomanian": [
+          "cenomanian"
+        ],
+        "Turonian": [
+          "turonian"
+        ],
+        "Coniacian": [
+          "coniacian"
+        ],
+        "Santonian": [
+          "santonian"
+        ],
+        "Campanian": [
+          "campanian"
+        ],
+        "Maastrichtian": [
+          "maastrichtian"
+        ],
+        "Danian": [
+          "danian"
+        ],
+        "Selandian": [
+          "selandian"
+        ],
+        "Thanetian": [
+          "thanetian"
+        ],
+        "Ypresian": [
+          "ypresian"
+        ],
+        "Lutetian": [
+          "lutetian"
+        ],
+        "Bartonian": [
+          "bartonian"
+        ],
+        "Priabonian": [
+          "priabonian"
+        ],
+        "Rupelian": [
+          "rupelian"
+        ],
+        "Chattian": [
+          "chattian"
+        ],
+        "Aquitanian": [
+          "aquitanian"
+        ],
+        "Burdigalian": [
+          "burdigalian"
+        ],
+        "Langhian": [
+          "langhian"
+        ],
+        "Serravallian": [
+          "serravallian"
+        ],
+        "Tortonian": [
+          "tortonian"
+        ],
+        "Messinian": [
+          "messinian"
+        ],
+        "Zanclean": [
+          "zanclean"
+        ],
+        "Piacenzian": [
+          "piacenzian"
+        ],
+        "Gelasian": [
+          "gelasian"
+        ],
+        "Calabrian": [
+          "calabrian"
+        ],
+        "Chibanian": [
+          "chibanian"
+        ],
+        "Late Pleistocene": [
+          "late pleistocene"
+        ],
+        "Greenlandian": [
+          "greenlandian"
+        ],
+        "Northgrippian": [
+          "northgrippian"
+        ],
+        "Meghalayan": [
+          "meghalayan"
+        ]
+      },
+      "generic": [
+        "period",
+        "epoch",
+        "era",
+        "eon",
+        "stage",
+        "series",
+        "system"
+      ],
+      "words_pt": {
+        "Hadean": [
+          "hadean"
+        ],
+        "Archean": [
+          "archean"
+        ],
+        "Proterozoic": [
+          "proterozoic"
+        ],
+        "Phanerozoic": [
+          "phanerozoic"
+        ],
+        "Eoarchean": [
+          "eoarchean"
+        ],
+        "Paleoarchean": [
+          "paleoarchean"
+        ],
+        "Mesoarchean": [
+          "mesoarchean"
+        ],
+        "Neoarchean": [
+          "neoarchean"
+        ],
+        "Paleoproterozoic": [
+          "paleoproterozoic"
+        ],
+        "Mesoproterozoic": [
+          "mesoproterozoic"
+        ],
+        "Neoproterozoic": [
+          "neoproterozoic"
+        ],
+        "Paleozoic": [
+          "paleozoic"
+        ],
+        "Mesozoic": [
+          "mesozoic"
+        ],
+        "Cenozoic": [
+          "cenozoic"
+        ],
+        "Siderian": [
+          "siderian"
+        ],
+        "Rhyacian": [
+          "rhyacian"
+        ],
+        "Orosirian": [
+          "orosirian"
+        ],
+        "Statherian": [
+          "statherian"
+        ],
+        "Calymmian": [
+          "calymmian"
+        ],
+        "Ectasian": [
+          "ectasian"
+        ],
+        "Stenian": [
+          "stenian"
+        ],
+        "Tonian": [
+          "tonian"
+        ],
+        "Cryogenian": [
+          "cryogenian"
+        ],
+        "Ediacaran": [
+          "ediacaran"
+        ],
+        "Cambrian": [
+          "cambrian"
+        ],
+        "Ordovician": [
+          "ordovician"
+        ],
+        "Silurian": [
+          "silurian"
+        ],
+        "Devonian": [
+          "devonian"
+        ],
+        "Carboniferous": [
+          "carboniferous"
+        ],
+        "Permian": [
+          "permian"
+        ],
+        "Triassic": [
+          "triassic"
+        ],
+        "Jurassic": [
+          "jurassic"
+        ],
+        "Cretaceous": [
+          "cretaceous"
+        ],
+        "Paleogene": [
+          "paleogene"
+        ],
+        "Neogene": [
+          "neogene"
+        ],
+        "Quaternary": [
+          "quaternary"
+        ],
+        "Terreneuvian": [
+          "terreneuvian"
+        ],
+        "Series 2": [
+          "series 2"
+        ],
+        "Miaolingian": [
+          "miaolingian"
+        ],
+        "Furongian": [
+          "furongian"
+        ],
+        "Early Ordovician": [
+          "early ordovician"
+        ],
+        "Middle Ordovician": [
+          "middle ordovician"
+        ],
+        "Late Ordovician": [
+          "late ordovician"
+        ],
+        "Llandovery": [
+          "llandovery"
+        ],
+        "Wenlock": [
+          "wenlock"
+        ],
+        "Ludlow": [
+          "ludlow"
+        ],
+        "Pridoli": [
+          "pridoli"
+        ],
+        "Early Devonian": [
+          "early devonian"
+        ],
+        "Middle Devonian": [
+          "middle devonian"
+        ],
+        "Late Devonian": [
+          "late devonian"
+        ],
+        "Mississippian": [
+          "mississippian"
+        ],
+        "Pennsylvanian": [
+          "pennsylvanian"
+        ],
+        "Cisuralian": [
+          "cisuralian"
+        ],
+        "Guadalupian": [
+          "guadalupian"
+        ],
+        "Lopingian": [
+          "lopingian"
+        ],
+        "Early Triassic": [
+          "early triassic"
+        ],
+        "Middle Triassic": [
+          "middle triassic"
+        ],
+        "Late Triassic": [
+          "late triassic"
+        ],
+        "Early Jurassic": [
+          "early jurassic"
+        ],
+        "Middle Jurassic": [
+          "middle jurassic"
+        ],
+        "Late Jurassic": [
+          "late jurassic"
+        ],
+        "Early Cretaceous": [
+          "early cretaceous"
+        ],
+        "Late Cretaceous": [
+          "late cretaceous"
+        ],
+        "Paleocene": [
+          "paleocene"
+        ],
+        "Eocene": [
+          "eocene"
+        ],
+        "Oligocene": [
+          "oligocene"
+        ],
+        "Miocene": [
+          "miocene"
+        ],
+        "Pliocene": [
+          "pliocene"
+        ],
+        "Pleistocene": [
+          "pleistocene"
+        ],
+        "Holocene": [
+          "holocene"
+        ],
+        "Fortunian": [
+          "fortunian"
+        ],
+        "Stage 2": [
+          "stage 2"
+        ],
+        "Stage 3": [
+          "stage 3"
+        ],
+        "Stage 4": [
+          "stage 4"
+        ],
+        "Wuliuan": [
+          "wuliuan"
+        ],
+        "Drumian": [
+          "drumian"
+        ],
+        "Guzhangian": [
+          "guzhangian"
+        ],
+        "Paibian": [
+          "paibian"
+        ],
+        "Jiangshanian": [
+          "jiangshanian"
+        ],
+        "Stage 10": [
+          "stage 10"
+        ],
+        "Tremadocian": [
+          "tremadocian"
+        ],
+        "Floian": [
+          "floian"
+        ],
+        "Dapingian": [
+          "dapingian"
+        ],
+        "Darriwilian": [
+          "darriwilian"
+        ],
+        "Sandbian": [
+          "sandbian"
+        ],
+        "Katian": [
+          "katian"
+        ],
+        "Hirnantian": [
+          "hirnantian"
+        ],
+        "Rhuddanian": [
+          "rhuddanian"
+        ],
+        "Aeronian": [
+          "aeronian"
+        ],
+        "Telychian": [
+          "telychian"
+        ],
+        "Sheinwoodian": [
+          "sheinwoodian"
+        ],
+        "Homerian": [
+          "homerian"
+        ],
+        "Gorstian": [
+          "gorstian"
+        ],
+        "Ludfordian": [
+          "ludfordian"
+        ],
+        "Lochkovian": [
+          "lochkovian"
+        ],
+        "Pragian": [
+          "pragian"
+        ],
+        "Emsian": [
+          "emsian"
+        ],
+        "Eifelian": [
+          "eifelian"
+        ],
+        "Givetian": [
+          "givetian"
+        ],
+        "Frasnian": [
+          "frasnian"
+        ],
+        "Famennian": [
+          "famennian"
+        ],
+        "Tournaisian": [
+          "tournaisian"
+        ],
+        "Visean": [
+          "visean"
+        ],
+        "Serpukhovian": [
+          "serpukhovian"
+        ],
+        "Bashkirian": [
+          "bashkirian"
+        ],
+        "Moscovian": [
+          "moscovian"
+        ],
+        "Kasimovian": [
+          "kasimovian"
+        ],
+        "Gzhelian": [
+          "gzhelian"
+        ],
+        "Asselian": [
+          "asselian"
+        ],
+        "Sakmarian": [
+          "sakmarian"
+        ],
+        "Artinskian": [
+          "artinskian"
+        ],
+        "Kungurian": [
+          "kungurian"
+        ],
+        "Roadian": [
+          "roadian"
+        ],
+        "Wordian": [
+          "wordian"
+        ],
+        "Capitanian": [
+          "capitanian"
+        ],
+        "Wuchiapingian": [
+          "wuchiapingian"
+        ],
+        "Changhsingian": [
+          "changhsingian"
+        ],
+        "Induan": [
+          "induan"
+        ],
+        "Olenekian": [
+          "olenekian"
+        ],
+        "Anisian": [
+          "anisian"
+        ],
+        "Ladinian": [
+          "ladinian"
+        ],
+        "Carnian": [
+          "carnian"
+        ],
+        "Norian": [
+          "norian"
+        ],
+        "Rhaetian": [
+          "rhaetian"
+        ],
+        "Hettangian": [
+          "hettangian"
+        ],
+        "Sinemurian": [
+          "sinemurian"
+        ],
+        "Pliensbachian": [
+          "pliensbachian"
+        ],
+        "Toarcian": [
+          "toarcian"
+        ],
+        "Aalenian": [
+          "aalenian"
+        ],
+        "Bajocian": [
+          "bajocian"
+        ],
+        "Bathonian": [
+          "bathonian"
+        ],
+        "Callovian": [
+          "callovian"
+        ],
+        "Oxfordian": [
+          "oxfordian"
+        ],
+        "Kimmeridgian": [
+          "kimmeridgian"
+        ],
+        "Tithonian": [
+          "tithonian"
+        ],
+        "Berriasian": [
+          "berriasian"
+        ],
+        "Valanginian": [
+          "valanginian"
+        ],
+        "Hauterivian": [
+          "hauterivian"
+        ],
+        "Barremian": [
+          "barremian"
+        ],
+        "Aptian": [
+          "aptian"
+        ],
+        "Albian": [
+          "albian"
+        ],
+        "Cenomanian": [
+          "cenomanian"
+        ],
+        "Turonian": [
+          "turonian"
+        ],
+        "Coniacian": [
+          "coniacian"
+        ],
+        "Santonian": [
+          "santonian"
+        ],
+        "Campanian": [
+          "campanian"
+        ],
+        "Maastrichtian": [
+          "maastrichtian"
+        ],
+        "Danian": [
+          "danian"
+        ],
+        "Selandian": [
+          "selandian"
+        ],
+        "Thanetian": [
+          "thanetian"
+        ],
+        "Ypresian": [
+          "ypresian"
+        ],
+        "Lutetian": [
+          "lutetian"
+        ],
+        "Bartonian": [
+          "bartonian"
+        ],
+        "Priabonian": [
+          "priabonian"
+        ],
+        "Rupelian": [
+          "rupelian"
+        ],
+        "Chattian": [
+          "chattian"
+        ],
+        "Aquitanian": [
+          "aquitanian"
+        ],
+        "Burdigalian": [
+          "burdigalian"
+        ],
+        "Langhian": [
+          "langhian"
+        ],
+        "Serravallian": [
+          "serravallian"
+        ],
+        "Tortonian": [
+          "tortonian"
+        ],
+        "Messinian": [
+          "messinian"
+        ],
+        "Zanclean": [
+          "zanclean"
+        ],
+        "Piacenzian": [
+          "piacenzian"
+        ],
+        "Gelasian": [
+          "gelasian"
+        ],
+        "Calabrian": [
+          "calabrian"
+        ],
+        "Chibanian": [
+          "chibanian"
+        ],
+        "Late Pleistocene": [
+          "late pleistocene"
+        ],
+        "Greenlandian": [
+          "greenlandian"
+        ],
+        "Northgrippian": [
+          "northgrippian"
+        ],
+        "Meghalayan": [
+          "meghalayan"
+        ]
+      },
+      "generic_pt": [
+        "período",
+        "periodo",
+        "época",
+        "epoca",
+        "era",
+        "éon",
+        "eon",
+        "andar",
+        "idade"
+      ]
     }
   ],
   "units": [
@@ -1151,6 +2204,32 @@
         "me avisa em"
       ],
       "label_pt": "Iniciar"
+    },
+    {
+      "name": "date",
+      "label": "Date",
+      "words": [
+        "how old is",
+        "when was",
+        "when is",
+        "date",
+        "age of"
+      ],
+      "elidable": true,
+      "theme": [
+        "chron"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {},
+      "words_pt": [
+        "quando foi",
+        "idade de",
+        "datar",
+        "data"
+      ],
+      "label_pt": "Datar"
     },
     {
       "name": "export",
