@@ -51,6 +51,17 @@ export function submit(raw) {
   return { kind: 'card', card: addCard(raw, r, performance.now() - t0) };
 }
 
+// a 32-bit FNV-1a of the text: the key of a file in the device store, and what a card remembers of it
+export function hashOf(text) { let h = 0x811c9dc5; for (let i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 0x01000193); } return (h >>> 0).toString(16).padStart(8, '0'); }
+// a file the person picked: kept on the device by hash, opened as a card
+export function openFile(name, text) {
+  if (!current()) newSession();
+  const t0 = performance.now(), hash = hashOf(text);
+  S.files[hash] = { name, hash, text, size: text.length };
+  const args = { file: { name, hash } }, res = T.open(args);
+  return { kind: 'card', card: addCard(`open ${name}`, { tool: 'open', args, rung: 'grammar', res }, performance.now() - t0) };
+}
+
 // two example sessions for a first visit
 export function seedExamples() {
   newSession(true); ['open assays.csv', 'histogram of cu', 'log scale', 'histogram of au'].forEach(x => submit(x));

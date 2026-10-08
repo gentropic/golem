@@ -312,6 +312,8 @@ Default to the user-confirms route: the app then requests no dangerous permissio
 
 **Fonts** are embedded by the build; the page makes no network request.
 
+**Real tables** (since 8 Oct 2026): the paperclip opens a CSV or TSV; recon types it; table questions and the histogram work on any numeric column; a session keeps the file on the device (under a megabyte) and replays it, or says the file is gone. Sample data is still labelled sample data.
+
 **Engine and shell** (since 8 Oct 2026): `src/engine/` reads and computes with no DOM, returning results as plain blocks (big value, note, key-values, table, list, steps, plot specs, actions); `src/shell/` renders them. The engine runs in Node, and `test/engine.test.mjs` drives it through the smoke queries, replay, slot flips, answers and undo.
 
 ### Known defects and shortcuts
@@ -339,7 +341,7 @@ In order. Each step leaves something that runs.
 4. **Rung 4.** Generate dispatch tool declarations and a corpus from golem's tool declarations, train on start, gate on margin and assembly.
 5. **Real packages under the tools.** Checked 8 Oct 2026 (`test/oracle.test.mjs`, against the sibling clone): golem's conversions, thickness factor, equal-area projection and summary statistics reproduce `@gcu/units`, `@gcu/bearing` and `@gcu/sadpan`. `bearing` and `sadpan` are vendored and in use under the field and table tools. `units` is not yet: it rounds its factors to six figures where golem's are exact, and it lacks troy and avoirdupois ounces, imperial pressure, temperature and square miles; golem keeps its own table until the package is fixed upstream, and the oracle test says when that happens. Still to check: `@gcu/recon` for table typing, `@gcu/plot`, `@gcu/librarian` for definitions.
 6. **Planner.** Preconditions and effects on the declarations; replace `needData()` and the key's hand-coded questions.
-7. **Real files.** Open CSV and `.dm` through the file picker or the lead-acid file bridge.
+7. **Real files.** Begun 8 Oct 2026: a CSV or TSV through the file picker (the lead-acid shell routes `<input type=file>` to the system picker), typed by `@gcu/recon`, with table questions in controlled English (`SPEC-skills` A2: aggregates, where, by, length weighting, a below-detection policy, counts, lists, distinct values, correlation, interval checks) and the file's columns as parser nouns. Still to do: `.dm`, xlsx and parquet through their packages, and files over 20 MB through `@gcu/sluice`.
 8. **Packs.** Install from a registry, define the `golem` facet, build it for `factbook`, `ods` and `elements-of-style`.
 9. **Session store** on `@gcu/vfs`; export and import a session as a file.
 10. **lead-acid.** The intent route in the shell; the web fallback in the page.

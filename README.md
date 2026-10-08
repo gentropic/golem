@@ -15,6 +15,7 @@ Open `dist/golem.html`, then:
 - Run `dens of chalcopyrite`. It has no reading and offers `dens means density`. Tap that, then run `dens of chalcopyrite` again.
 - Type `why` after any card, or `export as script`.
 - Open the menu (top left) for sessions and history search.
+- Tap the paperclip and open a CSV of your own. `mean cu by lith where au > 0.1`, `how many rows where cu > 1`, `top 5 rows sorted by au descending`, `check intervals`, `histogram of fe`: the column names come from the file.
 - Tap *sleep* (top right) to put golem to sleep; nothing runs until you tap *wake*.
 
 The Skills tab lists everything that runs, with examples. Each skill is one declaration in `src/engine/`: the tool, the rule that reads it, the phrases that amend it, what it contributes to a session name, and the verb frame the clause parser reads it by.
@@ -29,7 +30,7 @@ npm run test:engine  # the engine alone, in Node: the 27 queries, replay, slots,
 npm test             # build, engine tests, then drive the page through the same 27 queries
 ```
 
-The build is concatenation: `src/shell/index.html` with the two typefaces embedded, then the shell, engine and vendored modules in import order inside one `<script>`, with the `import` and `export` keywords dropped. No bundler, no transforms. The modules share one scope, so the build refuses duplicate top-level names and turns export aliases into plain declarations. It also writes `dist/golem.json`, the parser ontology the engine derives from its tool declarations. The built page makes no network request; the one external link is the library reader, opened on tap.
+The build is concatenation: `src/shell/index.html` with the two typefaces embedded, then the shell, engine and vendored modules in import order inside one `<script>`. Each module's text goes in verbatim inside a function, so its private names stay private, and its exports become plain declarations the later modules see. No bundler, no transforms of the code. The build refuses import cycles, an export declared twice, and the module syntax the wrapping cannot carry. It also writes `dist/golem.json`, the parser ontology the engine derives from its tool declarations. The built page makes no network request; the one external link is the library reader, opened on tap.
 
 If Playwright has no browser installed, run `npx playwright install chromium` or point `CHROMIUM_PATH` at one.
 
@@ -41,7 +42,7 @@ build.mjs                    the build: modules concatenated in import order
 src/engine/                  no DOM, no storage: everything that reads and computes
   core.js                    working state, the tool table, declarations, helpers
   units.js calc.js dates.js  compute tools
-  orientation.js table.js    field and table tools
+  orientation.js table.js    field tools; the open table (a file through recon, or the sample), histogram, table questions
   knowledge.js device.js     packs sample, device hand-offs
   notes.js skills.js         notes and taught words; the skills and packs catalog
   reading.js                 the reading ladder: context, grammar (clause, then the rules), taught; none, why, export
@@ -49,13 +50,14 @@ src/engine/                  no DOM, no storage: everything that reads and compu
   sessions.js                sessions, replay, auto-naming, serialize and hydrate
   engine.js                  submit, rerun, slot flips, answers, undo
   index.js                   the surface Node tests import
-src/vendor/                  copies, never edited here: @gcu/dispatch (the parser), @gcu/bearing, @gcu/sadpan, the lead-acid shim
+src/vendor/                  copies, never edited here: @gcu/dispatch (the parser), @gcu/bearing, @gcu/sadpan, @gcu/recon, @gcu/sift, the lead-acid shim
 src/shell/                   the browser: markup, rendering, wiring, storage
   index.html                 markup, Switchboard tokens, styles, bench notes
   fonts/                     Barlow and Space Mono (OFL), embedded by the build
   render.js                  blocks and plots to markup
   main.js                    tabs, drawer, storage, the sleep switch
 test/engine.test.mjs         engine tests, Node only
+test/files.test.mjs          a real CSV: recon typing, table questions, table nouns, replay (fixture in test/fixtures/)
 test/oracle.test.mjs         golem's arithmetic against the GCU packages it does not vendor
 test/smoke.mjs               browser smoke test on the built file
 dist/golem.html              the built mock (committed, so it opens without a build)

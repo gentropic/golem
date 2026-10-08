@@ -1,7 +1,7 @@
 // The shell: wiring, tabs, the session drawer, storage, and the sleep switch. Everything that touches
 // the DOM or the browser lives here or in render.js; the engine never does.
 import { S } from '../engine/core.js';
-import { submit, flipSlot, answer, seedExamples } from '../engine/engine.js';
+import { submit, flipSlot, answer, seedExamples, openFile } from '../engine/engine.js';
 import { sessions, current, newSession, openSession, renameSession, deleteSession, searchHistory, serialize, hydrate, onChange } from '../engine/sessions.js';
 import { skills, PACKS, SUGGESTIONS } from '../engine/skills.js';
 import { shell } from '../vendor/leadacid.js';
@@ -36,7 +36,9 @@ function renderStream(focus) {
 function replaceCard(c) { const old = $('stream').querySelector(`[data-id="${c.id}"]`); if (old) old.replaceWith(cardEl(c)); }
 function run(raw) {
   if (!awake) { status('Asleep. Tap wake at the top right.'); return; }
-  const o = submit(raw);
+  show(submit(raw));
+}
+function show(o) {
   switch (o.kind) {
     case 'new-session': renderStream(); status('New session.'); break;
     case 'drawer': openDrawer(); break;
@@ -63,7 +65,7 @@ function renderPacks() {
   let h = '<div class="sub">golem knows what its installed packs hold. These are the gcu-library entries plus packs worth adding.</div><div class="lbl">Library</div>';
   PACKS.forEach(([id, name, meta, st, d]) => { h += `<div class="item"><h3>${escHtml(name)} <span class="tag ${st}">${lab[st]}</span></h3><p>${escHtml(d)}</p><div class="from">${escHtml(id)} · ${escHtml(meta)}</div></div>`; });
   const al = Object.entries(S.aliases);
-  h += `<div class="lbl">On this device</div><div class="item"><h3>Taught words</h3><p>${al.length ? al.map(([k, v]) => `${escHtml(k)} → ${escHtml(v)}`).join('<br>') : 'None yet. Try “vario means variogram”.'}</p></div><div class="item"><h3>Notes</h3><p>${S.facts.length ? S.facts.map(esc).join('<br>') : 'None yet. Try “remember that …”.'}</p></div><div class="item"><h3>Open table</h3><p>${S.data ? `assays.csv · ${S.data.length} rows` : 'None.'}</p></div>`;
+  h += `<div class="lbl">On this device</div><div class="item"><h3>Taught words</h3><p>${al.length ? al.map(([k, v]) => `${escHtml(k)} → ${escHtml(v)}`).join('<br>') : 'None yet. Try “vario means variogram”.'}</p></div><div class="item"><h3>Notes</h3><p>${S.facts.length ? S.facts.map(escHtml).join('<br>') : 'None yet. Try “remember that …”.'}</p></div><div class="item"><h3>Open table</h3><p>${S.table ? `${escHtml(S.table.name)} · ${S.table.rows.length} rows · ${S.table.source === 'sample' ? 'sample data' : 'from your files'}` : 'None.'}</p></div><div class="item"><h3>Files on this device</h3><p>${Object.values(S.files).length ? Object.values(S.files).map(f => `${escHtml(f.name)} · ${(f.size / 1024).toFixed(0)} kB`).join('<br>') : 'None yet. Tap the paperclip to open a CSV.'}</p></div>`;
   $('v-packs').innerHTML = h;
 }
 
@@ -93,6 +95,14 @@ onChange(() => { renderBar(); persist(); });
 
 /* ── wiring ── */
 $('f').addEventListener('submit', e => { e.preventDefault(); const v = $('q').value; $('q').value = ''; run(v); });
+// a file from the picker (the lead-acid shell routes <input type=file> to the system picker): text in, a card out
+$('attach').addEventListener('click', () => { if (awake) $('file').click(); });
+$('file').addEventListener('change', e => {
+  const f = e.target.files && e.target.files[0]; if (!f) return;
+  if (f.size > 20e6) { status('That file is over 20 MB. golem reads smaller tables for now.'); e.target.value = ''; return; }
+  f.text().then(text => { show(openFile(f.name, text)); status(`Opened ${f.name}.`); }, () => status('Could not read that file.'));
+  e.target.value = '';
+});
 document.querySelector('.tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) showTab(b.dataset.tab); });
 $('v-skills').addEventListener('click', e => { const b = e.target.closest('[data-q]'); if (b) run(b.dataset.q); });
 $('sugg').addEventListener('click', e => { const b = e.target.closest('[data-q]'); if (b) run(b.dataset.q); });

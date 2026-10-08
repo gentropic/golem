@@ -9,8 +9,8 @@ import { createEngine, makeSession, ENGLISH } from '../vendor/dispatch.js';
 export const norm = s => s.trim().replace(/\s+/g, ' ').replace(/[?.!]+$/, '');
 
 /* ── rung 2, first half: the clause parser over golem's ontology ── */
-let clause = null;
-export const clauseEngine = () => clause || (clause = createEngine(ontology(), ENGLISH));
+let clause = null, clauseFor = null;
+export const clauseEngine = () => { const key = S.table ? S.table.hash : 'sample'; if (!clause || clauseFor !== key) { clause = createEngine(ontology(), ENGLISH); clauseFor = key; } return clause; };
 const clauseSession = () => S.clause || (S.clause = makeSession([]));
 // A parsed command becomes a tool call through its frame's bind(). Only the first command of a
 // sequence is taken for now; "then" chains are a plan the planner does not build yet.

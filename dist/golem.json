@@ -5,11 +5,11 @@
       "type": "variable",
       "needsId": true,
       "words": {
-        "Cu": [
+        "cu": [
           "cu",
           "copper"
         ],
-        "Au": [
+        "au": [
           "au",
           "gold"
         ]
@@ -21,13 +21,13 @@
         "columns"
       ],
       "words_pt": {
-        "Cu": [
+        "cu": [
           "cu",
-          "cobre"
+          "copper"
         ],
-        "Au": [
+        "au": [
           "au",
-          "ouro"
+          "gold"
         ]
       },
       "generic_pt": [

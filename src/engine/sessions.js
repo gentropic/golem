@@ -2,7 +2,7 @@
 // The shell persists whatever `serialize()` returns and feeds it back through `hydrate()`.
 import { S, T, toolByName } from './core.js';
 
-export let SS = [], cur = null;
+let SS = [], cur = null;
 let sid = 0;
 const listeners = [];
 // the shell registers here to persist and redraw after any change to the session store
@@ -15,13 +15,14 @@ export const spec = c => ({ id: c.id, raw: c.raw, tool: c.tool, args: c.args, ru
 // what a card contributes to its session's name: [label, weight], from the tool's declaration
 export function tagOf(c) { const d = toolByName(c.tool); return d && d.topic ? d.topic(c.args) : null; }
 export function autoName(cards) {
-  const table = cards.some(c => ['open', 'hist'].includes(c.tool)), w = new Map();
+  const opened = cards.find(c => c.tool === 'open'), table = opened || cards.some(c => ['hist', 'query'].includes(c.tool)), w = new Map();
+  const tname = opened && opened.args.file ? opened.args.file.name : 'assays.csv';
   cards.forEach((c, i) => {
-    if (table && c.tool !== 'hist') return;
+    if (table && !['hist', 'query'].includes(c.tool)) return;
     const t = tagOf(c); if (t) w.set(t[0], (w.get(t[0]) || 0) + t[1] + i * 1e-3);
   });
   const top = [...w.entries()].sort((x, y) => y[1] - x[1]).map(x => x[0]);
-  if (table) return 'assays.csv' + (top.length ? ': ' + top.slice(0, 2).join(', ') : '');
+  if (table) return tname + (top.length ? ': ' + top.slice(0, 2).join(', ') : '');
   if (!top.length) return 'New session';
   const two = top.slice(0, 2).join(', ');
   return two.length > 40 ? top[0] : two;
@@ -32,7 +33,7 @@ export function touch() { cur.updated = Date.now(); if (cur.auto) cur.name = aut
 // open a session: clear the working state and recompute every card from its spec
 export function load(s) {
   cur = s; const specs = s.cards;
-  S.cards = []; s.cards = S.cards; S.data = null; S.n = 0; S.clause = null;
+  S.cards = []; s.cards = S.cards; S.table = null; S.n = 0; S.clause = null;
   specs.forEach(c => {
     let res = null; try { res = T[c.tool](c.args); } catch (e) { res = null; }
     if (!res) return;
@@ -67,14 +68,16 @@ export const sessions = () => SS;
 export const current = () => cur;
 
 export function serialize() {
-  return { cur: cur && cur.id, sid, aliases: S.aliases, facts: S.facts, ss: SS.map(s => ({ ...s, cards: s.cards.map(spec) })) };
+  // files under a megabyte travel with the device state; larger ones stay in memory and say so on replay
+  const files = Object.fromEntries(Object.entries(S.files).filter(([, f]) => f.text.length <= 1e6));
+  return { cur: cur && cur.id, sid, aliases: S.aliases, facts: S.facts, files, ss: SS.map(s => ({ ...s, cards: s.cards.map(spec) })) };
 }
 export function hydrate(d) {
   if (!d || !Array.isArray(d.ss) || !d.ss.length) return false;
-  SS = d.ss; sid = d.sid || Math.max(...SS.map(s => s.id)); S.aliases = d.aliases || {}; S.facts = d.facts || [];
+  SS = d.ss; sid = d.sid || Math.max(...SS.map(s => s.id)); S.aliases = d.aliases || {}; S.facts = d.facts || []; S.files = d.files || {};
   load(SS.find(s => s.id === d.cur) || SS[0]); return true;
 }
 // forget everything: sessions, device state, working state (tests start here)
 export function reset() {
-  SS = []; cur = null; sid = 0; S.cards = []; S.n = 0; S.aliases = {}; S.facts = []; S.data = null; S.clause = null;
+  SS = []; cur = null; sid = 0; S.cards = []; S.n = 0; S.aliases = {}; S.facts = []; S.files = {}; S.table = null; S.clause = null;
 }

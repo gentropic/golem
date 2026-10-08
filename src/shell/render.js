@@ -54,6 +54,7 @@ function blockHtml(b) {
     case 'list': return `<ul class="plain">${b.items.map(i => `<li>${escHtml(i)}</li>`).join('')}</ul>`;
     case 'steps': return `<ol class="steps">${b.items.map(i => `<li>${escHtml(i)}</li>`).join('')}</ol>`;
     case 'pre': return `<pre>${escHtml(b.text)}</pre>`;
+    case 'hbars': { const max = Math.max(...b.rows.map(r => Math.abs(r[1]))) || 1; return `<div class="hbars">${b.rows.map(([k, v, t]) => `<div class="hb"><span class="hk">${escHtml(k)}</span><span class="hbar"><i style="width:${(Math.abs(v) / max * 100).toFixed(1)}%"></i></span><span class="hv">${escHtml(t)}</span></div>`).join('')}</div>`; }
     case 'marked': { let out = '', p = 0; b.spans.forEach(([s, e]) => { out += escHtml(b.text.slice(p, s)) + '<mark>' + escHtml(b.text.slice(s, e)) + '</mark>'; p = e; }); return `<div class="sub marked">${out + escHtml(b.text.slice(p))}</div>`; }
     case 'chips': return `<div class="opts">${b.items.map(q => `<button class="chip" type="button" data-act="run" data-q="${escHtml(q)}">${escHtml(q)}</button>`).join('')}</div>`;
     case 'actions': return `<div class="opts">${b.items.map(i => i.href ? `<a class="btn" href="${escHtml(i.href)}" target="_blank" rel="noopener">${escHtml(i.label)}</a>`
@@ -77,4 +78,3 @@ export function cardEl(c) {
     <details class="trace"><summary>plan · ${r.trace.length} step${r.trace.length === 1 ? '' : 's'}</summary><ol>${r.trace.map(t => `<li>${escHtml(t)}</li>`).join('')}</ol></details>`;
   return el;
 }
-export { fmt };

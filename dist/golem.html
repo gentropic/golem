@@ -64,7 +64,9 @@ button{cursor:pointer}
   font:600 13px/1.2 var(--sans);color:var(--au-success);transition:color var(--dur) var(--ease)}
 .asleep .power{color:var(--au-fg-soft)}
 .brand{font:700 15px var(--mono);letter-spacing:.04em}
-.steps{margin:0;padding-left:20px;font:12.5px/1.6 var(--mono)} .plain{margin:0;padding-left:18px} .marked{color:var(--au-fg)}
+.steps{margin:0;padding-left:20px;font:12.5px/1.6 var(--mono)}
+.hbars{display:grid;grid-template-columns:auto 1fr auto;gap:4px 8px;align-items:center;margin:6px 0;font:12px var(--mono)} .hbars .hk{color:var(--au-fg-muted);white-space:nowrap;max-width:9em;overflow:hidden;text-overflow:ellipsis} .hbars .hbar{height:10px;background:var(--au-surface-bright);border-radius:2px;overflow:hidden} .hbars .hbar i{display:block;height:100%;background:var(--au-info)} .hbars .hv{text-align:right}
+.attach{background:var(--au-surface-bright);border:1px solid var(--au-border);border-radius:var(--r);min-height:34px;padding:0 8px;cursor:pointer;margin-right:6px} .plain{margin:0;padding-left:18px} .marked{color:var(--au-fg)}
 .stat{font:11px var(--mono);color:var(--au-fg-muted);line-height:1.3}
 .icon{background:var(--au-surface-bright);border:1px solid var(--au-border);border-radius:var(--r);width:38px;height:34px;display:grid;place-items:center;flex:none;padding:0}
 .icon svg{stroke:var(--au-fg);stroke-width:2;stroke-linecap:square}
@@ -199,6 +201,7 @@ svg text{font:10px var(--mono);fill:var(--au-fg-muted)}
       <div class="dock">
         <div id="status" aria-live="polite"></div>
         <div class="sugg" id="sugg"></div>
+        <button class="attach" id="attach" type="button" title="Open a CSV or TSV from your files" aria-label="Open a file">📎</button><input type="file" id="file" accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values,text/plain" hidden>
         <form class="ask" id="f" autocomplete="off">
           <input id="q" type="text" placeholder="ask, compute, or act" aria-label="Query" enterkeyhint="go">
           <button class="btn go" type="submit">Run</button>
@@ -266,13 +269,14 @@ svg text{font:10px var(--mono);fill:var(--au-fg-muted)}
 <script>
 'use strict';
 /* ==== src/engine/core.js ==== */
+const { S, T, TOOLS, tool, toolByName, FRAMES, frame, clock, fmt, iso, rad, deg, p3, p2, qty } = (() => {
 // The engine's shared ground: working state, the tool table, declarations, and small helpers.
 // Nothing under src/engine/ touches a DOM, a window, or storage; the shell does that.
 
-// Working state. `cards` is the current session's cards (specs plus live results), `data` the open
-// table, `aliases` the taught words and `facts` the notes (both belong to the device, not a session).
-// `clause` is the parser's session, rebuilt when a session is opened.
-const S = { cards: [], n: 0, aliases: {}, facts: [], data: null, clause: null };
+// Working state. `cards` is the current session's cards (specs plus live results), `table` the open
+// table, `aliases` the taught words, `facts` the notes and `files` the opened files by hash (those three
+// belong to the device, not a session). `clause` is the parser's session, rebuilt when a session is opened.
+const S = { cards: [], n: 0, aliases: {}, facts: [], files: {}, table: null, clause: null };
 
 // The tool table: T.name = args => Result | null. A tool returns null when its arguments do not apply.
 //   Result = { read: (string | Slot)[], body: Block[], trace: string[], py?, value?, ask?, copy? }
@@ -313,15 +317,21 @@ const fmt = (x, sig = 6) => {
   return Number(x.toPrecision(sig)).toLocaleString('en-US', { maximumFractionDigits: 8 });
 };
 const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-const rad = d => d * Math.PI / 180, deg = r => r * 180 / Math.PI;
-const p3 = x => String(Math.round(x) % 360).padStart(3, '0'), p2 = x => String(Math.round(x)).padStart(2, '0');
+const rad = d => d * Math.PI / 180;
+const deg = r => r * 180 / Math.PI;
+const p3 = x => String(Math.round(x) % 360).padStart(3, '0');
+const p2 = x => String(Math.round(x)).padStart(2, '0');
 // a quantity node from the parser as a number in a base unit, given the unit's factor
 const qty = (node, f) => node && node.type === 'quantity' ? node.n * f(node.unit) : null;
+  return { S, T, TOOLS, tool, toolByName, FRAMES, frame, clock, fmt, iso, rad, deg, p3, p2, qty };
+})();
 
 /* ==== src/engine/units.js ==== */
+const { U, UNITS, DIM, COMPOUNDS, parseUnit, dimName } = (() => {
 // Unit conversion with dimension checks. A small table until @gcu/units stands under it.
 
-const U = {}, UNITS = [];
+const U = {};
+const UNITS = [];
 const u = (dim, f, ...n) => { UNITS.push({ dim, f, name: n[0], words: n }); n.forEach(k => { U[k] = { dim, f, name: n[0] }; }); };
 u('L', 1, 'm', 'meter', 'metre'); u('L', 1000, 'km', 'kilometer', 'kilometre'); u('L', .01, 'cm'); u('L', .001, 'mm');
 u('L', .3048, 'ft', 'foot', 'feet'); u('L', .0254, 'inch', 'inches', '"'); u('L', 1609.344, 'mi', 'mile'); u('L', .9144, 'yd', 'yard');
@@ -387,8 +397,11 @@ frame({
   words_pt: ['converter', 'converte', 'converta', 'passar', 'passa'], label_pt: 'Converter',
   bind: c => { const q = c.theme[0], to = c.roles.unit && c.roles.unit[0]; return q && q.type === 'quantity' && to ? { tool: 'convert', args: { v: q.n, from: q.unit, to: to.unit } } : null; }
 });
+  return { U, UNITS, DIM, COMPOUNDS, parseUnit, dimName };
+})();
 
 /* ==== src/engine/calc.js ==== */
+const { calc } = (() => {
 // Arithmetic by recursive descent. No eval, no Function. Trigonometry in degrees.
 
 const FN = { sqrt: Math.sqrt, abs: Math.abs, exp: Math.exp, ln: Math.log, log: Math.log10, sin: x => Math.sin(rad(x)), cos: x => Math.cos(rad(x)), tan: x => Math.tan(rad(x)), asin: x => deg(Math.asin(x)), acos: x => deg(Math.acos(x)), atan: x => deg(Math.atan(x)) };
@@ -430,8 +443,11 @@ tool({
     return { read: ['evaluate', { v: a.x }, 'trig in degrees'], value: v, body: [{ t: 'big', v: fmt(v, 10) }], trace: [`expr.parse("${a.x}")`, `evaluate → ${v}`], py: a.x.replace(/\^/g, '**') };
   }
 });
+  return { calc };
+})();
 
 /* ==== src/engine/dates.js ==== */
+const { day0, today, fmtDate, findDate, findTime } = (() => {
 // Dates and times: day counts, weekdays, and the parsers the calendar tools share.
 
 const MON = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'], DOW = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
@@ -490,8 +506,11 @@ tool({
     return { read: ['weekday of', { v: fmtDate(f.d) }], body: [{ t: 'big', v: f.d.toLocaleDateString('en-GB', { weekday: 'long' }) }], trace: [`dates.parse("${a.s}")`, 'Gregorian weekday'], py: `date("${iso(f.d)}").strftime("%A")` };
   }
 });
+  return { day0, today, fmtDate, findDate, findTime };
+})();
 
 /* ==== src/vendor/bearing.js ==== */
+const { Stereonet, SvgBuilder, analysis, cardinalPoints, circular, cluster, color, compass, computeContours, conversions, curves, densityGrid, equalAngle, equalArea, euler, fabricplot, fault, generateNet, io, mat3, mergeStyles, quat, rose, rotation, simulate, statistics, styleDefaults, symmetricEigen3, vec3 } = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/bearing, the structural-geology engine (projections, vectors, statistics),
 // copied from ../auditable/ext/bearing/index.js, itself synced from gentropic/bearing.js dist/bearing.mjs.
 // Re-vendor by copying that file here. golem uses conversions, vec3 and equalArea.
@@ -4414,30 +4433,11 @@ function mapValue(name, value, min, max, options) {
   const t = max > min ? (value - min) / (max - min) : 0;
   return colorScale(name, options)(t);
 }
-const analysis = analysis_exports;
-const circular = circular_exports;
-const cluster = cluster_exports;
-const color = color_exports;
-const compass = compass_exports;
-const conversions = conversions_exports;
-const curves = curves_exports;
-const equalAngle = equal_angle_exports;
-const equalArea = equal_area_exports;
-const euler = euler_exports;
-const fabricplot = fabricplot_exports;
-const fault = fault_exports;
-const io = io_exports;
-const mat3 = mat3_exports;
-const mergeStyles = deepMerge;
-const quat = quat_exports;
-const rose = rose_exports;
-const rotation = rotation_exports;
-const simulate = simulate_exports;
-const statistics = statistics_exports;
-const styleDefaults = defaults;
-const vec3 = vec3_exports;
+  return { Stereonet, SvgBuilder, analysis: analysis_exports, cardinalPoints, circular: circular_exports, cluster: cluster_exports, color: color_exports, compass: compass_exports, computeContours, conversions: conversions_exports, curves: curves_exports, densityGrid, equalAngle: equal_angle_exports, equalArea: equal_area_exports, euler: euler_exports, fabricplot: fabricplot_exports, fault: fault_exports, generateNet, io: io_exports, mat3: mat3_exports, mergeStyles: deepMerge, quat: quat_exports, rose: rose_exports, rotation: rotation_exports, simulate: simulate_exports, statistics: statistics_exports, styleDefaults: defaults, symmetricEigen3, vec3: vec3_exports };
+})();
 
 /* ==== src/engine/orientation.js ==== */
+(() => {
 // Orientation: true thickness from an intercept, and planes on a stereonet. @gcu/bearing (vendored) does the
 // vectors; the shell draws the `net` block (lower hemisphere, equal area) from the planes and lines it carries.
 const planeDD = a => a.conv === 'sd' ? (a.a1 + 90) % 360 : a.a1;
@@ -4487,8 +4487,10 @@ tool({
     };
   }
 });
+})();
 
 /* ==== src/vendor/sadpan.js ==== */
+const { table, from, csv, series, concat, merge, semijoin, antijoin, op, Table, Series, BooleanMask, GroupBy, DataFrame, read_csv, where } = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sadpan, DataFrame-style tables and series, copied from
 // ../auditable/ext/sadpan/index.js (built from its src/ by @gcu/build). Re-vendor by copying that file here.
 // golem uses series() for summary statistics.
@@ -6613,11 +6615,794 @@ if (typeof window !== 'undefined') {
     window._auditableExtensions['sadpan'] = sadpanModule;
   }
 }
+  return { table, from, csv, series, concat, merge, semijoin, antijoin, op, Table, Series, BooleanMask, GroupBy, DataFrame, read_csv, where };
+})();
+
+/* ==== src/vendor/recon.js ==== */
+const { NULL_SENTINELS, detectDelimiter, buildContext, XYZ_PATTERNS, DXYZ_PATTERNS, guessCoords, detectUnit, detectAnalyte, geometryAccumulator, inferGeometry, corePack, geoPack, defaultHeuristics, registerHeuristic, sniff } = (() => {
+// ⚠ VENDORED — DO NOT EDIT. @gcu/recon, copied from ../auditable/ext/recon/index.js (built from its src/ by @gcu/build).
+// Re-vendor by copying that file here.
+
+// ⚠ GENERATED FILE — DO NOT EDIT. Source: src/  Build: @gcu/build src/main.js
+// @gcu/recon — Reconnaissance for data: a general, heuristic-driven sniffer that scouts a sample of tabular data and produces an annotated manifest — delimiter, types, semantic roles, units, analytes, spatial grid facet — via a registry of heuristics. Geoscience detection is one registerable pack. Inference only; zero dependencies.
+
+// ── src/detect.js ──
+
+// @gcu/recon — bootstrap detection: delimiter, base column types, the sniff context.
+// Zero-dep; NULL_SENTINELS mirrors @gcu/sluice's (recon stays standalone).
+
+const NULL_SENTINELS = new Set([
+  '', 'NA', 'NaN', 'na', 'nan', 'N/A', 'n/a', 'null', 'NULL', '*', '-',
+  '-999', '-99', '#N/A', 'VOID', 'void', '-1.0e+32', '-1e+32', '1e+31', '-9999', '-99999',
+]);
+
+const DELIMITERS = [',', '\t', ';', '|', ' '];
+
+// Pick the delimiter that splits the sample into the most, most-consistent columns.
+function detectDelimiter(lines) {
+  let best = ',', bestScore = -1;
+  for (const d of DELIMITERS) {
+    const counts = lines.map((l) => l.split(d).length);
+    if (counts.length === 0 || counts[0] < 2) continue;
+    const allSame = counts.every((c) => c === counts[0]);
+    const score = allSame ? counts[0] * 1000 + counts.length : counts[0];
+    if (score > bestScore) { bestScore = score; best = d; }
+  }
+  return best;
+}
+
+const unquote = (s) => s.trim().replace(/^["']|["']$/g, '');
+
+// Build the sniff context from raw sample lines.
+function buildContext(lines, { delimiter, comment = '#' } = {}) {
+  const clean = lines.filter((l) => l !== '' && !(comment && l.startsWith(comment)));
+  if (clean.length === 0) return { delimiter: delimiter || ',', header: [], sampleRows: [], columnCount: 0, baseTypes: [] };
+  const delim = delimiter || detectDelimiter(clean.slice(0, 20));
+  const header = clean[0].split(delim).map(unquote);
+  const columnCount = header.length;
+  const sampleRows = clean.slice(1).map((l) => l.split(delim).map(unquote));
+
+  // Base type detection: numeric / categorical / id (BMA-style num vs non-num counts).
+  const num = new Array(columnCount).fill(0);
+  const nonNum = new Array(columnCount).fill(0);
+  const distinct = Array.from({ length: columnCount }, () => new Set());
+  for (const row of sampleRows) {
+    for (let c = 0; c < columnCount; c++) {
+      const v = row[c] ?? '';
+      if (NULL_SENTINELS.has(v)) continue;
+      distinct[c].add(v);
+      if (!isNaN(Number(v))) num[c]++; else nonNum[c]++;
+    }
+  }
+  const n = sampleRows.length;
+  const baseTypes = header.map((_, c) => {
+    const total = num[c] + nonNum[c];
+    if (total === 0) return 'numeric';
+    // All-numeric → numeric, even if (near-)unique. A fine-resolution grade is
+    // all-distinct numbers but is NOT an id; id-ness is a ROLE (the `id`
+    // heuristic, name + cardinality), orthogonal to the base type. Typing a
+    // grade as `id` here would make parseCsv read it as a string → stats break.
+    if (nonNum[c] === 0) return 'numeric';
+    if (num[c] === 0) return 'categorical';
+    return num[c] / total > 0.8 ? 'numeric' : 'categorical';
+  });
+
+  return { delimiter: delim, header, sampleRows, columnCount, baseTypes, distinct: distinct.map((s) => s.size), rowSample: n };
+}
+
+// ── src/naming.js ──
+
+// @gcu/recon — column-NAME analysis: coordinate roles, units, analytes.
+// Standalone detectors (exported; useful + testable on their own).
+
+// XYZ / DXYZ name patterns (harvested from BMA).
+const XYZ_PATTERNS = {
+  x: [/^x$/i, /^xc$/i, /^x[_-]?cent(re|er)?$/i, /^mid[_-]?x$/i, /^centroid[_-]?x$/i, /^east(ing)?$/i, /^x[_-]?coord$/i, /^xcenter$/i, /^xmid$/i, /^xblock$/i],
+  y: [/^y$/i, /^yc$/i, /^y[_-]?cent(re|er)?$/i, /^mid[_-]?y$/i, /^centroid[_-]?y$/i, /^north(ing)?$/i, /^y[_-]?coord$/i, /^ycenter$/i, /^ymid$/i, /^yblock$/i],
+  z: [/^z$/i, /^zc$/i, /^z[_-]?cent(re|er)?$/i, /^mid[_-]?z$/i, /^centroid[_-]?z$/i, /^elev(ation)?$/i, /^rl$/i, /^z[_-]?coord$/i, /^zcenter$/i, /^zmid$/i, /^zblock$/i, /^level$/i, /^bench$/i],
+};
+const DXYZ_PATTERNS = {
+  dx: [/^dx$/i, /^xinc$/i, /^xsize$/i, /^dimx$/i, /^xlen$/i, /^x[_-]?dim$/i, /^x[_-]?size$/i, /^size[_-]?x$/i],
+  dy: [/^dy$/i, /^yinc$/i, /^ysize$/i, /^dimy$/i, /^ylen$/i, /^y[_-]?dim$/i, /^y[_-]?size$/i, /^size[_-]?y$/i],
+  dz: [/^dz$/i, /^zinc$/i, /^zsize$/i, /^dimz$/i, /^zlen$/i, /^z[_-]?dim$/i, /^z[_-]?size$/i, /^size[_-]?z$/i],
+};
+
+// guessCoords — identify X/Y/Z (and dX/dY/dZ) columns among numeric columns by name,
+// with a first-3-numeric positional fallback for X/Y/Z. Returns { cols, confidence }.
+function guessCoords(header, types) {
+  const isNum = (i) => !types || types[i] === 'numeric' || types[i] === 'id';
+  const cols = {}; const confidence = {};
+  for (const axis of ['x', 'y', 'z']) {
+    for (const pat of XYZ_PATTERNS[axis]) {
+      const i = header.findIndex((h, idx) => isNum(idx) && pat.test(h.trim()));
+      if (i >= 0) { cols[axis] = header[i]; confidence[axis] = 0.9; break; }
+    }
+  }
+  for (const axis of ['dx', 'dy', 'dz']) {
+    for (const pat of DXYZ_PATTERNS[axis]) {
+      const i = header.findIndex((h, idx) => isNum(idx) && pat.test(h.trim()));
+      if (i >= 0) { cols[axis] = header[i]; confidence[axis] = 0.9; break; }
+    }
+  }
+  if (!(cols.x && cols.y && cols.z)) {
+    const numCols = header.filter((_, i) => isNum(i));
+    if (numCols.length >= 3 && !cols.x && !cols.y && !cols.z) {
+      cols.x = numCols[0]; cols.y = numCols[1]; cols.z = numCols[2];
+      confidence.x = confidence.y = confidence.z = 0.3;  // positional fallback
+    }
+  }
+  return { cols, confidence };
+}
+
+// detectUnit — parse a physical unit from a column name. Returns { unit, confidence } | null.
+const UNIT_SUFFIXES = [
+  [/(_|\b)(g[_/]?t|gpt|gt)$/i, 'g/t'], [/(_|\b)ppm$/i, 'ppm'], [/(_|\b)ppb$/i, 'ppb'],
+  [/(_|\b)(pct|pc|perc(ent)?)$/i, '%'], [/(_|\b)(g[_/]?cm3|gcm3|sg|dens(ity)?)$/i, 'g/cm3'],
+  [/(_|\b)(m|metres?|meters?)$/i, 'm'], [/(_|\b)(rl)$/i, 'm'], [/(_|\b)(deg|degrees?)$/i, 'deg'],
+];
+function detectUnit(name) {
+  // Bracketed/parenthetical unit wins (explicit): "Au (g/t)", "FE [%]".
+  const br = name.match(/[([{]\s*([^)\]}]+?)\s*[)\]}]\s*$/);
+  if (br) {
+    const u = normalizeUnit(br[1]);
+    if (u) return { unit: u, confidence: 0.95 };
+  }
+  for (const [re, unit] of UNIT_SUFFIXES) {
+    if (re.test(name)) return { unit, confidence: 0.8 };
+  }
+  if (/(^|_)%$/.test(name) || name.endsWith('%')) return { unit: '%', confidence: 0.9 };
+  return null;
+}
+function normalizeUnit(raw) {
+  const s = raw.trim().toLowerCase().replace(/\s+/g, '');
+  const map = { 'g/t': 'g/t', gpt: 'g/t', 'gt': 'g/t', '%': '%', pct: '%', percent: '%', ppm: 'ppm', ppb: 'ppb', 'g/cm3': 'g/cm3', gcm3: 'g/cm3', sg: 'g/cm3', m: 'm', deg: 'deg' };
+  return map[s] || (/^[a-z%/0-9]+$/.test(s) ? raw.trim() : null);
+}
+
+// detectAnalyte — element symbol or common oxide from a column name. { analyte, confidence } | null.
+const ELEMENTS = new Set(['Au', 'Ag', 'Cu', 'Pb', 'Zn', 'Fe', 'Ni', 'Co', 'Mo', 'U', 'Sn', 'W', 'As', 'Sb', 'Bi', 'Cd', 'Cr', 'Mn', 'V', 'Ti', 'S', 'C', 'P', 'K', 'Na', 'Ca', 'Mg', 'Al', 'Si', 'Hg', 'Te', 'Se', 'Ba', 'Sr', 'Li', 'Be', 'Pt', 'Pd', 'Rh', 'Ir', 'Os', 'Ru', 'Re', 'Ta', 'Nb', 'Zr', 'Hf', 'Ga', 'Ge', 'In', 'Tl', 'Sc', 'Y', 'La', 'Ce', 'Nd', 'Th']);
+const OXIDES = new Set(['SiO2', 'Al2O3', 'Fe2O3', 'FeO', 'CaO', 'MgO', 'K2O', 'Na2O', 'TiO2', 'MnO', 'P2O5', 'Cr2O3', 'SO3', 'LOI', 'BaO', 'SrO']);
+const ELEM_LC = new Map([...ELEMENTS].map((e) => [e.toLowerCase(), e]));
+const OX_LC = new Map([...OXIDES].map((o) => [o.toLowerCase(), o]));
+
+function detectAnalyte(name) {
+  // strip a leading/trailing unit-ish or descriptor token, then test the core token(s).
+  const tokens = name.split(/[_\s\-.]+/).filter(Boolean);
+  for (const tok of tokens) {
+    if (OXIDES.has(tok)) return { analyte: tok, confidence: 0.95 };
+    if (OX_LC.has(tok.toLowerCase())) return { analyte: OX_LC.get(tok.toLowerCase()), confidence: 0.85 };
+    if (ELEMENTS.has(tok)) return { analyte: tok, confidence: 0.95 };
+    if (ELEM_LC.has(tok.toLowerCase())) return { analyte: ELEM_LC.get(tok.toLowerCase()), confidence: 0.8 };
+  }
+  return null;
+}
+
+// ── src/geometry.js ──
+
+// @gcu/recon — grid geometry inference (the scan-phase). A sluice-protocol
+// accumulator collects per-axis coord material; inferGeometry interprets it into
+// a spatial facet. computeGeometry logic harvested from BMA's worker.
+
+const DEFAULT_CAP = 200000;
+const round10 = (v) => Number(v.toPrecision(10));   // collapse float noise for spacing equality
+
+// geometryAccumulator(coordCols) — a sluice-protocol accumulator over ROWS.
+// coordCols: { x?, y?, z?, dx?, dy?, dz? } (column names). Collects, per axis:
+// capped distinct coords, extent, ordering transitions, sample count; plus
+// distinct dim values for dX/dY/dZ. State is structuredClone-transferable.
+function geometryAccumulator(coordCols, { cap = DEFAULT_CAP } = {}) {
+  const axes = ['x', 'y', 'z'].filter((a) => coordCols[a]);
+  const dims = ['dx', 'dy', 'dz'].filter((a) => coordCols[a]);
+  const newAxis = () => ({ distinct: {}, dn: 0, overflow: false, min: Infinity, max: -Infinity, prev: null, transitions: 0, count: 0 });
+  return {
+    create: () => ({
+      coordCols, cap,
+      axes: Object.fromEntries(axes.map((a) => [a, newAxis()])),
+      dims: Object.fromEntries(dims.map((a) => [a, { distinct: {}, overflow: false }])),
+    }),
+    push: (s, row) => {
+      for (const a of axes) {
+        const v = row[coordCols[a]];
+        if (!Number.isFinite(v)) continue;
+        const ax = s.axes[a];
+        ax.count++;
+        if (v < ax.min) ax.min = v;
+        if (v > ax.max) ax.max = v;
+        if (ax.prev !== null && v !== ax.prev) ax.transitions++;
+        ax.prev = v;
+        if (!ax.overflow) {
+          const k = String(round10(v));
+          if (!(k in ax.distinct)) { if (ax.dn >= s.cap) ax.overflow = true; else { ax.distinct[k] = 1; ax.dn++; } }
+        }
+      }
+      for (const a of dims) {
+        const v = row[coordCols[a]];
+        if (!Number.isFinite(v) || v <= 0) continue;
+        const dm = s.dims[a];
+        if (!dm.overflow) { const k = String(round10(v)); if (!(k in dm.distinct)) { if (Object.keys(dm.distinct).length >= s.cap) dm.overflow = true; else dm.distinct[k] = 1; } }
+      }
+    },
+    merge: (a, b) => {
+      const out = { coordCols: a.coordCols, cap: a.cap, axes: {}, dims: {} };
+      for (const ax in a.axes) {
+        const x = a.axes[ax], y = b.axes[ax] || newAxis();
+        const distinct = { ...x.distinct };
+        let dn = x.dn, overflow = x.overflow || y.overflow;
+        for (const k in y.distinct) { if (!(k in distinct)) { if (dn >= a.cap) overflow = true; else { distinct[k] = 1; dn++; } } }
+        out.axes[ax] = { distinct, dn, overflow, min: Math.min(x.min, y.min), max: Math.max(x.max, y.max), prev: null, transitions: x.transitions + y.transitions, count: x.count + y.count };
+      }
+      for (const d in a.dims) {
+        const distinct = { ...a.dims[d].distinct };
+        for (const k in (b.dims[d] || { distinct: {} }).distinct) distinct[k] = 1;
+        out.dims[d] = { distinct, overflow: a.dims[d].overflow || (b.dims[d] && b.dims[d].overflow) };
+      }
+      return out;
+    },
+    result: (s) => {
+      const axes = {};
+      for (const a in s.axes) {
+        const ax = s.axes[a];
+        axes[a] = { values: Object.keys(ax.distinct).map(Number).sort((p, q) => p - q), min: ax.min, max: ax.max, transitions: ax.transitions, count: ax.count, overflow: ax.overflow };
+      }
+      const dims = {};
+      for (const d in s.dims) dims[d] = Object.keys(s.dims[d].distinct).map(Number).sort((p, q) => p - q);
+      return { axes, dims };
+    },
+  };
+}
+
+// inferGeometry(accResult) → spatial facet (gridded | scattered).
+function inferGeometry(accResult, { rotation } = {}) {
+  const { axes, dims } = accResult;
+  const present = ['x', 'y', 'z'].filter((a) => axes[a] && axes[a].count > 0);
+  if (present.length < 3) {
+    return { kind: 'scattered', coordCols: present };
+  }
+  const per = {};
+  let anySub = false;
+  for (const a of present) {
+    const dimKey = a === 'x' ? 'dx' : a === 'y' ? 'dy' : 'dz';
+    per[a] = computeAxis(axes[a], dims[dimKey]);
+    if (per[a].isSubBlocked) anySub = true;
+    if (per[a].size == null) return { kind: 'scattered', coordCols: present };
+  }
+  // ordering: most transitions = fastest-varying = innermost
+  const order = present.slice().sort((p, q) => axes[q].transitions - axes[p].transitions).map((a) => a.toUpperCase());
+  return {
+    kind: 'gridded',
+    origin: [per.x.origin, per.y.origin, per.z.origin],
+    size: [per.x.size, per.y.size, per.z.size],
+    count: [per.x.count, per.y.count, per.z.count],
+    rotation: rotation || [1, 0, 0, 0, 1, 0, 0, 0, 1],
+    order: { fastest: order[0], middle: order[1], slowest: order[2] },
+    subBlocked: anySub,
+    subBlocks: anySub ? Object.fromEntries(present.map((a) => [a, per[a].subBlockSizes])) : null,
+  };
+}
+
+// Per-axis grid inference from collected distinct coords (+ optional dim values).
+function computeAxis(axisData, dimValues) {
+  const sorted = axisData.values;
+  const min = axisData.min, max = axisData.max;
+  if (sorted.length <= 1) return { origin: min, max, size: null, count: 1, isSubBlocked: false, subBlockSizes: [] };
+
+  // spacing-frequency histogram
+  const spacingCounts = {};
+  for (let i = 1; i < sorted.length; i++) {
+    const d = round10(sorted[i] - sorted[i - 1]);
+    if (d > 0) spacingCounts[d] = (spacingCounts[d] || 0) + 1;
+  }
+  const spacings = Object.entries(spacingCounts).map(([s, c]) => ({ size: Number(s), count: c })).sort((a, b) => b.count - a.count);
+
+  let parentSize = null, subBlockSizes = [], isSubBlocked = false;
+  if (spacings.length === 1) {
+    parentSize = spacings[0].size;
+  } else if (spacings.length > 1) {
+    const total = spacings.reduce((s, x) => s + x.count, 0);
+    const significant = spacings.filter((s) => s.count / total > 0.02);
+    if (significant.length === 1) {
+      parentSize = significant[0].size;
+    } else {
+      const bySize = significant.slice().sort((a, b) => b.size - a.size);
+      const candidate = bySize[0].size;
+      const subs = [];
+      for (const s of bySize.slice(1)) {
+        const ratio = candidate / s.size, r = Math.round(ratio);
+        if (r >= 2 && Math.abs(ratio - r) < 0.05) subs.push({ size: s.size, ratio: r, count: s.count });
+      }
+      if (subs.length > 0) { parentSize = candidate; subBlockSizes = subs; isSubBlocked = true; }
+      else parentSize = spacings[0].size;
+    }
+  }
+
+  // explicit dim column overrides spacing inference
+  if (dimValues && dimValues.length > 0) {
+    const uniq = dimValues;
+    const maxDim = uniq[uniq.length - 1];
+    if (uniq.length === 1) { parentSize = uniq[0]; isSubBlocked = false; subBlockSizes = []; }
+    else { parentSize = maxDim; isSubBlocked = true; subBlockSizes = uniq.slice(0, -1).map((d) => ({ size: d, ratio: Math.round(maxDim / d) })); }
+  }
+
+  const count = parentSize ? Math.round((max - min) / parentSize) + 1 : sorted.length;
+  return { origin: min, max, size: parentSize, count, isSubBlocked, subBlockSizes };
+}
+
+// ── src/heuristics.js ──
+
+// @gcu/recon — built-in heuristic packs. Each heuristic: { name, pack, detect(ctx) }
+// returning Annotation[] = { target, key, value, confidence, source }. target is a
+// column name or '$table'. Heuristics are pure functions of the sniff context.
+
+
+const BOOL_SET = new Set(['0', '1', 'true', 'false', 'yes', 'no', 'y', 'n', 't', 'f']);
+const colValues = (ctx, c) => ctx.sampleRows.map((r) => r[c]).filter((v) => v !== undefined && v !== '');
+
+// ── core pack ─────────────────────────────────────────────────────────
+const typeH = {
+  name: 'type', pack: 'core',
+  detect: (ctx) => ctx.header.map((name, c) => ({ target: name, key: 'type', value: ctx.baseTypes[c], confidence: 0.85, source: 'type' })),
+};
+
+const constantH = {
+  // constant-ness is orthogonal to role (a plan-section Z is constant AND coord-z),
+  // so it gets its own key rather than competing for 'role'.
+  name: 'constant', pack: 'core',
+  detect: (ctx) => ctx.header
+    .map((name, c) => (ctx.distinct && ctx.distinct[c] === 1 && ctx.sampleRows.length > 1)
+      ? { target: name, key: 'constant', value: true, confidence: 0.9, source: 'constant' } : null)
+    .filter(Boolean),
+};
+
+const booleanH = {
+  name: 'boolean', pack: 'core',
+  detect: (ctx) => ctx.header.map((name, c) => {
+    const vals = colValues(ctx, c);
+    if (vals.length === 0) return null;
+    return vals.every((v) => BOOL_SET.has(String(v).toLowerCase()))
+      ? { target: name, key: 'role', value: 'flag', confidence: 0.8, source: 'boolean' } : null;
+  }).filter(Boolean),
+};
+
+const dateH = {
+  name: 'date', pack: 'core',
+  detect: (ctx) => ctx.header.map((name, c) => {
+    const byName = /(^|[_\s])(date|datetime|timestamp|dt)([_\s]|$)/i.test(name);
+    const vals = colValues(ctx, c).slice(0, 20);
+    const parseable = vals.length > 0 && vals.every((v) => /\d{4}-\d{2}-\d{2}/.test(v) || (isNaN(Number(v)) && !isNaN(Date.parse(v))));
+    if (byName && parseable) return { target: name, key: 'role', value: 'date', confidence: 0.85, source: 'date' };
+    if (byName) return { target: name, key: 'role', value: 'date', confidence: 0.6, source: 'date' };
+    if (parseable && /\d{4}-\d{2}-\d{2}/.test(vals[0] || '')) return { target: name, key: 'role', value: 'date', confidence: 0.6, source: 'date' };
+    return null;
+  }).filter(Boolean),
+};
+
+const idH = {
+  name: 'id', pack: 'core',
+  detect: (ctx) => ctx.header.map((name, c) => {
+    const idName = /(^|[_\s])(id|hole|bhid|dhid|holeid|sampleid|sample_id|key)([_\s]|$)/i.test(name) || /id$/i.test(name);
+    const highCard = ctx.distinct && ctx.sampleRows.length >= 8 && ctx.distinct[c] >= ctx.sampleRows.length * 0.98;
+    if (ctx.baseTypes[c] === 'id' || (idName && highCard)) {
+      return { target: name, key: 'role', value: 'id', confidence: idName && highCard ? 0.9 : 0.6, source: 'id' };
+    }
+    return null;
+  }).filter(Boolean),
+};
+
+const corePack = [typeH, constantH, booleanH, dateH, idH];
+
+// ── geo pack ──────────────────────────────────────────────────────────
+const coordsH = {
+  name: 'coords', pack: 'geo',
+  detect: (ctx) => {
+    const { cols, confidence } = guessCoords(ctx.header, ctx.baseTypes);
+    const out = [];
+    for (const axis of ['x', 'y', 'z']) {
+      if (cols[axis]) out.push({ target: cols[axis], key: 'role', value: 'coord-' + axis, confidence: confidence[axis], source: 'coords' });
+    }
+    for (const axis of ['dx', 'dy', 'dz']) {
+      if (cols[axis]) out.push({ target: cols[axis], key: 'role', value: 'size-' + axis, confidence: confidence[axis] || 0.9, source: 'coords' });
+    }
+    return out;
+  },
+};
+
+const unitsH = {
+  name: 'units', pack: 'geo',
+  detect: (ctx) => ctx.header.map((name) => {
+    const u = detectUnit(name);
+    return u ? { target: name, key: 'unit', value: u.unit, confidence: u.confidence, source: 'units' } : null;
+  }).filter(Boolean),
+};
+
+const analyteH = {
+  name: 'analyte', pack: 'geo',
+  // Coord-aware: a column already detected as a coordinate/size axis is NOT an
+  // analyte — resolves single-letter element clashes (a "Y" axis vs Yttrium, "V"
+  // vs Vanadium, etc.). coordsH runs first in the geo pack, so its role
+  // annotations are already in ctx.annotations.
+  detect: (ctx) => {
+    const coords = new Set(ctx.annotations
+      .filter((a) => a.key === 'role' && /^(coord|size)-/.test(a.value))
+      .map((a) => a.target));
+    return ctx.header.map((name) => {
+      if (coords.has(name)) return null;
+      const a = detectAnalyte(name);
+      return a ? { target: name, key: 'analyte', value: a.analyte, confidence: a.confidence, source: 'analyte' } : null;
+    }).filter(Boolean);
+  },
+};
+
+const geoPack = [coordsH, unitsH, analyteH];
+
+// ── src/recon.js ──
+
+// @gcu/recon — the registry + the sniff() runner that assembles the annotated
+// manifest from heuristic output.
+
+
+// Mutable default registry (plugin-over-hardwire: register more packs at will).
+const defaultHeuristics = [...corePack, ...geoPack];
+
+function registerHeuristic(h) {
+  if (!h || typeof h.detect !== 'function') throw new Error('recon: heuristic needs a detect() function');
+  defaultHeuristics.push(h);
+  return h;
+}
+
+// sniff(lines, opts) — sample-phase inference. opts:
+//   delimiter   — override delimiter detection
+//   heuristics  — explicit heuristic list (else defaultHeuristics)
+//   packs       — filter defaultHeuristics by pack name (e.g. ['core'])
+function sniff(lines, opts = {}) {
+  const ctx = buildContext(lines, opts);
+  ctx.annotations = [];
+
+  let heuristics = opts.heuristics || defaultHeuristics;
+  if (opts.packs) heuristics = heuristics.filter((h) => opts.packs.includes(h.pack));
+
+  for (const h of heuristics) {
+    let found = [];
+    try { found = h.detect(ctx) || []; } catch { found = []; }
+    for (const ann of found) ctx.annotations.push({ ...ann, source: ann.source || h.name });
+  }
+
+  return assemble(ctx);
+}
+
+function assemble(ctx) {
+  // best annotation per (target,key) by confidence
+  const best = new Map();           // `${target} ${key}` -> annotation
+  for (const ann of ctx.annotations) {
+    const k = ann.target + ' ' + ann.key;
+    const cur = best.get(k);
+    if (!cur || (ann.confidence ?? 0) > (cur.confidence ?? 0)) best.set(k, ann);
+  }
+  const pick = (target, key) => best.get(target + ' ' + key);
+
+  const columns = ctx.header.map((name, c) => {
+    const col = { name, type: ctx.baseTypes[c], confidence: {} };
+    const t = pick(name, 'type'); if (t) { col.type = t.value; col.confidence.type = t.confidence; }
+    const role = pick(name, 'role'); if (role) { col.role = role.value; col.confidence.role = role.confidence; }
+    const unit = pick(name, 'unit'); if (unit) { col.unit = unit.value; col.confidence.unit = unit.confidence; }
+    const analyte = pick(name, 'analyte'); if (analyte) { col.analyte = analyte.value; col.confidence.analyte = analyte.confidence; }
+    const cst = pick(name, 'constant'); if (cst) { col.constant = true; col.confidence.constant = cst.confidence; }
+    return col;
+  });
+
+  // coordCols from role annotations (coord-x / size-dx / …)
+  const coordCols = {};
+  for (const col of columns) {
+    if (!col.role) continue;
+    const m = col.role.match(/^coord-([xyz])$/);
+    if (m) coordCols[m[1]] = col.name;
+    const d = col.role.match(/^size-(d[xyz])$/);
+    if (d) coordCols[d[1]] = col.name;
+  }
+
+  return {
+    delimiter: ctx.delimiter,
+    header: ctx.header,
+    rowSample: ctx.rowSample,
+    columns,
+    coordCols,
+    facets: { spatial: null },        // filled by inferGeometry after a coord scan
+    annotations: ctx.annotations,
+  };
+}
+
+// ── src/main.js ──
+
+// @gcu/recon — reconnaissance for data: a general, heuristic-driven sniffer.
+//
+// Scouts a sample of tabular data (and, for geometry, a coord scan) and produces
+// an annotated manifest — delimiter, header, types, semantic roles, units,
+// analytes, spatial facet — via a registry of heuristics. Geoscience detection is
+// one registerable pack, not hardcoded. Inference only: no mutation, no reorder,
+// no format reading (sources are sluice/archive/omf). Zero-dep.
+//
+// Module manifest (build concat order):
+//   detect.js     — delimiter, base types, the sniff context, NULL_SENTINELS
+//   naming.js     — column-name analysis: coords, units, analytes (standalone detectors)
+//   geometry.js   — geometryAccumulator (sluice-protocol) + inferGeometry
+//   heuristics.js — corePack + geoPack
+//   recon.js      — registry + sniff() runner + manifest assembly
+  return { NULL_SENTINELS, detectDelimiter, buildContext, XYZ_PATTERNS, DXYZ_PATTERNS, guessCoords, detectUnit, detectAnalyte, geometryAccumulator, inferGeometry, corePack, geoPack, defaultHeuristics, registerHeuristic, sniff };
+})();
+
+/* ==== src/vendor/sift.js ==== */
+const { evaluatePredicate, predicateColumns, validatePredicate, parsePredicate, predicateToString } = (() => {
+// ⚠ VENDORED — DO NOT EDIT. @gcu/sift, copied from ../auditable/ext/sift/index.js (built from its src/ by @gcu/build).
+// Re-vendor by copying that file here.
+
+// ⚠ GENERATED FILE — DO NOT EDIT. Source: src/  Build: @gcu/build src/main.js
+// @gcu/sift — A safe, structured predicate spec (no eval) with a JS-flavoured string parser — the lib the GCU selection/linking contract rests on.
+
+// ── src/predicate.js ──
+
+// @gcu/sift — predicate: a structured, safe boolean-expression spec for filters
+// and cross-surface selections (the selection/linking contract §2).
+//
+// A predicate is plain JSON (structuredClone-transferable), evaluated by WALKING
+// the tree — never eval / new Function — so any surface (even an untrusted one)
+// can apply it over its own data. Users TYPE a JS-flavoured string; the emitter
+// parses it to the spec; only the spec travels. Full-JS power lives in derived
+// columns (owner-evaluated), not here — a user who needs `Math.log(x)` makes a
+// derived boolean column and filters on it (a trivial, safe, travelling predicate).
+//
+// Extracted from strata (its filter engine) once plate became the second
+// consumer — the predicate lib the selection/linking contract rests on. strata
+// build-inlines this file (staying a self-contained leaf); plate consumes it
+// (via strata's re-export); a notebook can load('@gcu/sift') directly. Zero-dep.
+//
+// Spec shapes:
+//   Predicate = { form: 'spec', root: Expr }
+//   Expr (boolean): {op:'and'|'or', args:Expr[]} · {op:'not', arg:Expr}
+//     · {op:'=='|'!='|'<'|'<='|'>'|'>=', left:Term, right:Term}
+//     · {op:'in'|'notin', left:Term, set:Lit[]} · {op:'between', arg:Term, lo:Term, hi:Term}
+//     · {op:'isnull'|'notnull', arg:Term} · {op:'truthy', arg:Term}
+//   Term (value): {col:string} · {lit:value} · {op:'+'|'-'|'*'|'/', left,right} · {op:'neg', arg}
+
+const COMPARE = new Set(['==', '!=', '<', '<=', '>', '>=']);
+const ARITH = new Set(['+', '-', '*', '/']);
+const BOOL_OPS = new Set([...COMPARE, 'and', 'or', 'not', 'in', 'notin', 'between', 'isnull', 'notnull', 'truthy']);
+
+function isValueNode(n) {
+  return n && (('col' in n) || ('lit' in n) || ARITH.has(n.op) || n.op === 'neg');
+}
+function isNullLit(n) { return n && ('lit' in n) && n.lit === null; }
+
+// ── evaluator ──────────────────────────────────────────────────────────
+
+/**
+ * Evaluate a predicate against one row.
+ * @param {object} pred  a Predicate ({form,root}) or a bare Expr
+ * @param {(col:string)=>*} get  resolves a column name → the row's value
+ * @returns {boolean}
+ */
+function evaluatePredicate(pred, get) {
+  return _bool(pred && pred.root ? pred.root : pred, get);
+}
+
+function _val(n, get) {
+  if (n == null) return null;
+  if ('col' in n) { const v = get(n.col); return v === undefined ? null : v; }
+  if ('lit' in n) return n.lit;
+  if (n.op === 'neg') { const a = _val(n.arg, get); return a == null ? null : -a; }
+  if (ARITH.has(n.op)) {
+    const a = _val(n.left, get), b = _val(n.right, get);
+    if (a == null || b == null) return null;
+    switch (n.op) { case '+': return a + b; case '-': return a - b; case '*': return a * b; case '/': return a / b; }
+  }
+  return null;
+}
+
+function _cmp(a, b) { // non-null comparison: numbers numeric, else lexical
+  if (typeof a === 'number' && typeof b === 'number') return a - b;
+  const sa = String(a), sb = String(b);
+  return sa < sb ? -1 : sa > sb ? 1 : 0;
+}
+
+function _truthy(v) { return v != null && v !== false && v !== 0 && v !== ''; }
+
+function _bool(n, get) {
+  if (!n || typeof n.op !== 'string') throw new Error('predicate: not a boolean node');
+  switch (n.op) {
+    case 'and': return n.args.every((x) => _bool(x, get));
+    case 'or': return n.args.some((x) => _bool(x, get));
+    case 'not': return !_bool(n.arg, get);
+    case 'truthy': return _truthy(_val(n.arg, get));
+    case 'isnull': return _val(n.arg, get) == null;
+    case 'notnull': return _val(n.arg, get) != null;
+    case 'in': case 'notin': {
+      const v = _val(n.left, get);
+      const has = v != null && n.set.includes(v);
+      return n.op === 'in' ? has : (v != null && !has);
+    }
+    case 'between': {
+      const v = _val(n.arg, get); if (v == null) return false;
+      const lo = _val(n.lo, get), hi = _val(n.hi, get);
+      if (lo == null || hi == null) return false;
+      return _cmp(v, lo) >= 0 && _cmp(v, hi) <= 0;
+    }
+    default: {
+      if (!COMPARE.has(n.op)) throw new Error('predicate: unknown op "' + n.op + '"');
+      const a = _val(n.left, get), b = _val(n.right, get);
+      // == / != with a null operand → false (null-checks go through isnull/notnull).
+      if (n.op === '==') return a != null && b != null && a === b;
+      if (n.op === '!=') return a != null && b != null && a !== b;
+      if (a == null || b == null) return false;
+      const c = _cmp(a, b);
+      switch (n.op) { case '<': return c < 0; case '<=': return c <= 0; case '>': return c > 0; case '>=': return c >= 0; }
+    }
+  }
+}
+
+// ── deps + validate ────────────────────────────────────────────────────
+
+/** The column names a predicate references (for "can this receiver satisfy it?"). */
+function predicateColumns(pred) {
+  const out = new Set();
+  (function walk(n) {
+    if (!n || typeof n !== 'object') return;
+    if ('col' in n) out.add(n.col);
+    for (const k of ['arg', 'left', 'right', 'lo', 'hi']) if (n[k]) walk(n[k]);
+    if (n.args) n.args.forEach(walk);
+  })(pred && pred.root ? pred.root : pred);
+  return [...out];
+}
+
+/** Shape-check a predicate; throws on a malformed spec. Returns true. */
+function validatePredicate(pred) {
+  (function v(n, ctx) {
+    if (!n || typeof n !== 'object') throw new Error('predicate: expected a node');
+    if ('col' in n || 'lit' in n) return;
+    if (typeof n.op !== 'string') throw new Error('predicate: node needs an op');
+    if (ctx === 'bool' && !BOOL_OPS.has(n.op)) throw new Error('predicate: "' + n.op + '" is not a boolean op');
+    if (n.op === 'and' || n.op === 'or') { if (!Array.isArray(n.args)) throw new Error('predicate: and/or needs args[]'); n.args.forEach((a) => v(a, 'bool')); return; }
+    if (n.op === 'not' || n.op === 'truthy' || n.op === 'isnull' || n.op === 'notnull' || n.op === 'neg') { v(n.arg, n.op === 'not' ? 'bool' : 'val'); return; }
+    if (n.op === 'between') { v(n.arg, 'val'); v(n.lo, 'val'); v(n.hi, 'val'); return; }
+    if (n.op === 'in' || n.op === 'notin') { v(n.left, 'val'); if (!Array.isArray(n.set)) throw new Error('predicate: in/notin needs set[]'); return; }
+    if (COMPARE.has(n.op) || ARITH.has(n.op)) { v(n.left, 'val'); v(n.right, 'val'); return; }
+    throw new Error('predicate: unknown op "' + n.op + '"');
+  })(pred && pred.root ? pred.root : pred, 'bool');
+  return true;
+}
+
+// ── string → spec parser (authoring side only) ─────────────────────────
+// A JS-flavoured expression subset: && || ! , == === != !== < <= > >= ,
+// + - * / , parens, column idents, number/string/bool/null literals. Anything
+// outside (function calls, member access, …) is rejected — that's the safety.
+// `x == null` / `x != null` lower to isnull / notnull. A bare term in boolean
+// position becomes `truthy` (so a derived boolean column filters as `flag`).
+
+function tokenize(s) {
+  const toks = []; let i = 0;
+  while (i < s.length) {
+    const c = s[i];
+    if (/\s/.test(c)) { i++; continue; }
+    if (c === '"' || c === "'") {
+      let j = i + 1, out = '';
+      while (j < s.length && s[j] !== c) { if (s[j] === '\\') { out += s[j + 1]; j += 2; } else { out += s[j++]; } }
+      if (j >= s.length) throw new Error('sift: unterminated string');
+      toks.push({ t: 'lit', v: out }); i = j + 1; continue;
+    }
+    if (/[0-9]/.test(c) || (c === '.' && /[0-9]/.test(s[i + 1] || ''))) {
+      let j = i; while (j < s.length && /[0-9.]/.test(s[j])) j++;
+      toks.push({ t: 'num', v: Number(s.slice(i, j)) }); i = j; continue;
+    }
+    if (/[A-Za-z_$]/.test(c)) {
+      let j = i; while (j < s.length && /[A-Za-z0-9_$]/.test(s[j])) j++;
+      toks.push({ t: 'ident', v: s.slice(i, j) }); i = j; continue;
+    }
+    const three = s.slice(i, i + 3), two = s.slice(i, i + 2);
+    if (three === '===' || three === '!==') { toks.push({ t: 'op', v: three === '===' ? '==' : '!=' }); i += 3; continue; }
+    if (['&&', '||', '==', '!=', '<=', '>='].includes(two)) { toks.push({ t: 'op', v: two }); i += 2; continue; }
+    if ('!<>+-*/'.includes(c)) { toks.push({ t: 'op', v: c }); i++; continue; }
+    if (c === '(') { toks.push({ t: 'lparen' }); i++; continue; }
+    if (c === ')') { toks.push({ t: 'rparen' }); i++; continue; }
+    throw new Error('sift: unexpected character "' + c + '"');
+  }
+  return toks;
+}
+
+function asBool(node) { return isValueNode(node) ? { op: 'truthy', arg: node } : node; }
+
+/** Parse a filter string → { form:'spec', root }. Throws on disallowed syntax. */
+function parsePredicate(str) {
+  const toks = tokenize(str);
+  let p = 0;
+  const peek = () => toks[p];
+  const isOp = (v) => peek() && peek().t === 'op' && peek().v === v;
+
+  function flatten(op, a, b) { const r = []; for (const x of [a, b]) { if (x.op === op) r.push(...x.args); else r.push(x); } return r; }
+
+  function parseOr() { let l = parseAnd(); while (isOp('||')) { p++; l = { op: 'or', args: flatten('or', l, parseAnd()) }; } return l; }
+  function parseAnd() { let l = asBool(parseCmp()); while (isOp('&&')) { p++; l = { op: 'and', args: flatten('and', l, asBool(parseCmp())) }; } return l; }
+  function parseCmp() {
+    const left = parseAdd();
+    if (peek() && peek().t === 'op' && COMPARE.has(peek().v)) {
+      const op = peek().v; p++;
+      const right = parseAdd();
+      if ((op === '==' || op === '!=') && isNullLit(right)) return { op: op === '==' ? 'isnull' : 'notnull', arg: left };
+      if ((op === '==' || op === '!=') && isNullLit(left)) return { op: op === '==' ? 'isnull' : 'notnull', arg: right };
+      return { op, left, right };
+    }
+    return left;
+  }
+  function parseAdd() { let l = parseMul(); while (isOp('+') || isOp('-')) { const op = peek().v; p++; l = { op, left: l, right: parseMul() }; } return l; }
+  function parseMul() { let l = parseUnary(); while (isOp('*') || isOp('/')) { const op = peek().v; p++; l = { op, left: l, right: parseUnary() }; } return l; }
+  function parseUnary() {
+    if (isOp('!')) { p++; return { op: 'not', arg: asBool(parseUnary()) }; }
+    if (isOp('-')) { p++; return { op: 'neg', arg: parseUnary() }; }
+    return parsePrimary();
+  }
+  function parsePrimary() {
+    const t = peek();
+    if (!t) throw new Error('sift: unexpected end of expression');
+    if (t.t === 'num') { p++; return { lit: t.v }; }
+    if (t.t === 'lit') { p++; return { lit: t.v }; }
+    if (t.t === 'lparen') { p++; const e = parseOr(); if (!peek() || peek().t !== 'rparen') throw new Error('sift: expected ")"'); p++; return e; }
+    if (t.t === 'ident') {
+      p++;
+      if (t.v === 'true') return { lit: true };
+      if (t.v === 'false') return { lit: false };
+      if (t.v === 'null') return { lit: null };
+      if (peek() && peek().t === 'lparen') throw new Error('sift: function calls are not allowed — use a derived column for full-JS logic');
+      return { col: t.v };
+    }
+    throw new Error('sift: unexpected token "' + (t.v != null ? t.v : t.t) + '"');
+  }
+
+  const root = asBool(parseOr());
+  if (p < toks.length) throw new Error('sift: unexpected token after expression');
+  return { form: 'spec', root };
+}
+
+// ── spec → string (for display / audit / round-trip) ───────────────────
+
+const PARENS = new Set(['and', 'or']);
+
+function predicateToString(pred) {
+  return _str(pred && pred.root ? pred.root : pred);
+}
+function _str(n) {
+  if (!n) return '';
+  if ('col' in n) return n.col;
+  if ('lit' in n) { const v = n.lit; return typeof v === 'string' ? JSON.stringify(v) : String(v); }
+  switch (n.op) {
+    case 'and': return n.args.map(_wrap).join(' && ');
+    case 'or': return n.args.map(_wrap).join(' || ');
+    case 'not': return '!' + _wrap(n.arg);
+    case 'neg': return '-' + _wrap(n.arg);
+    case 'truthy': return _str(n.arg);
+    case 'isnull': return _str(n.arg) + ' == null';
+    case 'notnull': return _str(n.arg) + ' != null';
+    case 'in': return _str(n.left) + ' in [' + n.set.map((x) => JSON.stringify(x)).join(', ') + ']';
+    case 'notin': return _str(n.left) + ' notin [' + n.set.map((x) => JSON.stringify(x)).join(', ') + ']';
+    case 'between': return _str(n.arg) + ' between ' + _str(n.lo) + ' and ' + _str(n.hi);
+    default: return _str(n.left) + ' ' + n.op + ' ' + _str(n.right);
+  }
+}
+function _wrap(n) { return n && PARENS.has(n.op) ? '(' + _str(n) + ')' : _str(n); }
+
+// ── src/main.js ──
+
+// @gcu/sift — the safe, structured predicate lib the selection/linking contract
+// rests on. One module today (predicate.js); kept as a manifest for symmetry
+// with the other concat libs and room to grow (e.g. a set-algebra combinator).
+//
+// Module manifest (build concat order):
+//   predicate.js — structured boolean-expr spec + validator + evaluator + parser
+  return { evaluatePredicate, predicateColumns, validatePredicate, parsePredicate, predicateToString };
+})();
 
 /* ==== src/engine/table.js ==== */
-// The open table: a synthetic drillhole set and a histogram with summary statistics.
-// Sample data, labelled as such in every result it reaches.
+const { makeData, sampleTable, ELEMENT, parseDelimited, tableFromText, openTable, colOf, stats, whereToSift } = (() => {
+// The open table: a real delimited file typed by @gcu/recon, or the synthetic sample; a histogram; and
+// table questions in controlled English answered through @gcu/sadpan and @gcu/sift (all vendored).
+// Sample data stays labelled as sample data; a file is named on every card that reads it.
 
+/* ── the sample ────────────────────────────────────────────── */
 function mulberry(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 function makeData() {
   const r = mulberry(20261008), g = () => Math.sqrt(-2 * Math.log(1 - r())) * Math.cos(2 * Math.PI * r()), rows = [], MU = { GRD: Math.log(.25), BRX: Math.log(.8), DYK: Math.log(.03) };
@@ -6637,81 +7422,311 @@ function makeData() {
   }
   return rows;
 }
-// summary statistics through @gcu/sadpan (vendored): sample standard deviation, median of the sorted values
+const SAMPLE_COLS = [{ name: 'hole', type: 'categorical' }, { name: 'from', type: 'numeric', unit: 'm' }, { name: 'to', type: 'numeric', unit: 'm' }, { name: 'lith', type: 'categorical' }, { name: 'cu', type: 'numeric', unit: '%', analyte: 'Cu' }, { name: 'au', type: 'numeric', unit: 'g/t', analyte: 'Au' }];
+const sampleTable = () => ({ name: 'assays.csv', source: 'sample', hash: 'sample', rows: makeData(), roles: { hole: 'hole', from: 'from', to: 'to' }, cols: SAMPLE_COLS });
+
+/* ── a file: delimited text → a typed table ────────────────── */
+const ELEMENT = { Cu: 'copper', Au: 'gold', Ag: 'silver', Fe: 'iron', Ni: 'nickel', Zn: 'zinc', Pb: 'lead', Co: 'cobalt', Mn: 'manganese', Al: 'aluminium', S: 'sulfur', As: 'arsenic', Mo: 'molybdenum', U: 'uranium', Li: 'lithium', Sn: 'tin', W: 'tungsten', Cr: 'chromium', Ti: 'titanium', P: 'phosphorus' };
+function parseDelimited(text, delim) {
+  const rows = []; let row = [], field = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) { if (c === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else q = false; } else field += c; }
+    else if (c === '"') q = true;
+    else if (c === delim) { row.push(field); field = ''; }
+    else if (c === '\n' || c === '\r') { if (c === '\r' && text[i + 1] === '\n') i++; row.push(field); rows.push(row); row = []; field = ''; }
+    else field += c;
+  }
+  if (field.length || row.length) { row.push(field); rows.push(row); }
+  return rows.filter(r => r.length > 1 || (r.length === 1 && r[0].trim() !== ''));
+}
+const isSentinel = v => v === '' || NULL_SENTINELS.has(String(v).trim());
+const ROLE = { hole: /^(hole|holeid|hole_id|bhid|dhid|dh|drillhole|collar)$/i, from: /^(from|depth_from|from_m|depthfrom|start)$/i, to: /^(to|depth_to|to_m|depthto|end)$/i };
+// recon types the columns from a sample of lines; the parse then follows those types
+function tableFromText(name, text, hash) {
+  const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');
+  if (lines.length < 2) return null;
+  const m = sniff(lines.slice(0, 300));
+  const grid = parseDelimited(text, m.delimiter), header = grid[0].map(h => h.trim());
+  const cols = header.map((h, i) => { const c = m.columns.find(x => x.name === h) || { type: 'categorical' }; const an = detectAnalyte(h); return { name: h, type: c.type === 'numeric' ? 'numeric' : 'categorical', unit: c.unit, analyte: an ? an.analyte : undefined, i }; });
+  const rows = grid.slice(1).map(r => { const o = {}; cols.forEach(c => { const raw = (r[c.i] ?? '').trim(); o[c.name] = isSentinel(raw) ? null : c.type === 'numeric' ? (isNaN(+raw) ? null : +raw) : raw; }); return o; });
+  const roles = {}; for (const [k, re] of Object.entries(ROLE)) { const c = cols.find(x => re.test(x.name)); if (c) roles[k] = c.name; }
+  if (!(roles.from && roles.to)) { delete roles.from; delete roles.to; }
+  return { name, source: 'file', hash, rows, cols: cols.map(({ i, ...c }) => c), roles, delimiter: m.delimiter };
+}
+const openTable = t => { S.table = t; return t; };
+// a column by what the person called it: its name, its analyte symbol or element name, or a unique start
+function colOf(word, table = S.table) {
+  if (!table) return null;
+  const w = String(word).trim().toLowerCase();
+  const byName = table.cols.find(c => c.name.toLowerCase() === w); if (byName) return byName;
+  const an = detectAnalyte(w) ? detectAnalyte(w).analyte : Object.keys(ELEMENT).find(k => ELEMENT[k] === w);
+  if (an) { const c = table.cols.find(c => c.analyte === an); if (c) return c; }
+  const starts = table.cols.filter(c => c.name.toLowerCase().startsWith(w));
+  return starts.length === 1 ? starts[0] : null;
+}
+const colNames = t => t.cols.map(c => c.name).join(', ');
+const shown = w => { const c = colOf(w, S.table || { cols: SAMPLE_COLS }); return c ? (c.analyte || c.name) : w; };
+const srcLine = t => t.source === 'sample' ? 'assays.csv · synthetic sample generated for this mock' : `${t.name} · ${t.rows.length} rows · typed by @gcu/recon`;
+
+/* ── statistics, weighted or not ───────────────────────────── */
 function stats(v) {
   const s = series(v), sd = s.std();
   return { n: s.count(), mean: s.mean(), sd, va: sd * sd, min: s.min(), med: s.median(), max: s.max() };
 }
-const UNIT = { cu: '%', au: 'g/t' }, COL = { cu: 'Cu', au: 'Au' };
-const colOf = w => w[0] === 'c' ? 'cu' : 'au';
-// the precondition "a table is open": asked once, then satisfied as a plan step the args remember
-function needData(a, trace) {
-  if (S.data) return null;
+// weighted mean, standard deviation and quantiles; with equal weights these agree with stats()
+function wstats(v, w) {
+  const W = w.reduce((a, b) => a + b, 0), mean = v.reduce((a, x, i) => a + x * w[i], 0) / W;
+  const va = v.reduce((a, x, i) => a + w[i] * (x - mean) ** 2, 0) / W * (v.length / Math.max(1, v.length - 1));
+  const idx = v.map((_, i) => i).sort((a, b) => v[a] - v[b]);
+  const q = p => { let acc = 0; for (const i of idx) { acc += w[i]; if (acc / W >= p) return v[i]; } return v[idx[idx.length - 1]]; };
+  return { n: v.length, mean, sd: Math.sqrt(va), va, min: Math.min(...v), max: Math.max(...v), med: q(.5), q, W };
+}
+
+/* ── the precondition: a table is open ─────────────────────── */
+// asked once, then satisfied as a plan step the args remember
+function needTable(a, trace) {
+  if (S.table) return null;
   if (!a.auto) return { prompt: 'No table is open. Open the sample table first?', options: [{ label: 'open assays.csv', value: true }], set: (x, v) => { x.auto = v; } };
-  S.data = makeData(); trace.push('open assays.csv (precondition, added to the plan)');
+  openTable(sampleTable()); trace.push('open assays.csv (precondition, added to the plan)');
   return null;
 }
 tool({
   name: 'open', rank: 50,
-  skill: { group: 'Table', title: 'Open and validate', on: 'sadpan · tare', about: 'Typed columns, interval checks, flags for suspicious codes.', examples: ['open assays.csv'] },
-  read: (text, q) => /^open (.+\.csv|the sample|sample|assays)$/.test(q) ? {} : null,
-  run: () => {
-    S.data = makeData();
-    const d = S.data, holes = new Set(d.map(r => r.hole)).size, n1 = d.filter(r => r.to - r.from === 1).length, neg = d.filter(r => r.au < 0).length;
+  skill: { group: 'Table', title: 'Open and validate', on: '@gcu/recon · sadpan', about: 'A CSV or TSV from your files, typed by recon: numbers, categories, units, analytes, hole and interval columns.', examples: ['open assays.csv'] },
+  read: (text, q) => { let m; if (/^open (?:the sample|sample|assays|assays\.csv)$/.test(q)) return {}; if ((m = /^open (.+)$/.exec(q))) { const f = Object.values(S.files).find(f => f.name.toLowerCase() === m[1]); return f ? { file: { name: f.name, hash: f.hash } } : null; } return null; },
+  topic: () => null,
+  run: a => {
+    let t;
+    if (a.file) {
+      const f = S.files[a.file.hash];
+      if (!f) return { read: ['open table', { v: a.file.name }], body: [{ t: 'note', kind: 'err', text: `${a.file.name} is not kept on this device. Open it again from your files.` }], trace: ['file: not in the device store'] };
+      t = tableFromText(a.file.name, f.text, a.file.hash);
+      if (!t) return { read: ['open table', { v: a.file.name }], body: [{ t: 'note', kind: 'err', text: `${a.file.name} has no table in it: fewer than two lines.` }], trace: ['recon: nothing to type'] };
+    } else t = sampleTable();
+    openTable(t);
+    const n1 = t.roles.from ? t.rows.filter(r => r[t.roles.to] - r[t.roles.from] === 1).length : 0, holes = t.roles.hole ? new Set(t.rows.map(r => r[t.roles.hole])).size : 0;
+    const bdl = t.cols.filter(c => c.type === 'numeric').map(c => [c.name, t.rows.filter(r => r[c.name] != null && r[c.name] < 0).length]).filter(x => x[1]);
+    const nulls = t.rows.reduce((n, r) => n + Object.values(r).filter(v => v == null).length, 0);
+    const rows = [['rows', `${t.rows.length}${holes ? ` samples in ${holes} holes` : ''}`], ['columns', t.cols.map(c => `${c.name} (${c.type === 'numeric' ? (c.unit || 'number') : 'category'}${c.analyte ? ', ' + c.analyte : ''})`).join(' · ')]];
+    if (t.roles.from) rows.push(['intervals', `${t.roles.from} to ${t.roles.to}${t.roles.hole ? ' by ' + t.roles.hole : ''}; ${n1} samples of 1 m`]);
+    const trace = [t.source === 'sample' ? 'generate the sample table' : `recon.sniff(${t.name}) → delimiter "${t.delimiter}", ${t.cols.length} columns typed`, `roles: ${Object.entries(t.roles).map(([k, v]) => `${k} = ${v}`).join(', ') || 'none found'}`, `tare: ${nulls} blank or sentinel cells, ${bdl.map(([c, n]) => `${n} negative ${c}`).join(', ') || 'no negative codes'}`];
     return {
-      read: ['open table', { v: 'assays.csv' }],
-      body: [
-        { t: 'kv', rows: [['rows', `${d.length} samples in ${holes} holes`], ['columns', 'hole (id) · from, to (m) · lith (category) · cu (%) · au (g/t)'], ['lengths', `${n1} samples of 1 m, ${d.length - n1} of 2 m`], ['lith', [...new Set(d.map(r => r.lith))].join(', ')]] },
-        ...(neg ? [{ t: 'note', text: `${neg} Au values are −0.01. That looks like a below-detection code. Statistics leave them out until you say what they mean.` }] : []),
-        { t: 'src', text: 'synthetic table generated for this mock · sadpan + tare checks' }
-      ],
-      trace: ['read assays.csv → typed columns', 'tare: intervals contiguous, no overlaps', `tare: ${neg} negative Au values flagged`], py: 'dh = read_csv("assays.csv")'
+      read: ['open table', { v: t.name }],
+      body: [{ t: 'kv', rows }, ...(bdl.length ? [{ t: 'note', text: `${bdl.map(([c, n]) => `${n} ${c} values are negative`).join('; ')}. That looks like a below-detection code. Statistics leave them out until you choose a policy on a card.` }] : []), { t: 'src', text: srcLine(t) }],
+      trace, py: `dh = read_csv("${t.name}")`
     };
   }
 });
 frame({
   name: 'open', label: 'Open', words: ['open', 'load'], theme: ['table'], required: ['theme'], roles: {},
   words_pt: ['abrir', 'abre', 'carregar', 'carrega'], label_pt: 'Abrir',
-  bind: () => ({ tool: 'open', args: {} })
+  bind: c => { const v = c.theme[0] && c.theme[0].value; const f = v && Object.values(S.files).find(f => f.name.toLowerCase() === String(v).toLowerCase()); return f ? { tool: 'open', args: { file: { name: f.name, hash: f.hash } } } : { tool: 'open', args: {} }; }
 });
+
+/* ── values of a column, with the below-detection policy ───── */
+// numbers of a column after the policy: exclude (default) | half | limit | zero for negative codes
+function column(rows, col, bdl = 'exclude') {
+  const out = [], skipped = { null: 0, bdl: 0 };
+  for (const r of rows) {
+    const v = r[col];
+    if (v == null) { skipped.null++; continue; }
+    if (v < 0) { skipped.bdl++; if (bdl === 'exclude') continue; out.push(bdl === 'zero' ? 0 : bdl === 'half' ? -v / 2 : -v); continue; }
+    out.push(v);
+  }
+  return { v: out, skipped };
+}
+const BDL = ['exclude', 'half', 'limit', 'zero'];
+const bdlSlot = (a, skipped) => skipped.bdl ? [{ v: `below detection: ${a.bdl || 'exclude'}`, key: 'bdl', alts: BDL, cur: a.bdl || 'exclude' }] : [];
+
 tool({
   name: 'hist', rank: 51,
-  skill: { group: 'Table', title: 'Histogram', on: 'sadpan · @gcu/plot', about: 'Amend it afterwards with “log scale”.', examples: ['histogram of cu'] },
-  read: (text, q) => { const m = /^hist(?:ogram)? (?:of )?(cu|au|copper|gold)( (?:in )?log(?: scale)?)?$/.exec(q); return m ? { col: colOf(m[1]), log: !!m[2] } : null; },
+  skill: { group: 'Table', title: 'Histogram', on: '@gcu/sadpan · @gcu/plot', about: 'Any numeric column of the open table. Amend it afterwards with “log scale”.', examples: ['histogram of cu'] },
+  read: (text, q) => { const m = /^hist(?:ogram)? (?:of )?(\w+)( (?:in )?log(?: scale)?)?$/.exec(q); return m ? { col: m[1], log: !!m[2] } : null; },
   amend: [{ arg: 'log', match: /^(?:in )?(log|linear)(?: scale)?$/, value: m => m[1] === 'log' }],
-  topic: a => [COL[a.col] + ' histogram', 3],
+  topic: a => [`${shown(a.col)} histogram`, 3],
   run: a => {
-    const trace = [], ask = needData(a, trace);
-    const read = ['histogram of', { v: COL[a.col] }, { v: a.log ? 'log scale' : 'linear scale', key: 'log', alts: [false, true], cur: !!a.log }];
-    if (ask) return { read, ask, body: [], trace: ['blocked: needs an open table'] };
-    const raw = S.data.map(r => r[a.col]), v = raw.filter(x => x > 0), st = stats(v), f = a.log ? Math.log10 : x => x, lo = a.log ? f(st.min) : 0, hi = f(st.max), nb = 18, bins = new Array(nb).fill(0);
-    v.forEach(x => { bins[Math.min(nb - 1, Math.floor((f(x) - lo) / (hi - lo) * nb))]++; });
+    const trace = [], ask = needTable(a, trace);
+    if (ask) return { read: ['histogram of', { v: a.col }], ask, body: [], trace: ['blocked: needs an open table'] };
+    const c = colOf(a.col); if (!c) return null;
+    if (c.type !== 'numeric') return { read: ['histogram of', { v: c.name }], body: [{ t: 'note', kind: 'err', text: `${c.name} is a category, not a number. Try "count by ${c.name}".` }], trace: [...trace, 'column is categorical'] };
+    const unit = c.unit || '';
+    const { v: all, skipped } = column(S.table.rows, c.name, a.bdl), v = all.filter(x => x > 0);
+    const read = ['histogram of', { v: c.name }, { v: a.log ? 'log scale' : 'linear scale', key: 'log', alts: [false, true], cur: !!a.log }, ...bdlSlot(a, skipped)];
+    if (v.length < 2) return { read, body: [{ t: 'note', kind: 'err', text: `${c.name} has ${v.length} positive value${v.length === 1 ? '' : 's'}; nothing to bin.` }], trace };
+    const st = stats(v), f = a.log ? Math.log10 : x => x, lo = a.log ? f(st.min) : 0, hi = f(st.max), nb = 18, bins = new Array(nb).fill(0);
+    v.forEach(x => { bins[Math.min(nb - 1, Math.floor((f(x) - lo) / Math.max(1e-12, hi - lo) * nb))]++; });
     const inv = t => a.log ? Math.pow(10, t) : t;
-    trace.push(`select ${a.col}; drop ${raw.length - v.length} non-positive values`, `bin into ${nb} ${a.log ? 'log10' : 'linear'} classes`);
+    trace.push(`select ${c.name}; skip ${skipped.null} blank, ${skipped.bdl} below-detection (${a.bdl || 'exclude'}), ${all.length - v.length} non-positive`, `bin into ${nb} ${a.log ? 'log10' : 'linear'} classes`);
     return {
       read,
       body: [
-        { t: 'bars', label: `Histogram of ${COL[a.col]}`, bins, ticks: [0, .5, 1].map(t => fmt(inv(lo + t * (hi - lo)), 2)) },
-        { t: 'kv', rows: [['n', String(st.n)], ['mean', `${fmt(st.mean, 3)} ${UNIT[a.col]}`], ['median', `${fmt(st.med, 3)} ${UNIT[a.col]}`], ['cv', fmt(st.sd / st.mean, 3)], ['range', `${fmt(st.min, 3)} to ${fmt(st.max, 3)} ${UNIT[a.col]}`]] },
-        { t: 'src', text: '@gcu/sadpan · vendored · sample-count weighted' }
+        { t: 'bars', label: `Histogram of ${c.name}`, bins, ticks: [0, .5, 1].map(t => fmt(inv(lo + t * (hi - lo)), 2)) },
+        { t: 'kv', rows: [['n', String(st.n)], ['mean', `${fmt(st.mean, 3)} ${unit}`], ['median', `${fmt(st.med, 3)} ${unit}`], ['cv', fmt(st.sd / st.mean, 3)], ['range', `${fmt(st.min, 3)} to ${fmt(st.max, 3)} ${unit}`]] },
+        { t: 'src', text: `@gcu/sadpan · vendored · sample-count weighted · ${srcLine(S.table)}` }
       ],
-      trace, py: `plot.hist(dh["${a.col}"][dh["${a.col}"] > 0], bins=${nb}${a.log ? ', log=True' : ''})`
+      trace, py: `plot.hist(dh["${c.name}"][dh["${c.name}"] > 0], bins=${nb}${a.log ? ', log=True' : ''})`
     };
   }
 });
-// "histogram of cu", "plot a histogram of gold in log scale"
+// "histogram of cu", "plot a histogram of fe in log scale"
 frame({
   name: 'plot', label: 'Plot', words: ['plot', 'draw', 'show', 'display'], elidable: true,
   theme: ['plot'], required: ['theme', 'of'], roles: { of: { preps: ['of', 'for'], types: ['variable'] }, scale: { preps: ['in', 'on', 'with'], types: ['scale'] } },
   words_pt: ['plotar', 'plota', 'mostrar', 'mostra', 'desenhar', 'desenha'], label_pt: 'Plotar',
   bind: c => {
     const kind = c.theme[0] && c.theme[0].value, v = c.roles.of && c.roles.of[0]; if (!kind || !v || !v.value) return null;
-    const col = v.value.toLowerCase();
-    return kind === 'histogram' ? { tool: 'hist', args: { col, log: !!(c.roles.scale && c.roles.scale[0].value === 'log') } } : null;
+    return kind === 'histogram' ? { tool: 'hist', args: { col: v.value, log: !!(c.roles.scale && c.roles.scale[0].value === 'log') } } : null;
   }
 });
 
+/* ── table questions in controlled English ─────────────────── */
+const AGGS = { mean: 'mean', average: 'mean', avg: 'mean', median: 'median', sum: 'sum', total: 'sum', min: 'min', minimum: 'min', max: 'max', maximum: 'max', std: 'std', stdev: 'std', 'standard deviation': 'std', variance: 'var', cv: 'cv', count: 'count' };
+const AGGRE = '(?:mean|average|avg|median|sum|total|min(?:imum)?|max(?:imum)?|std(?:ev)?|standard deviation|variance|cv|count|p\\d{1,2})';
+const aggOf = w => AGGS[w] || (/^p\d{1,2}$/.test(w) ? w : null);
+const num = s => /^-?\d+(\.\d+)?$/.test(s) ? s : `"${s.replace(/"/g, '')}"`;
+const lit = (table, colName, s) => { if (/^-?\d+(\.\d+)?$/.test(s)) return s; const c = table.cols.find(x => x.name === colName); if (c && c.type === 'categorical') { const hit = table.rows.map(r => r[colName]).find(v => v != null && String(v).toLowerCase() === s.toLowerCase()); if (hit != null) return num(String(hit)); } return num(s); };
+// controlled English conditions → a sift predicate source: "cu > 0.5 and lith is brx" → cu > 0.5 && lith == "brx"
+function whereToSift(text, table) {
+  let s = ' ' + text.trim() + ' ';
+  const col = w => { const c = colOf(w, table); if (!c) throw new Error(`no column called "${w}"; the table has ${colNames(table)}`); return c.name; };
+  s = s.replace(/\b(\w+) between (\S+) and (\S+)/gi, (_, c, a, b) => `(${col(c)} >= ${a} && ${col(c)} <= ${b})`);
+  s = s.replace(/\b(\w+) (?:is )?in ((?:[\w.-]+,? ?)+)/gi, (_, c, list) => '(' + list.split(/,\s*|\s+/).filter(Boolean).map(v => `${col(c)} == ${lit(table, col(c), v)}`).join(' || ') + ')');
+  s = s.replace(/\b(\w+) is (?:not )?(?:blank|null|empty|missing)/gi, (m, c) => `${col(c)} ${/ not /.test(m) ? '!=' : '=='} null`);
+  s = s.replace(/\b(\w+) (?:is )?(above|over|greater than|more than|at least|below|under|less than|at most|is not|is|=|==|!=|>=|<=|>|<) (\S+)/gi, (_, c, op, v) => {
+    const o = { above: '>', over: '>', 'greater than': '>', 'more than': '>', 'at least': '>=', below: '<', under: '<', 'less than': '<', 'at most': '<=', 'is not': '!=', is: '==', '=': '==', '==': '==', '!=': '!=', '>=': '>=', '<=': '<=', '>': '>', '<': '<' }[op.toLowerCase()];
+    return `${col(c)} ${o} ${lit(table, col(c), v)}`;
+  });
+  s = s.replace(/\bnot \(/gi, '!(').replace(/ and /gi, ' && ').replace(/ or /gi, ' || ');
+  const pred = parsePredicate(s.trim());
+  return { src: s.trim(), pred };
+}
+function readQuery(text, q) {
+  let m, weight, view;
+  if ((m = /^(.*?) weighted by (length|count|samples?)$/.exec(q))) { q = m[1]; weight = m[2] === 'length' ? 'length' : 'count'; }
+  if ((m = /^(.*?) as a (chart|table)$/.exec(q))) { q = m[1]; view = m[2]; }
+  const base = { weight, view };
+  if ((m = /^check (intervals|overlaps|gaps)(?: by (\w+))?$/.exec(q))) return { ...base, kind: 'check', by: m[2] };
+  if ((m = /^correlation (?:of|between) (\w+) and (\w+)(?: where (.+))?$/.exec(q))) return { ...base, kind: 'corr', cols: [m[1], m[2]], where: m[3] };
+  if ((m = /^(?:distinct|unique|values of) (\w+)(?: where (.+))?$/.exec(q))) return { ...base, kind: 'distinct', cols: [m[1]], where: m[2] };
+  if ((m = /^(?:how many(?: \w+)?|count)(?: where (.+?))?(?: by (\w+(?: and \w+)?))?(?: where (.+))?$/.exec(q))) return { ...base, kind: 'count', by: m[2] ? m[2].split(' and ') : undefined, where: m[1] || m[3] };
+  if ((m = /^(?:show |list )?(?:top (\d+) )?rows(?: where (.+?))?(?: sorted by (\w+)( descending| desc| ascending| asc)?)?$/.exec(q))) return { ...base, kind: 'list', limit: m[1] ? +m[1] : 20, where: m[2], sort: m[3], desc: /desc/.test(m[4] || '') };
+  if ((m = new RegExp(`^(${AGGRE}(?: and ${AGGRE})*) (?:of )?(\\w+(?: and \\w+)*)(?: by (\\w+(?: and \\w+)?))?(?: where (.+))?$`).exec(q))) {
+    const aggs = m[1].split(' and ').map(aggOf); if (aggs.some(x => !x)) return null;
+    return { ...base, kind: 'agg', aggs, cols: m[2].split(' and '), by: m[3] ? m[3].split(' and ') : undefined, where: m[4] };
+  }
+  return null;
+}
+const aggLabel = a => a === 'var' ? 'variance' : a === 'cv' ? 'cv' : a;
+function aggregate(agg, v, w) {
+  if (!v.length) return null;
+  if (agg === 'count') return v.length;
+  const st = w ? wstats(v, w) : stats(v);
+  if (agg === 'median') return st.med;
+  if (/^p\d/.test(agg)) { const p = +agg.slice(1) / 100; if (w) return st.q(p); const s = [...v].sort((a, b) => a - b); return s[Math.min(s.length - 1, Math.ceil(p * s.length) - 1)]; }
+  if (agg === 'sum') return w ? v.reduce((a, x, i) => a + x * w[i], 0) : v.reduce((a, b) => a + b, 0);
+  if (agg === 'var') return st.va;
+  if (agg === 'cv') return st.sd / st.mean;
+  return st[agg];
+}
+tool({
+  name: 'query', rank: 49,
+  skill: { group: 'Table', title: 'Table questions', on: '@gcu/sift · @gcu/sadpan', about: 'Means, medians, percentiles, counts, lists and correlations in controlled English, with where and by.', examples: ['mean cu by lith where au > 0.1', 'how many samples where cu > 0.5 and lith is BRX', 'top 5 rows sorted by au descending', 'check intervals'] },
+  read: readQuery,
+  amend: [
+    { arg: 'by', match: /^by (\w+(?: and \w+)?)$/, value: m => m[1].split(' and ') },
+    { arg: 'where', match: /^where (.+)$/ },
+    { arg: 'weight', match: /^weighted by (length|count|samples?)$/, value: m => m[1] === 'length' ? 'length' : 'count' },
+    { arg: 'view', match: /^as a (chart|table)$/ },
+    { arg: 'aggs', match: new RegExp(`^and (${AGGRE})$`), value: (m, a) => a.aggs ? [...a.aggs, aggOf(m[1])] : null }
+  ],
+  topic: a => a.kind === 'agg' ? [`${a.cols.map(shown).join(', ')} ${a.aggs.map(aggLabel).join(', ')}`, 2] : [`${a.kind} ${a.cols ? a.cols.map(shown).join(', ') : ''}`.trim(), 2],
+  run: a => {
+    const trace = [], ask = needTable(a, trace);
+    const refuse = (read, text) => ({ read, body: [{ t: 'note', kind: 'err', text }, { t: 'src', text: S.table ? srcLine(S.table) : '' }], trace: [...trace, 'stop'] });
+    if (ask) return { read: [a.kind, 'over the table'], ask, body: [], trace: ['blocked: needs an open table'] };
+    const T = S.table, R = T.roles;
+    const want = (a.cols || []).map(w => [w, colOf(w)]), missing = want.find(([, c]) => !c);
+    if (missing) return refuse([a.kind, { v: missing[0] }], `No column called "${missing[0]}". The table has ${colNames(T)}.`);
+    const cols = want.map(([, c]) => c);
+    const bys = (a.by || []).map(w => [w, colOf(w)]), missingBy = bys.find(([, c]) => !c);
+    if (missingBy) return refuse([a.kind, 'by', { v: missingBy[0] }], `No column called "${missingBy[0]}". The table has ${colNames(T)}.`);
+    const by = bys.map(([, c]) => c);
+    let rows = T.rows, whereText = null;
+    if (a.where) {
+      let p; try { p = whereToSift(a.where, T); } catch (e) { return refuse([a.kind, 'where', { v: a.where }], e.message); }
+      rows = rows.filter(r => evaluatePredicate(p.pred, c => r[c])); whereText = predicateToString(p.pred);
+      trace.push(`sift: ${p.src} → ${rows.length} of ${T.rows.length} rows`);
+    }
+    const weight = a.weight || (R.from && a.kind === 'agg' ? 'length' : 'count');
+    const read = [];
+    const weightSlot = R.from && a.kind === 'agg' ? [{ v: `weighted by ${weight}`, key: 'weight', alts: ['length', 'count'], cur: weight }] : [];
+    const src = { t: 'src', text: `@gcu/sift · @gcu/sadpan · vendored · ${srcLine(T)}` };
+    const groups = by.length ? [...rows.reduce((m, r) => { const k = by.map(c => r[c.name] ?? '(blank)').join(' / '); (m.get(k) || m.set(k, []).get(k)).push(r); return m; }, new Map())] : [[null, rows]];
+    if (a.kind === 'count') {
+      read.push('count rows', ...(by.length ? ['by', { v: by.map(c => c.name).join(' and ') }] : []), ...(whereText ? ['where', { v: whereText }] : []));
+      if (!by.length) return { read, value: rows.length, body: [{ t: 'big', v: String(rows.length), unit: 'rows' }, src], trace: [...trace, `count → ${rows.length}`], py: `len(dh${a.where ? `.query('${a.where}')` : ''})` };
+      const out = groups.map(([k, g]) => [k, g.length]).sort((x, y) => y[1] - x[1]);
+      return { read, body: [{ t: 'table', head: [by.map(c => c.name).join(' / '), 'rows'], num: [false, true], rows: out.map(([k, n]) => [k, String(n)]) }, ...(a.view !== 'table' && out.length >= 2 && out.length <= 20 ? [{ t: 'hbars', rows: out.map(([k, n]) => [k, n, String(n)]) }] : []), src], trace: [...trace, `group by ${by.map(c => c.name).join(', ')} → ${out.length} groups`], py: `dh.groupby(${JSON.stringify(by.map(c => c.name))}).size()` };
+    }
+    if (a.kind === 'distinct') {
+      const c = cols[0], counts = new Map(); rows.forEach(r => { const k = r[c.name] ?? '(blank)'; counts.set(k, (counts.get(k) || 0) + 1); });
+      const out = [...counts].sort((x, y) => y[1] - x[1]);
+      read.push('distinct values of', { v: c.name }, ...(whereText ? ['where', { v: whereText }] : []));
+      return { read, body: [{ t: 'table', head: [c.name, 'rows'], num: [false, true], rows: out.map(([k, n]) => [String(k), String(n)]) }, src], trace: [...trace, `distinct ${c.name} → ${out.length} values`], py: `dh["${c.name}"].value_counts()` };
+    }
+    if (a.kind === 'list') {
+      let out = rows; const sc = a.sort ? colOf(a.sort) : null;
+      if (a.sort && !sc) return refuse(['list rows sorted by', { v: a.sort }], `No column called "${a.sort}". The table has ${colNames(T)}.`);
+      if (sc) out = [...out].sort((x, y) => (x[sc.name] == null) - (y[sc.name] == null) || (a.desc ? (y[sc.name] > x[sc.name] ? 1 : -1) : (x[sc.name] > y[sc.name] ? 1 : -1)));
+      out = out.slice(0, a.limit || 20);
+      read.push('list', { v: `${out.length} rows` }, ...(whereText ? ['where', { v: whereText }] : []), ...(sc ? ['sorted by', { v: sc.name + (a.desc ? ' descending' : '') }] : []));
+      return { read, body: [{ t: 'table', head: T.cols.map(c => c.name), num: T.cols.map(c => c.type === 'numeric'), rows: out.map(r => T.cols.map(c => r[c.name] == null ? '' : typeof r[c.name] === 'number' ? fmt(r[c.name], 6) : String(r[c.name]))) }, { t: 'sub', text: `${out.length} of ${rows.length} rows shown.` }, src], trace: [...trace, `${sc ? `sort by ${sc.name}${a.desc ? ' descending' : ''}; ` : ''}take ${out.length}`], py: `dh${sc ? `.sort_values("${sc.name}", ascending=${!a.desc})` : ''}.head(${a.limit || 20})` };
+    }
+    if (a.kind === 'corr') {
+      const [x, y] = cols; if (x.type !== 'numeric' || y.type !== 'numeric') return refuse(['correlation of', { v: x.name }, 'and', { v: y.name }], 'Correlation needs two numeric columns.');
+      const pairs = rows.map(r => [r[x.name], r[y.name]]).filter(([p, q]) => p != null && q != null && p >= 0 && q >= 0);
+      if (pairs.length < 3) return refuse(['correlation of', { v: x.name }, 'and', { v: y.name }], 'Fewer than three rows have both values.');
+      const mx = pairs.reduce((s, p) => s + p[0], 0) / pairs.length, my = pairs.reduce((s, p) => s + p[1], 0) / pairs.length;
+      const sxy = pairs.reduce((s, p) => s + (p[0] - mx) * (p[1] - my), 0), sxx = pairs.reduce((s, p) => s + (p[0] - mx) ** 2, 0), syy = pairs.reduce((s, p) => s + (p[1] - my) ** 2, 0), r = sxy / Math.sqrt(sxx * syy);
+      read.push('correlation of', { v: x.name }, 'and', { v: y.name }, ...(whereText ? ['where', { v: whereText }] : []));
+      return { read, value: r, body: [{ t: 'big', v: fmt(r, 3), unit: 'Pearson r' }, { t: 'sub', text: `${pairs.length} rows with both values; negative codes left out.` }, src], trace: [...trace, `pairs → ${pairs.length}`, `pearson r = ${fmt(r, 6)}`], py: `dh[["${x.name}", "${y.name}"]].corr()` };
+    }
+    if (a.kind === 'check') {
+      if (!(R.hole && R.from && R.to)) return refuse(['check intervals'], `This table has no hole, from and to columns that recon could name (found: ${Object.entries(R).map(([k, v]) => `${k} = ${v}`).join(', ') || 'none'}).`);
+      const byHole = new Map(); rows.forEach(r => { const k = r[R.hole]; (byHole.get(k) || byHole.set(k, []).get(k)).push(r); });
+      const out = [], issues = []; let gaps = 0, overlaps = 0, bad = 0;
+      for (const [h, rs] of byHole) {
+        const s = [...rs].sort((x, y) => x[R.from] - y[R.from]); let g = 0, o = 0, b = 0, len = 0, prev = null;
+        for (const r of s) { const f = r[R.from], t = r[R.to]; if (f == null || t == null || t <= f) { b++; continue; } len += t - f; if (prev != null) { if (f > prev + 1e-9) { g++; issues.push([h, 'gap', `${fmt(prev)} to ${fmt(f)}`]); } else if (f < prev - 1e-9) { o++; issues.push([h, 'overlap', `${fmt(f)} to ${fmt(Math.min(t, prev))}`]); } } prev = Math.max(prev ?? -Infinity, t); }
+        gaps += g; overlaps += o; bad += b; out.push([h, s.length, fmt(len), g, o, b]);
+      }
+      read.push('check intervals of', { v: T.name });
+      return { read, body: [{ t: 'kv', rows: [['holes', String(byHole.size)], ['gaps', String(gaps)], ['overlaps', String(overlaps)], ['bad intervals', `${bad} (missing or to ≤ from)`]] }, { t: 'table', head: [R.hole, 'rows', 'length', 'gaps', 'overlaps', 'bad'], num: [false, true, true, true, true, true], rows: out.map(r => r.map(String)) }, ...(issues.length ? [{ t: 'table', head: ['hole', 'issue', 'where'], rows: issues.slice(0, 40) }] : []), src], trace: [...trace, `sort by ${R.from} within ${R.hole}`, `walk intervals: ${gaps} gaps, ${overlaps} overlaps, ${bad} bad`], py: `tare.intervals(dh, hole="${R.hole}", frm="${R.from}", to="${R.to}")` };
+    }
+    // agg
+    const bad = cols.find(c => c.type !== 'numeric'); if (bad) return refuse([a.aggs.join(', '), 'of', { v: bad.name }], `${bad.name} is a category, not a number. Try "count by ${bad.name}" or "distinct ${bad.name}".`);
+    const skipped = { null: 0, bdl: 0 };
+    const cell = (g, c, agg) => { const vs = [], ws = []; for (const r of g) { const v = r[c.name]; if (v == null) { skipped.null++; continue; } let x = v; if (v < 0) { skipped.bdl++; if ((a.bdl || 'exclude') === 'exclude') continue; x = a.bdl === 'zero' ? 0 : a.bdl === 'half' ? -v / 2 : -v; } vs.push(x); if (weight === 'length') ws.push(Math.max(0, r[R.to] - r[R.from]) || 0); } return aggregate(agg, vs, weight === 'length' ? ws : null); };
+    const head = [...(by.length ? [by.map(c => c.name).join(' / ')] : []), ...cols.flatMap(c => a.aggs.map(g => `${aggLabel(g)} ${c.name}${c.unit ? ' (' + c.unit + ')' : ''}`))];
+    const table = groups.map(([k, g]) => [...(by.length ? [k] : []), ...cols.flatMap(c => a.aggs.map(agg => cell(g, c, agg)))]);
+    read.push(a.aggs.map(aggLabel).join(' and '), 'of', { v: cols.map(c => c.name).join(' and ') }, ...(by.length ? ['by', { v: by.map(c => c.name).join(' and ') }] : []), ...(whereText ? ['where', { v: whereText }] : []), ...weightSlot, ...bdlSlot(a, skipped));
+    trace.push(`skip ${skipped.null} blank, ${skipped.bdl} below-detection (${a.bdl || 'exclude'})`, `${weight === 'length' ? `length-weighted over ${R.from}–${R.to}` : 'sample-count weighted'}: ${a.aggs.join(', ')} of ${cols.map(c => c.name).join(', ')}${by.length ? ' by ' + by.map(c => c.name).join(', ') : ''}`);
+    const py = `dh${a.where ? `.query('${a.where}')` : ''}${by.length ? `.groupby(${JSON.stringify(by.map(c => c.name))})` : ''}[${JSON.stringify(cols.map(c => c.name))}].agg(${JSON.stringify(a.aggs)})`;
+    if (!by.length && cols.length === 1 && a.aggs.length === 1) {
+      const v = table[0][0];
+      return { read, value: v, body: [v == null ? { t: 'note', kind: 'err', text: 'No usable values after the filter.' } : { t: 'big', v: fmt(v, 4), unit: a.aggs[0] === 'count' ? 'rows' : a.aggs[0] === 'cv' ? '' : cols[0].unit || '' }, { t: 'sub', text: `${rows.length} rows${skipped.bdl ? `, ${skipped.bdl} below detection ${a.bdl === 'exclude' || !a.bdl ? 'left out' : 'as ' + a.bdl}` : ''}.` }, src], trace, py };
+    }
+    const fmtCell = v => v == null ? '' : fmt(v, 4);
+    const sorted = by.length && a.aggs.length === 1 && cols.length === 1 ? [...table].sort((x, y) => (y[1] ?? -Infinity) - (x[1] ?? -Infinity)) : table;
+    return { read, body: [{ t: 'table', head, num: head.map((_, i) => i > 0 || !by.length), rows: sorted.map(r => r.map((v, i) => i === 0 && by.length ? String(v) : fmtCell(v))) }, ...(a.view !== 'table' && by.length && cols.length === 1 && a.aggs.length === 1 && sorted.length >= 2 && sorted.length <= 20 ? [{ t: 'hbars', rows: sorted.filter(r => r[1] != null).map(r => [String(r[0]), r[1], fmt(r[1], 3)]) }] : []), src], trace, py };
+  }
+});
+  return { makeData, sampleTable, ELEMENT, parseDelimited, tableFromText, openTable, colOf, stats, whereToSift };
+})();
+
 /* ==== src/engine/knowledge.js ==== */
+const { FB, fbFind, MIN, ODS, ODSA } = (() => {
 // Knowledge from packs: a Factbook sample, minerals with an identification key, an ODS term index,
 // and a style check from The Elements of Style (1918). All sample data, labelled as such.
 
@@ -6900,8 +7915,11 @@ frame({
   words_pt: ['identificar', 'identifica'], label_pt: 'Identificar',
   bind: c => { const t = c.theme[0]; return t && t.generic ? { tool: 'key', args: {} } : null; }
 });
+  return { FB, fbFind, MIN, ODS, ODSA };
+})();
 
 /* ==== src/engine/device.js ==== */
+(() => {
 // Device hand-offs: calendar event, timer, alarm. Simulated in the mock; on Android they become intents.
 
 // the hand-off description every device card carries: the intent, its permission, and the button
@@ -6965,8 +7983,10 @@ tool({
     return { read: ['set an alarm at', { v: t }], body: [{ t: 'big', v: t }, kv, { t: 'actions', items: [go] }], trace: [`time → ${t}`, 'build intent: ACTION_SET_ALARM'], py: `device.alarm("${t}")` };
   }
 });
+})();
 
 /* ==== src/engine/notes.js ==== */
+(() => {
 // Notes and taught words. Both belong to the device and are shared by every session.
 
 tool({
@@ -6997,8 +8017,10 @@ tool({
     return { read: ['learn that', { v: a.word }, 'means', { v: a.means }], body: [{ t: 'note', kind: 'ok', text: `Learned. From now on “${a.word}” reads as “${a.means}” on this device.` }], trace: ['lexicon.add(word → meaning)', 'retrain: instant, the lexicon is a table'] };
   }
 });
+})();
 
 /* ==== src/engine/skills.js ==== */
+const { PACKS, skills, examples, vocab, SUGGESTIONS } = (() => {
 // The catalog: skills derived from the declarations, planned skills named here, and the packs golem
 // knows about. Examples feed the Skills tab, the "nearest skills" suggestions and the teach vocabulary.
 
@@ -7034,8 +8056,11 @@ let VOCAB = null;
 const vocab = () => VOCAB || (VOCAB = new Set(examples().filter(e => !/ means /.test(e)).join(' ').toLowerCase().split(/[^a-z]+/).filter(w => w.length > 3)));
 // the example chips in the dock
 const SUGGESTIONS = ['dens means density', 'histogram of cu', 'log scale', 'identify a mineral', 'population density of mongolia in people per square mile', 'and chile', 'set a timer for 5 min', 'what is a skiplist', 'why', 'export as script', 'undo'];
+  return { PACKS, skills, examples, vocab, SUGGESTIONS };
+})();
 
 /* ==== src/engine/ontology.js ==== */
+const { ontology } = (() => {
 // The clause ontology, assembled from what golem knows: units from the conversion table, nouns from the
 // sample packs, verb frames from the declarations. Inert data; the build writes it to dist/golem.json.
 // Portuguese synonyms are listed here by hand until packs carry them in their golem facet.
@@ -7043,6 +8068,10 @@ const SUGGESTIONS = ['dens means density', 'histogram of cu', 'log scale', 'iden
 const MIN_PT = { pyrite: 'pirita', chalcopyrite: 'calcopirita', galena: 'galena', magnetite: 'magnetita', hematite: 'hematita', molybdenite: 'molibdenita', gold: 'ouro', sphalerite: 'esfalerita', quartz: 'quartzo', calcite: 'calcita', fluorite: 'fluorita', malachite: 'malaquita' };
 const FB_PT = { Australia: ['austrália', 'australia'], Brazil: ['brasil'], Canada: ['canadá', 'canada'], Chile: ['chile'], Germany: ['alemanha'], Indonesia: ['indonésia', 'indonesia'], Ireland: ['irlanda'], Japan: ['japão', 'japao'], Kazakhstan: ['cazaquistão', 'cazaquistao'], Mongolia: ['mongólia', 'mongolia'], Peru: ['peru'], Portugal: ['portugal'], 'South Africa': ['áfrica do sul', 'africa do sul'], Zambia: ['zâmbia', 'zambia'] };
 const uniq = a => [...new Set(a)];
+function variables() {
+  const cols = S.table ? S.table.cols.filter(c => c.type === 'numeric' && !/^(from|to|x|y|z|east|north|elev)/i.test(c.name)) : [{ name: 'cu', analyte: 'Cu' }, { name: 'au', analyte: 'Au' }];
+  return Object.fromEntries(cols.map(c => [c.name, uniq([c.name.toLowerCase(), ...(c.analyte ? [c.analyte.toLowerCase(), ELEMENT[c.analyte]] : [])].filter(Boolean))]));
+}
 
 function ontology() {
   const units = UNITS.map(x => ({ unit: x.name, dim: DIM[x.dim], words: uniq(x.words.map(w => w.toLowerCase())) }));
@@ -7054,8 +8083,9 @@ function ontology() {
   return {
     $comment: 'golem ontology, generated by the build from src/engine/. Nouns are the sample packs; the real ones arrive with packs.',
     nouns: [
-      { type: 'variable', needsId: true, words: Object.fromEntries(Object.entries(COL).map(([k, v]) => [v, [k, k === 'cu' ? 'copper' : 'gold']])), generic: ['grade', 'grades', 'column', 'columns'],
-        words_pt: { Cu: ['cu', 'cobre'], Au: ['au', 'ouro'] }, generic_pt: ['teor', 'teores', 'coluna', 'colunas'] },
+      // the open table's numeric columns, by name, analyte symbol and element name; the sample's when none is open
+      { type: 'variable', needsId: true, words: variables(), generic: ['grade', 'grades', 'column', 'columns'],
+        words_pt: variables(), generic_pt: ['teor', 'teores', 'coluna', 'colunas'] },
       { type: 'plot', words: { histogram: ['histogram', 'hist'] }, generic: ['plot', 'chart'], words_pt: { histogram: ['histograma'] }, generic_pt: ['gráfico', 'grafico'] },
       { type: 'mineral', words: Object.fromEntries(Object.keys(MIN).map(k => [k, [k]])), generic: ['mineral', 'minerals', 'rock', 'sample'],
         words_pt: Object.fromEntries(Object.keys(MIN).map(k => [k, [MIN_PT[k]]])), generic_pt: ['mineral', 'minerais', 'rocha', 'amostra'] },
@@ -7079,8 +8109,11 @@ function ontology() {
     scales: {}
   };
 }
+  return { ontology };
+})();
 
 /* ==== src/vendor/dispatch.js ==== */
+const { deriveVocab, LOCALES, ELEMENT_LEX, createContext, KINDS, generate, alignCorpus, trainModels, TAGS, tagSetOf, createDispatcher, trainSession, tokenize, normText, mulberry32, createEngine, makeSession, DEMO_NOW, buildGrammar, chart, framesFrom, ENGLISH, PORTUGUESE } = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/dispatch, built from ../auditable/ext/dispatch/src/ by its own build.
 // Source of truth: gentropic/auditable ext/dispatch (local clone: ../auditable). Re-vendor by copying
 // ext/dispatch/index.js here after 'node ext/dispatch/build.js'. golem uses the grammar rung only:
@@ -8847,8 +9880,11 @@ const PORTUGUESE = {
 // compatible. See SPEC.md; provenance: the gcu-dispatch incubator.
 // the grammar rung (clause): a controlled-command parser — case-grammar verb frames over an Earley
 // chart with costed repairs; ontology as data, locale banks for en and pt-BR. SPEC.md "The grammar rung".
+  return { deriveVocab, LOCALES, ELEMENT_LEX, createContext, KINDS, generate, alignCorpus, trainModels, TAGS, tagSetOf, createDispatcher, trainSession, tokenize, normText, mulberry32, createEngine, makeSession, DEMO_NOW, buildGrammar, chart, framesFrom, ENGLISH, PORTUGUESE };
+})();
 
 /* ==== src/engine/reading.js ==== */
+const { norm, clauseEngine, clauseRead, grammar, context, taught } = (() => {
 // The reading ladder: context (amendments, meta-intents), grammar (the clause parser, then the regex
 // rules the declarations carry), taught words (device lexicon rewrites, then grammar again). Plus the
 // tools that talk about the session itself: none, why, export.
@@ -8856,8 +9892,8 @@ const PORTUGUESE = {
 const norm = s => s.trim().replace(/\s+/g, ' ').replace(/[?.!]+$/, '');
 
 /* ── rung 2, first half: the clause parser over golem's ontology ── */
-let clause = null;
-const clauseEngine = () => clause || (clause = createEngine(ontology(), ENGLISH));
+let clause = null, clauseFor = null;
+const clauseEngine = () => { const key = S.table ? S.table.hash : 'sample'; if (!clause || clauseFor !== key) { clause = createEngine(ontology(), ENGLISH); clauseFor = key; } return clause; };
 const clauseSession = () => S.clause || (S.clause = makeSession([]));
 // A parsed command becomes a tool call through its frame's bind(). Only the first command of a
 // sequence is taken for now; "then" chains are a plan the planner does not build yet.
@@ -8954,8 +9990,11 @@ frame({
   words_pt: ['exportar', 'exporta', 'salvar', 'salva'], label_pt: 'Exportar',
   bind: () => ({ tool: 'export', args: {} })
 });
+  return { norm, clauseEngine, clauseRead, grammar, context, taught };
+})();
 
 /* ==== src/engine/sessions.js ==== */
+const { onChange, spec, tagOf, autoName, touch, load, openSession, newSession, renameSession, deleteSession, searchHistory, sessions, current, serialize, hydrate, reset } = (() => {
 // Sessions: stored as plans (card specs), replayed on open, named from the tools that ran.
 // The shell persists whatever `serialize()` returns and feeds it back through `hydrate()`.
 
@@ -8972,13 +10011,14 @@ const spec = c => ({ id: c.id, raw: c.raw, tool: c.tool, args: c.args, rung: c.r
 // what a card contributes to its session's name: [label, weight], from the tool's declaration
 function tagOf(c) { const d = toolByName(c.tool); return d && d.topic ? d.topic(c.args) : null; }
 function autoName(cards) {
-  const table = cards.some(c => ['open', 'hist'].includes(c.tool)), w = new Map();
+  const opened = cards.find(c => c.tool === 'open'), table = opened || cards.some(c => ['hist', 'query'].includes(c.tool)), w = new Map();
+  const tname = opened && opened.args.file ? opened.args.file.name : 'assays.csv';
   cards.forEach((c, i) => {
-    if (table && c.tool !== 'hist') return;
+    if (table && !['hist', 'query'].includes(c.tool)) return;
     const t = tagOf(c); if (t) w.set(t[0], (w.get(t[0]) || 0) + t[1] + i * 1e-3);
   });
   const top = [...w.entries()].sort((x, y) => y[1] - x[1]).map(x => x[0]);
-  if (table) return 'assays.csv' + (top.length ? ': ' + top.slice(0, 2).join(', ') : '');
+  if (table) return tname + (top.length ? ': ' + top.slice(0, 2).join(', ') : '');
   if (!top.length) return 'New session';
   const two = top.slice(0, 2).join(', ');
   return two.length > 40 ? top[0] : two;
@@ -8989,7 +10029,7 @@ function touch() { cur.updated = Date.now(); if (cur.auto) cur.name = autoName(S
 // open a session: clear the working state and recompute every card from its spec
 function load(s) {
   cur = s; const specs = s.cards;
-  S.cards = []; s.cards = S.cards; S.data = null; S.n = 0; S.clause = null;
+  S.cards = []; s.cards = S.cards; S.table = null; S.n = 0; S.clause = null;
   specs.forEach(c => {
     let res = null; try { res = T[c.tool](c.args); } catch (e) { res = null; }
     if (!res) return;
@@ -9024,19 +10064,24 @@ const sessions = () => SS;
 const current = () => cur;
 
 function serialize() {
-  return { cur: cur && cur.id, sid, aliases: S.aliases, facts: S.facts, ss: SS.map(s => ({ ...s, cards: s.cards.map(spec) })) };
+  // files under a megabyte travel with the device state; larger ones stay in memory and say so on replay
+  const files = Object.fromEntries(Object.entries(S.files).filter(([, f]) => f.text.length <= 1e6));
+  return { cur: cur && cur.id, sid, aliases: S.aliases, facts: S.facts, files, ss: SS.map(s => ({ ...s, cards: s.cards.map(spec) })) };
 }
 function hydrate(d) {
   if (!d || !Array.isArray(d.ss) || !d.ss.length) return false;
-  SS = d.ss; sid = d.sid || Math.max(...SS.map(s => s.id)); S.aliases = d.aliases || {}; S.facts = d.facts || [];
+  SS = d.ss; sid = d.sid || Math.max(...SS.map(s => s.id)); S.aliases = d.aliases || {}; S.facts = d.facts || []; S.files = d.files || {};
   load(SS.find(s => s.id === d.cur) || SS[0]); return true;
 }
 // forget everything: sessions, device state, working state (tests start here)
 function reset() {
-  SS = []; cur = null; sid = 0; S.cards = []; S.n = 0; S.aliases = {}; S.facts = []; S.data = null; S.clause = null;
+  SS = []; cur = null; sid = 0; S.cards = []; S.n = 0; S.aliases = {}; S.facts = []; S.files = {}; S.table = null; S.clause = null;
 }
+  return { onChange, spec, tagOf, autoName, touch, load, openSession, newSession, renameSession, deleteSession, searchHistory, sessions, current, serialize, hydrate, reset };
+})();
 
 /* ==== src/engine/engine.js ==== */
+const { addCard, rerun, flipSlot, answer, undo, submit, hashOf, openFile, seedExamples } = (() => {
 // The entry point: submit(raw) reads a request and returns what happened. Cards are recomputed in
 // place by rerun(); answers and slot flips go through it, so args stay the only state that matters.
 
@@ -9079,13 +10124,27 @@ function submit(raw) {
   return { kind: 'card', card: addCard(raw, r, performance.now() - t0) };
 }
 
+// a 32-bit FNV-1a of the text: the key of a file in the device store, and what a card remembers of it
+function hashOf(text) { let h = 0x811c9dc5; for (let i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 0x01000193); } return (h >>> 0).toString(16).padStart(8, '0'); }
+// a file the person picked: kept on the device by hash, opened as a card
+function openFile(name, text) {
+  if (!current()) newSession();
+  const t0 = performance.now(), hash = hashOf(text);
+  S.files[hash] = { name, hash, text, size: text.length };
+  const args = { file: { name, hash } }, res = T.open(args);
+  return { kind: 'card', card: addCard(`open ${name}`, { tool: 'open', args, rung: 'grammar', res }, performance.now() - t0) };
+}
+
 // two example sessions for a first visit
 function seedExamples() {
   newSession(true); ['open assays.csv', 'histogram of cu', 'log scale', 'histogram of au'].forEach(x => submit(x));
   newSession(true); ['0.35 oz per short ton in g/t', 'true thickness of a 14 m intercept, hole 270/60, bedding 045/30', 'remind me to send the samples to the lab on friday at 9', 'dens of chalcopyrite'].forEach(x => submit(x));
 }
+  return { addCard, rerun, flipSlot, answer, undo, submit, hashOf, openFile, seedExamples };
+})();
 
 /* ==== src/vendor/leadacid.js ==== */
+const { shell, orientationFromRotationVector } = (() => {
 // ⚠ VENDORED — DO NOT EDIT. The lead-acid shell shim, copied from ../auditable/ext/leadacid/index.js
 // (itself vendored from gentropic/lead-acid, lead-acid.js). Re-vendor by copying that file here.
 
@@ -9707,8 +10766,11 @@ function orientationFromRotationVector(v) {
   if (gamma < -90) gamma += 180;
   return { alpha, beta, gamma };
 }
+  return { shell, orientationFromRotationVector };
+})();
 
 /* ==== src/shell/render.js ==== */
+const { escHtml, pad, cardEl } = (() => {
 // Rendering. The engine hands over plain blocks; this is the only file that turns them into markup.
 
 const escHtml = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -9763,6 +10825,7 @@ function blockHtml(b) {
     case 'list': return `<ul class="plain">${b.items.map(i => `<li>${escHtml(i)}</li>`).join('')}</ul>`;
     case 'steps': return `<ol class="steps">${b.items.map(i => `<li>${escHtml(i)}</li>`).join('')}</ol>`;
     case 'pre': return `<pre>${escHtml(b.text)}</pre>`;
+    case 'hbars': { const max = Math.max(...b.rows.map(r => Math.abs(r[1]))) || 1; return `<div class="hbars">${b.rows.map(([k, v, t]) => `<div class="hb"><span class="hk">${escHtml(k)}</span><span class="hbar"><i style="width:${(Math.abs(v) / max * 100).toFixed(1)}%"></i></span><span class="hv">${escHtml(t)}</span></div>`).join('')}</div>`; }
     case 'marked': { let out = '', p = 0; b.spans.forEach(([s, e]) => { out += escHtml(b.text.slice(p, s)) + '<mark>' + escHtml(b.text.slice(s, e)) + '</mark>'; p = e; }); return `<div class="sub marked">${out + escHtml(b.text.slice(p))}</div>`; }
     case 'chips': return `<div class="opts">${b.items.map(q => `<button class="chip" type="button" data-act="run" data-q="${escHtml(q)}">${escHtml(q)}</button>`).join('')}</div>`;
     case 'actions': return `<div class="opts">${b.items.map(i => i.href ? `<a class="btn" href="${escHtml(i.href)}" target="_blank" rel="noopener">${escHtml(i.label)}</a>`
@@ -9786,8 +10849,11 @@ function cardEl(c) {
     <details class="trace"><summary>plan · ${r.trace.length} step${r.trace.length === 1 ? '' : 's'}</summary><ol>${r.trace.map(t => `<li>${escHtml(t)}</li>`).join('')}</ol></details>`;
   return el;
 }
+  return { escHtml, pad, cardEl };
+})();
 
 /* ==== src/shell/main.js ==== */
+(() => {
 // The shell: wiring, tabs, the session drawer, storage, and the sleep switch. Everything that touches
 // the DOM or the browser lives here or in render.js; the engine never does.
 
@@ -9820,7 +10886,9 @@ function renderStream(focus) {
 function replaceCard(c) { const old = $('stream').querySelector(`[data-id="${c.id}"]`); if (old) old.replaceWith(cardEl(c)); }
 function run(raw) {
   if (!awake) { status('Asleep. Tap wake at the top right.'); return; }
-  const o = submit(raw);
+  show(submit(raw));
+}
+function show(o) {
   switch (o.kind) {
     case 'new-session': renderStream(); status('New session.'); break;
     case 'drawer': openDrawer(); break;
@@ -9847,7 +10915,7 @@ function renderPacks() {
   let h = '<div class="sub">golem knows what its installed packs hold. These are the gcu-library entries plus packs worth adding.</div><div class="lbl">Library</div>';
   PACKS.forEach(([id, name, meta, st, d]) => { h += `<div class="item"><h3>${escHtml(name)} <span class="tag ${st}">${lab[st]}</span></h3><p>${escHtml(d)}</p><div class="from">${escHtml(id)} · ${escHtml(meta)}</div></div>`; });
   const al = Object.entries(S.aliases);
-  h += `<div class="lbl">On this device</div><div class="item"><h3>Taught words</h3><p>${al.length ? al.map(([k, v]) => `${escHtml(k)} → ${escHtml(v)}`).join('<br>') : 'None yet. Try “vario means variogram”.'}</p></div><div class="item"><h3>Notes</h3><p>${S.facts.length ? S.facts.map(esc).join('<br>') : 'None yet. Try “remember that …”.'}</p></div><div class="item"><h3>Open table</h3><p>${S.data ? `assays.csv · ${S.data.length} rows` : 'None.'}</p></div>`;
+  h += `<div class="lbl">On this device</div><div class="item"><h3>Taught words</h3><p>${al.length ? al.map(([k, v]) => `${escHtml(k)} → ${escHtml(v)}`).join('<br>') : 'None yet. Try “vario means variogram”.'}</p></div><div class="item"><h3>Notes</h3><p>${S.facts.length ? S.facts.map(escHtml).join('<br>') : 'None yet. Try “remember that …”.'}</p></div><div class="item"><h3>Open table</h3><p>${S.table ? `${escHtml(S.table.name)} · ${S.table.rows.length} rows · ${S.table.source === 'sample' ? 'sample data' : 'from your files'}` : 'None.'}</p></div><div class="item"><h3>Files on this device</h3><p>${Object.values(S.files).length ? Object.values(S.files).map(f => `${escHtml(f.name)} · ${(f.size / 1024).toFixed(0)} kB`).join('<br>') : 'None yet. Tap the paperclip to open a CSV.'}</p></div>`;
   $('v-packs').innerHTML = h;
 }
 
@@ -9877,6 +10945,14 @@ onChange(() => { renderBar(); persist(); });
 
 /* ── wiring ── */
 $('f').addEventListener('submit', e => { e.preventDefault(); const v = $('q').value; $('q').value = ''; run(v); });
+// a file from the picker (the lead-acid shell routes <input type=file> to the system picker): text in, a card out
+$('attach').addEventListener('click', () => { if (awake) $('file').click(); });
+$('file').addEventListener('change', e => {
+  const f = e.target.files && e.target.files[0]; if (!f) return;
+  if (f.size > 20e6) { status('That file is over 20 MB. golem reads smaller tables for now.'); e.target.value = ''; return; }
+  f.text().then(text => { show(openFile(f.name, text)); status(`Opened ${f.name}.`); }, () => status('Could not read that file.'));
+  e.target.value = '';
+});
 document.querySelector('.tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) showTab(b.dataset.tab); });
 $('v-skills').addEventListener('click', e => { const b = e.target.closest('[data-q]'); if (b) run(b.dataset.q); });
 $('sugg').addEventListener('click', e => { const b = e.target.closest('[data-q]'); if (b) run(b.dataset.q); });
@@ -9926,6 +11002,7 @@ if (shell.present) $('st-where').textContent = 'in the lead-acid shell';
 if (!restore()) seedExamples();
 renderStream();
 $('status').textContent = '';
+})();
 </script>
 </body>
 </html>

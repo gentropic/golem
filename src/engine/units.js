@@ -1,7 +1,8 @@
 // Unit conversion with dimension checks. A small table until @gcu/units stands under it.
 import { tool, frame, fmt } from './core.js';
 
-export const U = {}, UNITS = [];
+export const U = {};
+export const UNITS = [];
 const u = (dim, f, ...n) => { UNITS.push({ dim, f, name: n[0], words: n }); n.forEach(k => { U[k] = { dim, f, name: n[0] }; }); };
 u('L', 1, 'm', 'meter', 'metre'); u('L', 1000, 'km', 'kilometer', 'kilometre'); u('L', .01, 'cm'); u('L', .001, 'mm');
 u('L', .3048, 'ft', 'foot', 'feet'); u('L', .0254, 'inch', 'inches', '"'); u('L', 1609.344, 'mi', 'mile'); u('L', .9144, 'yd', 'yard');

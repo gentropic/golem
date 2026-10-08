@@ -1,8 +1,9 @@
 // Build dist/golem.html: src/shell/index.html with the fonts embedded, then the shell, engine and vendored
-// modules concatenated in import order inside one classic <script>. No bundler and no transforms beyond
-// dropping the import and export keywords, so the output is the source you read. The modules therefore
-// share one scope: the build refuses duplicate top-level names, import cycles, and the module syntax a
-// concatenation cannot carry (default exports, namespace imports, re-exports, aliased imports, import.meta).
+// modules in import order inside one classic <script>. No bundler and no transforms of the code itself:
+// each module's text goes in verbatim, wrapped in a function so its private names stay private, and its
+// exports become plain `const` declarations in the shared scope. The build refuses import cycles, exported
+// names declared twice, and the module syntax the wrapping cannot carry (default exports, namespace
+// imports, aliased imports, re-exports, `export let`, import.meta, several declarators on one export line).
 // It also writes dist/golem.json, the clause ontology the engine derives from its declarations.
 import { readFileSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
@@ -31,23 +32,28 @@ export function bundle(entry) {
     order.push({ rel, code }); state.set(abs, 'done');
   };
   visit(entry);
-  const names = new Map();
+  const owner = new Map();
   const parts = order.map(({ rel, code }) => {
     if (/^\s*export\s+default\b/m.test(code)) throw new Error(`build: src/${rel}: no default exports`);
     if (/^\s*export\s*(\*|\{[^}]*\}\s*from\b)/m.test(code)) throw new Error(`build: src/${rel}: no re-exports`);
+    if (/^\s*export\s+let\b/m.test(code)) throw new Error(`build: src/${rel}: no "export let" (a reassigned export cannot cross the wrapper; export a function that reads it)`);
     if (/\bimport\.meta\b/.test(code)) throw new Error(`build: src/${rel}: import.meta has no meaning in the single file`);
-    for (const m of code.matchAll(/^(?:export\s+)?(?:const|let|var|function|class)\s+([\w$]+)/gm)) {
-      if (names.has(m[1])) throw new Error(`build: top-level name "${m[1]}" is declared in both src/${names.get(m[1])} and src/${rel}`);
-      names.set(m[1], rel);
-    }
-    // an export block disappears, except that `name as alias` entries become `const alias = name` so the
-    // alias exists in the shared scope (vendored bundles export their namespaces that way)
+    // best effort: a second declarator after a top-level comma (a comma inside parentheses is a parameter list)
+    if (/^export\s+(?:const|var)\s+\w+\s*=\s*[^\n(]*,\s*\w+\s*=[^=>]/m.test(code)) throw new Error(`build: src/${rel}: one declarator per export line`);
+    // the module's exports: declarations, and export blocks (with `name as alias`)
+    const exports = [];
+    for (const m of code.matchAll(/^export\s+(?:async\s+)?(?:const|var|function\*?|class)\s+([\w$]+)/gm)) exports.push([m[1], m[1]]);
     const stripped = code.replace(/^\s*import\s[^\n]*\n/gm, '').replace(/^\s*export\s*\{([^}]*)\};?[^\n]*\n/gm, (_, inner) => {
-      const aliases = inner.split(',').map(e => e.trim()).map(e => /^([\w$]+)\s+as\s+([\w$]+)$/.exec(e)).filter(Boolean);
-      for (const [, , alias] of aliases) { if (names.has(alias)) throw new Error(`build: top-level name "${alias}" is declared in both src/${names.get(alias)} and src/${rel}`); names.set(alias, rel); }
-      return aliases.map(([, name, alias]) => `const ${alias} = ${name};`).join('\n') + (aliases.length ? '\n' : '');
+      for (const e of inner.split(',').map(x => x.trim()).filter(Boolean)) {
+        const m = /^([\w$]+)(?:\s+as\s+([\w$]+))?$/.exec(e); if (!m) throw new Error(`build: src/${rel}: cannot read export entry "${e}"`);
+        exports.push([m[1], m[2] || m[1]]);
+      }
+      return '';
     }).replace(/^export\s+/gm, '');
-    return `/* ==== src/${rel} ==== */\n${stripped.trim()}\n`;
+    for (const [, name] of exports) { if (owner.has(name)) throw new Error(`build: "${name}" is exported by both src/${owner.get(name)} and src/${rel}`); owner.set(name, rel); }
+    const ret = exports.length ? `\n  return { ${exports.map(([n, a]) => n === a ? n : `${a}: ${n}`).join(', ')} };` : '';
+    const head = exports.length ? `const { ${exports.map(([, a]) => a).join(', ')} } = ` : '';
+    return `/* ==== src/${rel} ==== */\n${head}(() => {\n${stripped.trim()}${ret}\n})();\n`;
   });
   return parts.join('\n');
 }

@@ -63,6 +63,17 @@ const kept = await page.locator('#stream .card').count();
 console.log(`${kept === 7 ? 'ok  ' : 'FAIL'} session replays after reload: ${kept} cards`);
 const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 console.log(`${overflow <= 0 ? 'ok  ' : 'FAIL'} no horizontal overflow at 420 px`);
+// a real file through the picker, then a table question on it
+await page.setInputFiles('#file', join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'holes.csv'));
+await page.waitForTimeout(150);
+const opened = await page.evaluate(() => [...document.querySelectorAll('#stream .card')].pop().textContent);
+const fileOk = /typed by @gcu\/recon/.test(opened);
+console.log(`${fileOk ? 'ok  ' : 'FAIL'} a CSV opens through the picker`);
+await page.fill('#q', 'mean cu by litho'); await page.press('#q', 'Enter'); await page.waitForTimeout(60);
+const grouped = await page.evaluate(() => [...document.querySelectorAll('#stream .card')].pop().textContent);
+const queryOk = /BRX/.test(grouped) && /holes\.csv/.test(grouped);
+console.log(`${queryOk ? 'ok  ' : 'FAIL'} a grouped mean on the opened file`);
+if (!fileOk || !queryOk) failed++;
 errors.forEach(e => console.log('FAIL ' + e));
 await browser.close();
 if (failed || !nameOk || kept !== 7 || overflow > 0 || errors.length) { console.log('\nsmoke test failed'); process.exit(1); }
