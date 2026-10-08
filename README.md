@@ -24,7 +24,8 @@ The Skills tab lists everything that runs, with examples. Each skill is one decl
 ```sh
 npm install        # only needed for the test (Playwright)
 npm run build        # src/shell/index.html + the modules → dist/golem.html
-npm run test:engine  # the engine alone, in Node: the 27 queries, replay, slots, answers, undo
+npm run test:engine  # the engine alone, in Node: the 27 queries, replay, slots, answers, undo, and the
+                     # oracle tests against the GCU packages in a sibling auditable clone (skipped if absent)
 npm test             # build, engine tests, then drive the page through the same 27 queries
 ```
 
@@ -55,6 +56,7 @@ src/shell/                   the browser: markup, rendering, wiring, storage
   render.js                  blocks and plots to markup
   main.js                    tabs, drawer, storage, the sleep switch
 test/engine.test.mjs         engine tests, Node only
+test/oracle.test.mjs         golem's arithmetic against @gcu/units, bearing, gsjs, sadpan, drillhole
 test/smoke.mjs               browser smoke test on the built file
 dist/golem.html              the built mock (committed, so it opens without a build)
 ```

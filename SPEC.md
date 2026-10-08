@@ -160,19 +160,19 @@ Status: **mock** = works in `src/` today; **planned** = named, not built.
 
 | Group | Skill | Status | Builds on |
 |---|---|---|---|
-| Compute | Unit conversion with dimension checks | mock (own table) | `@gcu/units`, `@gcu/dimensions` |
+| Compute | Unit conversion with dimension checks | mock (own table, checked against `@gcu/units`) | `@gcu/units`, `@gcu/dimensions` |
 | Compute | Arithmetic, trig in degrees | mock (own parser) | `@gcu/expr` if it fits, else keep the parser |
 | Compute | Dates: day counts, weekdays | mock | built in |
 | Compute | Step-by-step algebra | planned | new package; nothing symbolic was found in the monorepo |
-| Field | True thickness from intercept, hole and plane | mock | `@gcu/bearing` |
-| Field | Stereonet: planes, poles, lines | mock (own SVG) | `@gcu/bearing`, `@gcu/stereonet` |
+| Field | True thickness from intercept, hole and plane | mock (checked against `@gcu/bearing`) | `@gcu/bearing` |
+| Field | Stereonet: planes, poles, lines | mock (own SVG, projection checked against `@gcu/bearing`) | `@gcu/bearing`, `@gcu/stereonet` |
 | Field | Mineral identification key | mock | minerals pack; question choice could use `@gcu/learn` trees |
 | Field | Compass capture from phone sensors | planned | lead-acid sensor route (does not exist yet) |
 | Field | Colour from camera to Munsell | planned | swatch (not found under `ext/`) |
 | Field | Kinematic slope check | planned | daylight / `@gcu/bearing` |
 | Table | Open, type and validate a table | mock (synthetic data) | `@gcu/recon`, `@gcu/sadpan`, `@gcu/sluice`, `@gcu/dm` |
-| Table | Histogram and summary | mock | `@gcu/sadpan`, `@gcu/plot` |
-| Table | Downhole variogram after compositing | mock | `@gcu/drillhole`, `@gcu/gsjs`, `@gcu/gslib` as oracle |
+| Table | Histogram and summary | mock (statistics checked against `@gcu/sadpan`) | `@gcu/sadpan`, `@gcu/plot` |
+| Table | Downhole variogram after compositing | mock (composites checked against `@gcu/drillhole`, variogram against `@gcu/gsjs`) | `@gcu/drillhole`, `@gcu/gsjs`, `@gcu/gslib` as oracle |
 | Table | Transform by example | planned | new package |
 | Table | Report paragraph from plan parameters | planned | templates; see [Open decisions](#14-open-decisions) on output English |
 | Knowledge | Record lookup, conversion, filter, rank | mock (14-row sample) | factbook pack, `@gcu/sift` |
@@ -336,7 +336,7 @@ In order. Each step leaves something that runs.
 2. **Tool declarations as data.** Done 8 Oct 2026: `tool()` and `frame()` declarations; the catalog, amendments, session names and the ontology derive from them. The declaration shape is still JS (readers and amendment matchers are regexes); the ontology they produce is JSON.
 3. **Real grammar.** Begun 8 Oct 2026: the clause parser is vendored and reads first; the regex rules read what it cannot yet. To finish, the grammar needs free-text roles, dates, orientations and amendments through ellipsis (listed in `ext/dispatch/SPEC.md`), then the regex rules go. The parser is now the grammar rung of `@gcu/dispatch` (`ext/dispatch/src/grammar/`). clause reads imperatives, bare phrases and closed questions against an ontology; `ext/dispatch/bench/golem.json` is the starting ontology for golem's register and `ext/dispatch/bench/golem-corpus.mjs` its hand corpus. Still outside the grammar and needing their own reading: free-text arguments (`remember that …`, `check: …`, `X means Y`, event titles), absolute dates and clock times, orientations like `270/60`, and arithmetic (a token-shape check routes it to the expression parser). Amendments (`in feet`, `and chile`) can move into clause's ellipsis machinery.
 4. **Rung 4.** Generate dispatch tool declarations and a corpus from golem's tool declarations, train on start, gate on margin and assembly.
-5. **Real packages under the tools.** `@gcu/units`, `@gcu/bearing`, `@gcu/recon` + `@gcu/sadpan`, `@gcu/drillhole`, `@gcu/gsjs`, `@gcu/plot`, `@gcu/librarian`. Check each mock result against the package result before deleting the mock code; `@gcu/gslib` is the oracle for the variogram.
+5. **Real packages under the tools.** The check is done (8 Oct 2026, `test/oracle.test.mjs`, run against the sibling clone): golem's conversions, thickness factor, equal-area projection, length-weighted composites, downhole variogram and summary statistics reproduce `@gcu/units`, `@gcu/bearing`, `@gcu/drillhole`, `@gcu/gsjs` and `@gcu/sadpan`. Two findings for the monorepo: `@gcu/units` rounds its factors to six figures where golem's are exact, and it lacks troy/avoirdupois ounces, imperial pressure, temperature and square miles, so golem keeps its own table for those. Whether to vendor the packages (about 400 kB of bundles for arithmetic that is a few kilobytes here) is an open decision; the oracle test keeps the two from drifting either way. Still to check: `@gcu/recon` for table typing, `@gcu/plot`, `@gcu/librarian` for definitions.
 6. **Planner.** Preconditions and effects on the declarations; replace `needData()` and the composite question.
 7. **Real files.** Open CSV and `.dm` through the file picker or the lead-acid file bridge.
 8. **Packs.** Install from a registry, define the `golem` facet, build it for `factbook`, `ods` and `elements-of-style`.

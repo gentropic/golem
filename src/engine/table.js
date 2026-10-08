@@ -26,6 +26,34 @@ export function stats(v) {
   return { n, mean, sd: Math.sqrt(va), va, min: s[0], med: n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2, max: s[n - 1] };
 }
 export const UNIT = { cu: '%', au: 'g/t' }, COL = { cu: 'Cu', au: 'Au' };
+// fixed-length downhole composites, length weighted, from the top of each hole; a composite needs at
+// least half its length covered by positive samples. Returns { comps: { hole: [value | null] }, nc, all }.
+export function composite(data, col, L) {
+  const byHole = {};
+  data.forEach(r => { if (r[col] > 0) (byHole[r.hole] = byHole[r.hole] || []).push(r); });
+  const comps = {}; let nc = 0; const all = [];
+  Object.entries(byHole).forEach(([h, rs]) => {
+    const end = Math.max(...rs.map(r => r.to)), out = [];
+    for (let k = 0; (k + 1) * L <= end; k++) {
+      let w = 0, sum = 0;
+      rs.forEach(r => { const o = Math.min(r.to, (k + 1) * L) - Math.max(r.from, k * L); if (o > 0) { w += o; sum += o * r[col]; } });
+      out.push(w >= L / 2 ? sum / w : null);
+      if (w >= L / 2) { nc++; all.push(sum / w); }
+    }
+    comps[h] = out;
+  });
+  return { comps, nc, all };
+}
+// the experimental downhole semivariogram: pairs of composites k steps apart down each hole, 12 lags
+export function downhole(comps, L, nlags = 12) {
+  const lags = [];
+  for (let k = 1; k <= nlags; k++) {
+    let s2 = 0, np = 0;
+    Object.values(comps).forEach(c => { for (let i = 0; i + k < c.length; i++) if (c[i] != null && c[i + k] != null) { s2 += (c[i] - c[i + k]) ** 2; np++; } });
+    if (np) lags.push({ h: k * L, g: s2 / (2 * np), np });
+  }
+  return lags;
+}
 const colOf = w => w[0] === 'c' ? 'cu' : 'au';
 // the precondition "a table is open": asked once, then satisfied as a plan step the args remember
 function needData(a, trace) {
@@ -96,25 +124,7 @@ tool({
     }
     if (ask) return { read, ask, body: [], trace: ['blocked: precondition not met'] };
     read.push('composited to', { v: a.comp + ' m', key: 'comp', alts: [2, 3, 4], cur: a.comp });
-    const L = a.comp, byHole = {};
-    S.data.forEach(r => { if (r[a.col] > 0) (byHole[r.hole] = byHole[r.hole] || []).push(r); });
-    const comps = {}; let nc = 0; const all = [];
-    Object.entries(byHole).forEach(([h, rs]) => {
-      const end = Math.max(...rs.map(r => r.to)), out = [];
-      for (let k = 0; (k + 1) * L <= end; k++) {
-        let w = 0, sum = 0;
-        rs.forEach(r => { const o = Math.min(r.to, (k + 1) * L) - Math.max(r.from, k * L); if (o > 0) { w += o; sum += o * r[a.col]; } });
-        out.push(w >= L / 2 ? sum / w : null);
-        if (w >= L / 2) { nc++; all.push(sum / w); }
-      }
-      comps[h] = out;
-    });
-    const sill = stats(all).va, lags = [];
-    for (let k = 1; k <= 12; k++) {
-      let s2 = 0, np = 0;
-      Object.values(comps).forEach(c => { for (let i = 0; i + k < c.length; i++) if (c[i] != null && c[i + k] != null) { s2 += (c[i] - c[i + k]) ** 2; np++; } });
-      if (np) lags.push({ h: k * L, g: s2 / (2 * np), np });
-    }
+    const L = a.comp, { comps, nc, all } = composite(S.data, a.col, L), sill = stats(all).va, lags = downhole(comps, L);
     const hx = lags[lags.length - 1].h, gy = Math.max(sill, ...lags.map(l => l.g)) * 1.1;
     trace.push(`drop non-positive ${a.col} values`, `composite to ${L} m, length weighted, keep ≥ 50% coverage → ${nc} composites`, `pair composites down each hole at lags of ${L} m → ${lags.length} lags`);
     return {
