@@ -12,12 +12,19 @@ export const norm = s => s.trim().replace(/\s+/g, ' ').replace(/[?.!]+$/, '');
 let clause = null, clauseFor = null;
 export const clauseEngine = () => { const key = S.table ? S.table.hash : 'sample'; if (!clause || clauseFor !== key) { clause = createEngine(ontology(), ENGLISH); clauseFor = key; } return clause; };
 const clauseSession = () => S.clause || (S.clause = makeSession([]));
-// A parsed command becomes a tool call through its frame's bind(). Only the first command of a
-// sequence is taken for now; "then" chains are a plan the planner does not build yet.
+// The parser's verdict on a text, then the frame's bind(): a frame may answer { tool, args }, or
+// { clarify } when the reading is whole but a value is missing, which becomes a clarify verdict too.
+// Only the first command of a sequence is taken for now; "then" chains are a plan the planner does not build yet.
+function verdictOf(text, session) {
+  const r = clauseEngine().understand(text, session);
+  if (r.status !== 'ok') return { r };
+  const cmd = r.commands[0], f = FRAMES.find(x => x.name === cmd.verb), b = f && f.bind(cmd), echo = r.echo.replace(/\.$/, '');
+  if (!b) return { r: { status: 'clarify', reasons: [`I read "${echo}" but no tool takes that`], partial: [echo], diag: r.diag } };
+  if (b.clarify) return { r: { status: 'clarify', reasons: [b.clarify], partial: [echo], diag: r.diag } };
+  return { r, b };
+}
 export function clauseRead(text, rung) {
-  const r = clauseEngine().understand(text, clauseSession());
-  if (r.status !== 'ok') return { verdict: r };
-  const cmd = r.commands[0], f = FRAMES.find(x => x.name === cmd.verb), b = f && f.bind(cmd);
+  const { r, b } = verdictOf(text, clauseSession());
   if (!b) return { verdict: r };
   const res = T[b.tool](b.args); if (!res) return { verdict: r };
   res.trace.unshift(`clause: ${r.echo}`, ...r.diag.notes.map(n => `clause: ${n}`));
@@ -72,10 +79,11 @@ tool({
       const c = [...vocab()].find(v => v.length > t.length && v.startsWith(t)) || [...vocab()].find(v => Math.abs(v.length - t.length) <= 1 && lev(v, t) === 1);
       if (c) { teach = `${t} means ${c}`; break; }
     }
-    const verdict = clauseEngine().understand(a.q, makeSession([]));
+    const verdict = verdictOf(a.q, makeSession([])).r;
+    const partial = verdict.status === 'clarify' && verdict.partial ? verdict.partial.join(' / ').replace(/\.$/, '') : null;
     return {
-      read: [],
-      body: [{ t: 'note', kind: 'err', text: 'No reading, so no answer. I do not guess.' },
+      read: partial ? ['read so far', { v: partial }] : [],
+      body: [partial ? { t: 'note', kind: 'err', text: `Not enough to act on: ${verdict.reasons.join('; ')}. I do not guess.` } : { t: 'note', kind: 'err', text: 'No reading, so no answer. I do not guess.' },
         ...(near.length ? [{ t: 'lbl', text: 'Nearest skills' }, { t: 'chips', items: near.map(x => x.e) }] : [{ t: 'sub', text: 'Nothing close. The Skills tab lists what I can do.' }]),
         ...(teach ? [{ t: 'lbl', text: 'Teach me the word' }, { t: 'chips', items: [teach] }] : [])],
       trace: ['context: no open question, no amendment fits', describeVerdict(verdict), 'grammar: no rule matched', 'lexicon: no taught phrase applies', 'stop']

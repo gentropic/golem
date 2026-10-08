@@ -488,6 +488,24 @@
           "caderno"
         ]
       }
+    },
+    {
+      "type": "timer",
+      "words": {
+        "timer": [
+          "timer",
+          "countdown"
+        ]
+      },
+      "words_pt": {
+        "timer": [
+          "timer",
+          "cronômetro",
+          "cronometro",
+          "temporizador",
+          "contagem"
+        ]
+      }
     }
   ],
   "units": [
@@ -966,7 +984,15 @@
     }
   ],
   "postmods": [],
-  "qmods": [],
+  "qmods": [
+    {
+      "head": "timer",
+      "attr": "duration",
+      "dims": [
+        "time"
+      ]
+    }
+  ],
   "verbs": [
     {
       "name": "convert",
@@ -1204,21 +1230,26 @@
     },
     {
       "name": "timer",
-      "label": "Set a timer",
+      "label": "Start",
       "words": [
-        "set a timer",
-        "start a timer",
-        "timer"
+        "set",
+        "start",
+        "remind me in"
       ],
-      "theme": [],
+      "elidable": true,
+      "theme": [
+        "timer",
+        "quantity:time"
+      ],
       "required": [
-        "for"
+        "theme"
       ],
       "roles": {
         "for": {
           "preps": [
             "for",
-            "of"
+            "of",
+            "in"
           ],
           "types": [
             "quantity:time"
@@ -1229,9 +1260,11 @@
         "cronômetro",
         "cronometro",
         "timer",
-        "temporizador"
+        "temporizador",
+        "me lembra em",
+        "me avisa em"
       ],
-      "label_pt": "Cronômetro"
+      "label_pt": "Iniciar"
     },
     {
       "name": "export",

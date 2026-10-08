@@ -38,11 +38,13 @@ export function ontology() {
       { type: 'scale', words: { log: ['log', 'logarithmic', 'log scale'], linear: ['linear', 'linear scale'] }, words_pt: { log: ['log', 'logarítmica', 'logaritmica', 'escala log'], linear: ['linear', 'escala linear'] } },
       { type: 'term', words: terms, generic: ['term', 'word'], words_pt: { ...terms, 'hash table': ['hash table', 'tabela hash'], 'b-tree': ['b-tree', 'btree', 'árvore b', 'arvore b'] }, generic_pt: ['termo', 'palavra'] },
       { type: 'table', words: { 'assays.csv': ['assays.csv', 'assays', 'sample table'] }, generic: ['table', 'file', 'csv'], words_pt: { 'assays.csv': ['assays.csv', 'assays', 'tabela de amostra'] }, generic_pt: ['tabela', 'arquivo'] },
-      { type: 'format', words: { script: ['script', 'python', 'adder'], notebook: ['notebook'] }, words_pt: { script: ['script', 'python', 'adder'], notebook: ['notebook', 'caderno'] } }
+      { type: 'format', words: { script: ['script', 'python', 'adder'], notebook: ['notebook'] }, words_pt: { script: ['script', 'python', 'adder'], notebook: ['notebook', 'caderno'] } },
+      { type: 'timer', words: { timer: ['timer', 'countdown'] }, words_pt: { timer: ['timer', 'cronômetro', 'cronometro', 'temporizador', 'contagem'] } }
     ],
     units,
     compounds: [{ mod: 'filter', heads: ['country'], attr: 'filter', echo: true }, { mod: 'scale', heads: ['plot'], attr: 'scale', echo: true }],
-    postmods: [], qmods: [],
+    postmods: [],
+    qmods: [{ head: 'timer', attr: 'duration', dims: ['time'] }],   // "a 30 minute timer"
     verbs: FRAMES.map(({ bind, ...f }) => f),
     inherit: [],
     echoOrder: ['of', 'unit', 'by', 'scale', 'for', 'as'],

@@ -157,6 +157,18 @@ test('the clause parser reads the bare phrases and closed questions; the regex r
   assert.ok(none.res.trace.some(t => /^clause: reject/.test(t)), 'the no-reading card records the parser verdict');
 });
 
+test('timers read like a person says them, and a bare timer asks for how long', () => {
+  g.reset();
+  for (const [q, sec] of [['set a timer for 5 min', 300], ['start a 30 minutes timer', 1800], ['30 minute timer', 1800], ['timer for 30 minutes', 1800], ['remind me in 20 minutes', 1200], ['countdown 90 seconds', 90], ['set a timer for half an hour', 1800], ['start a timer for an hour', 3600]]) {
+    const c = g.submit(q).card;
+    assert.equal(c.tool, 'timer', `"${q}" is a timer: ${c.res.trace[0]}`);
+    assert.equal(c.args.sec, sec, `"${q}" → ${sec} s`);
+  }
+  const bare = g.submit('start a timer').card;
+  assert.equal(bare.rung, 'none');
+  assert.ok(g.textOf(bare).includes('Not enough to act on'), 'the parser read it and says what is missing');
+});
+
 test('every result is plain data: no HTML strings, args survive JSON', () => {
   g.reset();
   for (const [q] of STEPS) g.submit(q);

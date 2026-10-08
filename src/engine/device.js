@@ -36,7 +36,12 @@ tool({
 tool({
   name: 'timer', rank: 30,
   skill: { group: 'Device', title: 'Timer and alarm', on: 'lead-acid intent', about: 'Handed to the Clock app.', examples: ['set a timer for 5 min', 'set an alarm for 6:15'] },
-  read: (text, q) => { const m = /^(?:set |start )?(?:a )?timer (?:for |of )?(\d+(?:\.\d+)?) ?(s|sec|secs|seconds?|m|min|mins|minutes?|h|hr|hours?)$/.exec(q); return m ? { sec: Math.round(m[1] * (m[2][0] === 's' ? 1 : m[2][0] === 'm' ? 60 : 3600)) } : null; },
+  read: (text, q) => {
+    let m = /^(?:set |start )?(?:a )?(?:timer|countdown) (?:for |of )?(\d+(?:\.\d+)?) ?(s|sec|secs|seconds?|m|min|mins|minutes?|h|hr|hours?)$/.exec(q);
+    if (m) return { sec: Math.round(m[1] * (m[2][0] === 's' ? 1 : m[2][0] === 'm' ? 60 : 3600)) };
+    m = /^(?:set |start )?(?:a )?(?:timer|countdown) (?:for |of )?(half an hour|an hour|a minute|a quarter(?: of an)? hour|quarter of an hour)$/.exec(q);
+    return m ? { sec: /half/.test(m[1]) ? 1800 : /quarter/.test(m[1]) ? 900 : /hour/.test(m[1]) ? 3600 : 60 } : null;
+  },
   topic: () => ['Timer', 1],
   run: a => {
     if (!a.end) a.end = Date.now() + a.sec * 1000;
@@ -48,11 +53,17 @@ tool({
     };
   }
 });
+// "set a timer for 5 min", "start a 30 minute timer", "30 minute timer", "remind me in 20 minutes"; a bare "start a timer" asks for how long
 frame({
-  name: 'timer', label: 'Set a timer', words: ['set a timer', 'start a timer', 'timer'],
-  theme: [], required: ['for'], roles: { for: { preps: ['for', 'of'], types: ['quantity:time'] } },
-  words_pt: ['cronômetro', 'cronometro', 'timer', 'temporizador'], label_pt: 'Cronômetro',
-  bind: c => { const q = c.roles.for && c.roles.for[0], u = q && parseUnit(q.unit); return u && u.dim === 't' ? { tool: 'timer', args: { sec: Math.round(q.n * u.f) } } : null; }
+  name: 'timer', label: 'Start', words: ['set', 'start', 'remind me in'], elidable: true,
+  theme: ['timer', 'quantity:time'], required: ['theme'], roles: { for: { preps: ['for', 'of', 'in'], types: ['quantity:time'] } },
+  words_pt: ['cronômetro', 'cronometro', 'timer', 'temporizador', 'me lembra em', 'me avisa em'], label_pt: 'Iniciar',
+  bind: c => {
+    const t = c.theme[0], q = (t && t.type === 'quantity') ? t : (t && t.attrs && t.attrs.duration) || (c.roles.for && c.roles.for[0]);
+    const u = q && parseUnit(q.unit);
+    if (!q) return { clarify: 'for how long? Say "for 30 minutes"' };
+    return u && u.dim === 't' ? { tool: 'timer', args: { sec: Math.round(q.n * u.f) } } : { clarify: `${q.n} ${q.unit} is not a duration` };
+  }
 });
 tool({
   name: 'alarm', rank: 31,

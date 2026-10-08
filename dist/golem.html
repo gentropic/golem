@@ -7955,7 +7955,12 @@ tool({
 tool({
   name: 'timer', rank: 30,
   skill: { group: 'Device', title: 'Timer and alarm', on: 'lead-acid intent', about: 'Handed to the Clock app.', examples: ['set a timer for 5 min', 'set an alarm for 6:15'] },
-  read: (text, q) => { const m = /^(?:set |start )?(?:a )?timer (?:for |of )?(\d+(?:\.\d+)?) ?(s|sec|secs|seconds?|m|min|mins|minutes?|h|hr|hours?)$/.exec(q); return m ? { sec: Math.round(m[1] * (m[2][0] === 's' ? 1 : m[2][0] === 'm' ? 60 : 3600)) } : null; },
+  read: (text, q) => {
+    let m = /^(?:set |start )?(?:a )?(?:timer|countdown) (?:for |of )?(\d+(?:\.\d+)?) ?(s|sec|secs|seconds?|m|min|mins|minutes?|h|hr|hours?)$/.exec(q);
+    if (m) return { sec: Math.round(m[1] * (m[2][0] === 's' ? 1 : m[2][0] === 'm' ? 60 : 3600)) };
+    m = /^(?:set |start )?(?:a )?(?:timer|countdown) (?:for |of )?(half an hour|an hour|a minute|a quarter(?: of an)? hour|quarter of an hour)$/.exec(q);
+    return m ? { sec: /half/.test(m[1]) ? 1800 : /quarter/.test(m[1]) ? 900 : /hour/.test(m[1]) ? 3600 : 60 } : null;
+  },
   topic: () => ['Timer', 1],
   run: a => {
     if (!a.end) a.end = Date.now() + a.sec * 1000;
@@ -7967,11 +7972,17 @@ tool({
     };
   }
 });
+// "set a timer for 5 min", "start a 30 minute timer", "30 minute timer", "remind me in 20 minutes"; a bare "start a timer" asks for how long
 frame({
-  name: 'timer', label: 'Set a timer', words: ['set a timer', 'start a timer', 'timer'],
-  theme: [], required: ['for'], roles: { for: { preps: ['for', 'of'], types: ['quantity:time'] } },
-  words_pt: ['cronômetro', 'cronometro', 'timer', 'temporizador'], label_pt: 'Cronômetro',
-  bind: c => { const q = c.roles.for && c.roles.for[0], u = q && parseUnit(q.unit); return u && u.dim === 't' ? { tool: 'timer', args: { sec: Math.round(q.n * u.f) } } : null; }
+  name: 'timer', label: 'Start', words: ['set', 'start', 'remind me in'], elidable: true,
+  theme: ['timer', 'quantity:time'], required: ['theme'], roles: { for: { preps: ['for', 'of', 'in'], types: ['quantity:time'] } },
+  words_pt: ['cronômetro', 'cronometro', 'timer', 'temporizador', 'me lembra em', 'me avisa em'], label_pt: 'Iniciar',
+  bind: c => {
+    const t = c.theme[0], q = (t && t.type === 'quantity') ? t : (t && t.attrs && t.attrs.duration) || (c.roles.for && c.roles.for[0]);
+    const u = q && parseUnit(q.unit);
+    if (!q) return { clarify: 'for how long? Say "for 30 minutes"' };
+    return u && u.dim === 't' ? { tool: 'timer', args: { sec: Math.round(q.n * u.f) } } : { clarify: `${q.n} ${q.unit} is not a duration` };
+  }
 });
 tool({
   name: 'alarm', rank: 31,
@@ -8097,11 +8108,13 @@ function ontology() {
       { type: 'scale', words: { log: ['log', 'logarithmic', 'log scale'], linear: ['linear', 'linear scale'] }, words_pt: { log: ['log', 'logarítmica', 'logaritmica', 'escala log'], linear: ['linear', 'escala linear'] } },
       { type: 'term', words: terms, generic: ['term', 'word'], words_pt: { ...terms, 'hash table': ['hash table', 'tabela hash'], 'b-tree': ['b-tree', 'btree', 'árvore b', 'arvore b'] }, generic_pt: ['termo', 'palavra'] },
       { type: 'table', words: { 'assays.csv': ['assays.csv', 'assays', 'sample table'] }, generic: ['table', 'file', 'csv'], words_pt: { 'assays.csv': ['assays.csv', 'assays', 'tabela de amostra'] }, generic_pt: ['tabela', 'arquivo'] },
-      { type: 'format', words: { script: ['script', 'python', 'adder'], notebook: ['notebook'] }, words_pt: { script: ['script', 'python', 'adder'], notebook: ['notebook', 'caderno'] } }
+      { type: 'format', words: { script: ['script', 'python', 'adder'], notebook: ['notebook'] }, words_pt: { script: ['script', 'python', 'adder'], notebook: ['notebook', 'caderno'] } },
+      { type: 'timer', words: { timer: ['timer', 'countdown'] }, words_pt: { timer: ['timer', 'cronômetro', 'cronometro', 'temporizador', 'contagem'] } }
     ],
     units,
     compounds: [{ mod: 'filter', heads: ['country'], attr: 'filter', echo: true }, { mod: 'scale', heads: ['plot'], attr: 'scale', echo: true }],
-    postmods: [], qmods: [],
+    postmods: [],
+    qmods: [{ head: 'timer', attr: 'duration', dims: ['time'] }],   // "a 30 minute timer"
     verbs: FRAMES.map(({ bind, ...f }) => f),
     inherit: [],
     echoOrder: ['of', 'unit', 'by', 'scale', 'for', 'as'],
@@ -9895,12 +9908,19 @@ const norm = s => s.trim().replace(/\s+/g, ' ').replace(/[?.!]+$/, '');
 let clause = null, clauseFor = null;
 const clauseEngine = () => { const key = S.table ? S.table.hash : 'sample'; if (!clause || clauseFor !== key) { clause = createEngine(ontology(), ENGLISH); clauseFor = key; } return clause; };
 const clauseSession = () => S.clause || (S.clause = makeSession([]));
-// A parsed command becomes a tool call through its frame's bind(). Only the first command of a
-// sequence is taken for now; "then" chains are a plan the planner does not build yet.
+// The parser's verdict on a text, then the frame's bind(): a frame may answer { tool, args }, or
+// { clarify } when the reading is whole but a value is missing, which becomes a clarify verdict too.
+// Only the first command of a sequence is taken for now; "then" chains are a plan the planner does not build yet.
+function verdictOf(text, session) {
+  const r = clauseEngine().understand(text, session);
+  if (r.status !== 'ok') return { r };
+  const cmd = r.commands[0], f = FRAMES.find(x => x.name === cmd.verb), b = f && f.bind(cmd), echo = r.echo.replace(/\.$/, '');
+  if (!b) return { r: { status: 'clarify', reasons: [`I read "${echo}" but no tool takes that`], partial: [echo], diag: r.diag } };
+  if (b.clarify) return { r: { status: 'clarify', reasons: [b.clarify], partial: [echo], diag: r.diag } };
+  return { r, b };
+}
 function clauseRead(text, rung) {
-  const r = clauseEngine().understand(text, clauseSession());
-  if (r.status !== 'ok') return { verdict: r };
-  const cmd = r.commands[0], f = FRAMES.find(x => x.name === cmd.verb), b = f && f.bind(cmd);
+  const { r, b } = verdictOf(text, clauseSession());
   if (!b) return { verdict: r };
   const res = T[b.tool](b.args); if (!res) return { verdict: r };
   res.trace.unshift(`clause: ${r.echo}`, ...r.diag.notes.map(n => `clause: ${n}`));
@@ -9955,10 +9975,11 @@ tool({
       const c = [...vocab()].find(v => v.length > t.length && v.startsWith(t)) || [...vocab()].find(v => Math.abs(v.length - t.length) <= 1 && lev(v, t) === 1);
       if (c) { teach = `${t} means ${c}`; break; }
     }
-    const verdict = clauseEngine().understand(a.q, makeSession([]));
+    const verdict = verdictOf(a.q, makeSession([])).r;
+    const partial = verdict.status === 'clarify' && verdict.partial ? verdict.partial.join(' / ').replace(/\.$/, '') : null;
     return {
-      read: [],
-      body: [{ t: 'note', kind: 'err', text: 'No reading, so no answer. I do not guess.' },
+      read: partial ? ['read so far', { v: partial }] : [],
+      body: [partial ? { t: 'note', kind: 'err', text: `Not enough to act on: ${verdict.reasons.join('; ')}. I do not guess.` } : { t: 'note', kind: 'err', text: 'No reading, so no answer. I do not guess.' },
         ...(near.length ? [{ t: 'lbl', text: 'Nearest skills' }, { t: 'chips', items: near.map(x => x.e) }] : [{ t: 'sub', text: 'Nothing close. The Skills tab lists what I can do.' }]),
         ...(teach ? [{ t: 'lbl', text: 'Teach me the word' }, { t: 'chips', items: [teach] }] : [])],
       trace: ['context: no open question, no amendment fits', describeVerdict(verdict), 'grammar: no rule matched', 'lexicon: no taught phrase applies', 'stop']
