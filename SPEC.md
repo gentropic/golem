@@ -167,6 +167,8 @@ Status: **mock** = works in `src/` today; **planned** = named, not built.
 | Compute | Step-by-step algebra | planned | new package; nothing symbolic was found in the monorepo |
 | Field | True thickness from intercept, hole and plane | `@gcu/bearing` vendored | `@gcu/bearing` |
 | Field | Stereonet: planes, poles, lines | `@gcu/bearing` vendored (projection); own SVG | `@gcu/bearing`, `@gcu/stereonet` |
+| Field | Structural geometry: apparent dip, three-point plane, intersection of planes, rake, oriented core, Fisher mean | `@gcu/bearing` vendored (8 Oct 2026); rotation and rose diagrams planned | `@gcu/bearing` |
+| Field | Magnetic declination, magnetic and true bearings | `@gcu/wmm` vendored (8 Oct 2026); grid north needs UTM, planned | `@gcu/wmm` |
 | Field | Mineral identification key | mock | minerals pack; question choice could use `@gcu/learn` trees |
 | Field | Compass capture from phone sensors | planned | lead-acid sensor route (does not exist yet) |
 | Field | Colour from camera to Munsell | planned | swatch (not found under `ext/`) |

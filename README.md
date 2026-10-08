@@ -15,6 +15,7 @@ Open `dist/golem.html`, then:
 - Run `dens of chalcopyrite`. It has no reading and offers `dens means density`. Tap that, then run `dens of chalcopyrite` again.
 - Type `why` after any card, or `export as script`.
 - Open the menu (top left) for sessions and history search.
+- Try `apparent dip of 000/30 on a section at 045`, `intersection of 090/45 and 270/45`, `core alpha 40 beta 230 in hole 270/60`, `declination at -19.92, -43.94`.
 - Tap the paperclip and open a CSV of your own. `mean cu by lith where au > 0.1`, `how many rows where cu > 1`, `top 5 rows sorted by au descending`, `check intervals`, `histogram of fe`: the column names come from the file.
 - Tap *sleep* (top right) to put golem to sleep; nothing runs until you tap *wake*.
 
@@ -42,7 +43,8 @@ build.mjs                    the build: modules concatenated in import order
 src/engine/                  no DOM, no storage: everything that reads and computes
   core.js                    working state, the tool table, declarations, helpers
   units.js calc.js dates.js  compute tools
-  orientation.js table.js    field tools; the open table (a file through recon, or the sample), histogram, table questions
+  orientation.js table.js    true thickness and the stereonet; the open table (a file through recon, or the sample), histogram, table questions
+  structure.js geo.js        apparent dip, three-point, intersection, rake, oriented core, Fisher mean; declination from wmm
   knowledge.js device.js     packs sample, device hand-offs
   notes.js skills.js         notes and taught words; the skills and packs catalog
   reading.js                 the reading ladder: context, grammar (clause, then the rules), taught; none, why, export
@@ -50,7 +52,7 @@ src/engine/                  no DOM, no storage: everything that reads and compu
   sessions.js                sessions, replay, auto-naming, serialize and hydrate
   engine.js                  submit, rerun, slot flips, answers, undo
   index.js                   the surface Node tests import
-src/vendor/                  copies, never edited here: @gcu/dispatch (the parser), @gcu/bearing, @gcu/sadpan, @gcu/recon, @gcu/sift, the lead-acid shim
+src/vendor/                  copies, never edited here: @gcu/dispatch (the parser), @gcu/bearing, @gcu/sadpan, @gcu/recon, @gcu/sift, @gcu/wmm, the lead-acid shim
 src/shell/                   the browser: markup, rendering, wiring, storage
   index.html                 markup, Switchboard tokens, styles, bench notes
   fonts/                     Barlow and Space Mono (OFL), embedded by the build
@@ -58,6 +60,7 @@ src/shell/                   the browser: markup, rendering, wiring, storage
   main.js                    tabs, drawer, storage, the sleep switch
 test/engine.test.mjs         engine tests, Node only
 test/files.test.mjs          a real CSV: recon typing, table questions, table nouns, replay (fixture in test/fixtures/)
+test/structure.test.mjs      the structural geometry and declination checks from the skills spec
 test/oracle.test.mjs         golem's arithmetic against the GCU packages it does not vendor
 test/smoke.mjs               browser smoke test on the built file
 dist/golem.html              the built mock (committed, so it opens without a build)

@@ -7996,6 +7996,436 @@ tool({
 });
 })();
 
+/* ==== src/engine/structure.js ==== */
+(() => {
+// Structural geometry over @gcu/bearing (vendored): apparent dip, the three-point problem, the line of
+// intersection of two planes, rake, oriented core, and the Fisher mean of a set. Every answer draws the
+// net. Planes are read as dip direction/dip with the usual strike/dip slot; lines as trend/plunge.
+
+const ORI = '(\\d{1,3})\\s*/\\s*(\\d{1,2})';
+const ddOf = (a1, conv) => conv === 'sd' ? (a1 + 90) % 360 : a1;
+const planeSlot = (a1, a2, conv, key = 'conv') => ({ v: `${p3(a1)}/${p2(a2)} as ${conv === 'sd' ? 'strike/dip (right-hand)' : 'dip direction/dip'}`, key, alts: ['dd', 'sd'], cur: conv || 'dd' });
+const down = v => v[2] > 0 ? vec3.negate(v) : v;   // the lower-hemisphere twin of a vector
+const plane = v => conversions.dcosToPlane(down(vec3.normalize(v)));   // a pole → [dd, dip]
+const line = v => conversions.dcosToLine(down(vec3.normalize(v)));     // → [trend, plunge]
+const ori = (a, b) => `${p3(a)}/${p2(b)}`;
+const SRC = { t: 'src', text: '@gcu/bearing · vendored · lower hemisphere, equal area' };
+
+tool({
+  name: 'apparent', rank: 62,
+  skill: { group: 'Field', title: 'Structural geometry', on: '@gcu/bearing', about: 'Apparent dip, three-point plane, intersection of planes, rake, oriented core, Fisher mean. Planes as dip direction/dip, flip the slot for strike/dip.', examples: ['apparent dip of 000/30 on a section at 045', 'intersection of 090/45 and 270/45', 'plane through 0,0,100 and 100,0,100 and 0,100,0', 'mean of 120/35, 130/40 and 125/38', 'core alpha 40 beta 230 in hole 270/60'] },
+  read: (text, q) => { const m = new RegExp(`^apparent dip of ${ORI} (?:on|along|in) (?:a )?section (?:at|of|azimuth|striking) (\\d{1,3})$`).exec(q); return m ? { a1: +m[1], a2: +m[2], conv: 'dd', az: +m[3] } : null; },
+  topic: () => ['Apparent dip', 2],
+  run: a => {
+    const dd = ddOf(a.a1, a.conv), delta = a.az - dd, c = Math.cos(rad(delta)), app = deg(Math.atan(Math.tan(rad(a.a2)) * Math.abs(c)));
+    const tr = (c >= 0 ? a.az : a.az + 180) % 360;
+    return {
+      read: ['apparent dip of', planeSlot(a.a1, a.a2, a.conv), 'on a section at', { v: p3(a.az) }], value: app,
+      body: [{ t: 'big', v: fmt(app, 3), unit: '° apparent dip' }, { t: 'net', planes: [{ dd, dip: a.a2 }], lines: [{ tr, pl: app, label: 'apparent' }] }, { t: 'kv', rows: [['plunges toward', p3(tr)], ['section to dip direction', `${fmt(Math.abs(((delta + 180) % 360 + 360) % 360 - 180), 3)}°`], ['true dip', `${p2(a.a2)}° toward ${p3(dd)}`]] }, SRC],
+      trace: [`plane → dip direction ${p3(dd)}, dip ${p2(a.a2)}`, `tan(apparent) = tan(${a.a2}°) × |cos(${fmt(delta)}°)| = ${fmt(Math.tan(rad(a.a2)) * Math.abs(c), 5)}`, `apparent dip = ${fmt(app, 5)}°`], py: `bearing.apparent_dip(plane=(${dd}, ${a.a2}), section=${a.az})`
+    };
+  }
+});
+tool({
+  name: 'threepoint', rank: 63,
+  read: (text, q) => { const N = '(-?\\d+(?:\\.\\d+)?)\\s*,\\s*(-?\\d+(?:\\.\\d+)?)\\s*,\\s*(-?\\d+(?:\\.\\d+)?)'; const m = new RegExp(`^(?:plane|bedding|contact|surface) through ${N} and ${N} and ${N}$`).exec(q); return m ? { p: [[+m[1], +m[2], +m[3]], [+m[4], +m[5], +m[6]], [+m[7], +m[8], +m[9]]] } : null; },
+  topic: () => ['Three-point plane', 2],
+  run: a => {
+    const [p1, p2v, p3v] = a.p, v1 = vec3.sub(p2v, p1), v2 = vec3.sub(p3v, p1), n = vec3.cross(v1, v2);
+    const read = ['plane through', { v: p1.join(', ') }, { v: p2v.join(', ') }, { v: p3v.join(', ') }];
+    if (vec3.length(n) < 1e-9) return { read, body: [{ t: 'note', kind: 'err', text: 'The three points are on one line; no plane is defined.' }], trace: ['cross product of the two edges is zero'] };
+    const ang = deg(vec3.angle(v1, v2)), [dd, dip] = plane(n);
+    return {
+      read, value: dip,
+      body: [{ t: 'big', v: ori(dd, dip), unit: 'dip direction/dip' }, { t: 'net', planes: [{ dd, dip }], lines: [] }, { t: 'kv', rows: [['strike', p3(dd + 270)], ['dip', `${fmt(dip, 3)}° toward ${p3(dd)}`], ['triangle', `${fmt(ang, 3)}° between the edges${ang < 10 || ang > 170 ? ' (thin: the dip is poorly constrained)' : ''}`]] }, SRC],
+      trace: ['east, north, up coordinates', `edges: ${v1.map(x => fmt(x)).join(', ')} and ${v2.map(x => fmt(x)).join(', ')}`, `normal = edge1 × edge2 = ${n.map(x => fmt(x, 4)).join(', ')}`, 'bearing.dcosToPlane(lower-hemisphere pole)'], py: `bearing.three_point(${JSON.stringify(a.p)})`
+    };
+  }
+});
+tool({
+  name: 'intersect', rank: 64,
+  read: (text, q) => { const m = new RegExp(`^(?:line of )?intersection of ${ORI} and ${ORI}$`).exec(q); return m ? { a: [+m[1], +m[2]], b: [+m[3], +m[4]], conv: 'dd' } : null; },
+  topic: () => ['Plane intersection', 2],
+  run: a => {
+    const d1 = ddOf(a.a[0], a.conv), d2 = ddOf(a.b[0], a.conv), n1 = conversions.planeToDcos(d1, a.a[1]), n2 = conversions.planeToDcos(d2, a.b[1]), l = vec3.cross(n1, n2);
+    const read = ['intersection of', planeSlot(a.a[0], a.a[1], a.conv), 'and', { v: ori(a.b[0], a.b[1]) }];
+    if (vec3.length(l) < 1e-9) return { read, body: [{ t: 'note', kind: 'err', text: 'The planes are parallel; they do not intersect in a line.' }], trace: ['pole × pole is zero'] };
+    const [tr, pl] = line(l), horizontal = Math.abs(l[2]) < 1e-9;
+    return {
+      read, value: pl,
+      body: [{ t: 'big', v: ori(tr, pl), unit: 'trend/plunge' }, { t: 'net', planes: [{ dd: d1, dip: a.a[1] }, { dd: d2, dip: a.b[1] }], lines: [{ tr, pl, label: 'line' }] }, { t: 'kv', rows: [['trend', `${p3(tr)}${horizontal ? ` or ${p3(tr + 180)} (horizontal)` : ''}`], ['plunge', `${fmt(pl, 3)}°`]] }, SRC],
+      trace: [`poles: ${ori(d1 + 180, 90 - a.a[1])} and ${ori(d2 + 180, 90 - a.b[1])}`, 'line = pole1 × pole2, lower hemisphere', 'bearing.dcosToLine'], py: `bearing.intersection((${d1}, ${a.a[1]}), (${d2}, ${a.b[1]}))`
+    };
+  }
+});
+tool({
+  name: 'rake', rank: 65,
+  read: (text, q) => {
+    let m = new RegExp(`^(?:line (?:at|with) )?rake (?:of )?(\\d{1,3}) on ${ORI}$`).exec(q); if (m) return { rake: +m[1], a1: +m[2], a2: +m[3], conv: 'dd' };
+    m = new RegExp(`^rake of (?:lineation |line |the line )?${ORI} on ${ORI}$`).exec(q); return m ? { tr: +m[1], pl: +m[2], a1: +m[3], a2: +m[4], conv: 'dd' } : null;
+  },
+  topic: () => ['Rake', 1],
+  run: a => {
+    const dd = ddOf(a.a1, a.conv), n = conversions.planeToDcos(dd, a.a2);
+    if (a.rake != null) {
+      const [tr, pl] = conversions.rakeToLine(dd, a.a2, a.rake);
+      return { read: ['line at rake', { v: `${a.rake}°` }, 'on', planeSlot(a.a1, a.a2, a.conv)], body: [{ t: 'big', v: ori(tr, pl), unit: 'trend/plunge' }, { t: 'net', planes: [{ dd, dip: a.a2 }], lines: [{ tr, pl, label: 'line' }] }, { t: 'kv', rows: [['rake', `${a.rake}° from the strike ${p3(dd + 270)}`]] }, SRC], trace: [`bearing.rakeToLine(${dd}, ${a.a2}, ${a.rake})`], py: `bearing.rake_to_line((${dd}, ${a.a2}), ${a.rake})` };
+    }
+    const l = conversions.lineToDcos(a.tr, a.pl), off = deg(Math.asin(Math.abs(vec3.dot(n, l))));
+    const read = ['rake of', { v: ori(a.tr, a.pl) }, 'on', planeSlot(a.a1, a.a2, a.conv)];
+    if (off > 2) return { read, body: [{ t: 'note', kind: 'err', text: `That line is ${fmt(off, 3)}° off the plane; a rake is measured on the plane.` }], trace: [`angle between line and plane = ${fmt(off, 4)}°`] };
+    const s = conversions.lineToDcos(dd - 90, 0), r = deg(Math.acos(Math.max(-1, Math.min(1, vec3.dot(s, l)))));
+    return { read, value: r, body: [{ t: 'big', v: fmt(r, 3), unit: `° from the strike ${p3(dd + 270)}` }, { t: 'net', planes: [{ dd, dip: a.a2 }], lines: [{ tr: a.tr, pl: a.pl, label: 'line' }] }, SRC], trace: [`strike direction ${p3(dd + 270)} as a unit vector`, `rake = acos(strike · line) = ${fmt(r, 4)}°`, off > 0.01 ? `the line sits ${fmt(off, 3)}° off the plane (measurement noise)` : 'the line lies on the plane'], py: `bearing.rake((${dd}, ${a.a2}), (${a.tr}, ${a.pl}))` };
+  }
+});
+// Oriented core. Convention, stated on the card: alpha is the angle between the core axis and the plane
+// (90 = perpendicular to the core); beta is measured clockwise, looking down the hole, from the
+// bottom-of-hole reference line to the down-hole apex of the ellipse. Other conventions exist (SPEC-skills,
+// open decision 9); the slot will carry them when a second one is wired.
+tool({
+  name: 'core', rank: 66,
+  read: (text, q) => { const m = new RegExp(`^(?:oriented )?core alpha (\\d{1,2}) beta (\\d{1,3}) in (?:a )?hole ${ORI}$`).exec(q); return m ? { alpha: +m[1], beta: +m[2], htr: +m[3], hpl: +m[4] } : null; },
+  topic: () => ['Oriented core', 2],
+  run: a => {
+    const read = ['core', { v: `alpha ${a.alpha}` }, { v: `beta ${a.beta}` }, 'in hole', { v: ori(a.htr, a.hpl) }];
+    if (a.hpl >= 89.5) return { read, body: [{ t: 'note', kind: 'err', text: 'In a vertical hole the bottom-of-hole line is undefined, so beta has no reference. Give the hole a plunge below 89.5°.' }], trace: ['bottom-of-hole line undefined'] };
+    const d = conversions.lineToDcos(a.htr, a.hpl), g = [0, 0, -1];
+    const b = vec3.normalize(vec3.sub(g, vec3.scale(d, vec3.dot(g, d))));   // bottom-of-hole line: down, perpendicular to the axis
+    const y = vec3.cross(d, b), u = vec3.sub(vec3.scale(b, Math.cos(rad(a.beta))), vec3.scale(y, Math.sin(rad(a.beta))));   // clockwise looking down-hole
+    const e = vec3.add(vec3.scale(d, Math.cos(rad(a.alpha))), vec3.scale(u, Math.sin(rad(a.alpha))));   // the ellipse long axis, down-hole end
+    const s = vec3.cross(d, u), n = vec3.cross(e, s), [dd, dip] = plane(n);
+    return {
+      read, value: dip,
+      body: [{ t: 'big', v: ori(dd, dip), unit: 'dip direction/dip' }, { t: 'net', planes: [{ dd, dip }], lines: [{ tr: a.htr, pl: a.hpl, label: 'hole' }] }, { t: 'kv', rows: [['strike', p3(dd + 270)], ['convention', 'alpha from the core axis to the plane; beta clockwise looking down-hole, from the bottom-of-hole line to the ellipse apex']] }, SRC],
+      trace: [`hole axis ${ori(a.htr, a.hpl)} as a unit vector`, `bottom-of-hole line = down, projected perpendicular to the axis → ${line(b).map(x => fmt(x)).join('/')}`, `apex direction = bottom-of-hole rotated ${a.beta}° clockwise looking down-hole`, `long axis = cos(${a.alpha}°)·axis + sin(${a.alpha}°)·apex; plane = long axis and the short axis`, 'bearing.dcosToPlane(lower-hemisphere pole)'], py: `bearing.oriented_core(alpha=${a.alpha}, beta=${a.beta}, hole=(${a.htr}, ${a.hpl}))`
+    };
+  }
+});
+tool({
+  name: 'fmean', rank: 67,
+  read: (text, q) => { const m = new RegExp(`^(?:fisher )?mean of ((?:${ORI}(?:,? (?:and )?)?)+)$`).exec(q); if (!m) return null; const items = [...m[1].matchAll(new RegExp(ORI, 'g'))].map(x => [+x[1], +x[2]]); return items.length >= 2 ? { items, kind: 'planes' } : null; },
+  topic: () => ['Fisher mean', 2],
+  run: a => {
+    const planes = a.kind === 'planes', dcos = a.items.map(([x, y]) => planes ? conversions.planeToDcos(x, y) : conversions.lineToDcos(x, y));
+    const st = statistics.fisherStats(dcos), m = planes ? plane(st.mean) : line(st.mean), n = a.items.length;
+    const read = ['mean of', { v: `${n} ${a.kind}`, key: 'kind', alts: ['planes', 'lines'], cur: a.kind }, { v: a.items.map(i => ori(i[0], i[1])).join(', ') }];
+    const rows = [['mean', `${ori(m[0], m[1])} (${planes ? 'dip direction/dip' : 'trend/plunge'})`], ['R / n', `${fmt(st.R, 4)} / ${n}`], ['κ', n >= 3 ? fmt(st.kappa, 4) : 'needs 3 or more'], ['α95', n >= 3 ? `${fmt(st.alpha95, 3)}°` : 'needs 3 or more']];
+    return {
+      read, value: m[1],
+      body: [{ t: 'big', v: ori(m[0], m[1]), unit: planes ? 'mean plane' : 'mean line' }, { t: 'net', planes: planes ? a.items.map(([x, y]) => ({ dd: x, dip: y })) : [], lines: planes ? [{ tr: m[0] + 180, pl: 90 - m[1], label: 'mean pole' }] : [...a.items.map(([x, y]) => ({ tr: x, pl: y, label: '' })), { tr: m[0], pl: m[1], label: 'mean' }] }, { t: 'kv', rows }, SRC],
+      trace: [`${n} ${planes ? 'poles' : 'lines'} as unit vectors`, 'bearing.statistics.fisherStats → resultant, κ, α95', planes ? 'mean pole → plane' : 'mean vector → line'], py: `bearing.fisher_mean(${JSON.stringify(a.items)}, kind="${a.kind}")`
+    };
+  }
+});
+})();
+
+/* ==== src/vendor/wmm.js ==== */
+const { COEFFICIENTS, DEGREE, EPOCH, MODEL, field, declination, decimalYear, VALID_FROM, VALID_TO } = (() => {
+// ⚠ VENDORED — DO NOT EDIT. @gcu/wmm, the World Magnetic Model (WMM2025) evaluated from NOAA's coefficients,
+// copied from ../auditable/ext/wmm/index.js. Re-vendor by copying that file here when the model is reissued.
+
+// ⚠ GENERATED FILE — DO NOT EDIT. Source: src/  Build: @gcu/build src/main.js
+// @gcu/wmm — The World Magnetic Model (WMM2025), evaluated: geodetic position + date → the main geomagnetic field (X, Y, Z, H, F), inclination, declination, grid variation and their secular variation. Zero dependencies, offline, pinned by NOAA's published test values. The one number a compass needs to turn magnetic north into true north.
+
+// ── src/coefficients.js ──
+
+// @gcu/wmm — WMM2025 Gauss coefficients, GENERATED from NOAA/NCEI WMM2025.COF
+// (model WMM-2025, epoch 2025.0, released 11/13/2024; public domain). Do not edit by hand:
+// regenerate from the COF when the model changes (every five years).
+// Rows: [n, m, g (nT), h (nT), gdot (nT/yr), hdot (nT/yr)], Schmidt semi-normalized.
+const EPOCH = 2025.0;
+const MODEL = "WMM-2025";
+const DEGREE = 12;
+const COEFFICIENTS = [
+  [1, 0, -29351.8, 0.0, 12.0, 0.0],
+  [1, 1, -1410.8, 4545.4, 9.7, -21.5],
+  [2, 0, -2556.6, 0.0, -11.6, 0.0],
+  [2, 1, 2951.1, -3133.6, -5.2, -27.7],
+  [2, 2, 1649.3, -815.1, -8.0, -12.1],
+  [3, 0, 1361.0, 0.0, -1.3, 0.0],
+  [3, 1, -2404.1, -56.6, -4.2, 4.0],
+  [3, 2, 1243.8, 237.5, 0.4, -0.3],
+  [3, 3, 453.6, -549.5, -15.6, -4.1],
+  [4, 0, 895.0, 0.0, -1.6, 0.0],
+  [4, 1, 799.5, 278.6, -2.4, -1.1],
+  [4, 2, 55.7, -133.9, -6.0, 4.1],
+  [4, 3, -281.1, 212.0, 5.6, 1.6],
+  [4, 4, 12.1, -375.6, -7.0, -4.4],
+  [5, 0, -233.2, 0.0, 0.6, 0.0],
+  [5, 1, 368.9, 45.4, 1.4, -0.5],
+  [5, 2, 187.2, 220.2, 0.0, 2.2],
+  [5, 3, -138.7, -122.9, 0.6, 0.4],
+  [5, 4, -142.0, 43.0, 2.2, 1.7],
+  [5, 5, 20.9, 106.1, 0.9, 1.9],
+  [6, 0, 64.4, 0.0, -0.2, 0.0],
+  [6, 1, 63.8, -18.4, -0.4, 0.3],
+  [6, 2, 76.9, 16.8, 0.9, -1.6],
+  [6, 3, -115.7, 48.8, 1.2, -0.4],
+  [6, 4, -40.9, -59.8, -0.9, 0.9],
+  [6, 5, 14.9, 10.9, 0.3, 0.7],
+  [6, 6, -60.7, 72.7, 0.9, 0.9],
+  [7, 0, 79.5, 0.0, -0.0, 0.0],
+  [7, 1, -77.0, -48.9, -0.1, 0.6],
+  [7, 2, -8.8, -14.4, -0.1, 0.5],
+  [7, 3, 59.3, -1.0, 0.5, -0.8],
+  [7, 4, 15.8, 23.4, -0.1, 0.0],
+  [7, 5, 2.5, -7.4, -0.8, -1.0],
+  [7, 6, -11.1, -25.1, -0.8, 0.6],
+  [7, 7, 14.2, -2.3, 0.8, -0.2],
+  [8, 0, 23.2, 0.0, -0.1, 0.0],
+  [8, 1, 10.8, 7.1, 0.2, -0.2],
+  [8, 2, -17.5, -12.6, 0.0, 0.5],
+  [8, 3, 2.0, 11.4, 0.5, -0.4],
+  [8, 4, -21.7, -9.7, -0.1, 0.4],
+  [8, 5, 16.9, 12.7, 0.3, -0.5],
+  [8, 6, 15.0, 0.7, 0.2, -0.6],
+  [8, 7, -16.8, -5.2, -0.0, 0.3],
+  [8, 8, 0.9, 3.9, 0.2, 0.2],
+  [9, 0, 4.6, 0.0, -0.0, 0.0],
+  [9, 1, 7.8, -24.8, -0.1, -0.3],
+  [9, 2, 3.0, 12.2, 0.1, 0.3],
+  [9, 3, -0.2, 8.3, 0.3, -0.3],
+  [9, 4, -2.5, -3.3, -0.3, 0.3],
+  [9, 5, -13.1, -5.2, 0.0, 0.2],
+  [9, 6, 2.4, 7.2, 0.3, -0.1],
+  [9, 7, 8.6, -0.6, -0.1, -0.2],
+  [9, 8, -8.7, 0.8, 0.1, 0.4],
+  [9, 9, -12.9, 10.0, -0.1, 0.1],
+  [10, 0, -1.3, 0.0, 0.1, 0.0],
+  [10, 1, -6.4, 3.3, 0.0, 0.0],
+  [10, 2, 0.2, 0.0, 0.1, -0.0],
+  [10, 3, 2.0, 2.4, 0.1, -0.2],
+  [10, 4, -1.0, 5.3, -0.0, 0.1],
+  [10, 5, -0.6, -9.1, -0.3, -0.1],
+  [10, 6, -0.9, 0.4, 0.0, 0.1],
+  [10, 7, 1.5, -4.2, -0.1, 0.0],
+  [10, 8, 0.9, -3.8, -0.1, -0.1],
+  [10, 9, -2.7, 0.9, -0.0, 0.2],
+  [10, 10, -3.9, -9.1, -0.0, -0.0],
+  [11, 0, 2.9, 0.0, 0.0, 0.0],
+  [11, 1, -1.5, 0.0, -0.0, -0.0],
+  [11, 2, -2.5, 2.9, 0.0, 0.1],
+  [11, 3, 2.4, -0.6, 0.0, -0.0],
+  [11, 4, -0.6, 0.2, 0.0, 0.1],
+  [11, 5, -0.1, 0.5, -0.1, -0.0],
+  [11, 6, -0.6, -0.3, 0.0, -0.0],
+  [11, 7, -0.1, -1.2, -0.0, 0.1],
+  [11, 8, 1.1, -1.7, -0.1, -0.0],
+  [11, 9, -1.0, -2.9, -0.1, 0.0],
+  [11, 10, -0.2, -1.8, -0.1, 0.0],
+  [11, 11, 2.6, -2.3, -0.1, 0.0],
+  [12, 0, -2.0, 0.0, 0.0, 0.0],
+  [12, 1, -0.2, -1.3, 0.0, -0.0],
+  [12, 2, 0.3, 0.7, -0.0, 0.0],
+  [12, 3, 1.2, 1.0, -0.0, -0.1],
+  [12, 4, -1.3, -1.4, -0.0, 0.1],
+  [12, 5, 0.6, -0.0, -0.0, -0.0],
+  [12, 6, 0.6, 0.6, 0.1, -0.0],
+  [12, 7, 0.5, -0.1, -0.0, -0.0],
+  [12, 8, -0.1, 0.8, 0.0, 0.0],
+  [12, 9, -0.4, 0.1, 0.0, -0.0],
+  [12, 10, -0.2, -1.0, -0.1, -0.0],
+  [12, 11, -1.3, 0.1, -0.0, 0.0],
+  [12, 12, -0.7, 0.2, -0.1, -0.1],
+];
+
+// ── src/wmm.js ──
+
+// @gcu/wmm — the World Magnetic Model, evaluated.
+//
+// Geodetic position + date → the main field (X north, Y east, Z down; nT), its
+// derived elements (H, F, inclination I, declination D, grid variation GV) and
+// their secular variation. The equations are the WMM technical report's
+// (NOAA/NCEI; §"The model"): a degree-12 spherical-harmonic expansion of the
+// geomagnetic potential in Schmidt semi-normalized associated Legendre
+// functions, evaluated in geocentric spherical coordinates and rotated back
+// to the geodetic frame. Coefficients come from the official COF file
+// (coefficients.js, generated — never hand-typed) and the twelve published
+// test points pin the implementation (test/wmm.test.mjs).
+//
+// The one number a compass wants is `declination(lat, lon, date)`: add it to a
+// magnetic azimuth to get true (east-positive, bearing's convention).
+
+const DEG = Math.PI / 180;
+const A_WGS84 = 6378.137;                 // km, semi-major axis
+const F_WGS84 = 1 / 298.257223563;        // flattening
+const E2 = F_WGS84 * (2 - F_WGS84);       // first eccentricity squared
+const A_REF = 6371.2;                     // km, the geomagnetic reference radius
+
+// coefficient tables indexed [n][m]
+const G = [], H = [], GD = [], HD = [];
+for (let n = 0; n <= DEGREE; n++) { G.push(new Float64Array(n + 1)); H.push(new Float64Array(n + 1)); GD.push(new Float64Array(n + 1)); HD.push(new Float64Array(n + 1)); }
+for (const [n, m, g, h, gd, hd] of COEFFICIENTS) { G[n][m] = g; H[n][m] = h; GD[n][m] = gd; HD[n][m] = hd; }
+
+/** A Date (or a decimal year) → decimal year, e.g. 2027-07-02 → 2027.5. */
+function decimalYear(date = new Date()) {
+  if (typeof date === 'number') return date;
+  const y = date.getUTCFullYear();
+  const start = Date.UTC(y, 0, 1), next = Date.UTC(y + 1, 0, 1);
+  return y + (date.getTime() - start) / (next - start);
+}
+
+/** Model validity: [epoch, epoch + 5). Outside it the model still evaluates, with `valid: false`. */
+const VALID_FROM = EPOCH;
+const VALID_TO = EPOCH + 5;
+
+/**
+ * Evaluate the field at geodetic latitude/longitude (degrees), height above the
+ * WGS84 ellipsoid (km) and a date (Date or decimal year).
+ * → { x, y, z, h, f, incl, decl, gv, xdot, ydot, zdot, hdot, fdot, idot, ddot, year, valid }
+ *   nT and nT/yr; angles in degrees, rates in deg/yr. `gv` is null outside |lat| > 55°.
+ */
+function field(lat, lon, { height = 0, date = new Date() } = {}) {
+  const year = decimalYear(date);
+  const dt = year - EPOCH;
+  const phi = lat * DEG, lam = lon * DEG;
+
+  // geodetic → geocentric spherical (r, phi')
+  const sphi = Math.sin(phi), cphi = Math.cos(phi);
+  const rc = A_WGS84 / Math.sqrt(1 - E2 * sphi * sphi);
+  const p = (rc + height) * cphi;
+  const zc = (rc * (1 - E2) + height) * sphi;
+  const r = Math.hypot(p, zc);
+  const phic = Math.atan2(zc, p);
+  const psi = phic - phi;
+
+  // Schmidt semi-normalized P[n][m](x) and dP/dθ, x = sin φ' = cos θ, s = sin θ
+  const x = Math.sin(phic), s = Math.cos(phic);
+  const P = [], DP = [];
+  for (let n = 0; n <= DEGREE; n++) { P.push(new Float64Array(n + 1)); DP.push(new Float64Array(n + 1)); }
+  P[0][0] = 1; DP[0][0] = 0;
+  for (let n = 1; n <= DEGREE; n++) {
+    for (let m = 0; m <= n; m++) {
+      if (m === n) {
+        if (n === 1) { P[1][1] = s; DP[1][1] = x; }
+        else {
+          const k = Math.sqrt((2 * n - 1) / (2 * n));
+          P[n][n] = k * s * P[n - 1][n - 1];
+          DP[n][n] = k * (x * P[n - 1][n - 1] + s * DP[n - 1][n - 1]);
+        }
+      } else {
+        const d = Math.sqrt(n * n - m * m);
+        const q = n - 1 > m - 1 && n >= 2 ? Math.sqrt((n - 1) * (n - 1) - m * m) : 0;
+        const p1 = P[n - 1][m], dp1 = DP[n - 1][m];
+        const p2 = n >= 2 && m <= n - 2 ? P[n - 2][m] : 0;
+        const dp2 = n >= 2 && m <= n - 2 ? DP[n - 2][m] : 0;
+        P[n][m] = ((2 * n - 1) * x * p1 - q * p2) / d;
+        DP[n][m] = ((2 * n - 1) * (-s * p1 + x * dp1) - q * dp2) / d;
+      }
+    }
+  }
+
+  // sums over the expansion; the derivative wrt φ' is −dP/dθ
+  const cml = new Float64Array(DEGREE + 1), sml = new Float64Array(DEGREE + 1);
+  for (let m = 0; m <= DEGREE; m++) { cml[m] = Math.cos(m * lam); sml[m] = Math.sin(m * lam); }
+  let xp = 0, yp = 0, zp = 0, xpd = 0, ypd = 0, zpd = 0;
+  let ar = (A_REF / r) * (A_REF / r);
+  for (let n = 1; n <= DEGREE; n++) {
+    ar *= A_REF / r;                       // (a/r)^(n+2)
+    for (let m = 0; m <= n; m++) {
+      const g = G[n][m] + dt * GD[n][m], h = H[n][m] + dt * HD[n][m];
+      const gd = GD[n][m], hd = HD[n][m];
+      const c = g * cml[m] + h * sml[m], cd = gd * cml[m] + hd * sml[m];
+      const sn = g * sml[m] - h * cml[m], snd = gd * sml[m] - hd * cml[m];
+      xp += ar * c * DP[n][m];             // −(a/r)^(n+2) · c · dP/dφ'  with dP/dφ' = −dP/dθ
+      xpd += ar * cd * DP[n][m];
+      yp += ar * m * sn * P[n][m];
+      ypd += ar * m * snd * P[n][m];
+      zp -= (n + 1) * ar * c * P[n][m];
+      zpd -= (n + 1) * ar * cd * P[n][m];
+    }
+  }
+  yp /= s; ypd /= s;                       // 1/cos φ'
+
+  // geocentric → geodetic components
+  const cpsi = Math.cos(psi), spsi = Math.sin(psi);
+  const X = xp * cpsi - zp * spsi, Z = xp * spsi + zp * cpsi, Y = yp;
+  const Xd = xpd * cpsi - zpd * spsi, Zd = xpd * spsi + zpd * cpsi, Yd = ypd;
+
+  const Hh = Math.hypot(X, Y), Ff = Math.hypot(Hh, Z);
+  const decl = Math.atan2(Y, X) / DEG, incl = Math.atan2(Z, Hh) / DEG;
+  const Hd = (X * Xd + Y * Yd) / Hh, Fd = (X * Xd + Y * Yd + Z * Zd) / Ff;
+  const Dd = (X * Yd - Y * Xd) / (Hh * Hh) / DEG, Id = (Hh * Zd - Z * Hd) / (Ff * Ff) / DEG;
+  let gv = null;
+  if (lat > 55) gv = decl - lon; else if (lat < -55) gv = decl + lon;
+  if (gv != null) { gv = ((gv + 180) % 360 + 360) % 360 - 180; }
+
+  return {
+    x: X, y: Y, z: Z, h: Hh, f: Ff, incl, decl, gv,
+    xdot: Xd, ydot: Yd, zdot: Zd, hdot: Hd, fdot: Fd, idot: Id, ddot: Dd,
+    year, valid: year >= VALID_FROM && year < VALID_TO,
+  };
+}
+
+/** Magnetic declination (degrees, east positive) at a place and date. true = magnetic + declination. */
+function declination(lat, lon, date = new Date(), height = 0) {
+  return field(lat, lon, { height, date }).decl;
+}
+
+// ── src/main.js ──
+
+// @gcu/wmm — module manifest. coefficients.js (GENERATED from NOAA's WMM2025.COF)
+// then wmm.js (the evaluation). A zero-dependency leaf: the one number a compass
+// needs to turn magnetic north into true north, offline.
+  return { COEFFICIENTS, DEGREE, EPOCH, MODEL, field, declination, decimalYear, VALID_FROM, VALID_TO };
+})();
+
+/* ==== src/engine/geo.js ==== */
+(() => {
+// Magnetic declination from @gcu/wmm (vendored WMM2025), and bearings between magnetic and true north.
+// A place is coordinates in the request; device location stays off (SPEC-skills 0.7).
+
+const LL = '(-?\\d{1,2}(?:\\.\\d+)?)\\s*,\\s*(-?\\d{1,3}(?:\\.\\d+)?)';
+const whereNote = { t: 'note', kind: 'err', text: 'Where? Give coordinates, as in "declination at -19.92, -43.94". Device location stays off.' };
+const dateOf = a => a.date ? new Date(a.date) : clock.now();
+const decl = (a) => { const d = dateOf(a), f = field(a.lat, a.lon, { date: d }); return { d, f }; };
+const dirWord = x => x < 0 ? 'west' : 'east';
+const SRC = f => ({ t: 'src', text: `@gcu/wmm · vendored · ${MODEL}, valid ${VALID_FROM} to ${VALID_TO}${f.valid ? '' : ' · outside the validity window'}` });
+
+tool({
+  name: 'declination', rank: 68,
+  skill: { group: 'Field', title: 'Magnetic declination', on: '@gcu/wmm', about: 'The World Magnetic Model at a place and date, and magnetic to true bearings.', examples: ['declination at -19.92, -43.94', '045 magnetic to true at -19.92, -43.94'] },
+  read: (text, q) => {
+    if (/^(?:magnetic )?declination(?: here)?$/.test(q)) return { here: true };
+    const m = new RegExp(`^(?:magnetic )?declination (?:at|for|in) ${LL}(?: on (.+))?$`).exec(q); if (!m) return null;
+    const args = { lat: +m[1], lon: +m[2] }; if (m[3]) { const d = findDate(m[3]); if (!d) return null; args.date = iso(d.d); } return args;
+  },
+  topic: () => ['Declination', 2],
+  run: a => {
+    if (a.here) return { read: ['declination', { v: 'here' }], body: [whereNote], trace: ['no place: device location is off and no coordinates were given'] };
+    if (Math.abs(a.lat) > 90 || Math.abs(a.lon) > 180) return null;
+    const { d, f } = decl(a);
+    return {
+      read: ['declination at', { v: `${a.lat}, ${a.lon}` }, 'on', { v: fmtDate(d) }], value: f.decl,
+      body: [{ t: 'big', v: `${fmt(Math.abs(f.decl), 3)}° ${dirWord(f.decl)}`, unit: 'declination' },
+        ...(f.valid ? [] : [{ t: 'note', kind: 'err', text: `${fmtDate(d)} is outside ${MODEL}'s window (${VALID_FROM} to ${VALID_TO}); the value is extrapolated and may be off.` }]),
+        { t: 'kv', rows: [['inclination', `${fmt(f.incl, 3)}°`], ['total intensity', `${fmt(f.f, 5)} nT`], ['horizontal', `${fmt(f.h, 5)} nT`], ['annual change', `${fmt(f.ddot, 3)}°/year in declination`]] }, SRC(f)],
+      trace: [`wmm.field(${a.lat}, ${a.lon}, ${fmt(f.year, 6)})`, `declination ${fmt(f.decl, 5)}° (east positive)`], py: `wmm.declination(${a.lat}, ${a.lon}, "${iso(d)}")`
+    };
+  }
+});
+tool({
+  name: 'bearing', rank: 69,
+  read: (text, q) => {
+    const m = new RegExp(`^(\\d{1,3}(?:\\.\\d+)?) (magnetic|true|grid) to (magnetic|true|grid)(?: at ${LL}(?: on (.+))?)?$`).exec(q); if (!m) return null;
+    const args = { v: +m[1], from: m[2], to: m[3] }; if (m[4]) { args.lat = +m[4]; args.lon = +m[5]; } if (m[6]) { const d = findDate(m[6]); if (!d) return null; args.date = iso(d.d); } return args;
+  },
+  topic: () => ['Declination', 1],
+  run: a => {
+    const read = [{ v: p3(a.v) }, a.from, 'to', a.to];
+    if (a.from === a.to) return { read, body: [{ t: 'big', v: p3(a.v) }], trace: ['same north on both sides'] };
+    if (a.from === 'grid' || a.to === 'grid') return { read, body: [{ t: 'note', kind: 'err', text: 'Grid north needs the UTM convergence at the place, which is not built yet. Magnetic to true and back work.' }], trace: ['grid convergence: not built'] };
+    if (a.lat == null) return { read, body: [whereNote], trace: ['declination needs a place'] };
+    const { d, f } = decl(a), out = ((a.from === 'magnetic' ? a.v + f.decl : a.v - f.decl) % 360 + 360) % 360;
+    return {
+      read: [{ v: p3(a.v) }, a.from, 'to', a.to, 'at', { v: `${a.lat}, ${a.lon}` }], value: out,
+      body: [{ t: 'big', v: fmt(out, 4), unit: `° ${a.to}` }, { t: 'kv', rows: [['declination', `${fmt(Math.abs(f.decl), 3)}° ${dirWord(f.decl)} on ${fmtDate(d)}`], ['applied', `${a.from} ${a.from === 'magnetic' ? '+' : '−'} declination`]] }, SRC(f)],
+      trace: [`wmm.field(${a.lat}, ${a.lon}, ${fmt(f.year, 6)}) → declination ${fmt(f.decl, 5)}°`, `${a.v} ${a.from === 'magnetic' ? '+' : '−'} ${fmt(f.decl, 5)} = ${fmt(out, 5)}`], py: `wmm.to_${a.to}(${a.v}, ${a.lat}, ${a.lon}, "${iso(d)}")`
+    };
+  }
+});
+})();
+
 /* ==== src/engine/notes.js ==== */
 (() => {
 // Notes and taught words. Both belong to the device and are shared by every session.
