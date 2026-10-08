@@ -23,11 +23,12 @@ The Skills tab lists everything that runs, with examples.
 
 ```sh
 npm install        # only needed for the test (Playwright)
-npm run build      # src/* → dist/golem.html
-npm test           # build, then drive the page through 27 queries
+npm run build        # src/shell/index.html + the modules → dist/golem.html
+npm run test:engine  # the engine alone, in Node: the 27 queries, replay, slots, answers, undo
+npm test             # build, engine tests, then drive the page through the same 27 queries
 ```
 
-The build is concatenation: `src/00-shell.html`, then every `src/*.js` in name order inside one `<script>`. No bundler, no transforms.
+The build is concatenation: `src/shell/index.html`, then the shell and engine modules in import order inside one `<script>`, with the `import` and `export` keywords dropped. No bundler, no transforms. The modules share one scope, so the build refuses duplicate top-level names.
 
 If Playwright has no browser installed, run `npx playwright install chromium` or point `CHROMIUM_PATH` at one.
 
@@ -35,14 +36,23 @@ If Playwright has no browser installed, run `npx playwright install chromium` or
 
 ```
 SPEC.md                      the specification
-build.mjs                    the build
-src/00-shell.html            markup, Switchboard tokens, styles, bench notes
-src/10-core.js               utilities, units, arithmetic, dates
-src/20-field-table.js        true thickness, stereonet, synthetic table, histogram, variogram
-src/30-knowledge-device.js   records, minerals and key, definitions, style check, device hand-offs, notes
-src/40-read-render.js        skills and packs catalog, the reading ladder, cards, tabs, wiring
-src/50-sessions.js           sessions, replay, auto-naming, menu drawer, storage, start-up
-test/smoke.mjs               browser smoke test
+build.mjs                    the build: modules concatenated in import order
+src/engine/                  no DOM, no storage: everything that reads and computes
+  core.js                    working state, the tool table, helpers
+  units.js calc.js dates.js  compute tools
+  orientation.js table.js    field and table tools
+  knowledge.js device.js     packs sample, device hand-offs
+  notes.js skills.js         notes and taught words; the skills and packs catalog
+  reading.js                 the reading ladder: context, grammar, taught; none, why, export
+  sessions.js                sessions, replay, auto-naming, serialize and hydrate
+  engine.js                  submit, rerun, slot flips, answers, undo
+  index.js                   the surface Node tests import
+src/shell/                   the browser: markup, rendering, wiring, storage
+  index.html                 markup, Switchboard tokens, styles, bench notes
+  render.js                  blocks and plots to markup
+  main.js                    tabs, drawer, storage, the sleep switch
+test/engine.test.mjs         engine tests, Node only
+test/smoke.mjs               browser smoke test on the built file
 dist/golem.html              the built mock (committed, so it opens without a build)
 ```
 

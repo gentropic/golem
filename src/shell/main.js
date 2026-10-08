@@ -1,0 +1,142 @@
+// The shell: wiring, tabs, the session drawer, storage, and the sleep switch. Everything that touches
+// the DOM or the browser lives here or in render.js; the engine never does.
+import { S } from '../engine/core.js';
+import { submit, flipSlot, answer, seedExamples } from '../engine/engine.js';
+import { sessions, current, newSession, openSession, renameSession, deleteSession, searchHistory, serialize, hydrate, onChange } from '../engine/sessions.js';
+import { SKILLS, PACKS, SUGGESTIONS } from '../engine/skills.js';
+import { esc, pad, cardEl } from './render.js';
+
+const $ = id => document.getElementById(id);
+const KEY = 'golem.mock.v2';
+let awake = true, statusT;
+
+function status(msg) { $('status').textContent = msg; clearTimeout(statusT); statusT = setTimeout(() => { $('status').textContent = ''; }, 5000); }
+function showTab(t) {
+  ['ask', 'skills', 'packs'].forEach(k => { $('v-' + k).hidden = k !== t; });
+  document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === t));
+}
+function tick() {
+  document.querySelectorAll('[data-end]').forEach(el => {
+    const s = Math.ceil((+el.dataset.end - Date.now()) / 1000);
+    el.textContent = s <= 0 ? 'done' : String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+  });
+}
+setInterval(tick, 500);
+
+/* ── the stream ── */
+function renderBar() { $('sname').textContent = current().name; }
+function renderStream(focus) {
+  $('stream').innerHTML = '';
+  S.cards.forEach(c => $('stream').appendChild(cardEl(c)));
+  $('exlbl').hidden = !current().example; tick(); renderBar(); renderPacks(); showTab('ask');
+  const el = focus && $('stream').querySelector(`[data-id="${focus}"]`);
+  if (el) el.scrollIntoView({ block: 'start' }); else $('v-ask').scrollTop = 0;
+}
+function replaceCard(c) { const old = $('stream').querySelector(`[data-id="${c.id}"]`); if (old) old.replaceWith(cardEl(c)); }
+function run(raw) {
+  if (!awake) { status('Asleep. Tap wake at the top right.'); return; }
+  const o = submit(raw);
+  switch (o.kind) {
+    case 'new-session': renderStream(); status('New session.'); break;
+    case 'drawer': openDrawer(); break;
+    case 'rename': status(`Session named “${o.name}”.`); break;
+    case 'answered': replaceCard(o.card); status(`Answered #${pad(o.card.id)}: ${o.label}`); break;
+    case 'undo': { const el = $('stream').querySelector(`[data-id="${o.card.id}"]`); if (el) el.remove(); status(`Removed #${pad(o.card.id)}: ${o.card.raw}`); break; }
+    case 'nothing': status(o.msg); break;
+    case 'card': { const el = cardEl(o.card); $('stream').appendChild(el); showTab('ask'); el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); break; }
+  }
+  tick(); renderPacks();
+}
+
+/* ── catalog and packs ── */
+function renderSkills() {
+  const live = SKILLS.filter(s => s[3]).length; let h = `<div class="sub">${live} skills run in this mock. ${SKILLS.length - live} more are planned from packages that already exist or are named here. Tap an example to run it.</div>`, g = '';
+  SKILLS.forEach(([grp, name, from, on, d, ex]) => {
+    if (grp !== g) { h += `<div class="lbl">${esc(grp)}</div>`; g = grp; }
+    h += `<div class="item"><h3>${esc(name)} <span class="tag ${on ? 'live' : 'plan'}">${on ? 'in mock' : 'planned'}</span></h3><p>${esc(d)}</p><div class="from">${esc(from)}</div>${ex.length ? `<div class="opts">${ex.map(x => `<button class="chip" type="button" data-q="${esc(x)}" style="white-space:normal;text-align:left">${esc(x)}</button>`).join('')}</div>` : ''}</div>`;
+  });
+  $('v-skills').innerHTML = h;
+}
+function renderPacks() {
+  const lab = { live: 'in mock', samp: 'sample in mock', plan: 'not wired' };
+  let h = '<div class="sub">golem knows what its installed packs hold. These are the gcu-library entries plus packs worth adding.</div><div class="lbl">Library</div>';
+  PACKS.forEach(([id, name, meta, st, d]) => { h += `<div class="item"><h3>${esc(name)} <span class="tag ${st}">${lab[st]}</span></h3><p>${esc(d)}</p><div class="from">${esc(id)} · ${esc(meta)}</div></div>`; });
+  const al = Object.entries(S.aliases);
+  h += `<div class="lbl">On this device</div><div class="item"><h3>Taught words</h3><p>${al.length ? al.map(([k, v]) => `${esc(k)} → ${esc(v)}`).join('<br>') : 'None yet. Try “vario means variogram”.'}</p></div><div class="item"><h3>Notes</h3><p>${S.facts.length ? S.facts.map(esc).join('<br>') : 'None yet. Try “remember that …”.'}</p></div><div class="item"><h3>Open table</h3><p>${S.data ? `assays.csv · ${S.data.length} rows` : 'None.'}</p></div>`;
+  $('v-packs').innerHTML = h;
+}
+
+/* ── the drawer: sessions and history ── */
+let ren = null, del = null;
+const when = t => { const d = new Date(t), n = new Date(); return d.toDateString() === n.toDateString() ? d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }); };
+function renderDrawer() {
+  const q = $('hq').value.trim(); let h;
+  if (q) {
+    const hits = searchHistory(q);
+    h = `<div class="lbl">${hits.length} match${hits.length === 1 ? '' : 'es'} in history</div>` + hits.slice(0, 40).map(({ session: s, card: c }) => `<div class="srow"><button class="open" type="button" data-s="${s.id}" data-c="${c.id}" style="font:13px var(--mono)">&gt; ${esc(c.raw)}</button><div class="meta"><span>${esc(s.name)}</span></div></div>`).join('');
+  } else {
+    const cur = current();
+    h = '<div class="lbl">Sessions</div>' + [...sessions()].sort((x, y) => y.updated - x.updated || y.id - x.id).map(s => `<div class="srow" aria-current="${s === cur}">${ren === s.id ? `<input class="ren" data-id="${s.id}" value="${esc(s.name)}" aria-label="Session name. Leave empty to name it automatically.">` : `<button class="open" type="button" data-s="${s.id}">${esc(s.name)}</button>`}<div class="meta"><span>${s.cards.length} card${s.cards.length === 1 ? '' : 's'} · ${when(s.updated)}</span>${s.auto ? '<span class="tag plan">auto name</span>' : ''}${s.example ? '<span class="tag samp">example</span>' : ''}<button class="link" type="button" data-ren="${s.id}">rename</button><button class="link" type="button" data-del="${s.id}">${del === s.id ? 'confirm delete' : 'delete'}</button></div></div>`).join('');
+  }
+  $('dlist').innerHTML = h;
+  const i = $('dlist').querySelector('.ren'); if (i) { i.focus(); i.select(); }
+}
+function openDrawer() { ren = del = null; $('hq').value = ''; renderDrawer(); $('drawer').hidden = false; $('scrim').hidden = false; }
+function closeDrawer() { $('drawer').hidden = true; $('scrim').hidden = true; }
+function commitName(inp) { ren = null; renameSession(+inp.dataset.id, inp.value); renderDrawer(); }
+
+/* ── storage ── */
+function persist() { try { localStorage.setItem(KEY, JSON.stringify(serialize())); } catch (e) { /* storage is optional */ } }
+function restore() { try { return hydrate(JSON.parse(localStorage.getItem(KEY))); } catch (e) { return false; } }
+onChange(() => { renderBar(); persist(); });
+
+/* ── wiring ── */
+$('f').addEventListener('submit', e => { e.preventDefault(); const v = $('q').value; $('q').value = ''; run(v); });
+document.querySelector('.tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) showTab(b.dataset.tab); });
+$('v-skills').addEventListener('click', e => { const b = e.target.closest('[data-q]'); if (b) run(b.dataset.q); });
+$('sugg').addEventListener('click', e => { const b = e.target.closest('[data-q]'); if (b) run(b.dataset.q); });
+$('stream').addEventListener('click', e => {
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  const c = S.cards.find(x => x.id === +b.closest('.card').dataset.id), act = b.dataset.act;
+  if (act === 'run') return run(b.dataset.q);
+  if (!awake) return status('Asleep. Tap wake at the top right.');
+  if (act === 'slot') { flipSlot(c, b.dataset.key); replaceCard(c); }
+  else if (act === 'answer') { answer(c, +b.dataset.i); replaceCard(c); }
+  else if (act === 'handoff') { const n = document.createElement('div'); n.className = 'note ok'; n.textContent = b.dataset.msg; b.replaceWith(n); }
+  else if (act === 'copy') {
+    const fail = () => { const p = document.createElement('pre'); p.textContent = c.res.copy; b.closest('.ans').appendChild(p); status('Copy was blocked here. The text is shown so you can select it.'); };
+    try { navigator.clipboard.writeText(c.res.copy).then(() => status('Copied.'), fail); } catch (err) { fail(); }
+  }
+  tick(); renderPacks();
+});
+$('power').addEventListener('click', () => {
+  awake = !awake; $('phone').classList.toggle('asleep', !awake); $('st-on').textContent = awake ? 'awake' : 'asleep'; $('q').disabled = !awake;
+  $('power').textContent = awake ? 'sleep' : 'wake'; $('power').setAttribute('aria-pressed', String(!awake));
+  status(awake ? 'Awake.' : 'Asleep. Nothing runs until you wake it.');
+});
+$('menu').addEventListener('click', openDrawer);
+$('sname').addEventListener('click', openDrawer);
+$('dclose').addEventListener('click', closeDrawer);
+$('scrim').addEventListener('click', closeDrawer);
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('drawer').hidden) closeDrawer(); });
+$('newsess').addEventListener('click', () => { newSession(); renderStream(); closeDrawer(); status('New session.'); $('q').focus(); });
+$('hq').addEventListener('input', renderDrawer);
+$('dlist').addEventListener('keydown', e => { if (e.target.classList.contains('ren') && e.key === 'Enter') commitName(e.target); });
+$('dlist').addEventListener('focusout', e => { if (e.target.classList.contains('ren') && ren != null) commitName(e.target); });
+$('dlist').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.s) { openSession(+b.dataset.s); renderStream(b.dataset.c); closeDrawer(); }
+  else if (b.dataset.ren) { ren = +b.dataset.ren; del = null; renderDrawer(); }
+  else if (b.dataset.del) {
+    const id = +b.dataset.del;
+    if (del !== id) { del = id; renderDrawer(); return; }
+    deleteSession(id); del = null; renderStream(); renderDrawer();
+  }
+});
+$('sugg').innerHTML = SUGGESTIONS.map(x => `<button class="chip" type="button" data-q="${esc(x)}">${esc(x)}</button>`).join('');
+
+/* ── start: restore saved sessions, or seed two examples ── */
+renderSkills();
+if (!restore()) seedExamples();
+renderStream();
+$('status').textContent = '';

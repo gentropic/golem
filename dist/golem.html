@@ -60,6 +60,7 @@ button{cursor:pointer}
   font:600 13px/1.2 var(--sans);color:var(--au-success);transition:color var(--dur) var(--ease)}
 .asleep .power{color:var(--au-fg-soft)}
 .brand{font:700 15px var(--mono);letter-spacing:.04em}
+.steps{margin:0;padding-left:20px;font:12.5px/1.6 var(--mono)} .plain{margin:0;padding-left:18px} .marked{color:var(--au-fg)}
 .stat{font:11px var(--mono);color:var(--au-fg-muted);line-height:1.3}
 .icon{background:var(--au-surface-bright);border:1px solid var(--au-border);border-radius:var(--r);width:38px;height:34px;display:grid;place-items:center;flex:none;padding:0}
 .icon svg{stroke:var(--au-fg);stroke-width:2;stroke-linecap:square}
@@ -259,11 +260,27 @@ svg text{font:10px var(--mono);fill:var(--au-fg-muted)}
 </div>
 
 <script>
-/* ==== src/10-core.js ==== */
 'use strict';
-/* ── utilities ─────────────────────────────────────────────── */
-const $ = id => document.getElementById(id);
-const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+/* ==== src/engine/core.js ==== */
+// The engine's shared ground: working state, the tool table, and small helpers.
+// Nothing under src/engine/ touches a DOM, a window, or storage; the shell does that.
+
+// Working state. `cards` is the current session's cards (specs plus live results), `data` the open
+// table, `aliases` the taught words and `facts` the notes (both belong to the device, not a session).
+const S = { cards: [], n: 0, aliases: {}, facts: [], data: null };
+
+// The tool table: T.name = args => Result | null. A tool returns null when its arguments do not apply.
+//   Result = { read: (string | Slot)[], body: Block[], trace: string[], py?, value?, amend?, ask?, copy? }
+//   Block  = { t: 'big' | 'sub' | 'note' | 'src' | 'lbl' | 'kv' | 'table' | 'list' | 'steps' | 'pre' | 'marked'
+//              | 'chips' | 'actions' | 'net' | 'bars' | 'curve', ... }   — plain data; the shell renders it
+//   Slot   = { v, key?, alts?, cur? }   — a slot with alts is an ambiguous reading the person can flip
+//   Ask    = { prompt, options: [{ label, value }], set(args, value) }
+// Everything a tool needs to recompute lives in its args, which are plain JSON.
+const T = {};
+
+// The clock, so tests can pin "today".
+const clock = { now: () => new Date() };
+
 const fmt = (x, sig = 6) => {
   if (!isFinite(x)) return String(x);
   const a = Math.abs(x);
@@ -272,9 +289,11 @@ const fmt = (x, sig = 6) => {
 };
 const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const rad = d => d * Math.PI / 180, deg = r => r * 180 / Math.PI;
-const T = {};   // tools: (args, card) => result | null
+const p3 = x => String(Math.round(x) % 360).padStart(3, '0'), p2 = x => String(Math.round(x)).padStart(2, '0');
 
-/* ── units ─────────────────────────────────────────────────── */
+/* ==== src/engine/units.js ==== */
+// Unit conversion with dimension checks. A small table until @gcu/units stands under it.
+
 const U = {};
 const u = (dim, f, ...n) => n.forEach(k => { U[k] = { dim, f, name: n[0] }; });
 u('L', 1, 'm', 'meter', 'metre'); u('L', 1000, 'km', 'kilometer', 'kilometre'); u('L', .01, 'cm'); u('L', .001, 'mm');
@@ -316,17 +335,19 @@ T.convert = a => {
   if (!f || !t) return null;
   const read = ['convert', { v: fmt(a.v) }, { v: f.name }, 'to', { v: t.name }];
   if (f.amb || t.amb) read.push({ v: 'oz = ' + (oz === 'troy' ? 'troy' : 'avoirdupois'), key: 'oz', alts: ['troy', 'av'], cur: oz });
-  if (f.dim !== t.dim) return { read, html: `<div class="note err">${esc(f.name)} is a ${dimName(f.dim)} and ${esc(t.name)} is a ${dimName(t.dim)}. No conversion exists between them.</div>`, trace: ['units: dimension check failed'] };
+  if (f.dim !== t.dim) return { read, body: [{ t: 'note', kind: 'err', text: `${f.name} is a ${dimName(f.dim)} and ${t.name} is a ${dimName(t.dim)}. No conversion exists between them.` }], trace: ['units: dimension check failed'] };
   const out = (a.v + f.off) * f.f / t.f - t.off;
   return {
     read, value: out, amend: 'unit',
-    html: `<div class="big">${fmt(out)} <small>${esc(t.name)}</small></div><div class="src">@gcu/units · exact factors · dimension: ${dimName(f.dim)}</div>`,
+    body: [{ t: 'big', v: fmt(out), unit: t.name }, { t: 'src', text: `@gcu/units · exact factors · dimension: ${dimName(f.dim)}` }],
     trace: [`units.parse("${a.from}") → ${dimName(f.dim)}, factor ${fmt(f.f, 9)}`, `units.parse("${a.to}") → factor ${fmt(t.f, 9)}`, `${fmt(a.v)} × ${fmt(f.f, 9)} ÷ ${fmt(t.f, 9)} = ${fmt(out, 9)}`],
     py: `units.convert(${a.v}, "${f.name}", "${t.name}")`
   };
 };
 
-/* ── arithmetic: recursive descent, no eval ────────────────── */
+/* ==== src/engine/calc.js ==== */
+// Arithmetic by recursive descent. No eval, no Function. Trigonometry in degrees.
+
 const FN = { sqrt: Math.sqrt, abs: Math.abs, exp: Math.exp, ln: Math.log, log: Math.log10, sin: x => Math.sin(rad(x)), cos: x => Math.cos(rad(x)), tan: x => Math.tan(rad(x)), asin: x => deg(Math.asin(x)), acos: x => deg(Math.acos(x)), atan: x => deg(Math.atan(x)) };
 function calc(src) {
   const s = src.replace(/\s+/g, '').replace(/×/g, '*').replace(/÷/g, '/').replace(/,/g, '');
@@ -358,17 +379,20 @@ function calc(src) {
 T.calc = a => {
   let v; try { v = calc(a.x); } catch (e) { return null; }
   if (typeof v !== 'number' || isNaN(v)) return null;
-  return { read: ['evaluate', { v: a.x }, 'trig in degrees'], value: v, html: `<div class="big">${fmt(v, 10)}</div>`, trace: [`expr.parse("${a.x}")`, `evaluate → ${v}`], py: a.x.replace(/\^/g, '**') };
+  return { read: ['evaluate', { v: a.x }, 'trig in degrees'], value: v, body: [{ t: 'big', v: fmt(v, 10) }], trace: [`expr.parse("${a.x}")`, `evaluate → ${v}`], py: a.x.replace(/\^/g, '**') };
 };
 
-/* ── dates ─────────────────────────────────────────────────── */
+/* ==== src/engine/dates.js ==== */
+// Dates and times: day counts, weekdays, and the parsers the calendar tools share.
+
 const MON = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'], DOW = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 const MONRE = '(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sept|sep|oct|nov|dec)';
 const DOWRE = '(sunday|monday|tuesday|wednesday|thursday|friday|saturday|sun|mon|tues|tue|wed|thurs|thur|thu|fri|sat)';
 const day0 = d => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+const today = () => day0(clock.now());
 const fmtDate = d => d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
 function findDate(s) {
-  const now = day0(new Date());
+  const now = today();
   const add = n => new Date(now.getFullYear(), now.getMonth(), now.getDate() + n);
   const md = (d, mo, y) => { let dt = new Date(y ? +y : now.getFullYear(), mo, d); if (!y && dt < now) dt = new Date(now.getFullYear() + 1, mo, d); return dt; };
   const mi = w => MON.indexOf(w.slice(0, 3));
@@ -399,36 +423,20 @@ function findTime(s) {
 }
 T.daysUntil = a => {
   const f = findDate(a.s); if (!f) return null;
-  const n = Math.round((f.d - day0(new Date())) / 864e5);
-  return { read: ['days from', { v: 'today' }, 'to', { v: fmtDate(f.d) }], value: n, html: `<div class="big">${n} <small>day${Math.abs(n) === 1 ? '' : 's'}</small></div><div class="sub">${Math.floor(Math.abs(n) / 7)} weeks and ${Math.abs(n) % 7} days</div>`, trace: [`dates.parse("${a.s}") → ${f.d.toDateString()}`, 'difference in whole days'], py: `(date("${iso(f.d)}") - date.today()).days` };
+  const n = Math.round((f.d - today()) / 864e5);
+  return { read: ['days from', { v: 'today' }, 'to', { v: fmtDate(f.d) }], value: n, body: [{ t: 'big', v: String(n), unit: `day${Math.abs(n) === 1 ? '' : 's'}` }, { t: 'sub', text: `${Math.floor(Math.abs(n) / 7)} weeks and ${Math.abs(n) % 7} days` }], trace: [`dates.parse("${a.s}") → ${f.d.toDateString()}`, 'difference in whole days'], py: `(date("${iso(f.d)}") - date.today()).days` };
 };
 T.weekday = a => {
   const f = findDate(a.s); if (!f) return null;
-  return { read: ['weekday of', { v: fmtDate(f.d) }], html: `<div class="big">${f.d.toLocaleDateString('en-GB', { weekday: 'long' })}</div>`, trace: [`dates.parse("${a.s}")`, 'Gregorian weekday'], py: `date("${iso(f.d)}").strftime("%A")` };
+  return { read: ['weekday of', { v: fmtDate(f.d) }], body: [{ t: 'big', v: f.d.toLocaleDateString('en-GB', { weekday: 'long' }) }], trace: [`dates.parse("${a.s}")`, 'Gregorian weekday'], py: `date("${iso(f.d)}").strftime("%A")` };
 };
 
-/* ==== src/20-field-table.js ==== */
-/* ── orientation: true thickness + stereonet ───────────────── */
-const p3 = x => String(Math.round(x) % 360).padStart(3, '0'), p2 = x => String(Math.round(x)).padStart(2, '0');
+/* ==== src/engine/orientation.js ==== */
+// Orientation: true thickness from an intercept, and planes on a stereonet. The engine computes; the
+// shell draws the `net` block (lower hemisphere, equal area) from the planes and lines it carries.
+
 const vLine = (tr, pl) => [Math.sin(rad(tr)) * Math.cos(rad(pl)), Math.cos(rad(tr)) * Math.cos(rad(pl)), -Math.sin(rad(pl))];
 const vPole = (dd, dip) => [Math.sin(rad(dd)) * Math.sin(rad(dip)), Math.cos(rad(dd)) * Math.sin(rad(dip)), Math.cos(rad(dip))];
-function proj(tr, pl, R) { const r = R * Math.SQRT2 * Math.sin(rad((90 - pl) / 2)); return [r * Math.sin(rad(tr)), -r * Math.cos(rad(tr))]; }
-function net(planes, lines) {
-  const R = 84, c = 104, lab = (x, y, t) => `<text x="${(c + x + (x > 20 ? -7 : 7)).toFixed(1)}" y="${(c + y - 6).toFixed(1)}" text-anchor="${x > 20 ? 'end' : 'start'}">${esc(t)}</text>`;
-  let s = `<svg viewBox="0 0 208 208" width="208" height="208" role="img" aria-label="Lower-hemisphere equal-area stereonet"><circle class="netbg" cx="${c}" cy="${c}" r="${R}"/><path class="grid" d="M${c - 5} ${c}h10M${c} ${c - 5}v10"/><path class="ax" d="M${c} ${c - R}v-7"/><text x="${c}" y="10" text-anchor="middle">N</text>`;
-  planes.forEach(p => {
-    const sv = [Math.sin(rad(p.dd - 90)), Math.cos(rad(p.dd - 90)), 0], dv = vLine(p.dd, p.dip), pts = [];
-    for (let k = 0; k <= 60; k++) {
-      const th = Math.PI * k / 60, v = sv.map((x, i) => Math.cos(th) * x + Math.sin(th) * dv[i]);
-      const [x, y] = proj(deg(Math.atan2(v[0], v[1])), deg(Math.asin(Math.min(1, Math.max(0, -v[2])))), R);
-      pts.push((c + x).toFixed(1) + ' ' + (c + y).toFixed(1));
-    }
-    const [px, py] = proj(p.dd + 180, 90 - p.dip, R);
-    s += `<path class="ln" d="M${pts.join('L')}"/><rect class="pole" x="${(c + px - 3.5).toFixed(1)}" y="${(c + py - 3.5).toFixed(1)}" width="7" height="7"/>${lab(px, py, 'pole')}`;
-  });
-  lines.forEach(l => { const [x, y] = proj(l.tr, l.pl, R); s += `<circle class="pt" cx="${(c + x).toFixed(1)}" cy="${(c + y).toFixed(1)}" r="4"/>${lab(x, y, l.label)}`; });
-  return s + '</svg>';
-}
 const planeDD = a => a.conv === 'sd' ? (a.a1 + 90) % 360 : a.a1;
 const convSlot = a => ({ v: `${p3(a.a1)}/${p2(a.a2)} as ${a.conv === 'sd' ? 'strike/dip (right-hand)' : 'dip direction/dip'}`, key: 'conv', alts: ['dd', 'sd'], cur: a.conv || 'dd' });
 
@@ -438,18 +446,33 @@ T.thickness = a => {
   return {
     read: ['true thickness of', { v: fmt(a.len) + ' m' }, 'in hole', { v: `${p3(a.htr)}/${p2(a.hpl)} trend/plunge` }, 'through', convSlot(a)],
     value: tt,
-    html: `<div class="big">${fmt(tt, 4)} <small>m true thickness</small></div>${net([{ dd, dip: a.a2 }], [{ tr: a.htr, pl: a.hpl, label: 'hole' }])}
-      <dl class="kv"><dt>hole to pole</dt><dd>${fmt(ang, 3)}°</dd><dt>hole to plane</dt><dd>${fmt(90 - ang, 3)}°</dd><dt>factor</dt><dd>${fmt(c, 4)} of downhole length</dd></dl><div class="src">@gcu/bearing · lower hemisphere, equal area</div>`,
+    body: [
+      { t: 'big', v: fmt(tt, 4), unit: 'm true thickness' },
+      { t: 'net', planes: [{ dd, dip: a.a2 }], lines: [{ tr: a.htr, pl: a.hpl, label: 'hole' }] },
+      { t: 'kv', rows: [['hole to pole', `${fmt(ang, 3)}°`], ['hole to plane', `${fmt(90 - ang, 3)}°`], ['factor', `${fmt(c, 4)} of downhole length`]] },
+      { t: 'src', text: '@gcu/bearing · lower hemisphere, equal area' }
+    ],
     trace: [`plane → dip direction ${p3(dd)}, dip ${p2(a.a2)}; pole ${p3(dd + 180)}/${p2(90 - a.a2)}`, `hole axis ${p3(a.htr)}/${p2(a.hpl)} as unit vector`, `|hole · pole| = ${fmt(c, 5)}`, `${fmt(a.len)} m × ${fmt(c, 5)} = ${fmt(tt, 5)} m`],
     py: `bearing.true_thickness(${a.len}, hole=(${a.htr}, ${a.hpl}), plane=(${dd}, ${a.a2}))`
   };
 };
 T.plane = a => {
   const dd = planeDD(a);
-  return { read: ['plot plane', convSlot(a)], html: `${net([{ dd, dip: a.a2 }], [])}<dl class="kv"><dt>strike</dt><dd>${p3(dd + 270)}</dd><dt>dip</dt><dd>${p2(a.a2)}° toward ${p3(dd)}</dd><dt>pole</dt><dd>${p3(dd + 180)}/${p2(90 - a.a2)}</dd></dl><div class="src">@gcu/bearing</div>`, trace: ['plane → great circle and pole', 'equal-area projection, lower hemisphere'], py: `stereonet.plane(${dd}, ${a.a2})` };
+  return {
+    read: ['plot plane', convSlot(a)],
+    body: [
+      { t: 'net', planes: [{ dd, dip: a.a2 }], lines: [] },
+      { t: 'kv', rows: [['strike', p3(dd + 270)], ['dip', `${p2(a.a2)}° toward ${p3(dd)}`], ['pole', `${p3(dd + 180)}/${p2(90 - a.a2)}`]] },
+      { t: 'src', text: '@gcu/bearing' }
+    ],
+    trace: ['plane → great circle and pole', 'equal-area projection, lower hemisphere'], py: `stereonet.plane(${dd}, ${a.a2})`
+  };
 };
 
-/* ── table: synthetic drillholes, histogram, variogram ─────── */
+/* ==== src/engine/table.js ==== */
+// The open table: a synthetic drillhole set, a histogram and a downhole variogram after compositing.
+// Sample data, labelled as such in every result it reaches.
+
 function mulberry(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 function makeData() {
   const r = mulberry(20261008), g = () => Math.sqrt(-2 * Math.log(1 - r())) * Math.cos(2 * Math.PI * r()), rows = [], MU = { GRD: Math.log(.25), BRX: Math.log(.8), DYK: Math.log(.03) };
@@ -474,6 +497,7 @@ function stats(v) {
   return { n, mean, sd: Math.sqrt(va), va, min: s[0], med: n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2, max: s[n - 1] };
 }
 const UNIT = { cu: '%', au: 'g/t' }, COL = { cu: 'Cu', au: 'Au' };
+// the precondition "a table is open": asked once, then satisfied as a plan step the args remember
 function needData(a, trace) {
   if (S.data) return null;
   if (!a.auto) return { prompt: 'No table is open. Open the sample table first?', options: [{ label: 'open assays.csv', value: true }], set: (x, v) => { x.auto = v; } };
@@ -485,26 +509,29 @@ T.open = a => {
   const d = S.data, holes = new Set(d.map(r => r.hole)).size, n1 = d.filter(r => r.to - r.from === 1).length, neg = d.filter(r => r.au < 0).length;
   return {
     read: ['open table', { v: 'assays.csv' }],
-    html: `<dl class="kv"><dt>rows</dt><dd>${d.length} samples in ${holes} holes</dd><dt>columns</dt><dd>hole (id) · from, to (m) · lith (category) · cu (%) · au (g/t)</dd><dt>lengths</dt><dd>${n1} samples of 1 m, ${d.length - n1} of 2 m</dd><dt>lith</dt><dd>${[...new Set(d.map(r => r.lith))].join(', ')}</dd></dl>
-      ${neg ? `<div class="note">${neg} Au values are −0.01. That looks like a below-detection code. Statistics leave them out until you say what they mean.</div>` : ''}<div class="src">synthetic table generated for this mock · sadpan + tare checks</div>`,
+    body: [
+      { t: 'kv', rows: [['rows', `${d.length} samples in ${holes} holes`], ['columns', 'hole (id) · from, to (m) · lith (category) · cu (%) · au (g/t)'], ['lengths', `${n1} samples of 1 m, ${d.length - n1} of 2 m`], ['lith', [...new Set(d.map(r => r.lith))].join(', ')]] },
+      ...(neg ? [{ t: 'note', text: `${neg} Au values are −0.01. That looks like a below-detection code. Statistics leave them out until you say what they mean.` }] : []),
+      { t: 'src', text: 'synthetic table generated for this mock · sadpan + tare checks' }
+    ],
     trace: ['read assays.csv → typed columns', 'tare: intervals contiguous, no overlaps', `tare: ${neg} negative Au values flagged`], py: 'dh = read_csv("assays.csv")'
   };
 };
 T.hist = a => {
   const trace = [], ask = needData(a, trace);
   const read = ['histogram of', { v: COL[a.col] }, { v: a.log ? 'log scale' : 'linear scale', key: 'log', alts: [false, true], cur: !!a.log }];
-  if (ask) return { read, ask, html: '', trace: ['blocked: needs an open table'] };
+  if (ask) return { read, ask, body: [], trace: ['blocked: needs an open table'] };
   const raw = S.data.map(r => r[a.col]), v = raw.filter(x => x > 0), st = stats(v), f = a.log ? Math.log10 : x => x, lo = a.log ? f(st.min) : 0, hi = f(st.max), nb = 18, bins = new Array(nb).fill(0);
   v.forEach(x => { bins[Math.min(nb - 1, Math.floor((f(x) - lo) / (hi - lo) * nb))]++; });
-  const W = 340, H = 150, x0 = 30, bw = (W - x0 - 6) / nb, top = Math.max(...bins), inv = t => a.log ? Math.pow(10, t) : t;
-  let s = `<svg viewBox="0 0 ${W} ${H + 24}" width="${W}" height="${H + 24}" role="img" aria-label="Histogram of ${COL[a.col]}"><path class="ax" d="M${x0} 6V${H}H${W - 6}"/><text x="${x0 - 4}" y="12" text-anchor="end">${top}</text><text x="${x0 - 4}" y="${H}" text-anchor="end">0</text>`;
-  bins.forEach((b, i) => { const h = b / top * (H - 10); s += `<rect class="barfill" x="${(x0 + i * bw + 1).toFixed(1)}" y="${(H - h).toFixed(1)}" width="${(bw - 2).toFixed(1)}" height="${h.toFixed(1)}"/>`; });
-  [0, .5, 1].forEach(t => { s += `<text x="${(x0 + t * (W - x0 - 6)).toFixed(1)}" y="${H + 14}" text-anchor="${t === 0 ? 'start' : t === 1 ? 'end' : 'middle'}">${fmt(inv(lo + t * (hi - lo)), 2)}</text>`; });
-  s += '</svg>';
+  const inv = t => a.log ? Math.pow(10, t) : t;
   trace.push(`select ${a.col}; drop ${raw.length - v.length} non-positive values`, `bin into ${nb} ${a.log ? 'log10' : 'linear'} classes`);
   return {
     read, amend: 'hist',
-    html: `${s}<dl class="kv"><dt>n</dt><dd>${st.n}</dd><dt>mean</dt><dd>${fmt(st.mean, 3)} ${UNIT[a.col]}</dd><dt>median</dt><dd>${fmt(st.med, 3)} ${UNIT[a.col]}</dd><dt>cv</dt><dd>${fmt(st.sd / st.mean, 3)}</dd><dt>range</dt><dd>${fmt(st.min, 3)} to ${fmt(st.max, 3)} ${UNIT[a.col]}</dd></dl><div class="src">sadpan · sample-count weighted, not declustered</div>`,
+    body: [
+      { t: 'bars', label: `Histogram of ${COL[a.col]}`, bins, ticks: [0, .5, 1].map(t => fmt(inv(lo + t * (hi - lo)), 2)) },
+      { t: 'kv', rows: [['n', String(st.n)], ['mean', `${fmt(st.mean, 3)} ${UNIT[a.col]}`], ['median', `${fmt(st.med, 3)} ${UNIT[a.col]}`], ['cv', fmt(st.sd / st.mean, 3)], ['range', `${fmt(st.min, 3)} to ${fmt(st.max, 3)} ${UNIT[a.col]}`]] },
+      { t: 'src', text: 'sadpan · sample-count weighted, not declustered' }
+    ],
     trace, py: `plot.hist(dh["${a.col}"][dh["${a.col}"] > 0], bins=${nb}${a.log ? ', log=True' : ''})`
   };
 };
@@ -515,7 +542,7 @@ T.vario = a => {
     const n1 = S.data.filter(r => r.to - r.from === 1).length;
     ask = { prompt: `A variogram needs samples of equal length. This table has ${n1} samples of 1 m and ${S.data.length - n1} of 2 m. Composite to what length?`, options: [2, 3, 4].map(v => ({ label: v + ' m', value: v })), set: (x, v) => { x.comp = v; } };
   }
-  if (ask) return { read, ask, html: '', trace: ['blocked: precondition not met'] };
+  if (ask) return { read, ask, body: [], trace: ['blocked: precondition not met'] };
   read.push('composited to', { v: a.comp + ' m', key: 'comp', alts: [2, 3, 4], cur: a.comp });
   const L = a.comp, byHole = {};
   S.data.forEach(r => { if (r[a.col] > 0) (byHole[r.hole] = byHole[r.hole] || []).push(r); });
@@ -536,49 +563,54 @@ T.vario = a => {
     Object.values(comps).forEach(c => { for (let i = 0; i + k < c.length; i++) if (c[i] != null && c[i + k] != null) { s2 += (c[i] - c[i + k]) ** 2; np++; } });
     if (np) lags.push({ h: k * L, g: s2 / (2 * np), np });
   }
-  const W = 340, H = 150, x0 = 38, hx = lags[lags.length - 1].h, gy = Math.max(sill, ...lags.map(l => l.g)) * 1.1, X = h => x0 + h / hx * (W - x0 - 10), Y = g => H - g / gy * (H - 10);
-  let s = `<svg viewBox="0 0 ${W} ${H + 24}" width="${W}" height="${H + 24}" role="img" aria-label="Downhole variogram of ${COL[a.col]}"><path class="ax" d="M${x0} 6V${H}H${W - 6}"/><path class="ln2" d="M${x0} ${Y(sill).toFixed(1)}H${W - 6}"/><text x="${W - 8}" y="${(Y(sill) - 4).toFixed(1)}" text-anchor="end">variance ${fmt(sill, 3)}</text><text x="${x0 - 4}" y="12" text-anchor="end">${fmt(gy, 2)}</text><text x="${x0 - 4}" y="${H}" text-anchor="end">0</text><path class="ln" d="M${lags.map(l => X(l.h).toFixed(1) + ' ' + Y(l.g).toFixed(1)).join('L')}"/>`;
-  lags.forEach(l => { s += `<circle class="pt" cx="${X(l.h).toFixed(1)}" cy="${Y(l.g).toFixed(1)}" r="3.2"/>`; });
-  [lags[0].h, lags[Math.floor(lags.length / 2)].h, hx].forEach(h => { s += `<text x="${X(h).toFixed(1)}" y="${H + 14}" text-anchor="middle">${h} m</text>`; });
-  s += '</svg>';
+  const hx = lags[lags.length - 1].h, gy = Math.max(sill, ...lags.map(l => l.g)) * 1.1;
   trace.push(`drop non-positive ${a.col} values`, `composite to ${L} m, length weighted, keep ≥ 50% coverage → ${nc} composites`, `pair composites down each hole at lags of ${L} m → ${lags.length} lags`);
   return {
     read,
-    html: `${s}<dl class="kv"><dt>composites</dt><dd>${nc} at ${L} m</dd><dt>first lag</dt><dd>γ(${L} m) = ${fmt(lags[0].g, 3)}, ${fmt(lags[0].g / sill * 100, 3)}% of the variance, ${lags[0].np} pairs</dd><dt>last lag</dt><dd>γ(${hx} m) = ${fmt(lags[lags.length - 1].g, 3)}, ${lags[lags.length - 1].np} pairs</dd></dl><div class="src">@gcu/drillhole → gsjs · experimental only, no model fitted</div>`,
+    body: [
+      { t: 'curve', label: `Downhole variogram of ${COL[a.col]}`, points: lags.map(l => ({ x: l.h, y: l.g })), xmax: hx, ymax: gy, ylabel: fmt(gy, 2), ref: { y: sill, label: `variance ${fmt(sill, 3)}` }, xticks: [lags[0].h, lags[Math.floor(lags.length / 2)].h, hx].map(h => ({ x: h, label: `${h} m` })) },
+      { t: 'kv', rows: [['composites', `${nc} at ${L} m`], ['first lag', `γ(${L} m) = ${fmt(lags[0].g, 3)}, ${fmt(lags[0].g / sill * 100, 3)}% of the variance, ${lags[0].np} pairs`], ['last lag', `γ(${hx} m) = ${fmt(lags[lags.length - 1].g, 3)}, ${lags[lags.length - 1].np} pairs`]] },
+      { t: 'src', text: '@gcu/drillhole → gsjs · experimental only, no model fitted' }
+    ],
     trace, py: `comp = drillhole.composite(dh[dh["${a.col}"] > 0], ${L})\ngsjs.variogram(comp, "${a.col}", direction="downhole", lag=${L}, nlags=12)`
   };
 };
 
-/* ==== src/30-knowledge-device.js ==== */
+/* ==== src/engine/knowledge.js ==== */
+// Knowledge from packs: a Factbook sample, minerals with an identification key, an ODS term index,
+// and a style check from The Elements of Style (1918). All sample data, labelled as such.
+
 /* ── records: Factbook sample (rounded) ────────────────────── */
 const FB = [['Australia', 'Canberra', 7741220, 26.8e6, 0], ['Brazil', 'Brasília', 8515770, 220.1e6, 0], ['Canada', 'Ottawa', 9984670, 38.8e6, 0], ['Chile', 'Santiago', 756102, 18.7e6, 0],
   ['Germany', 'Berlin', 357022, 84.1e6, 0], ['Indonesia', 'Jakarta', 1904569, 281.6e6, 0], ['Ireland', 'Dublin', 70273, 5.2e6, 0], ['Japan', 'Tokyo', 377915, 123.2e6, 0],
   ['Kazakhstan', 'Astana', 2724900, 20.3e6, 1], ['Mongolia', 'Ulaanbaatar', 1564116, 3.3e6, 1], ['Peru', 'Lima', 1285216, 32.6e6, 0], ['Portugal', 'Lisbon', 92090, 10.2e6, 0],
   ['South Africa', 'Pretoria', 1219090, 60.4e6, 0], ['Zambia', 'Lusaka', 752618, 20.8e6, 1]];
 const fbFind = n => FB.find(r => r[0].toLowerCase() === n.trim().replace(/^the /, ''));
-const FBSRC = '<div class="src">factbook pack · 14-country rounded sample in this mock</div>';
+const FBSRC = { t: 'src', text: 'factbook pack · 14-country rounded sample in this mock' };
 T.fact = a => {
   const r = fbFind(a.country); if (!r) return null;
   const read = [a.field, 'of', { v: r[0] }], trace = [`factbook.get("${r[0]}")`]; let big, py = `data("factbook")["${r[0]}"].${a.field}`;
-  if (a.field === 'capital') big = `<div class="big">${r[1]}</div>`;
-  else if (a.field === 'population') big = `<div class="big">${fmt(r[3], 4)} <small>people</small></div>`;
+  if (a.field === 'capital') big = { t: 'big', v: r[1] };
+  else if (a.field === 'population') big = { t: 'big', v: fmt(r[3], 4), unit: 'people' };
   else if (a.field === 'area') {
     let un = a.unit && parseUnit(a.unit); if (!un || un.dim !== 'A') un = parseUnit('km²');
-    read.push('in', { v: un.name }); big = `<div class="big">${fmt(r[2] * 1e6 / un.f, 5)} <small>${un.name}</small></div>`;
+    read.push('in', { v: un.name }); big = { t: 'big', v: fmt(r[2] * 1e6 / un.f, 5), unit: un.name };
     trace.push(`area ${fmt(r[2], 9)} km² → ${un.name}`); py = `units.convert(${py}, "km²", "${un.name}")`;
   } else {
     const mi = /mi/.test(a.unit || ''), v = r[3] / r[2] * (mi ? 2.589988110336 : 1), per = mi ? 'sq mi' : 'km²';
-    read.push('in', { v: 'people / ' + per }); big = `<div class="big">${fmt(v, 3)} <small>people per ${per}</small></div>`;
+    read.push('in', { v: 'people / ' + per }); big = { t: 'big', v: fmt(v, 3), unit: `people per ${per}` };
     trace.push(`population ${fmt(r[3], 4)} ÷ area ${fmt(r[2], 9)} km²`, mi ? 'units: per km² → per sq mi' : 'no unit change');
     py = `c = data("factbook")["${r[0]}"]\nunits.convert(c.population / c.area, "1/km²", "1/${per}")`;
   }
-  return { read, amend: 'fact', html: big + FBSRC, trace, py };
+  return { read, amend: 'fact', body: [big, FBSRC], trace, py };
 };
 T.factList = a => {
   const k = a.by === 'population' ? 3 : 2, rows = FB.filter(r => r[4]).sort((x, y) => y[k] - x[k]);
-  return { read: ['filter countries where', { v: 'landlocked' }, 'sort by', { v: a.by, key: 'by', alts: ['area', 'population'], cur: a.by }],
-    html: `<div class="tbl"><table><tr><th>Country</th><th class="n">Area km²</th><th class="n">Population</th></tr>${rows.map(r => `<tr><td>${r[0]}</td><td class="n">${fmt(r[2], 9)}</td><td class="n">${fmt(r[3], 4)}</td></tr>`).join('')}</table></div><div class="sub">${rows.length} of ${FB.length} records match.</div>${FBSRC}`,
-    trace: ['factbook.records → 14', 'filter landlocked = true', `sort by ${a.by}, descending`], py: `data("factbook").filter(landlocked=True).sort("${a.by}", desc=True)` };
+  return {
+    read: ['filter countries where', { v: 'landlocked' }, 'sort by', { v: a.by, key: 'by', alts: ['area', 'population'], cur: a.by }],
+    body: [{ t: 'table', head: ['Country', 'Area km²', 'Population'], num: [false, true, true], rows: rows.map(r => [r[0], fmt(r[2], 9), fmt(r[3], 4)]) }, { t: 'sub', text: `${rows.length} of ${FB.length} records match.` }, FBSRC],
+    trace: ['factbook.records → 14', 'filter landlocked = true', `sort by ${a.by}, descending`], py: `data("factbook").filter(landlocked=True).sort("${a.by}", desc=True)`
+  };
 };
 
 /* ── minerals: properties + identification key ─────────────── */
@@ -598,12 +630,12 @@ const KEYQ = {
   col: ['What colour is a fresh surface?', { yellow: 'brass or golden yellow', grey: 'grey to silver', black: 'black', clear: 'colourless or pale', brown: 'brown', green: 'green' }],
   mag: ['Does a magnet pick it up?', { y: 'yes', n: 'no' }], hcl: ['Does it fizz in dilute HCl?', { y: 'yes', n: 'no' }]
 };
-const minCard = n => { const m = MIN[n]; return `<dl class="kv"><dt>formula</dt><dd>${m[0]}</dd><dt>hardness</dt><dd>${m[1]} Mohs</dd><dt>density</dt><dd>${m[2]} g/cm³</dd><dt>streak</dt><dd>${m[3]}</dd><dt>lustre</dt><dd>${m[4] === 'm' ? 'metallic' : 'non-metallic'}</dd></dl><div class="src">minerals pack (proposed) · 12 minerals in this mock</div>`; };
+const minCard = n => { const m = MIN[n]; return [{ t: 'kv', rows: [['formula', m[0]], ['hardness', `${m[1]} Mohs`], ['density', `${m[2]} g/cm³`], ['streak', m[3]], ['lustre', m[4] === 'm' ? 'metallic' : 'non-metallic']] }, { t: 'src', text: 'minerals pack (proposed) · 12 minerals in this mock' }]; };
 T.mineral = a => {
   const m = MIN[a.name]; if (!m) return null;
-  const i = { formula: 0, hardness: 1, density: 2, streak: 3 }[a.prop], unit = a.prop === 'density' ? ' g/cm³' : a.prop === 'hardness' ? ' Mohs' : '';
-  if (i == null) return { read: ['describe mineral', { v: a.name }], html: minCard(a.name), trace: [`minerals.get("${a.name}")`], py: `data("minerals")["${a.name}"]` };
-  return { read: [a.prop, 'of mineral', { v: a.name }], html: `<div class="big">${m[i]}<small>${unit}</small></div><div class="src">minerals pack (proposed)</div>`, trace: [`minerals.get("${a.name}").${a.prop}`], py: `data("minerals")["${a.name}"].${a.prop}` };
+  const i = { formula: 0, hardness: 1, density: 2, streak: 3 }[a.prop], unit = a.prop === 'density' ? 'g/cm³' : a.prop === 'hardness' ? 'Mohs' : undefined;
+  if (i == null) return { read: ['describe mineral', { v: a.name }], body: minCard(a.name), trace: [`minerals.get("${a.name}")`], py: `data("minerals")["${a.name}"]` };
+  return { read: [a.prop, 'of mineral', { v: a.name }], body: [{ t: 'big', v: m[i], unit }, { t: 'src', text: 'minerals pack (proposed)' }], trace: [`minerals.get("${a.name}").${a.prop}`], py: `data("minerals")["${a.name}"].${a.prop}` };
 };
 T.key = a => {
   a.ans = a.ans || {};
@@ -614,11 +646,11 @@ T.key = a => {
   Object.keys(MATTR).forEach(k => { if (k in a.ans) return; const n = new Set(cand.map(c => MIN[c][MATTR[k]])).size; if (n > bn) { bn = n; best = k; } });
   if (cand.length > 1 && best) {
     const vals = [...new Set(cand.map(c => String(MIN[c][MATTR[best]])))];
-    return { read, trace, html: `<div class="sub">${cand.length} candidates: ${cand.join(', ')}</div>`,
+    return { read, trace, body: [{ t: 'sub', text: `${cand.length} candidates: ${cand.join(', ')}` }],
       ask: { prompt: KEYQ[best][0], options: vals.map(v => ({ label: KEYQ[best][1][v], value: v })), set: (x, v) => { x.ans = { ...x.ans, [best]: v }; } } };
   }
   const n = Object.keys(a.ans).length;
-  return { read, trace, html: `<div class="big">${cand.join(' or ')}</div><div class="sub">Reached in ${n} question${n === 1 ? '' : 's'}. Each question was the one that split the remaining candidates most.</div>${cand.length === 1 ? minCard(cand[0]) : ''}`, py: `key("minerals").identify(${JSON.stringify(a.ans)})` };
+  return { read, trace, body: [{ t: 'big', v: cand.join(' or ') }, { t: 'sub', text: `Reached in ${n} question${n === 1 ? '' : 's'}. Each question was the one that split the remaining candidates most.` }, ...(cand.length === 1 ? minCard(cand[0]) : [])], py: `key("minerals").identify(${JSON.stringify(a.ans)})` };
 };
 
 /* ── text: ODS term index + Strunk (1918) check ────────────── */
@@ -626,7 +658,12 @@ const ODS = { skiplist: ['4 Skiplists', '4.1 The Basic Structure'], 'hash table'
 const ODSA = { 'skip list': 'skiplist', heap: 'binary heap', 'red black tree': 'red-black tree', btree: 'b-tree', 'b tree': 'b-tree', hashtable: 'hash table' };
 T.define = a => {
   const t = a.term.replace(/s$/, ''), k = ODS[t] ? t : ODSA[t];
-  if (k) return { read: ['find the definition of', { v: k }], html: `<div class="big" style="font-size:17px">Open Data Structures, ch. ${ODS[k][0]}</div><div class="sub">Defined in §${ODS[k][1]}.</div><div class="note">The app shows the defining passage here and opens the reader at that section. This mock carries only the locator.</div><div class="opts"><a class="btn" href="https://gentropic.github.io/gcu-library/read.html?book=ods" target="_blank" rel="noopener">Open in the library reader</a></div><div class="src">ods pack · CC BY 2.5 · Pat Morin · sample term index</div>`, trace: [`index.lookup("${k}") across installed packs`, 'hit: ods, glossary facet'], py: `library.define("${k}")` };
+  if (k) return {
+    read: ['find the definition of', { v: k }],
+    body: [{ t: 'big', v: `Open Data Structures, ch. ${ODS[k][0]}`, size: 17 }, { t: 'sub', text: `Defined in §${ODS[k][1]}.` }, { t: 'note', text: 'The app shows the defining passage here and opens the reader at that section. This mock carries only the locator.' },
+      { t: 'actions', items: [{ href: 'https://gentropic.github.io/gcu-library/read.html?book=ods', label: 'Open in the library reader' }] }, { t: 'src', text: 'ods pack · CC BY 2.5 · Pat Morin · sample term index' }],
+    trace: [`index.lookup("${k}") across installed packs`, 'hit: ods, glossary facet'], py: `library.define("${k}")`
+  };
   if (MIN[t]) return T.mineral({ name: t });
   return null;
 };
@@ -642,14 +679,20 @@ T.lint = a => {
   const hits = [];
   LINT.forEach(([re, rule, fix]) => { re.lastIndex = 0; let m; while ((m = re.exec(a.text))) if (!hits.some(h => m.index < h.e && m.index + m[0].length > h.s)) hits.push({ s: m.index, e: m.index + m[0].length, rule, fix }); });
   hits.sort((x, y) => x.s - y.s);
-  let out = '', p = 0; hits.forEach(h => { out += esc(a.text.slice(p, h.s)) + '<mark>' + esc(a.text.slice(h.s, h.e)) + '</mark>'; p = h.e; }); out += esc(a.text.slice(p));
-  return { read: ['check text against', { v: 'The Elements of Style (1918)' }],
-    html: `<div class="sub" style="color:var(--au-fg)">${out}</div>${hits.length ? `<div class="tbl"><table><tr><th>Found</th><th>Rule</th><th>Try</th></tr>${hits.map(h => `<tr><td>${esc(a.text.slice(h.s, h.e))}</td><td>${h.rule}. ${RULE[h.rule]}</td><td>${h.fix}</td></tr>`).join('')}</table></div>` : '<div class="note ok">No rule in the pack matched this text.</div>'}<div class="src">elements-of-style pack · public domain · ${LINT.length} patterns compiled from rules 11 to 13</div>`,
-    trace: [`style.rules("elements-of-style") → ${LINT.length} patterns`, `scan ${a.text.length} characters → ${hits.length} matches`], py: `style.check(text, pack="elements-of-style")` };
+  return {
+    read: ['check text against', { v: 'The Elements of Style (1918)' }],
+    body: [{ t: 'marked', text: a.text, spans: hits.map(h => [h.s, h.e]) },
+      hits.length ? { t: 'table', head: ['Found', 'Rule', 'Try'], rows: hits.map(h => [a.text.slice(h.s, h.e), `${h.rule}. ${RULE[h.rule]}`, h.fix]) } : { t: 'note', kind: 'ok', text: 'No rule in the pack matched this text.' },
+      { t: 'src', text: `elements-of-style pack · public domain · ${LINT.length} patterns compiled from rules 11 to 13` }],
+    trace: [`style.rules("elements-of-style") → ${LINT.length} patterns`, `scan ${a.text.length} characters → ${hits.length} matches`], py: `style.check(text, pack="elements-of-style")`
+  };
 };
 
-/* ── device hand-offs (simulated) ──────────────────────────── */
-const hand = (label, intent, perm, msg) => `<dl class="kv"><dt>hand-off</dt><dd><code style="font:12px var(--mono)">${intent}</code></dd><dt>permission</dt><dd>${perm}</dd></dl><div class="opts"><button class="btn go" type="button" data-act="handoff" data-msg="${esc(msg)}">${label}</button>`;
+/* ==== src/engine/device.js ==== */
+// Device hand-offs: calendar event, timer, alarm. Simulated in the mock; on Android they become intents.
+
+// the hand-off description every device card carries: the intent, its permission, and the button
+const hand = (label, intent, perm, msg) => [{ t: 'kv', rows: [['hand-off', intent, { mono: true }], ['permission', perm]] }, { act: 'handoff', label, msg, go: true }];
 T.event = a => {
   const d = new Date(a.date), s = new Date(d.getFullYear(), d.getMonth(), d.getDate(), a.timed ? a.h : 0, a.timed ? a.mi : 0), e = new Date(+s + a.dur * 6e4);
   const hm = x => String(x.getHours()).padStart(2, '0') + ':' + String(x.getMinutes()).padStart(2, '0'), st = x => iso(x).replace(/-/g, '') + (a.timed ? 'T' + hm(x).replace(':', '') + '00' : '');
@@ -657,33 +700,48 @@ T.event = a => {
     a.timed ? `DTSTART:${st(s)}` : `DTSTART;VALUE=DATE:${st(s)}`, ...(a.timed ? [`DTEND:${st(e)}`] : []), `SUMMARY:${a.title}`, 'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
   const read = ['new event', { v: a.title }, 'on', { v: fmtDate(s) }];
   if (a.timed) read.push('at', { v: hm(s) }, 'for', { v: a.dur + ' min', key: 'dur', alts: [30, 60, 120], cur: a.dur }); else read.push({ v: 'all day' });
-  return { read, copy: ics,
-    html: `<div class="big" style="font-size:18px">${esc(a.title)}</div><div class="sub">${fmtDate(s)}${a.timed ? `, ${hm(s)} to ${hm(e)}` : ', all day'}</div>${hand('Add to calendar', 'ACTION_INSERT → CalendarContract.Events', 'none: your calendar app shows the event for you to save', 'On Android this opens your calendar app with these fields filled in. Nothing is sent from the mock.')}<button class="btn" type="button" data-act="copy">Copy .ics</button></div>`,
-    trace: [`dates.parse → ${fmtDate(s)}${a.timed ? ' ' + hm(s) : ''}`, 'title = what is left after removing date and time words', 'build intent extras: title, begin, end'], py: `device.calendar.insert(title="${a.title}", begin="${iso(s)}${a.timed ? 'T' + hm(s) : ''}", minutes=${a.dur})` };
+  const [kv, go] = hand('Add to calendar', 'ACTION_INSERT → CalendarContract.Events', 'none: your calendar app shows the event for you to save', 'On Android this opens your calendar app with these fields filled in. Nothing is sent from the mock.');
+  return {
+    read, copy: ics,
+    body: [{ t: 'big', v: a.title, size: 18 }, { t: 'sub', text: `${fmtDate(s)}${a.timed ? `, ${hm(s)} to ${hm(e)}` : ', all day'}` }, kv, { t: 'actions', items: [go, { act: 'copy', label: 'Copy .ics' }] }],
+    trace: [`dates.parse → ${fmtDate(s)}${a.timed ? ' ' + hm(s) : ''}`, 'title = what is left after removing date and time words', 'build intent extras: title, begin, end'], py: `device.calendar.insert(title="${a.title}", begin="${iso(s)}${a.timed ? 'T' + hm(s) : ''}", minutes=${a.dur})`
+  };
 };
 T.timer = a => {
   if (!a.end) a.end = Date.now() + a.sec * 1000;
-  return { read: ['start a timer for', { v: a.sec >= 60 ? fmt(a.sec / 60) + ' min' : a.sec + ' s' }],
-    html: `<div class="big" data-end="${a.end}">--:--</div>${hand('Hand to the Clock app', 'AlarmClock.ACTION_SET_TIMER, EXTRA_LENGTH=' + a.sec, 'SET_ALARM, granted at install', 'On Android the Clock app takes over the timer and rings when golem is closed. Here it counts down in the page.')}</div>`,
-    trace: [`duration → ${a.sec} s`, 'build intent: ACTION_SET_TIMER'], py: `device.timer(${a.sec})` };
+  const [kv, go] = hand('Hand to the Clock app', 'AlarmClock.ACTION_SET_TIMER, EXTRA_LENGTH=' + a.sec, 'SET_ALARM, granted at install', 'On Android the Clock app takes over the timer and rings when golem is closed. Here it counts down in the page.');
+  return {
+    read: ['start a timer for', { v: a.sec >= 60 ? fmt(a.sec / 60) + ' min' : a.sec + ' s' }],
+    body: [{ t: 'big', v: '--:--', end: a.end }, kv, { t: 'actions', items: [go] }],
+    trace: [`duration → ${a.sec} s`, 'build intent: ACTION_SET_TIMER'], py: `device.timer(${a.sec})`
+  };
 };
 T.alarm = a => {
   const t = String(a.h).padStart(2, '0') + ':' + String(a.mi).padStart(2, '0');
-  return { read: ['set an alarm at', { v: t }], html: `<div class="big">${t}</div>${hand('Hand to the Clock app', `AlarmClock.ACTION_SET_ALARM, HOUR=${a.h}, MINUTES=${a.mi}`, 'SET_ALARM, granted at install', 'On Android this creates the alarm in the Clock app. Nothing happens in the mock.')}</div>`, trace: [`time → ${t}`, 'build intent: ACTION_SET_ALARM'], py: `device.alarm("${t}")` };
+  const [kv, go] = hand('Hand to the Clock app', `AlarmClock.ACTION_SET_ALARM, HOUR=${a.h}, MINUTES=${a.mi}`, 'SET_ALARM, granted at install', 'On Android this creates the alarm in the Clock app. Nothing happens in the mock.');
+  return { read: ['set an alarm at', { v: t }], body: [{ t: 'big', v: t }, kv, { t: 'actions', items: [go] }], trace: [`time → ${t}`, 'build intent: ACTION_SET_ALARM'], py: `device.alarm("${t}")` };
 };
 
-/* ── memory + teaching ─────────────────────────────────────── */
-T.remember = a => { if (!a.done) { S.facts.push(a.text); a.done = true; } return { read: ['store note', { v: a.text }], html: `<div class="note ok">Stored on this device. ${S.facts.length} note${S.facts.length === 1 ? '' : 's'} in memory.</div>`, trace: ['notes.add(text)', 'index words for recall'], py: `notes.add("${a.text}")` }; };
+/* ==== src/engine/notes.js ==== */
+// Notes and taught words. Both belong to the device and are shared by every session.
+
+T.remember = a => {
+  if (!a.done) { S.facts.push(a.text); a.done = true; }
+  return { read: ['store note', { v: a.text }], body: [{ t: 'note', kind: 'ok', text: `Stored on this device. ${S.facts.length} note${S.facts.length === 1 ? '' : 's'} in memory.` }], trace: ['notes.add(text)', 'index words for recall'], py: `notes.add("${a.text}")` };
+};
 T.recall = a => {
   const w = a.about.split(/\s+/).filter(Boolean), hit = S.facts.filter(f => w.every(x => f.toLowerCase().includes(x)));
-  return { read: ['recall notes about', { v: a.about }], html: hit.length ? `<ul style="margin:0;padding-left:18px">${hit.map(f => `<li>${esc(f)}</li>`).join('')}</ul>` : `<div class="note">No stored note mentions “${esc(a.about)}”. I only know what you asked me to remember.</div>`, trace: [`notes.search("${a.about}") → ${hit.length}`], py: `notes.search("${a.about}")` };
+  return { read: ['recall notes about', { v: a.about }], body: [hit.length ? { t: 'list', items: hit } : { t: 'note', text: `No stored note mentions “${a.about}”. I only know what you asked me to remember.` }], trace: [`notes.search("${a.about}") → ${hit.length}`], py: `notes.search("${a.about}")` };
 };
-T.teach = a => { S.aliases[a.word] = a.means; return { read: ['learn that', { v: a.word }, 'means', { v: a.means }], html: `<div class="note ok">Learned. From now on “${esc(a.word)}” reads as “${esc(a.means)}” on this device.</div>`, trace: ['lexicon.add(word → meaning)', 'retrain: instant, the lexicon is a table'] }; };
+T.teach = a => {
+  S.aliases[a.word] = a.means;
+  return { read: ['learn that', { v: a.word }, 'means', { v: a.means }], body: [{ t: 'note', kind: 'ok', text: `Learned. From now on “${a.word}” reads as “${a.means}” on this device.` }], trace: ['lexicon.add(word → meaning)', 'retrain: instant, the lexicon is a table'] };
+};
 
-/* ==== src/40-read-render.js ==== */
-/* ── session state ─────────────────────────────────────────── */
-const S = { cards: [], n: 0, aliases: {}, facts: [], data: null, awake: true };
-
+/* ==== src/engine/skills.js ==== */
+// The catalog: skills with examples, and the packs golem knows about. Examples feed the Skills tab,
+// the "nearest skills" suggestions and the teach vocabulary.
+// Row: [group, name, builds on, in mock (1) or planned (0), description, examples]
 const SKILLS = [
   ['Compute', 'Unit conversion', '@gcu/units', 1, 'Grades, lengths, masses, areas, pressures, temperatures. Refuses mismatched dimensions.', ['0.35 oz per short ton in g/t', '2.7 g/cm3 in lb/ft3', '1500 psi in mpa', '5 km in kg']],
   ['Compute', 'Arithmetic', '@gcu/expr', 1, 'Parsed and evaluated, never eval. Trigonometry in degrees.', ['14 * cos(22) + 3^2', 'sqrt(2) * 84']],
@@ -714,6 +772,7 @@ const SKILLS = [
   ['Session', 'Sessions and history', 'plan store', 1, 'Sessions name themselves from the tools that ran. Search covers all of them.', ['new session', 'name this session friday lab run', 'history']],
   ['Session', 'Export the plan', 'adder', 1, 'The session as a script. Every line is a tool call it made.', ['export as script']]
 ];
+// Row: [id, name, size · licence, status (live | samp | plan), description]
 const PACKS = [
   ['factbook', 'CIA World Factbook', '2.8 MB · CC0', 'samp', 'Records: lookup, convert, filter, rank.'],
   ['factbook-full', 'Factbook, full profiles', '2.3 MB · CC0', 'plan', 'Deeper filters, such as exports and resources.'],
@@ -729,8 +788,14 @@ const PACKS = [
 ];
 const ALLEX = SKILLS.flatMap(s => s[5]);
 const VOCAB = new Set(ALLEX.filter(e => !/ means /.test(e)).join(' ').toLowerCase().split(/[^a-z]+/).filter(w => w.length > 3));
+// the example chips in the dock
+const SUGGESTIONS = ['vario means variogram', 'variogram of cu', 'histogram of cu', 'log scale', 'identify a mineral', 'population density of mongolia in people per square mile', 'and chile', 'set a timer for 5 min', 'what is a skiplist', 'why', 'export as script', 'undo'];
 
-/* ── reading a query ───────────────────────────────────────── */
+/* ==== src/engine/reading.js ==== */
+// The reading ladder: context (amendments, meta-intents), grammar (a regex rule table, until the clause
+// parser stands here), taught words (device lexicon rewrites, then grammar again). Plus the tools that
+// talk about the session itself: none, why, export.
+
 const norm = s => s.trim().replace(/\s+/g, ' ').replace(/[?.!]+$/, '');
 function parseEvent(str) {
   const low = str.toLowerCase(), d = findDate(low), t = findTime(low), du = /\bfor (\d+(?:\.\d+)?) ?(h|hr|hrs|hours?|min|mins|minutes?)\b/.exec(low);
@@ -738,8 +803,9 @@ function parseEvent(str) {
   let title = str;
   [d && d.m, t && t.m, du].filter(Boolean).sort((a, b) => b.index - a.index).forEach(m => { title = title.slice(0, m.index) + title.slice(m.index + m[0].length); });
   title = title.replace(/\s+/g, ' ').trim().replace(/^to /i, '').replace(/\b(on|at|for)$/i, '').trim();
-  return { title: title ? title[0].toUpperCase() + title.slice(1) : 'Event', date: +(d ? d.d : day0(new Date())), timed: !!t, h: t ? t.h : 0, mi: t ? t.mi : 0, dur: du ? Math.round(du[1] * (du[2][0] === 'h' ? 60 : 1)) : 60 };
+  return { title: title ? title[0].toUpperCase() + title.slice(1) : 'Event', date: +(d ? d.d : today()), timed: !!t, h: t ? t.h : 0, mi: t ? t.mi : 0, dur: du ? Math.round(du[1] * (du[2][0] === 'h' ? 60 : 1)) : 60 };
 }
+// Rung 2. Order matters; specific rules before general ones. `text` keeps the person's casing, `q` is lowercase.
 function grammar(text, q, rung) {
   let m, r;
   const go = (tool, args) => { const res = T[tool](args); return res ? { tool, args, rung, res } : null; };
@@ -771,6 +837,7 @@ function grammar(text, q, rung) {
   if ((m = /^(?:what is|what's|define|explain|describe)(?: an?| the)? (.+)$/.exec(q)) && (r = go('define', { term: m[1] }))) return r;
   return null;
 }
+// Rung 1. An amendment of the last card, or "why".
 function context(q, last) {
   if (!last) return null;
   let m, res; const am = last.res.amend;
@@ -784,6 +851,7 @@ function context(q, last) {
   if (am === 'fact' && (m = /^(?:and|same for|what about|now|and for)(?: the)? (.+)$/.exec(q)) && fbFind(m[1])) return go({ ...last.args, country: m[1] });
   return null;
 }
+// Rung 3. Taught words rewrite the query, then the grammar reads it again.
 function taught(text, q) {
   let q2 = ' ' + q + ' ', t2 = ' ' + text + ' ';
   Object.entries(S.aliases).forEach(([k, v]) => { const re = new RegExp('(?<=\\s)' + k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?=\\s)', 'gi'); q2 = q2.replace(re, v); t2 = t2.replace(re, v); });
@@ -793,6 +861,7 @@ function taught(text, q) {
   return r;
 }
 function lev(a, b) { const d = Array.from({ length: a.length + 1 }, (_, i) => [i]); for (let j = 1; j <= b.length; j++) d[0][j] = j; for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] !== b[j - 1])); return d[a.length][b.length]; }
+// Rung 5. Nothing read the query: say so, show the nearest skills, offer to learn the unknown word.
 T.none = a => {
   const qt = new Set(a.q.split(/[^a-z0-9]+/).filter(Boolean));
   const near = ALLEX.map(e => { const et = e.toLowerCase().split(/[^a-z0-9]+/); return { e, s: et.filter(t => qt.has(t)).length / Math.sqrt(et.length * (qt.size || 1)) }; }).filter(x => x.s > 0).sort((x, y) => y.s - x.s).slice(0, 3);
@@ -802,131 +871,39 @@ T.none = a => {
     const c = [...VOCAB].find(v => v.length > t.length && v.startsWith(t)) || [...VOCAB].find(v => Math.abs(v.length - t.length) <= 1 && lev(v, t) === 1);
     if (c) { teach = `${t} means ${c}`; break; }
   }
-  const chip = x => `<button class="chip" type="button" data-act="run" data-q="${esc(x)}">${esc(x)}</button>`;
-  return { read: [], html: `<div class="note err">No reading, so no answer. I do not guess.</div>${near.length ? `<div class="lbl">Nearest skills</div><div class="opts">${near.map(x => chip(x.e)).join('')}</div>` : '<div class="sub">Nothing close. The Skills tab lists what I can do.</div>'}${teach ? `<div class="lbl">Teach me the word</div><div class="opts">${chip(teach)}</div>` : ''}`,
-    trace: ['context: no open question, no amendment fits', 'grammar: no rule matched', 'lexicon: no taught phrase applies', 'stop'] };
+  return {
+    read: [],
+    body: [{ t: 'note', kind: 'err', text: 'No reading, so no answer. I do not guess.' },
+      ...(near.length ? [{ t: 'lbl', text: 'Nearest skills' }, { t: 'chips', items: near.map(x => x.e) }] : [{ t: 'sub', text: 'Nothing close. The Skills tab lists what I can do.' }]),
+      ...(teach ? [{ t: 'lbl', text: 'Teach me the word' }, { t: 'chips', items: [teach] }] : [])],
+    trace: ['context: no open question, no amendment fits', 'grammar: no rule matched', 'lexicon: no taught phrase applies', 'stop']
+  };
 };
 T.why = a => {
   const c = S.cards.find(x => x.id === a.ref);
-  return { read: ['explain card', { v: '#' + String(c.id).padStart(2, '0') }], html: `<ol style="margin:0;padding-left:20px;font:12.5px/1.6 var(--mono)">${c.res.trace.map(t => `<li>${esc(t)}</li>`).join('')}</ol><div class="sub">These are the steps that ran, with their inputs. I can show how an answer was computed. I cannot say why the data looks the way it does.</div>`, trace: ['plan.of(card) → steps'] };
+  return { read: ['explain card', { v: '#' + String(c.id).padStart(2, '0') }], body: [{ t: 'steps', items: c.res.trace }, { t: 'sub', text: 'These are the steps that ran, with their inputs. I can show how an answer was computed. I cannot say why the data looks the way it does.' }], trace: ['plan.of(card) → steps'] };
 };
 T.export = () => {
   const body = S.cards.filter(c => c.res.py).map(c => `# ${c.raw}\n${c.res.py}`).join('\n\n');
   const src = `# golem session, exported ${iso(new Date())}\n# every line is a tool call the session made\nfrom gcu import *\n\n${body || '# nothing to export yet'}`;
-  return { read: ['export session as', { v: 'adder script' }], copy: src, html: `<pre>${esc(src)}</pre><div class="opts"><button class="btn" type="button" data-act="copy">Copy script</button></div><div class="src">plan → adder · names are illustrative, the real packages decide the API</div>`, trace: ['collect the tool call behind each card', 'emit as adder source'] };
+  return { read: ['export session as', { v: 'adder script' }], copy: src, body: [{ t: 'pre', text: src }, { t: 'actions', items: [{ act: 'copy', label: 'Copy script' }] }, { t: 'src', text: 'plan → adder · names are illustrative, the real packages decide the API' }], trace: ['collect the tool call behind each card', 'emit as adder source'] };
 };
 
-/* ── rendering ─────────────────────────────────────────────── */
-const RUNG = { grammar: 'grammar', context: 'context', taught: 'taught', none: 'no reading' };
-function cardEl(c) {
-  const el = document.createElement('article');
-  el.className = 'card'; el.dataset.id = c.id;
-  const r = c.res, read = r.read.map(x => typeof x === 'string' ? esc(x) : x.alts ? `<button class="slot" type="button" data-act="slot" data-key="${x.key}" title="Tap to change this reading">${esc(x.v)}</button>` : `<span class="slot">${esc(x.v)}</span>`).join(' ');
-  const ask = r.ask ? `<div class="note">${esc(r.ask.prompt)}</div><div class="opts">${r.ask.options.map((o, i) => `<button class="btn" type="button" data-act="answer" data-i="${i}">${esc(o.label)}</button>`).join('')}</div>` : '';
-  el.innerHTML = `<div class="chead"><span>#${String(c.id).padStart(2, '0')}</span><span class="rung ${c.rung}">${RUNG[c.rung]}</span>${c.amends ? `<span>from #${String(c.amends).padStart(2, '0')}</span>` : ''}<span class="ms">${c.ms < 10 ? c.ms.toFixed(1) : Math.round(c.ms)} ms</span></div>
-    <div class="q">${esc(c.raw)}</div>${read ? `<div class="read"><span class="lbl">read as</span> ${read}</div>` : ''}
-    <div class="ans">${r.html}${ask}</div>
-    <details class="trace"><summary>plan · ${r.trace.length} step${r.trace.length === 1 ? '' : 's'}</summary><ol>${r.trace.map(t => `<li>${esc(t)}</li>`).join('')}</ol></details>`;
-  return el;
-}
-let statusT;
-function status(msg) { $('status').textContent = msg; clearTimeout(statusT); statusT = setTimeout(() => { $('status').textContent = ''; }, 5000); }
-function addCard(raw, r, ms, quiet) {
-  const c = { id: ++S.n, raw, tool: r.tool, args: r.args, rung: r.rung, amends: r.amends, res: r.res, ms };
-  S.cards.push(c);
-  const el = cardEl(c); $('stream').appendChild(el);
-  if (!quiet) { showTab('ask'); el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
-  tick(); renderPacks(); touch();
-}
-function rerun(c) {
-  const t0 = performance.now(); c.res = T[c.tool](c.args); c.ms = performance.now() - t0;
-  const old = $('stream').querySelector(`[data-id="${c.id}"]`), el = cardEl(c);
-  old.replaceWith(el); tick(); renderPacks(); touch();
-}
-function submit(raw, quiet) {
-  raw = raw.trim(); if (!raw) return;
-  if (!S.awake) { status('Asleep. Tap wake at the top right.'); return; }
-  const t0 = performance.now(), text = norm(raw), q = text.toLowerCase(), last = S.cards[S.cards.length - 1];
-  let m;
-  if (/^(start )?(a )?new session$/.test(q)) { newSession(); status('New session.'); return; }
-  if (/^(sessions|history|menu)$/.test(q)) { openDrawer(); return; }
-  if ((m = /^(?:(?:name|call|rename) this(?: session)?|rename(?: the)? session)(?: to| as)? (.+)$/.exec(q))) { cur.name = text.slice(-m[1].length); cur.auto = false; touch(); status(`Session named “${cur.name}”.`); return; }
-  if (last && last.res.ask) {
-    const os = last.res.ask.options, o = os.find(x => x.label.toLowerCase() === q || String(x.value) === q) || os.find(x => x.label.toLowerCase().startsWith(q) || q.includes(x.label.toLowerCase())) || (os.length === 1 && /^(yes|ok|okay|sure|do it|go)$/.test(q) ? os[0] : null);
-    if (o) { last.res.ask.set(last.args, o.value); rerun(last); status(`Answered #${String(last.id).padStart(2, '0')}: ${o.label}`); return; }
-  }
-  if (/^undo( that)?$/.test(q)) {
-    const c = S.cards.pop(); if (!c) { status('Nothing to undo.'); return; }
-    $('stream').querySelector(`[data-id="${c.id}"]`).remove(); touch(); status(`Removed #${String(c.id).padStart(2, '0')}: ${c.raw}`); return;
-  }
-  if (/^(again|repeat|rerun|do it again)$/.test(q)) { if (last) submit(last.raw); else status('Nothing to repeat.'); return; }
-  const r = context(q, last) || grammar(text, q, 'grammar') || taught(text, q) || { tool: 'none', args: { q }, rung: 'none', res: T.none({ q }) };
-  addCard(raw, r, performance.now() - t0, quiet);
-}
-function tick() {
-  document.querySelectorAll('[data-end]').forEach(el => {
-    const s = Math.ceil((+el.dataset.end - Date.now()) / 1000);
-    el.textContent = s <= 0 ? 'done' : String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
-  });
-}
-setInterval(tick, 500);
+/* ==== src/engine/sessions.js ==== */
+// Sessions: stored as plans (card specs), replayed on open, named from the tools that ran.
+// The shell persists whatever `serialize()` returns and feeds it back through `hydrate()`.
 
-/* ── tabs, catalog, packs ──────────────────────────────────── */
-function showTab(t) {
-  ['ask', 'skills', 'packs'].forEach(k => { $('v-' + k).hidden = k !== t; });
-  document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === t));
-}
-function renderSkills() {
-  const live = SKILLS.filter(s => s[3]).length; let h = `<div class="sub">${live} skills run in this mock. ${SKILLS.length - live} more are planned from packages that already exist or are named here. Tap an example to run it.</div>`, g = '';
-  SKILLS.forEach(([grp, name, from, on, d, ex]) => {
-    if (grp !== g) { h += `<div class="lbl">${grp}</div>`; g = grp; }
-    h += `<div class="item"><h3>${name} <span class="tag ${on ? 'live' : 'plan'}">${on ? 'in mock' : 'planned'}</span></h3><p>${d}</p><div class="from">${from}</div>${ex.length ? `<div class="opts">${ex.map(x => `<button class="chip" type="button" data-q="${esc(x)}" style="white-space:normal;text-align:left">${esc(x)}</button>`).join('')}</div>` : ''}</div>`;
-  });
-  $('v-skills').innerHTML = h;
-}
-function renderPacks() {
-  const lab = { live: 'in mock', samp: 'sample in mock', plan: 'not wired' };
-  let h = '<div class="sub">golem knows what its installed packs hold. These are the gcu-library entries plus packs worth adding.</div><div class="lbl">Library</div>';
-  PACKS.forEach(([id, name, meta, st, d]) => { h += `<div class="item"><h3>${name} <span class="tag ${st}">${lab[st]}</span></h3><p>${d}</p><div class="from">${id} · ${meta}</div></div>`; });
-  const al = Object.entries(S.aliases);
-  h += `<div class="lbl">On this device</div><div class="item"><h3>Taught words</h3><p>${al.length ? al.map(([k, v]) => `${esc(k)} → ${esc(v)}`).join('<br>') : 'None yet. Try “vario means variogram”.'}</p></div><div class="item"><h3>Notes</h3><p>${S.facts.length ? S.facts.map(esc).join('<br>') : 'None yet. Try “remember that …”.'}</p></div><div class="item"><h3>Open table</h3><p>${S.data ? `assays.csv · ${S.data.length} rows` : 'None.'}</p></div>`;
-  $('v-packs').innerHTML = h;
-}
+let SS = [], cur = null;
+let sid = 0;
+const listeners = [];
+// the shell registers here to persist and redraw after any change to the session store
+const onChange = fn => { listeners.push(fn); };
+const changed = () => listeners.forEach(f => f());
 
-/* ── wiring ────────────────────────────────────────────────── */
-$('f').addEventListener('submit', e => { e.preventDefault(); const v = $('q').value; $('q').value = ''; submit(v); });
-document.querySelector('.tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) showTab(b.dataset.tab); });
-$('v-skills').addEventListener('click', e => { const b = e.target.closest('[data-q]'); if (b) submit(b.dataset.q); });
-$('sugg').addEventListener('click', e => { const b = e.target.closest('[data-q]'); if (b) submit(b.dataset.q); });
-$('stream').addEventListener('click', e => {
-  const b = e.target.closest('[data-act]'); if (!b) return;
-  const c = S.cards.find(x => x.id === +b.closest('.card').dataset.id), act = b.dataset.act;
-  if (act === 'run') return submit(b.dataset.q);
-  if (!S.awake) return status('Asleep. Tap wake at the top right.');
-  if (act === 'slot') { const s = c.res.read.find(x => x.key === b.dataset.key); c.args[s.key] = s.alts[(s.alts.indexOf(s.cur) + 1) % s.alts.length]; rerun(c); }
-  else if (act === 'answer') { const o = c.res.ask.options[+b.dataset.i]; c.res.ask.set(c.args, o.value); rerun(c); }
-  else if (act === 'handoff') { const n = document.createElement('div'); n.className = 'note ok'; n.textContent = b.dataset.msg; b.replaceWith(n); }
-  else if (act === 'copy') {
-    const fail = () => { const p = document.createElement('pre'); p.textContent = c.res.copy; b.closest('.ans').appendChild(p); status('Copy was blocked here. The text is shown so you can select it.'); };
-    try { navigator.clipboard.writeText(c.res.copy).then(() => status('Copied.'), fail); } catch (err) { fail(); }
-  }
-});
-$('power').addEventListener('click', () => {
-  S.awake = !S.awake; $('phone').classList.toggle('asleep', !S.awake); $('st-on').textContent = S.awake ? 'awake' : 'asleep'; $('q').disabled = !S.awake;
-  $('power').textContent = S.awake ? 'sleep' : 'wake'; $('power').setAttribute('aria-pressed', String(!S.awake));
-  status(S.awake ? 'Awake.' : 'Asleep. Nothing runs until you wake it.');
-});
-$('sugg').innerHTML = ['vario means variogram', 'variogram of cu', 'histogram of cu', 'log scale', 'identify a mineral', 'population density of mongolia in people per square mile', 'and chile', 'set a timer for 5 min', 'what is a skiplist', 'why', 'export as script', 'undo']
-  .map(x => `<button class="chip" type="button" data-q="${esc(x)}">${esc(x)}</button>`).join('');
-
-/* ==== src/50-sessions.js ==== */
-/* ── sessions: stored as plans, replayed on open, named from their tools ── */
-let SS = [], cur = null, sid = 0, ren = null, del = null;
-const KEY = 'golem.mock.v2';
+// what a session keeps of a card: enough to recompute it, and nothing else
 const spec = c => ({ id: c.id, raw: c.raw, tool: c.tool, args: c.args, rung: c.rung, amends: c.amends, ms: c.ms });
-function persist() {
-  try { localStorage.setItem(KEY, JSON.stringify({ cur: cur.id, sid, aliases: S.aliases, facts: S.facts, ss: SS.map(s => ({ ...s, cards: s.cards.map(spec) })) })); } catch (e) { /* storage is optional */ }
-}
+
+// what a card contributes to its session's name: [label, weight]
 function tagOf(c) {
   const a = c.args;
   switch (c.tool) {
@@ -962,83 +939,325 @@ function autoName(cards) {
   const two = top.slice(0, 2).join(', ');
   return two.length > 40 ? top[0] : two;
 }
-function renderBar() { $('sname').textContent = cur.name; }
-function touch() { cur.updated = Date.now(); if (cur.auto) cur.name = autoName(S.cards); renderBar(); persist(); }
-function load(s, focus) {
+// the current session changed: refresh its automatic name and tell the shell
+function touch() { cur.updated = Date.now(); if (cur.auto) cur.name = autoName(S.cards); changed(); }
+
+// open a session: clear the working state and recompute every card from its spec
+function load(s) {
   cur = s; const specs = s.cards;
-  S.cards = []; s.cards = S.cards; S.data = null; S.n = 0; $('stream').innerHTML = '';
+  S.cards = []; s.cards = S.cards; S.data = null; S.n = 0;
   specs.forEach(c => {
     let res = null; try { res = T[c.tool](c.args); } catch (e) { res = null; }
     if (!res) return;
-    const card = { ...spec(c), res }; S.cards.push(card); S.n = Math.max(S.n, card.id); $('stream').appendChild(cardEl(card));
+    const card = { ...spec(c), res }; S.cards.push(card); S.n = Math.max(S.n, card.id);
   });
-  $('exlbl').hidden = !s.example; tick(); renderBar(); renderPacks(); showTab('ask');
+  return S.cards;
+}
+function openSession(id) { const s = SS.find(x => x.id === id); if (!s) return null; load(s); changed(); return s; }
+function newSession(example) {
+  const s = { id: ++sid, name: 'New session', auto: true, example: !!example, created: Date.now(), updated: Date.now(), cards: [] };
+  SS.push(s); load(s); changed(); return s;
+}
+// an empty name hands the session back to automatic naming
+function renameSession(id, name) {
+  const s = SS.find(x => x.id === id); if (!s) return null;
+  const v = name.trim();
+  if (v) { s.name = v; s.auto = false; } else { s.auto = true; s.name = autoName(s.cards); }
+  changed(); return s;
+}
+function deleteSession(id) {
+  SS = SS.filter(x => x.id !== id);
+  if (cur && cur.id === id) { if (SS.length) load([...SS].sort((x, y) => y.updated - x.updated)[0]); else newSession(); }
+  changed();
+}
+// substring match over what was typed, across every session
+function searchHistory(q) {
+  q = q.trim().toLowerCase(); const hits = [];
+  if (q) SS.forEach(s => s.cards.forEach(c => { if (c.raw.toLowerCase().includes(q)) hits.push({ session: s, card: c }); }));
+  return hits;
+}
+const sessions = () => SS;
+const current = () => cur;
+
+function serialize() {
+  return { cur: cur && cur.id, sid, aliases: S.aliases, facts: S.facts, ss: SS.map(s => ({ ...s, cards: s.cards.map(spec) })) };
+}
+function hydrate(d) {
+  if (!d || !Array.isArray(d.ss) || !d.ss.length) return false;
+  SS = d.ss; sid = d.sid || Math.max(...SS.map(s => s.id)); S.aliases = d.aliases || {}; S.facts = d.facts || [];
+  load(SS.find(s => s.id === d.cur) || SS[0]); return true;
+}
+// forget everything: sessions, device state, working state (tests start here)
+function reset() {
+  SS = []; cur = null; sid = 0; S.cards = []; S.n = 0; S.aliases = {}; S.facts = []; S.data = null;
+}
+
+/* ==== src/engine/engine.js ==== */
+// The entry point: submit(raw) reads a request and returns what happened. Cards are recomputed in
+// place by rerun(); answers and slot flips go through it, so args stay the only state that matters.
+
+function addCard(raw, r, ms) {
+  const c = { id: ++S.n, raw, tool: r.tool, args: r.args, rung: r.rung, amends: r.amends, res: r.res, ms };
+  S.cards.push(c); touch(); return c;
+}
+function rerun(c) {
+  const t0 = performance.now(); c.res = T[c.tool](c.args); c.ms = performance.now() - t0; touch(); return c;
+}
+// an ambiguous slot cycles through its alternatives
+function flipSlot(c, key) {
+  const s = c.res.read.find(x => x.key === key); if (!s || !s.alts) return null;
+  c.args[s.key] = s.alts[(s.alts.indexOf(s.cur) + 1) % s.alts.length]; return rerun(c);
+}
+// an open question answered by option index
+function answer(c, i) {
+  const o = c.res.ask && c.res.ask.options[i]; if (!o) return null;
+  c.res.ask.set(c.args, o.value); rerun(c); return o;
+}
+function undo() { const c = S.cards.pop(); if (!c) return null; touch(); return c; }
+
+// Outcomes: { kind: 'empty' | 'new-session' | 'drawer' | 'rename', name | 'answered', card, label
+//             | 'undo', card | 'nothing', msg | 'card', card }
+function submit(raw) {
+  raw = raw.trim(); if (!raw) return { kind: 'empty' };
+  const t0 = performance.now(), text = norm(raw), q = text.toLowerCase(), last = S.cards[S.cards.length - 1];
+  let m;
+  if (/^(start )?(a )?new session$/.test(q)) { newSession(); return { kind: 'new-session' }; }
+  if (!current()) newSession();
+  if (/^(sessions|history|menu)$/.test(q)) return { kind: 'drawer' };
+  if ((m = /^(?:(?:name|call|rename) this(?: session)?|rename(?: the)? session)(?: to| as)? (.+)$/.exec(q))) { const name = text.slice(-m[1].length); renameSession(current().id, name); return { kind: 'rename', name }; }
+  if (last && last.res.ask) {
+    const os = last.res.ask.options, o = os.find(x => x.label.toLowerCase() === q || String(x.value) === q) || os.find(x => x.label.toLowerCase().startsWith(q) || q.includes(x.label.toLowerCase())) || (os.length === 1 && /^(yes|ok|okay|sure|do it|go)$/.test(q) ? os[0] : null);
+    if (o) { last.res.ask.set(last.args, o.value); rerun(last); return { kind: 'answered', card: last, label: o.label }; }
+  }
+  if (/^undo( that)?$/.test(q)) { const c = undo(); return c ? { kind: 'undo', card: c } : { kind: 'nothing', msg: 'Nothing to undo.' }; }
+  if (/^(again|repeat|rerun|do it again)$/.test(q)) return last ? submit(last.raw) : { kind: 'nothing', msg: 'Nothing to repeat.' };
+  const r = context(q, last) || grammar(text, q, 'grammar') || taught(text, q) || { tool: 'none', args: { q }, rung: 'none', res: T.none({ q }) };
+  return { kind: 'card', card: addCard(raw, r, performance.now() - t0) };
+}
+
+// two example sessions for a first visit
+function seedExamples() {
+  newSession(true); ['open assays.csv', 'histogram of cu', 'log scale', 'variogram of cu', '2 m'].forEach(x => submit(x));
+  newSession(true); ['0.35 oz per short ton in g/t', 'true thickness of a 14 m intercept, hole 270/60, bedding 045/30', 'remind me to send the samples to the lab on friday at 9', 'vario of cu'].forEach(x => submit(x));
+}
+
+/* ==== src/shell/render.js ==== */
+// Rendering. The engine hands over plain blocks; this is the only file that turns them into markup.
+
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const pad = n => String(n).padStart(2, '0');
+const RUNG = { grammar: 'grammar', context: 'context', taught: 'taught', none: 'no reading' };
+
+/* ── plots: equal-area stereonet, histogram bars, variogram curve ── */
+function proj(tr, pl, R) { const r = R * Math.SQRT2 * Math.sin(rad((90 - pl) / 2)); return [r * Math.sin(rad(tr)), -r * Math.cos(rad(tr))]; }
+function svgNet(b) {
+  const R = 84, c = 104, lab = (x, y, t) => `<text x="${(c + x + (x > 20 ? -7 : 7)).toFixed(1)}" y="${(c + y - 6).toFixed(1)}" text-anchor="${x > 20 ? 'end' : 'start'}">${esc(t)}</text>`;
+  let s = `<svg viewBox="0 0 208 208" width="208" height="208" role="img" aria-label="Lower-hemisphere equal-area stereonet"><circle class="netbg" cx="${c}" cy="${c}" r="${R}"/><path class="grid" d="M${c - 5} ${c}h10M${c} ${c - 5}v10"/><path class="ax" d="M${c} ${c - R}v-7"/><text x="${c}" y="10" text-anchor="middle">N</text>`;
+  b.planes.forEach(p => {
+    const sv = [Math.sin(rad(p.dd - 90)), Math.cos(rad(p.dd - 90)), 0], dv = vLine(p.dd, p.dip), pts = [];
+    for (let k = 0; k <= 60; k++) {
+      const th = Math.PI * k / 60, v = sv.map((x, i) => Math.cos(th) * x + Math.sin(th) * dv[i]);
+      const [x, y] = proj(deg(Math.atan2(v[0], v[1])), deg(Math.asin(Math.min(1, Math.max(0, -v[2])))), R);
+      pts.push((c + x).toFixed(1) + ' ' + (c + y).toFixed(1));
+    }
+    const [px, py] = proj(p.dd + 180, 90 - p.dip, R);
+    s += `<path class="ln" d="M${pts.join('L')}"/><rect class="pole" x="${(c + px - 3.5).toFixed(1)}" y="${(c + py - 3.5).toFixed(1)}" width="7" height="7"/>${lab(px, py, 'pole')}`;
+  });
+  b.lines.forEach(l => { const [x, y] = proj(l.tr, l.pl, R); s += `<circle class="pt" cx="${(c + x).toFixed(1)}" cy="${(c + y).toFixed(1)}" r="4"/>${lab(x, y, l.label)}`; });
+  return s + '</svg>';
+}
+function svgBars(b) {
+  const W = 340, H = 150, x0 = 30, nb = b.bins.length, bw = (W - x0 - 6) / nb, top = Math.max(...b.bins);
+  let s = `<svg viewBox="0 0 ${W} ${H + 24}" width="${W}" height="${H + 24}" role="img" aria-label="${esc(b.label)}"><path class="ax" d="M${x0} 6V${H}H${W - 6}"/><text x="${x0 - 4}" y="12" text-anchor="end">${top}</text><text x="${x0 - 4}" y="${H}" text-anchor="end">0</text>`;
+  b.bins.forEach((n, i) => { const h = n / top * (H - 10); s += `<rect class="barfill" x="${(x0 + i * bw + 1).toFixed(1)}" y="${(H - h).toFixed(1)}" width="${(bw - 2).toFixed(1)}" height="${h.toFixed(1)}"/>`; });
+  b.ticks.forEach((t, i) => { const f = i / (b.ticks.length - 1); s += `<text x="${(x0 + f * (W - x0 - 6)).toFixed(1)}" y="${H + 14}" text-anchor="${f === 0 ? 'start' : f === 1 ? 'end' : 'middle'}">${esc(t)}</text>`; });
+  return s + '</svg>';
+}
+function svgCurve(b) {
+  const W = 340, H = 150, x0 = 38, X = x => x0 + x / b.xmax * (W - x0 - 10), Y = y => H - y / b.ymax * (H - 10);
+  let s = `<svg viewBox="0 0 ${W} ${H + 24}" width="${W}" height="${H + 24}" role="img" aria-label="${esc(b.label)}"><path class="ax" d="M${x0} 6V${H}H${W - 6}"/>`;
+  if (b.ref) s += `<path class="ln2" d="M${x0} ${Y(b.ref.y).toFixed(1)}H${W - 6}"/><text x="${W - 8}" y="${(Y(b.ref.y) - 4).toFixed(1)}" text-anchor="end">${esc(b.ref.label)}</text>`;
+  s += `<text x="${x0 - 4}" y="12" text-anchor="end">${esc(b.ylabel)}</text><text x="${x0 - 4}" y="${H}" text-anchor="end">0</text><path class="ln" d="M${b.points.map(p => X(p.x).toFixed(1) + ' ' + Y(p.y).toFixed(1)).join('L')}"/>`;
+  b.points.forEach(p => { s += `<circle class="pt" cx="${X(p.x).toFixed(1)}" cy="${Y(p.y).toFixed(1)}" r="3.2"/>`; });
+  b.xticks.forEach(t => { s += `<text x="${X(t.x).toFixed(1)}" y="${H + 14}" text-anchor="middle">${esc(t.label)}</text>`; });
+  return s + '</svg>';
+}
+
+/* ── blocks ── */
+function blockHtml(b) {
+  switch (b.t) {
+    case 'big': return `<div class="big"${b.size ? ` style="font-size:${b.size}px"` : ''}${b.end ? ` data-end="${b.end}"` : ''}>${esc(b.v)}${b.unit ? ` <small>${esc(b.unit)}</small>` : ''}</div>`;
+    case 'sub': return `<div class="sub">${esc(b.text)}</div>`;
+    case 'note': return `<div class="note${b.kind ? ' ' + b.kind : ''}">${esc(b.text)}</div>`;
+    case 'src': return `<div class="src">${esc(b.text)}</div>`;
+    case 'lbl': return `<div class="lbl">${esc(b.text)}</div>`;
+    case 'kv': return `<dl class="kv">${b.rows.map(([k, v, o]) => `<dt>${esc(k)}</dt><dd>${o && o.mono ? `<code>${esc(v)}</code>` : esc(v)}</dd>`).join('')}</dl>`;
+    case 'table': return `<div class="tbl"><table><tr>${b.head.map((h, i) => `<th${b.num && b.num[i] ? ' class="n"' : ''}>${esc(h)}</th>`).join('')}</tr>${b.rows.map(r => `<tr>${r.map((v, i) => `<td${b.num && b.num[i] ? ' class="n"' : ''}>${esc(v)}</td>`).join('')}</tr>`).join('')}</table></div>`;
+    case 'list': return `<ul class="plain">${b.items.map(i => `<li>${esc(i)}</li>`).join('')}</ul>`;
+    case 'steps': return `<ol class="steps">${b.items.map(i => `<li>${esc(i)}</li>`).join('')}</ol>`;
+    case 'pre': return `<pre>${esc(b.text)}</pre>`;
+    case 'marked': { let out = '', p = 0; b.spans.forEach(([s, e]) => { out += esc(b.text.slice(p, s)) + '<mark>' + esc(b.text.slice(s, e)) + '</mark>'; p = e; }); return `<div class="sub marked">${out + esc(b.text.slice(p))}</div>`; }
+    case 'chips': return `<div class="opts">${b.items.map(q => `<button class="chip" type="button" data-act="run" data-q="${esc(q)}">${esc(q)}</button>`).join('')}</div>`;
+    case 'actions': return `<div class="opts">${b.items.map(i => i.href ? `<a class="btn" href="${esc(i.href)}" target="_blank" rel="noopener">${esc(i.label)}</a>`
+      : `<button class="btn${i.go ? ' go' : ''}" type="button" data-act="${esc(i.act)}"${i.msg ? ` data-msg="${esc(i.msg)}"` : ''}>${esc(i.label)}</button>`).join('')}</div>`;
+    case 'net': return svgNet(b);
+    case 'bars': return svgBars(b);
+    case 'curve': return svgCurve(b);
+    default: return `<div class="note err">unknown block ${esc(b.t)}</div>`;
+  }
+}
+
+/* ── a card ── */
+function cardEl(c) {
+  const el = document.createElement('article');
+  el.className = 'card'; el.dataset.id = c.id;
+  const r = c.res, read = r.read.map(x => typeof x === 'string' ? esc(x) : x.alts ? `<button class="slot" type="button" data-act="slot" data-key="${x.key}" title="Tap to change this reading">${esc(x.v)}</button>` : `<span class="slot">${esc(x.v)}</span>`).join(' ');
+  const ask = r.ask ? `<div class="note">${esc(r.ask.prompt)}</div><div class="opts">${r.ask.options.map((o, i) => `<button class="btn" type="button" data-act="answer" data-i="${i}">${esc(o.label)}</button>`).join('')}</div>` : '';
+  el.innerHTML = `<div class="chead"><span>#${pad(c.id)}</span><span class="rung ${c.rung}">${RUNG[c.rung]}</span>${c.amends ? `<span>from #${pad(c.amends)}</span>` : ''}<span class="ms">${c.ms < 10 ? c.ms.toFixed(1) : Math.round(c.ms)} ms</span></div>
+    <div class="q">${esc(c.raw)}</div>${read ? `<div class="read"><span class="lbl">read as</span> ${read}</div>` : ''}
+    <div class="ans">${r.body.map(blockHtml).join('')}${ask}</div>
+    <details class="trace"><summary>plan · ${r.trace.length} step${r.trace.length === 1 ? '' : 's'}</summary><ol>${r.trace.map(t => `<li>${esc(t)}</li>`).join('')}</ol></details>`;
+  return el;
+}
+
+/* ==== src/shell/main.js ==== */
+// The shell: wiring, tabs, the session drawer, storage, and the sleep switch. Everything that touches
+// the DOM or the browser lives here or in render.js; the engine never does.
+
+const $ = id => document.getElementById(id);
+const KEY = 'golem.mock.v2';
+let awake = true, statusT;
+
+function status(msg) { $('status').textContent = msg; clearTimeout(statusT); statusT = setTimeout(() => { $('status').textContent = ''; }, 5000); }
+function showTab(t) {
+  ['ask', 'skills', 'packs'].forEach(k => { $('v-' + k).hidden = k !== t; });
+  document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === t));
+}
+function tick() {
+  document.querySelectorAll('[data-end]').forEach(el => {
+    const s = Math.ceil((+el.dataset.end - Date.now()) / 1000);
+    el.textContent = s <= 0 ? 'done' : String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+  });
+}
+setInterval(tick, 500);
+
+/* ── the stream ── */
+function renderBar() { $('sname').textContent = current().name; }
+function renderStream(focus) {
+  $('stream').innerHTML = '';
+  S.cards.forEach(c => $('stream').appendChild(cardEl(c)));
+  $('exlbl').hidden = !current().example; tick(); renderBar(); renderPacks(); showTab('ask');
   const el = focus && $('stream').querySelector(`[data-id="${focus}"]`);
   if (el) el.scrollIntoView({ block: 'start' }); else $('v-ask').scrollTop = 0;
 }
-function newSession(example) {
-  const s = { id: ++sid, name: 'New session', auto: true, example: !!example, created: Date.now(), updated: Date.now(), cards: [] };
-  SS.push(s); load(s); persist(); return s;
+function replaceCard(c) { const old = $('stream').querySelector(`[data-id="${c.id}"]`); if (old) old.replaceWith(cardEl(c)); }
+function run(raw) {
+  if (!awake) { status('Asleep. Tap wake at the top right.'); return; }
+  const o = submit(raw);
+  switch (o.kind) {
+    case 'new-session': renderStream(); status('New session.'); break;
+    case 'drawer': openDrawer(); break;
+    case 'rename': status(`Session named “${o.name}”.`); break;
+    case 'answered': replaceCard(o.card); status(`Answered #${pad(o.card.id)}: ${o.label}`); break;
+    case 'undo': { const el = $('stream').querySelector(`[data-id="${o.card.id}"]`); if (el) el.remove(); status(`Removed #${pad(o.card.id)}: ${o.card.raw}`); break; }
+    case 'nothing': status(o.msg); break;
+    case 'card': { const el = cardEl(o.card); $('stream').appendChild(el); showTab('ask'); el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); break; }
+  }
+  tick(); renderPacks();
 }
+
+/* ── catalog and packs ── */
+function renderSkills() {
+  const live = SKILLS.filter(s => s[3]).length; let h = `<div class="sub">${live} skills run in this mock. ${SKILLS.length - live} more are planned from packages that already exist or are named here. Tap an example to run it.</div>`, g = '';
+  SKILLS.forEach(([grp, name, from, on, d, ex]) => {
+    if (grp !== g) { h += `<div class="lbl">${esc(grp)}</div>`; g = grp; }
+    h += `<div class="item"><h3>${esc(name)} <span class="tag ${on ? 'live' : 'plan'}">${on ? 'in mock' : 'planned'}</span></h3><p>${esc(d)}</p><div class="from">${esc(from)}</div>${ex.length ? `<div class="opts">${ex.map(x => `<button class="chip" type="button" data-q="${esc(x)}" style="white-space:normal;text-align:left">${esc(x)}</button>`).join('')}</div>` : ''}</div>`;
+  });
+  $('v-skills').innerHTML = h;
+}
+function renderPacks() {
+  const lab = { live: 'in mock', samp: 'sample in mock', plan: 'not wired' };
+  let h = '<div class="sub">golem knows what its installed packs hold. These are the gcu-library entries plus packs worth adding.</div><div class="lbl">Library</div>';
+  PACKS.forEach(([id, name, meta, st, d]) => { h += `<div class="item"><h3>${esc(name)} <span class="tag ${st}">${lab[st]}</span></h3><p>${esc(d)}</p><div class="from">${esc(id)} · ${esc(meta)}</div></div>`; });
+  const al = Object.entries(S.aliases);
+  h += `<div class="lbl">On this device</div><div class="item"><h3>Taught words</h3><p>${al.length ? al.map(([k, v]) => `${esc(k)} → ${esc(v)}`).join('<br>') : 'None yet. Try “vario means variogram”.'}</p></div><div class="item"><h3>Notes</h3><p>${S.facts.length ? S.facts.map(esc).join('<br>') : 'None yet. Try “remember that …”.'}</p></div><div class="item"><h3>Open table</h3><p>${S.data ? `assays.csv · ${S.data.length} rows` : 'None.'}</p></div>`;
+  $('v-packs').innerHTML = h;
+}
+
+/* ── the drawer: sessions and history ── */
+let ren = null, del = null;
 const when = t => { const d = new Date(t), n = new Date(); return d.toDateString() === n.toDateString() ? d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }); };
 function renderDrawer() {
-  const q = $('hq').value.trim().toLowerCase(); let h;
+  const q = $('hq').value.trim(); let h;
   if (q) {
-    const hits = []; SS.forEach(s => s.cards.forEach(c => { if (c.raw.toLowerCase().includes(q)) hits.push([s, c]); }));
-    h = `<div class="lbl">${hits.length} match${hits.length === 1 ? '' : 'es'} in history</div>` + hits.slice(0, 40).map(([s, c]) => `<div class="srow"><button class="open" type="button" data-s="${s.id}" data-c="${c.id}" style="font:13px var(--mono)">&gt; ${esc(c.raw)}</button><div class="meta"><span>${esc(s.name)}</span></div></div>`).join('');
+    const hits = searchHistory(q);
+    h = `<div class="lbl">${hits.length} match${hits.length === 1 ? '' : 'es'} in history</div>` + hits.slice(0, 40).map(({ session: s, card: c }) => `<div class="srow"><button class="open" type="button" data-s="${s.id}" data-c="${c.id}" style="font:13px var(--mono)">&gt; ${esc(c.raw)}</button><div class="meta"><span>${esc(s.name)}</span></div></div>`).join('');
   } else {
-    h = '<div class="lbl">Sessions</div>' + [...SS].sort((x, y) => y.updated - x.updated || y.id - x.id).map(s => `<div class="srow" aria-current="${s === cur}">${ren === s.id ? `<input class="ren" data-id="${s.id}" value="${esc(s.name)}" aria-label="Session name. Leave empty to name it automatically.">` : `<button class="open" type="button" data-s="${s.id}">${esc(s.name)}</button>`}<div class="meta"><span>${s.cards.length} card${s.cards.length === 1 ? '' : 's'} · ${when(s.updated)}</span>${s.auto ? '<span class="tag plan">auto name</span>' : ''}${s.example ? '<span class="tag samp">example</span>' : ''}<button class="link" type="button" data-ren="${s.id}">rename</button><button class="link" type="button" data-del="${s.id}">${del === s.id ? 'confirm delete' : 'delete'}</button></div></div>`).join('');
+    const cur = current();
+    h = '<div class="lbl">Sessions</div>' + [...sessions()].sort((x, y) => y.updated - x.updated || y.id - x.id).map(s => `<div class="srow" aria-current="${s === cur}">${ren === s.id ? `<input class="ren" data-id="${s.id}" value="${esc(s.name)}" aria-label="Session name. Leave empty to name it automatically.">` : `<button class="open" type="button" data-s="${s.id}">${esc(s.name)}</button>`}<div class="meta"><span>${s.cards.length} card${s.cards.length === 1 ? '' : 's'} · ${when(s.updated)}</span>${s.auto ? '<span class="tag plan">auto name</span>' : ''}${s.example ? '<span class="tag samp">example</span>' : ''}<button class="link" type="button" data-ren="${s.id}">rename</button><button class="link" type="button" data-del="${s.id}">${del === s.id ? 'confirm delete' : 'delete'}</button></div></div>`).join('');
   }
   $('dlist').innerHTML = h;
   const i = $('dlist').querySelector('.ren'); if (i) { i.focus(); i.select(); }
 }
 function openDrawer() { ren = del = null; $('hq').value = ''; renderDrawer(); $('drawer').hidden = false; $('scrim').hidden = false; }
 function closeDrawer() { $('drawer').hidden = true; $('scrim').hidden = true; }
-function commitName(inp) {
-  const s = SS.find(x => x.id === +inp.dataset.id), v = inp.value.trim(); if (!s) return;
-  if (v) { s.name = v; s.auto = false; } else { s.auto = true; s.name = autoName(s.cards); }
-  ren = null; renderBar(); persist(); renderDrawer();
-}
+function commitName(inp) { ren = null; renameSession(+inp.dataset.id, inp.value); renderDrawer(); }
+
+/* ── storage ── */
+function persist() { try { localStorage.setItem(KEY, JSON.stringify(serialize())); } catch (e) { /* storage is optional */ } }
+function restore() { try { return hydrate(JSON.parse(localStorage.getItem(KEY))); } catch (e) { return false; } }
+onChange(() => { renderBar(); persist(); });
+
+/* ── wiring ── */
+$('f').addEventListener('submit', e => { e.preventDefault(); const v = $('q').value; $('q').value = ''; run(v); });
+document.querySelector('.tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) showTab(b.dataset.tab); });
+$('v-skills').addEventListener('click', e => { const b = e.target.closest('[data-q]'); if (b) run(b.dataset.q); });
+$('sugg').addEventListener('click', e => { const b = e.target.closest('[data-q]'); if (b) run(b.dataset.q); });
+$('stream').addEventListener('click', e => {
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  const c = S.cards.find(x => x.id === +b.closest('.card').dataset.id), act = b.dataset.act;
+  if (act === 'run') return run(b.dataset.q);
+  if (!awake) return status('Asleep. Tap wake at the top right.');
+  if (act === 'slot') { flipSlot(c, b.dataset.key); replaceCard(c); }
+  else if (act === 'answer') { answer(c, +b.dataset.i); replaceCard(c); }
+  else if (act === 'handoff') { const n = document.createElement('div'); n.className = 'note ok'; n.textContent = b.dataset.msg; b.replaceWith(n); }
+  else if (act === 'copy') {
+    const fail = () => { const p = document.createElement('pre'); p.textContent = c.res.copy; b.closest('.ans').appendChild(p); status('Copy was blocked here. The text is shown so you can select it.'); };
+    try { navigator.clipboard.writeText(c.res.copy).then(() => status('Copied.'), fail); } catch (err) { fail(); }
+  }
+  tick(); renderPacks();
+});
+$('power').addEventListener('click', () => {
+  awake = !awake; $('phone').classList.toggle('asleep', !awake); $('st-on').textContent = awake ? 'awake' : 'asleep'; $('q').disabled = !awake;
+  $('power').textContent = awake ? 'sleep' : 'wake'; $('power').setAttribute('aria-pressed', String(!awake));
+  status(awake ? 'Awake.' : 'Asleep. Nothing runs until you wake it.');
+});
 $('menu').addEventListener('click', openDrawer);
 $('sname').addEventListener('click', openDrawer);
 $('dclose').addEventListener('click', closeDrawer);
 $('scrim').addEventListener('click', closeDrawer);
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('drawer').hidden) closeDrawer(); });
-$('newsess').addEventListener('click', () => { newSession(); closeDrawer(); status('New session.'); $('q').focus(); });
+$('newsess').addEventListener('click', () => { newSession(); renderStream(); closeDrawer(); status('New session.'); $('q').focus(); });
 $('hq').addEventListener('input', renderDrawer);
 $('dlist').addEventListener('keydown', e => { if (e.target.classList.contains('ren') && e.key === 'Enter') commitName(e.target); });
 $('dlist').addEventListener('focusout', e => { if (e.target.classList.contains('ren') && ren != null) commitName(e.target); });
 $('dlist').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
-  if (b.dataset.s) { const s = SS.find(x => x.id === +b.dataset.s); load(s, b.dataset.c); persist(); closeDrawer(); }
+  if (b.dataset.s) { openSession(+b.dataset.s); renderStream(b.dataset.c); closeDrawer(); }
   else if (b.dataset.ren) { ren = +b.dataset.ren; del = null; renderDrawer(); }
   else if (b.dataset.del) {
     const id = +b.dataset.del;
     if (del !== id) { del = id; renderDrawer(); return; }
-    SS = SS.filter(x => x.id !== id); del = null;
-    if (cur.id === id) { if (SS.length) load([...SS].sort((x, y) => y.updated - x.updated)[0]); else newSession(); }
-    persist(); renderDrawer();
+    deleteSession(id); del = null; renderStream(); renderDrawer();
   }
 });
+$('sugg').innerHTML = SUGGESTIONS.map(x => `<button class="chip" type="button" data-q="${esc(x)}">${esc(x)}</button>`).join('');
 
-/* ── start: restore saved sessions, or seed two examples ───── */
-function seed() {
-  SS = []; sid = 0;
-  newSession(true); ['open assays.csv', 'histogram of cu', 'log scale', 'variogram of cu', '2 m'].forEach(x => submit(x, true));
-  newSession(true); ['0.35 oz per short ton in g/t', 'true thickness of a 14 m intercept, hole 270/60, bedding 045/30', 'remind me to send the samples to the lab on friday at 9', 'vario of cu'].forEach(x => submit(x, true));
-  $('v-ask').scrollTop = 0; $('status').textContent = '';
-}
-function restore() {
-  try {
-    const d = JSON.parse(localStorage.getItem(KEY));
-    if (!d || !Array.isArray(d.ss) || !d.ss.length) return false;
-    SS = d.ss; sid = d.sid || Math.max(...SS.map(s => s.id)); S.aliases = d.aliases || {}; S.facts = d.facts || [];
-    load(SS.find(s => s.id === d.cur) || SS[0]); return true;
-  } catch (e) { return false; }
-}
-renderSkills(); renderPacks();
-if (!restore()) seed();
-
+/* ── start: restore saved sessions, or seed two examples ── */
+renderSkills();
+if (!restore()) seedExamples();
+renderStream();
+$('status').textContent = '';
 </script>
 </body>
 </html>

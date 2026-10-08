@@ -303,7 +303,9 @@ Default to the user-confirms route: the app then requests no dangerous permissio
 
 **Simulated:** all device hand-offs. The timer counts down in the page.
 
-**Absent:** rung 4 (dispatch), the planner (preconditions are hand-coded), real packs, pt-BR, any GCU package (the mock has no dependencies at all), a DOM-free engine.
+**Absent:** rung 4 (dispatch), the planner (preconditions are hand-coded), real packs, pt-BR, any GCU package (the mock has no dependencies at all).
+
+**Engine and shell** (since 8 Oct 2026): `src/engine/` reads and computes with no DOM, returning results as plain blocks (big value, note, key-values, table, list, steps, plot specs, actions); `src/shell/` renders them. The engine runs in Node, and `test/engine.test.mjs` drives it through the smoke queries, replay, slot flips, answers and undo.
 
 ### Known defects and shortcuts
 
@@ -317,7 +319,6 @@ Default to the user-confirms route: the app then requests no dangerous permissio
 - Replaying a session re-applies its `teach` cards, and a "no reading" card stays a "no reading" card even if the word was taught later.
 - Session names: the 40-character cap drops the second label often. Weights are first guesses.
 - The export script uses invented API names (`units.convert`, `bearing.true_thickness`, …). They are placeholders until the real packages decide.
-- Tools return HTML strings, so the engine cannot run without a DOM.
 - The published web fonts load from Google Fonts. A shipped build must embed Barlow and Space Mono (the `.woff2` files are in `ext/switchboard/fonts/`) to keep the zero-network claim.
 
 ---
@@ -326,7 +327,7 @@ Default to the user-confirms route: the app then requests no dangerous permissio
 
 In order. Each step leaves something that runs.
 
-1. **Engine/shell split.** Move readings, tools and sessions into a DOM-free module with structured results; the shell renders them. Port the smoke test to plain Node tests against the engine and keep one browser test for the shell.
+1. **Engine/shell split.** Done 8 Oct 2026: `src/engine/` with structured results, `src/shell/` rendering them, Node tests for the engine and the browser smoke test for the shell.
 2. **Tool declarations as data.** One declaration per tool (section 4.2). Derive the skills list, the amendment table and the session-name labels from it.
 3. **Real grammar.** Replace the regex table with the clause parser, now the grammar rung of `@gcu/dispatch` (`ext/dispatch/src/grammar/`). clause reads imperatives, bare phrases and closed questions against an ontology; `ext/dispatch/bench/golem.json` is the starting ontology for golem's register and `ext/dispatch/bench/golem-corpus.mjs` its hand corpus. Still outside the grammar and needing their own reading: free-text arguments (`remember that …`, `check: …`, `X means Y`, event titles), absolute dates and clock times, orientations like `270/60`, and arithmetic (a token-shape check routes it to the expression parser). Amendments (`in feet`, `and chile`) can move into clause's ellipsis machinery.
 4. **Rung 4.** Generate dispatch tool declarations and a corpus from golem's tool declarations, train on start, gate on margin and assembly.
