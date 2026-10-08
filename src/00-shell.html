@@ -1,0 +1,252 @@
+<title>GCU golem</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap">
+<style>
+/* Layout: one handset running the instrument on the left, the bench notes beside it; stacks on narrow screens.
+   Tokens are @gcu/switchboard 1.3 (equipment gray / basalt). Barlow speaks to people, Space Mono is the machine. */
+:root{
+  --sw-bg-deep:#C2C1BE;--sw-bg:#D2D1CE;--sw-bg-raised:#E4E3E1;--sw-bg-bright:#EDECEB;
+  --sw-text:#232322;--sw-text-mid:#504F4C;--sw-text-soft:#5A5856;
+  --sw-border:#B3B1AD;--sw-border-soft:#C6C4C1;--sw-rule:#A5A3A0;
+  --sw-orange:#8B3F00;--sw-orange-soft:#FDE0CF;--sw-blue:#005C97;--sw-blue-soft:#CCE9FE;
+  --sw-green:#00602B;--sw-green-soft:#D2ECD7;--sw-yellow:#6F5700;--sw-yellow-soft:#F1E4CB;
+  --sw-red:#99191E;--sw-red-soft:#FFDDD8;--sw-violet:#793A8D;--sw-violet-soft:#F2DFF7;
+  --au-surface-deep:var(--sw-bg-deep);--au-surface:var(--sw-bg);--au-surface-raised:var(--sw-bg-raised);--au-surface-bright:var(--sw-bg-bright);
+  --au-fg:var(--sw-text);--au-fg-muted:var(--sw-text-mid);--au-fg-soft:var(--sw-text-soft);
+  --au-border:var(--sw-border);--au-border-soft:var(--sw-border-soft);--au-rule:var(--sw-rule);
+  --au-action:var(--sw-orange);--au-action-soft:var(--sw-orange-soft);--au-info:var(--sw-blue);--au-info-soft:var(--sw-blue-soft);
+  --au-success:var(--sw-green);--au-success-soft:var(--sw-green-soft);--au-warn:var(--sw-yellow);--au-warn-soft:var(--sw-yellow-soft);
+  --au-error:var(--sw-red);--au-error-soft:var(--sw-red-soft);--au-selected:var(--sw-violet);--au-selected-soft:var(--sw-violet-soft);
+  --mono:'Space Mono','JetBrains Mono',Consolas,monospace;--sans:'Barlow',system-ui,sans-serif;
+  --r:3px;--dur:.2s;--ease:cubic-bezier(.2,0,0,1);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --sw-bg-deep:#0E1012;--sw-bg:#15171A;--sw-bg-raised:#1D2024;--sw-bg-bright:#25282D;
+  --sw-text:#DDDCDA;--sw-text-mid:#9E9C98;--sw-text-soft:#83817E;
+  --sw-border:#2F3338;--sw-border-soft:#24272B;--sw-rule:#3A3E44;
+  --sw-orange:#FB9044;--sw-orange-soft:#2E2119;--sw-blue:#008CD1;--sw-blue-soft:#16262F;
+  --sw-green:#5CCB80;--sw-green-soft:#1A261D;--sw-yellow:#FFD73A;--sw-yellow-soft:#292317;
+  --sw-red:#E75A51;--sw-red-soft:#30201D;--sw-violet:#EC9FFF;--sw-violet-soft:#2A212C;color-scheme:dark}}
+:root[data-theme="dark"]{
+  --sw-bg-deep:#0E1012;--sw-bg:#15171A;--sw-bg-raised:#1D2024;--sw-bg-bright:#25282D;
+  --sw-text:#DDDCDA;--sw-text-mid:#9E9C98;--sw-text-soft:#83817E;
+  --sw-border:#2F3338;--sw-border-soft:#24272B;--sw-rule:#3A3E44;
+  --sw-orange:#FB9044;--sw-orange-soft:#2E2119;--sw-blue:#008CD1;--sw-blue-soft:#16262F;
+  --sw-green:#5CCB80;--sw-green-soft:#1A261D;--sw-yellow:#FFD73A;--sw-yellow-soft:#292317;
+  --sw-red:#E75A51;--sw-red-soft:#30201D;--sw-violet:#EC9FFF;--sw-violet-soft:#2A212C;color-scheme:dark}
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--au-surface-deep);color:var(--au-fg);font:15px/1.45 var(--sans);margin:0}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--au-action);outline-offset:1px}
+.wrap{max-width:1120px;margin:0 auto;padding-inline:16px;padding-block:20px 40px;display:grid;gap:18px}
+.mast{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 16px}
+.mast h1{font:700 26px/1 var(--sans);letter-spacing:.02em;margin:0;text-transform:lowercase}
+.mast p{margin:0;color:var(--au-fg-muted);max-width:62ch}
+.bench{display:grid;grid-template-columns:minmax(0,410px) minmax(0,1fr);gap:22px;align-items:start}
+@media (max-width:860px){.bench{grid-template-columns:minmax(0,1fr)}}
+
+/* handset */
+.phone{position:relative;background:var(--au-surface);border:1px solid var(--au-rule);border-radius:6px;height:min(800px,88vh);min-height:520px;
+  display:grid;grid-template-rows:auto minmax(0,1fr) auto auto;overflow:hidden}
+.bar{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--au-surface-raised);border-bottom:1px solid var(--au-border)}
+.power{background:var(--au-surface-bright);border:1px solid var(--au-border);border-radius:var(--r);padding:2px 10px;min-height:34px;
+  font:600 13px/1.2 var(--sans);color:var(--au-success);transition:color var(--dur) var(--ease)}
+.asleep .power{color:var(--au-fg-soft)}
+.brand{font:700 15px var(--mono);letter-spacing:.04em}
+.stat{font:11px var(--mono);color:var(--au-fg-muted);line-height:1.3}
+.icon{background:var(--au-surface-bright);border:1px solid var(--au-border);border-radius:var(--r);width:38px;height:34px;display:grid;place-items:center;flex:none;padding:0}
+.icon svg{stroke:var(--au-fg);stroke-width:2;stroke-linecap:square}
+.ttl{min-width:0;flex:1;display:grid}
+.ttl>*{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sbtn{background:none;border:0;padding:0;text-align:left;letter-spacing:0;font:700 14px var(--sans)}
+.scrim{position:absolute;inset:0;background:var(--au-surface-deep);opacity:.72;z-index:10}
+.drawer{position:absolute;inset:0 12% 0 0;z-index:11;background:var(--au-surface-raised);border-right:1px solid var(--au-rule);padding:10px;display:grid;gap:10px;grid-template-rows:auto auto auto minmax(0,1fr) auto;overflow:hidden}
+.drawer input{width:100%;background:var(--au-surface-bright);border:1px solid var(--au-rule);border-radius:var(--r);padding:8px 10px;font:13px var(--mono)}
+.dlist{overflow-y:auto;display:grid;gap:6px;align-content:start}
+.srow{border:1px solid var(--au-border);border-left:4px solid var(--au-border);border-radius:var(--r);background:var(--au-surface-bright);padding:7px 9px;display:grid;gap:4px;min-width:0}
+.srow[aria-current="true"]{border-left-color:var(--au-selected)}
+.srow .open{background:none;border:0;padding:0;text-align:left;font:600 14px var(--sans);overflow-wrap:anywhere}
+.srow .meta{font:11px var(--mono);color:var(--au-fg-soft);display:flex;gap:4px 10px;flex-wrap:wrap;align-items:center}
+.srow .link{font-size:11px}
+.stat b{color:var(--au-success);font-weight:700}
+.asleep .stat b{color:var(--au-fg-soft)}
+.view{overflow-y:auto;padding:10px;display:grid;gap:10px;align-content:start}
+.asleep .view,.asleep .dock{opacity:.45}
+.lbl{font:700 10.5px var(--mono);letter-spacing:.09em;text-transform:uppercase;color:var(--au-fg-soft)}
+.rowhead{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.link{background:none;border:0;padding:2px 0;color:var(--au-info);font:12px var(--mono);text-decoration:underline}
+
+/* readout card */
+.card{background:var(--au-surface-raised);border:1px solid var(--au-border);border-radius:var(--r);min-width:0}
+.card>*{padding-inline:10px}
+.chead{display:flex;align-items:center;gap:8px;padding-block:5px;border-bottom:1px solid var(--au-border-soft);font:11px var(--mono);color:var(--au-fg-soft)}
+.chead .ms{margin-left:auto}
+.rung{font:700 10px var(--mono);letter-spacing:.07em;text-transform:uppercase;padding:1px 6px;border-radius:2px;border:1px solid currentColor}
+.rung.grammar{color:var(--au-info);background:var(--au-info-soft)}
+.rung.context{color:var(--au-selected);background:var(--au-selected-soft)}
+.rung.taught{color:var(--au-success);background:var(--au-success-soft)}
+.rung.none{color:var(--au-error);background:var(--au-error-soft)}
+.q{font:13px/1.4 var(--mono);padding-block:7px 3px;overflow-wrap:anywhere}
+.q::before{content:"> ";color:var(--au-fg-soft)}
+.read{display:flex;flex-wrap:wrap;align-items:center;gap:4px 5px;padding-block:3px 6px;font-size:13px;color:var(--au-fg-muted)}
+.slot{font:12px var(--mono);background:var(--au-surface-bright);border:1px solid var(--au-border);border-radius:2px;padding:1px 6px;color:var(--au-fg)}
+button.slot{border-style:dashed;border-color:var(--au-action);color:var(--au-action)}
+button.slot::after{content:" \21C4"}
+.ans{padding-block:4px 9px;display:grid;gap:8px;min-width:0}
+.big{font:700 24px/1.15 var(--mono);overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.big small{font:400 13px var(--mono);color:var(--au-fg-muted)}
+.sub{font-size:13px;color:var(--au-fg-muted)}
+.src{font:11px var(--mono);color:var(--au-fg-soft)}
+.note{font-size:13px;border-left:3px solid var(--au-warn);background:var(--au-warn-soft);padding:6px 8px;border-radius:0 2px 2px 0}
+.note.err{border-color:var(--au-error);background:var(--au-error-soft)}
+.note.ok{border-color:var(--au-success);background:var(--au-success-soft)}
+.opts{display:flex;flex-wrap:wrap;gap:6px}
+.btn{background:var(--au-surface-bright);border:1px solid var(--au-border);border-radius:var(--r);padding:6px 10px;font:600 13px var(--sans);min-height:34px}
+.btn.go{background:var(--au-action);border-color:var(--au-action);color:var(--au-surface-bright)}
+.kv{display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 12px;font-size:13px;margin:0}
+.kv dt{font:11px/1.9 var(--mono);color:var(--au-fg-soft);text-transform:uppercase;letter-spacing:.05em}
+.kv dd{margin:0;overflow-wrap:anywhere}
+.tbl{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{font:700 10.5px var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--au-fg-soft);text-align:left}
+th,td{padding:4px 8px 4px 0;border-bottom:1px solid var(--au-border-soft);vertical-align:top}
+td.n,th.n{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+details.trace{border-top:1px solid var(--au-border-soft);padding-block:5px}
+details.trace summary{font:11px var(--mono);color:var(--au-fg-soft);cursor:pointer}
+details.trace ol{margin:6px 0 2px;padding-left:20px;font:12px/1.5 var(--mono);color:var(--au-fg-muted);overflow-wrap:anywhere}
+pre{margin:0;font:12px/1.5 var(--mono);background:var(--au-surface-deep);border:1px solid var(--au-border-soft);border-radius:2px;padding:8px;overflow-x:auto}
+mark{background:var(--au-warn-soft);color:var(--au-fg);border-bottom:2px solid var(--au-warn);padding:0 1px}
+svg{max-width:100%;height:auto;display:block}
+svg text{font:10px var(--mono);fill:var(--au-fg-muted)}
+.ax{stroke:var(--au-rule);fill:none} .grid{stroke:var(--au-border-soft);fill:none}
+.barfill{fill:var(--au-info)} .pt{fill:var(--au-action)} .ln{stroke:var(--au-info);fill:none;stroke-width:1.6}
+.ln2{stroke:var(--au-action);fill:none;stroke-dasharray:4 3} .pole{fill:var(--au-info)} .netbg{fill:var(--au-surface-bright);stroke:var(--au-rule)}
+
+/* dock */
+.dock{border-top:1px solid var(--au-border);background:var(--au-surface-raised);padding:7px 10px 9px;display:grid;gap:6px;min-width:0}
+#status{font:11px var(--mono);color:var(--au-fg-muted);min-height:15px}
+.sugg{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:thin}
+.chip{flex:none;background:var(--au-surface-bright);border:1px solid var(--au-border);border-radius:2px;padding:4px 8px;font:12px var(--mono);white-space:nowrap}
+.ask{display:flex;gap:6px}
+.ask input{flex:1;min-width:0;background:var(--au-surface-bright);border:1px solid var(--au-rule);border-radius:var(--r);padding:9px 10px;font:14px var(--mono)}
+.tabs{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--au-border);background:var(--au-surface-raised)}
+.tabs button{background:none;border:0;border-top:3px solid transparent;padding:9px 4px 10px;font:700 11px var(--mono);letter-spacing:.09em;text-transform:uppercase;color:var(--au-fg-soft)}
+.tabs button[aria-selected="true"]{color:var(--au-fg);border-top-color:var(--au-action)}
+
+/* catalog rows */
+.grp{display:grid;gap:6px}
+.item{background:var(--au-surface-raised);border:1px solid var(--au-border);border-radius:var(--r);padding:8px 10px;display:grid;gap:4px;min-width:0}
+.item h3{margin:0;font:600 14px var(--sans);display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.tag{font:700 9.5px var(--mono);letter-spacing:.07em;text-transform:uppercase;padding:1px 5px;border-radius:2px;border:1px solid currentColor}
+.tag.live{color:var(--au-success)} .tag.plan{color:var(--au-fg-soft)} .tag.samp{color:var(--au-info)}
+.item p{margin:0;font-size:13px;color:var(--au-fg-muted)}
+.item .from{font:11px var(--mono);color:var(--au-fg-soft)}
+
+/* bench notes */
+.notes{display:grid;gap:22px;min-width:0}
+.notes section{display:grid;gap:8px;min-width:0}
+.notes h2{margin:0;font:700 12px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--au-fg-muted);border-bottom:1px solid var(--au-rule);padding-bottom:5px}
+.notes p{margin:0;max-width:66ch}
+.notes ol,.notes ul{margin:0;padding-left:20px;display:grid;gap:5px;max-width:66ch}
+.notes code{font:12.5px var(--mono);background:var(--au-surface);padding:0 3px;border-radius:2px;overflow-wrap:anywhere}
+.notes .rung{margin-right:4px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <header class="mast">
+    <h1>golem</h1>
+    <p>A working mock of the GCU assistant. Nothing here calls a model: every answer comes from a parse you can see and a tool that computes.</p>
+  </header>
+
+  <main class="bench">
+    <section class="phone" id="phone" aria-label="golem app mock">
+      <div class="bar">
+        <button class="icon" id="menu" type="button" aria-label="Sessions and history"><svg width="18" height="14" viewBox="0 0 18 14" aria-hidden="true"><path d="M1 2h16M1 7h16M1 12h16"/></svg></button>
+        <div class="ttl"><button class="sbtn" id="sname" type="button" title="Sessions and history">New session</button><span class="stat">golem · <b id="st-on">awake</b> · offline · 0 requests</span></div>
+        <button class="power" id="power" title="Put golem to sleep or wake it" aria-pressed="false">sleep</button>
+      </div>
+      <div class="scrim" id="scrim" hidden></div>
+      <aside class="drawer" id="drawer" hidden aria-label="Sessions and history">
+        <div class="rowhead"><span class="brand">golem</span><button class="link" id="dclose" type="button">close</button></div>
+        <button class="btn go" id="newsess" type="button">New session</button>
+        <input id="hq" type="search" placeholder="search every session" aria-label="Search history">
+        <div class="dlist" id="dlist"></div>
+        <div class="src">A session is stored as its plan. Opening one replays it and gets the same answers.</div>
+      </aside>
+
+      <div class="view" id="v-ask">
+        <div class="lbl" id="exlbl" hidden>Example session</div>
+        <div id="stream" style="display:grid;gap:10px"></div>
+      </div>
+      <div class="view" id="v-skills" hidden></div>
+      <div class="view" id="v-packs" hidden></div>
+
+      <div class="dock">
+        <div id="status" aria-live="polite"></div>
+        <div class="sugg" id="sugg"></div>
+        <form class="ask" id="f" autocomplete="off">
+          <input id="q" type="text" placeholder="ask, compute, or act" aria-label="Query" enterkeyhint="go">
+          <button class="btn go" type="submit">Run</button>
+        </form>
+      </div>
+      <nav class="tabs" role="tablist">
+        <button role="tab" data-tab="ask" aria-selected="true">Ask</button>
+        <button role="tab" data-tab="skills" aria-selected="false">Skills</button>
+        <button role="tab" data-tab="packs" aria-selected="false">Packs</button>
+      </nav>
+    </section>
+
+    <aside class="notes">
+      <section>
+        <h2>How a query is read</h2>
+        <p>Each card shows which rung read the query and what it was read as. Dashed slots are ambiguous readings: tap one to flip it and the answer recomputes.</p>
+        <ol>
+          <li><span class="rung context">context</span> An open question from golem, or an amendment of the last card: <code>in feet</code>, <code>log scale</code>, <code>and chile</code>, <code>why</code>, <code>undo</code>.</li>
+          <li><span class="rung grammar">grammar</span> The controlled-English parse (clause). In this mock it is a rule table.</li>
+          <li><span class="rung taught">taught</span> Phrases you taught on this device: <code>vario means variogram</code>.</li>
+          <li>The dispatch CRF, for loose phrasing. Not in this mock.</li>
+          <li><span class="rung none">no reading</span> It stops, shows the nearest skills, and offers to learn the word it did not know.</li>
+        </ol>
+      </section>
+
+      <section>
+        <h2>Sessions, history and names</h2>
+        <p>The menu button holds every session and a search across all of them. A session is saved as its plan: the list of tool calls and their arguments. Opening one replays the plan, so history costs a few hundred bytes and old answers stay reproducible.</p>
+        <p>Names are computed. Each card contributes a label from its tool and subject, weighted by how much work the tool does: a variogram outweighs a unit conversion. The name is the top one or two labels, prefixed with the table when one is open. It updates as the session grows and stops when you name it yourself: <code>name this session friday lab run</code>.</p>
+      </section>
+
+      <section>
+        <h2>Calendar and other Android hand-offs</h2>
+        <p>Adding to the calendar needs no Google API and no network. Android apps hand an event to whatever calendar app the user has, and that app syncs it through the user's own account.</p>
+        <div class="tbl"><table>
+          <tr><th>Action</th><th>Mechanism</th><th>Permission</th></tr>
+          <tr><td>Event, user confirms</td><td><code>Intent.ACTION_INSERT</code> on <code>CalendarContract.Events</code></td><td>none</td></tr>
+          <tr><td>Event, silent</td><td><code>CalendarContract</code> provider insert</td><td><code>WRITE_CALENDAR</code> (runtime prompt)</td></tr>
+          <tr><td>Timer, alarm</td><td><code>AlarmClock.ACTION_SET_TIMER</code> / <code>ACTION_SET_ALARM</code></td><td><code>SET_ALARM</code> (install-time)</td></tr>
+          <tr><td>Show on map</td><td><code>ACTION_VIEW</code> with a <code>geo:</code> URI</td><td>none</td></tr>
+          <tr><td>Dial, message, email</td><td><code>ACTION_DIAL</code>, <code>ACTION_SENDTO</code></td><td>none</td></tr>
+          <tr><td>New contact</td><td><code>ContactsContract.Intents.Insert</code></td><td>none</td></tr>
+          <tr><td>Share a result</td><td><code>ACTION_SEND</code></td><td>none</td></tr>
+        </table></div>
+        <p>The confirm-in-the-other-app route is the better default: golem fills the fields, the user presses save, and the app asks for no permissions. lead-acid's shim today has fetch, push streams, keep-awake, publish, share, attest and files. Hand-offs need one new native route that starts an intent from a small allowlist.</p>
+      </section>
+
+      <section>
+        <h2>What is real in this mock</h2>
+        <ul>
+          <li>Computed in the page: units, arithmetic, dates, true thickness and the stereonet, the histogram and downhole variogram, the mineral key, the Strunk check, all parsing, teaching and amendments.</li>
+          <li>Sample data: <code>assays.csv</code> is synthetic. The Factbook figures are a rounded 14-country sample. The ODS entry points to a section and does not show the passage.</li>
+          <li>Simulated: the device hand-offs. The timer counts down in the page.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Out of scope by design</h2>
+        <p>Prose nobody authored a path to: essays, open translation, summaries in its own words, common-sense chat. golem says it has no reading. Everything else grows by adding tools and packs.</p>
+      </section>
+    </aside>
+  </main>
+</div>

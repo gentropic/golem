@@ -1,0 +1,1044 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>GCU golem</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap">
+<style>
+/* Layout: one handset running the instrument on the left, the bench notes beside it; stacks on narrow screens.
+   Tokens are @gcu/switchboard 1.3 (equipment gray / basalt). Barlow speaks to people, Space Mono is the machine. */
+:root{
+  --sw-bg-deep:#C2C1BE;--sw-bg:#D2D1CE;--sw-bg-raised:#E4E3E1;--sw-bg-bright:#EDECEB;
+  --sw-text:#232322;--sw-text-mid:#504F4C;--sw-text-soft:#5A5856;
+  --sw-border:#B3B1AD;--sw-border-soft:#C6C4C1;--sw-rule:#A5A3A0;
+  --sw-orange:#8B3F00;--sw-orange-soft:#FDE0CF;--sw-blue:#005C97;--sw-blue-soft:#CCE9FE;
+  --sw-green:#00602B;--sw-green-soft:#D2ECD7;--sw-yellow:#6F5700;--sw-yellow-soft:#F1E4CB;
+  --sw-red:#99191E;--sw-red-soft:#FFDDD8;--sw-violet:#793A8D;--sw-violet-soft:#F2DFF7;
+  --au-surface-deep:var(--sw-bg-deep);--au-surface:var(--sw-bg);--au-surface-raised:var(--sw-bg-raised);--au-surface-bright:var(--sw-bg-bright);
+  --au-fg:var(--sw-text);--au-fg-muted:var(--sw-text-mid);--au-fg-soft:var(--sw-text-soft);
+  --au-border:var(--sw-border);--au-border-soft:var(--sw-border-soft);--au-rule:var(--sw-rule);
+  --au-action:var(--sw-orange);--au-action-soft:var(--sw-orange-soft);--au-info:var(--sw-blue);--au-info-soft:var(--sw-blue-soft);
+  --au-success:var(--sw-green);--au-success-soft:var(--sw-green-soft);--au-warn:var(--sw-yellow);--au-warn-soft:var(--sw-yellow-soft);
+  --au-error:var(--sw-red);--au-error-soft:var(--sw-red-soft);--au-selected:var(--sw-violet);--au-selected-soft:var(--sw-violet-soft);
+  --mono:'Space Mono','JetBrains Mono',Consolas,monospace;--sans:'Barlow',system-ui,sans-serif;
+  --r:3px;--dur:.2s;--ease:cubic-bezier(.2,0,0,1);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --sw-bg-deep:#0E1012;--sw-bg:#15171A;--sw-bg-raised:#1D2024;--sw-bg-bright:#25282D;
+  --sw-text:#DDDCDA;--sw-text-mid:#9E9C98;--sw-text-soft:#83817E;
+  --sw-border:#2F3338;--sw-border-soft:#24272B;--sw-rule:#3A3E44;
+  --sw-orange:#FB9044;--sw-orange-soft:#2E2119;--sw-blue:#008CD1;--sw-blue-soft:#16262F;
+  --sw-green:#5CCB80;--sw-green-soft:#1A261D;--sw-yellow:#FFD73A;--sw-yellow-soft:#292317;
+  --sw-red:#E75A51;--sw-red-soft:#30201D;--sw-violet:#EC9FFF;--sw-violet-soft:#2A212C;color-scheme:dark}}
+:root[data-theme="dark"]{
+  --sw-bg-deep:#0E1012;--sw-bg:#15171A;--sw-bg-raised:#1D2024;--sw-bg-bright:#25282D;
+  --sw-text:#DDDCDA;--sw-text-mid:#9E9C98;--sw-text-soft:#83817E;
+  --sw-border:#2F3338;--sw-border-soft:#24272B;--sw-rule:#3A3E44;
+  --sw-orange:#FB9044;--sw-orange-soft:#2E2119;--sw-blue:#008CD1;--sw-blue-soft:#16262F;
+  --sw-green:#5CCB80;--sw-green-soft:#1A261D;--sw-yellow:#FFD73A;--sw-yellow-soft:#292317;
+  --sw-red:#E75A51;--sw-red-soft:#30201D;--sw-violet:#EC9FFF;--sw-violet-soft:#2A212C;color-scheme:dark}
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--au-surface-deep);color:var(--au-fg);font:15px/1.45 var(--sans);margin:0}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--au-action);outline-offset:1px}
+.wrap{max-width:1120px;margin:0 auto;padding-inline:16px;padding-block:20px 40px;display:grid;gap:18px}
+.mast{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 16px}
+.mast h1{font:700 26px/1 var(--sans);letter-spacing:.02em;margin:0;text-transform:lowercase}
+.mast p{margin:0;color:var(--au-fg-muted);max-width:62ch}
+.bench{display:grid;grid-template-columns:minmax(0,410px) minmax(0,1fr);gap:22px;align-items:start}
+@media (max-width:860px){.bench{grid-template-columns:minmax(0,1fr)}}
+
+/* handset */
+.phone{position:relative;background:var(--au-surface);border:1px solid var(--au-rule);border-radius:6px;height:min(800px,88vh);min-height:520px;
+  display:grid;grid-template-rows:auto minmax(0,1fr) auto auto;overflow:hidden}
+.bar{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--au-surface-raised);border-bottom:1px solid var(--au-border)}
+.power{background:var(--au-surface-bright);border:1px solid var(--au-border);border-radius:var(--r);padding:2px 10px;min-height:34px;
+  font:600 13px/1.2 var(--sans);color:var(--au-success);transition:color var(--dur) var(--ease)}
+.asleep .power{color:var(--au-fg-soft)}
+.brand{font:700 15px var(--mono);letter-spacing:.04em}
+.stat{font:11px var(--mono);color:var(--au-fg-muted);line-height:1.3}
+.icon{background:var(--au-surface-bright);border:1px solid var(--au-border);border-radius:var(--r);width:38px;height:34px;display:grid;place-items:center;flex:none;padding:0}
+.icon svg{stroke:var(--au-fg);stroke-width:2;stroke-linecap:square}
+.ttl{min-width:0;flex:1;display:grid}
+.ttl>*{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sbtn{background:none;border:0;padding:0;text-align:left;letter-spacing:0;font:700 14px var(--sans)}
+.scrim{position:absolute;inset:0;background:var(--au-surface-deep);opacity:.72;z-index:10}
+.drawer{position:absolute;inset:0 12% 0 0;z-index:11;background:var(--au-surface-raised);border-right:1px solid var(--au-rule);padding:10px;display:grid;gap:10px;grid-template-rows:auto auto auto minmax(0,1fr) auto;overflow:hidden}
+.drawer input{width:100%;background:var(--au-surface-bright);border:1px solid var(--au-rule);border-radius:var(--r);padding:8px 10px;font:13px var(--mono)}
+.dlist{overflow-y:auto;display:grid;gap:6px;align-content:start}
+.srow{border:1px solid var(--au-border);border-left:4px solid var(--au-border);border-radius:var(--r);background:var(--au-surface-bright);padding:7px 9px;display:grid;gap:4px;min-width:0}
+.srow[aria-current="true"]{border-left-color:var(--au-selected)}
+.srow .open{background:none;border:0;padding:0;text-align:left;font:600 14px var(--sans);overflow-wrap:anywhere}
+.srow .meta{font:11px var(--mono);color:var(--au-fg-soft);display:flex;gap:4px 10px;flex-wrap:wrap;align-items:center}
+.srow .link{font-size:11px}
+.stat b{color:var(--au-success);font-weight:700}
+.asleep .stat b{color:var(--au-fg-soft)}
+.view{overflow-y:auto;padding:10px;display:grid;gap:10px;align-content:start}
+.asleep .view,.asleep .dock{opacity:.45}
+.lbl{font:700 10.5px var(--mono);letter-spacing:.09em;text-transform:uppercase;color:var(--au-fg-soft)}
+.rowhead{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.link{background:none;border:0;padding:2px 0;color:var(--au-info);font:12px var(--mono);text-decoration:underline}
+
+/* readout card */
+.card{background:var(--au-surface-raised);border:1px solid var(--au-border);border-radius:var(--r);min-width:0}
+.card>*{padding-inline:10px}
+.chead{display:flex;align-items:center;gap:8px;padding-block:5px;border-bottom:1px solid var(--au-border-soft);font:11px var(--mono);color:var(--au-fg-soft)}
+.chead .ms{margin-left:auto}
+.rung{font:700 10px var(--mono);letter-spacing:.07em;text-transform:uppercase;padding:1px 6px;border-radius:2px;border:1px solid currentColor}
+.rung.grammar{color:var(--au-info);background:var(--au-info-soft)}
+.rung.context{color:var(--au-selected);background:var(--au-selected-soft)}
+.rung.taught{color:var(--au-success);background:var(--au-success-soft)}
+.rung.none{color:var(--au-error);background:var(--au-error-soft)}
+.q{font:13px/1.4 var(--mono);padding-block:7px 3px;overflow-wrap:anywhere}
+.q::before{content:"> ";color:var(--au-fg-soft)}
+.read{display:flex;flex-wrap:wrap;align-items:center;gap:4px 5px;padding-block:3px 6px;font-size:13px;color:var(--au-fg-muted)}
+.slot{font:12px var(--mono);background:var(--au-surface-bright);border:1px solid var(--au-border);border-radius:2px;padding:1px 6px;color:var(--au-fg)}
+button.slot{border-style:dashed;border-color:var(--au-action);color:var(--au-action)}
+button.slot::after{content:" \21C4"}
+.ans{padding-block:4px 9px;display:grid;gap:8px;min-width:0}
+.big{font:700 24px/1.15 var(--mono);overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.big small{font:400 13px var(--mono);color:var(--au-fg-muted)}
+.sub{font-size:13px;color:var(--au-fg-muted)}
+.src{font:11px var(--mono);color:var(--au-fg-soft)}
+.note{font-size:13px;border-left:3px solid var(--au-warn);background:var(--au-warn-soft);padding:6px 8px;border-radius:0 2px 2px 0}
+.note.err{border-color:var(--au-error);background:var(--au-error-soft)}
+.note.ok{border-color:var(--au-success);background:var(--au-success-soft)}
+.opts{display:flex;flex-wrap:wrap;gap:6px}
+.btn{background:var(--au-surface-bright);border:1px solid var(--au-border);border-radius:var(--r);padding:6px 10px;font:600 13px var(--sans);min-height:34px}
+.btn.go{background:var(--au-action);border-color:var(--au-action);color:var(--au-surface-bright)}
+.kv{display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 12px;font-size:13px;margin:0}
+.kv dt{font:11px/1.9 var(--mono);color:var(--au-fg-soft);text-transform:uppercase;letter-spacing:.05em}
+.kv dd{margin:0;overflow-wrap:anywhere}
+.tbl{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{font:700 10.5px var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--au-fg-soft);text-align:left}
+th,td{padding:4px 8px 4px 0;border-bottom:1px solid var(--au-border-soft);vertical-align:top}
+td.n,th.n{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+details.trace{border-top:1px solid var(--au-border-soft);padding-block:5px}
+details.trace summary{font:11px var(--mono);color:var(--au-fg-soft);cursor:pointer}
+details.trace ol{margin:6px 0 2px;padding-left:20px;font:12px/1.5 var(--mono);color:var(--au-fg-muted);overflow-wrap:anywhere}
+pre{margin:0;font:12px/1.5 var(--mono);background:var(--au-surface-deep);border:1px solid var(--au-border-soft);border-radius:2px;padding:8px;overflow-x:auto}
+mark{background:var(--au-warn-soft);color:var(--au-fg);border-bottom:2px solid var(--au-warn);padding:0 1px}
+svg{max-width:100%;height:auto;display:block}
+svg text{font:10px var(--mono);fill:var(--au-fg-muted)}
+.ax{stroke:var(--au-rule);fill:none} .grid{stroke:var(--au-border-soft);fill:none}
+.barfill{fill:var(--au-info)} .pt{fill:var(--au-action)} .ln{stroke:var(--au-info);fill:none;stroke-width:1.6}
+.ln2{stroke:var(--au-action);fill:none;stroke-dasharray:4 3} .pole{fill:var(--au-info)} .netbg{fill:var(--au-surface-bright);stroke:var(--au-rule)}
+
+/* dock */
+.dock{border-top:1px solid var(--au-border);background:var(--au-surface-raised);padding:7px 10px 9px;display:grid;gap:6px;min-width:0}
+#status{font:11px var(--mono);color:var(--au-fg-muted);min-height:15px}
+.sugg{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:thin}
+.chip{flex:none;background:var(--au-surface-bright);border:1px solid var(--au-border);border-radius:2px;padding:4px 8px;font:12px var(--mono);white-space:nowrap}
+.ask{display:flex;gap:6px}
+.ask input{flex:1;min-width:0;background:var(--au-surface-bright);border:1px solid var(--au-rule);border-radius:var(--r);padding:9px 10px;font:14px var(--mono)}
+.tabs{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--au-border);background:var(--au-surface-raised)}
+.tabs button{background:none;border:0;border-top:3px solid transparent;padding:9px 4px 10px;font:700 11px var(--mono);letter-spacing:.09em;text-transform:uppercase;color:var(--au-fg-soft)}
+.tabs button[aria-selected="true"]{color:var(--au-fg);border-top-color:var(--au-action)}
+
+/* catalog rows */
+.grp{display:grid;gap:6px}
+.item{background:var(--au-surface-raised);border:1px solid var(--au-border);border-radius:var(--r);padding:8px 10px;display:grid;gap:4px;min-width:0}
+.item h3{margin:0;font:600 14px var(--sans);display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.tag{font:700 9.5px var(--mono);letter-spacing:.07em;text-transform:uppercase;padding:1px 5px;border-radius:2px;border:1px solid currentColor}
+.tag.live{color:var(--au-success)} .tag.plan{color:var(--au-fg-soft)} .tag.samp{color:var(--au-info)}
+.item p{margin:0;font-size:13px;color:var(--au-fg-muted)}
+.item .from{font:11px var(--mono);color:var(--au-fg-soft)}
+
+/* bench notes */
+.notes{display:grid;gap:22px;min-width:0}
+.notes section{display:grid;gap:8px;min-width:0}
+.notes h2{margin:0;font:700 12px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--au-fg-muted);border-bottom:1px solid var(--au-rule);padding-bottom:5px}
+.notes p{margin:0;max-width:66ch}
+.notes ol,.notes ul{margin:0;padding-left:20px;display:grid;gap:5px;max-width:66ch}
+.notes code{font:12.5px var(--mono);background:var(--au-surface);padding:0 3px;border-radius:2px;overflow-wrap:anywhere}
+.notes .rung{margin-right:4px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <header class="mast">
+    <h1>golem</h1>
+    <p>A working mock of the GCU assistant. Nothing here calls a model: every answer comes from a parse you can see and a tool that computes.</p>
+  </header>
+
+  <main class="bench">
+    <section class="phone" id="phone" aria-label="golem app mock">
+      <div class="bar">
+        <button class="icon" id="menu" type="button" aria-label="Sessions and history"><svg width="18" height="14" viewBox="0 0 18 14" aria-hidden="true"><path d="M1 2h16M1 7h16M1 12h16"/></svg></button>
+        <div class="ttl"><button class="sbtn" id="sname" type="button" title="Sessions and history">New session</button><span class="stat">golem · <b id="st-on">awake</b> · offline · 0 requests</span></div>
+        <button class="power" id="power" title="Put golem to sleep or wake it" aria-pressed="false">sleep</button>
+      </div>
+      <div class="scrim" id="scrim" hidden></div>
+      <aside class="drawer" id="drawer" hidden aria-label="Sessions and history">
+        <div class="rowhead"><span class="brand">golem</span><button class="link" id="dclose" type="button">close</button></div>
+        <button class="btn go" id="newsess" type="button">New session</button>
+        <input id="hq" type="search" placeholder="search every session" aria-label="Search history">
+        <div class="dlist" id="dlist"></div>
+        <div class="src">A session is stored as its plan. Opening one replays it and gets the same answers.</div>
+      </aside>
+
+      <div class="view" id="v-ask">
+        <div class="lbl" id="exlbl" hidden>Example session</div>
+        <div id="stream" style="display:grid;gap:10px"></div>
+      </div>
+      <div class="view" id="v-skills" hidden></div>
+      <div class="view" id="v-packs" hidden></div>
+
+      <div class="dock">
+        <div id="status" aria-live="polite"></div>
+        <div class="sugg" id="sugg"></div>
+        <form class="ask" id="f" autocomplete="off">
+          <input id="q" type="text" placeholder="ask, compute, or act" aria-label="Query" enterkeyhint="go">
+          <button class="btn go" type="submit">Run</button>
+        </form>
+      </div>
+      <nav class="tabs" role="tablist">
+        <button role="tab" data-tab="ask" aria-selected="true">Ask</button>
+        <button role="tab" data-tab="skills" aria-selected="false">Skills</button>
+        <button role="tab" data-tab="packs" aria-selected="false">Packs</button>
+      </nav>
+    </section>
+
+    <aside class="notes">
+      <section>
+        <h2>How a query is read</h2>
+        <p>Each card shows which rung read the query and what it was read as. Dashed slots are ambiguous readings: tap one to flip it and the answer recomputes.</p>
+        <ol>
+          <li><span class="rung context">context</span> An open question from golem, or an amendment of the last card: <code>in feet</code>, <code>log scale</code>, <code>and chile</code>, <code>why</code>, <code>undo</code>.</li>
+          <li><span class="rung grammar">grammar</span> The controlled-English parse (clause). In this mock it is a rule table.</li>
+          <li><span class="rung taught">taught</span> Phrases you taught on this device: <code>vario means variogram</code>.</li>
+          <li>The dispatch CRF, for loose phrasing. Not in this mock.</li>
+          <li><span class="rung none">no reading</span> It stops, shows the nearest skills, and offers to learn the word it did not know.</li>
+        </ol>
+      </section>
+
+      <section>
+        <h2>Sessions, history and names</h2>
+        <p>The menu button holds every session and a search across all of them. A session is saved as its plan: the list of tool calls and their arguments. Opening one replays the plan, so history costs a few hundred bytes and old answers stay reproducible.</p>
+        <p>Names are computed. Each card contributes a label from its tool and subject, weighted by how much work the tool does: a variogram outweighs a unit conversion. The name is the top one or two labels, prefixed with the table when one is open. It updates as the session grows and stops when you name it yourself: <code>name this session friday lab run</code>.</p>
+      </section>
+
+      <section>
+        <h2>Calendar and other Android hand-offs</h2>
+        <p>Adding to the calendar needs no Google API and no network. Android apps hand an event to whatever calendar app the user has, and that app syncs it through the user's own account.</p>
+        <div class="tbl"><table>
+          <tr><th>Action</th><th>Mechanism</th><th>Permission</th></tr>
+          <tr><td>Event, user confirms</td><td><code>Intent.ACTION_INSERT</code> on <code>CalendarContract.Events</code></td><td>none</td></tr>
+          <tr><td>Event, silent</td><td><code>CalendarContract</code> provider insert</td><td><code>WRITE_CALENDAR</code> (runtime prompt)</td></tr>
+          <tr><td>Timer, alarm</td><td><code>AlarmClock.ACTION_SET_TIMER</code> / <code>ACTION_SET_ALARM</code></td><td><code>SET_ALARM</code> (install-time)</td></tr>
+          <tr><td>Show on map</td><td><code>ACTION_VIEW</code> with a <code>geo:</code> URI</td><td>none</td></tr>
+          <tr><td>Dial, message, email</td><td><code>ACTION_DIAL</code>, <code>ACTION_SENDTO</code></td><td>none</td></tr>
+          <tr><td>New contact</td><td><code>ContactsContract.Intents.Insert</code></td><td>none</td></tr>
+          <tr><td>Share a result</td><td><code>ACTION_SEND</code></td><td>none</td></tr>
+        </table></div>
+        <p>The confirm-in-the-other-app route is the better default: golem fills the fields, the user presses save, and the app asks for no permissions. lead-acid's shim today has fetch, push streams, keep-awake, publish, share, attest and files. Hand-offs need one new native route that starts an intent from a small allowlist.</p>
+      </section>
+
+      <section>
+        <h2>What is real in this mock</h2>
+        <ul>
+          <li>Computed in the page: units, arithmetic, dates, true thickness and the stereonet, the histogram and downhole variogram, the mineral key, the Strunk check, all parsing, teaching and amendments.</li>
+          <li>Sample data: <code>assays.csv</code> is synthetic. The Factbook figures are a rounded 14-country sample. The ODS entry points to a section and does not show the passage.</li>
+          <li>Simulated: the device hand-offs. The timer counts down in the page.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Out of scope by design</h2>
+        <p>Prose nobody authored a path to: essays, open translation, summaries in its own words, common-sense chat. golem says it has no reading. Everything else grows by adding tools and packs.</p>
+      </section>
+    </aside>
+  </main>
+</div>
+
+<script>
+/* ==== src/10-core.js ==== */
+'use strict';
+/* ── utilities ─────────────────────────────────────────────── */
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const fmt = (x, sig = 6) => {
+  if (!isFinite(x)) return String(x);
+  const a = Math.abs(x);
+  if (a !== 0 && (a < 1e-4 || a >= 1e12)) return x.toExponential(4);
+  return Number(x.toPrecision(sig)).toLocaleString('en-US', { maximumFractionDigits: 8 });
+};
+const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const rad = d => d * Math.PI / 180, deg = r => r * 180 / Math.PI;
+const T = {};   // tools: (args, card) => result | null
+
+/* ── units ─────────────────────────────────────────────────── */
+const U = {};
+const u = (dim, f, ...n) => n.forEach(k => { U[k] = { dim, f, name: n[0] }; });
+u('L', 1, 'm', 'meter', 'metre'); u('L', 1000, 'km', 'kilometer', 'kilometre'); u('L', .01, 'cm'); u('L', .001, 'mm');
+u('L', .3048, 'ft', 'foot', 'feet'); u('L', .0254, 'inch', 'inches', '"'); u('L', 1609.344, 'mi', 'mile'); u('L', .9144, 'yd', 'yard');
+u('M', 1e-3, 'g', 'gram'); u('M', 1, 'kg', 'kilogram'); u('M', 1000, 't', 'tonne', 'metric ton'); u('M', .45359237, 'lb', 'lbs', 'pound');
+u('M', .0311034768, 'troy oz', 'ozt', 'troy ounce'); u('M', .028349523125, 'oz (av)', 'avoirdupois oz');
+u('M', 907.18474, 'short ton', 'st', 'ton'); u('M', 1016.0469088, 'long ton'); u('M', 2e-4, 'ct', 'carat');
+u('R', 1e-6, 'g/t', 'gpt'); u('R', 1e-6, 'ppm'); u('R', 1e-9, 'ppb'); u('R', .01, '%', 'percent', 'pct');
+u('A', 1, 'm²', 'm2'); u('A', 1e6, 'km²', 'km2', 'sq km', 'square kilometer', 'square km'); u('A', 1e4, 'ha', 'hectare');
+u('A', 4046.8564224, 'acre'); u('A', 2589988.110336, 'sq mi', 'square mile', 'mi2', 'mi²');
+u('V', 1e-3, 'L', 'l', 'liter', 'litre'); u('V', 1, 'm³', 'm3', 'cubic meter'); u('V', 1e-6, 'cm³', 'cm3', 'cc');
+u('V', .028316846592, 'ft³', 'ft3', 'cubic foot', 'cubic feet'); u('V', .003785411784, 'gal', 'gallon'); u('V', .158987294928, 'bbl', 'barrel');
+u('P', 1, 'Pa', 'pa'); u('P', 1e3, 'kPa', 'kpa'); u('P', 1e6, 'MPa', 'mpa'); u('P', 6894.757293168, 'psi'); u('P', 1e5, 'bar');
+u('t', 1, 's', 'sec', 'second'); u('t', 60, 'min', 'minute'); u('t', 3600, 'h', 'hr', 'hour'); u('t', 86400, 'day');
+[['°C', 1, 273.15, 'c', '°c', 'celsius'], ['°F', 5 / 9, 459.67, 'f', '°f', 'fahrenheit'], ['K', 1, 0, 'k', 'kelvin']]
+  .forEach(([name, f, off, ...n]) => n.forEach(k => { U[k] = { dim: 'T', f, off, name }; }));
+const DIM = { L: 'length', M: 'mass', R: 'mass ratio', T: 'temperature', A: 'area', V: 'volume', P: 'pressure', t: 'time' };
+
+function unit1(s, oz) {
+  s = s.trim();
+  if (/^(oz|ounces?)$/.test(s)) return { ...U[oz === 'av' ? 'oz (av)' : 'troy oz'], amb: true };
+  return U[s] || U[s.replace(/s$/, '')] || null;
+}
+function parseUnit(s, oz) {
+  s = s.trim().replace(/\s+/g, ' ');
+  const one = unit1(s, oz);
+  if (one) return { dim: one.dim, f: one.f, off: one.off || 0, name: one.name, amb: one.amb };
+  const m = s.match(/^(.+?)\s*(?: per |\/)\s*(.+)$/);
+  if (!m) return null;
+  const a = unit1(m[1], oz), b = unit1(m[2], oz);
+  if (!a || !b || a.dim === 'T' || b.dim === 'T') return null;
+  return { dim: a.dim === 'M' && b.dim === 'M' ? 'R' : a.dim + '/' + b.dim, f: a.f / b.f, off: 0, name: a.name + ' / ' + b.name, amb: a.amb || b.amb };
+}
+const dimName = d => DIM[d] || d.split('/').map(x => DIM[x] || x).join(' per ');
+
+T.convert = a => {
+  const oz = a.oz || (/ per |\//.test(a.from) ? 'troy' : 'av');
+  const f = parseUnit(a.from, oz), t = parseUnit(a.to, oz);
+  if (!f || !t) return null;
+  const read = ['convert', { v: fmt(a.v) }, { v: f.name }, 'to', { v: t.name }];
+  if (f.amb || t.amb) read.push({ v: 'oz = ' + (oz === 'troy' ? 'troy' : 'avoirdupois'), key: 'oz', alts: ['troy', 'av'], cur: oz });
+  if (f.dim !== t.dim) return { read, html: `<div class="note err">${esc(f.name)} is a ${dimName(f.dim)} and ${esc(t.name)} is a ${dimName(t.dim)}. No conversion exists between them.</div>`, trace: ['units: dimension check failed'] };
+  const out = (a.v + f.off) * f.f / t.f - t.off;
+  return {
+    read, value: out, amend: 'unit',
+    html: `<div class="big">${fmt(out)} <small>${esc(t.name)}</small></div><div class="src">@gcu/units · exact factors · dimension: ${dimName(f.dim)}</div>`,
+    trace: [`units.parse("${a.from}") → ${dimName(f.dim)}, factor ${fmt(f.f, 9)}`, `units.parse("${a.to}") → factor ${fmt(t.f, 9)}`, `${fmt(a.v)} × ${fmt(f.f, 9)} ÷ ${fmt(t.f, 9)} = ${fmt(out, 9)}`],
+    py: `units.convert(${a.v}, "${f.name}", "${t.name}")`
+  };
+};
+
+/* ── arithmetic: recursive descent, no eval ────────────────── */
+const FN = { sqrt: Math.sqrt, abs: Math.abs, exp: Math.exp, ln: Math.log, log: Math.log10, sin: x => Math.sin(rad(x)), cos: x => Math.cos(rad(x)), tan: x => Math.tan(rad(x)), asin: x => deg(Math.asin(x)), acos: x => deg(Math.acos(x)), atan: x => deg(Math.atan(x)) };
+function calc(src) {
+  const s = src.replace(/\s+/g, '').replace(/×/g, '*').replace(/÷/g, '/').replace(/,/g, '');
+  let i = 0;
+  const pk = () => s[i];
+  const paren = () => { i++; const v = expr(); if (pk() !== ')') throw 0; i++; return v; };
+  function atom() {
+    if (pk() === '(') return paren();
+    if (pk() === '-') { i++; return -pow(); }
+    const w = /^[a-z]+/.exec(s.slice(i));
+    if (w) {
+      i += w[0].length;
+      if (w[0] === 'pi') return Math.PI;
+      if (w[0] === 'e') return Math.E;
+      if (!FN[w[0]] || pk() !== '(') throw 0;
+      return FN[w[0]](paren());
+    }
+    const n = /^\d*\.?\d+(e[-+]?\d+)?/.exec(s.slice(i));
+    if (!n) throw 0;
+    i += n[0].length; return parseFloat(n[0]);
+  }
+  function pow() { const b = atom(); if (pk() === '^') { i++; return Math.pow(b, pow()); } return b; }
+  function term() { let v = pow(); while (pk() === '*' || pk() === '/') { const o = s[i++], r = pow(); v = o === '*' ? v * r : v / r; } return v; }
+  function expr() { let v = term(); while (pk() === '+' || pk() === '-') { const o = s[i++], r = term(); v = o === '+' ? v + r : v - r; } return v; }
+  const v = expr();
+  if (i < s.length) throw 0;
+  return v;
+}
+T.calc = a => {
+  let v; try { v = calc(a.x); } catch (e) { return null; }
+  if (typeof v !== 'number' || isNaN(v)) return null;
+  return { read: ['evaluate', { v: a.x }, 'trig in degrees'], value: v, html: `<div class="big">${fmt(v, 10)}</div>`, trace: [`expr.parse("${a.x}")`, `evaluate → ${v}`], py: a.x.replace(/\^/g, '**') };
+};
+
+/* ── dates ─────────────────────────────────────────────────── */
+const MON = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'], DOW = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+const MONRE = '(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sept|sep|oct|nov|dec)';
+const DOWRE = '(sunday|monday|tuesday|wednesday|thursday|friday|saturday|sun|mon|tues|tue|wed|thurs|thur|thu|fri|sat)';
+const day0 = d => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+const fmtDate = d => d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+function findDate(s) {
+  const now = day0(new Date());
+  const add = n => new Date(now.getFullYear(), now.getMonth(), now.getDate() + n);
+  const md = (d, mo, y) => { let dt = new Date(y ? +y : now.getFullYear(), mo, d); if (!y && dt < now) dt = new Date(now.getFullYear() + 1, mo, d); return dt; };
+  const mi = w => MON.indexOf(w.slice(0, 3));
+  let m;
+  if ((m = /\b(\d{4})-(\d\d)-(\d\d)\b/.exec(s))) return { d: new Date(+m[1], m[2] - 1, +m[3]), m };
+  if ((m = new RegExp('\\b(?:on )?(?:the )?(\\d{1,2})(?:st|nd|rd|th)? (?:of )?' + MONRE + '(?: (\\d{4}))?\\b').exec(s))) return { d: md(+m[1], mi(m[2]), m[3]), m };
+  if ((m = new RegExp('\\b(?:on )?' + MONRE + ' (\\d{1,2})(?:st|nd|rd|th)?(?:,? (\\d{4}))?\\b').exec(s))) return { d: md(+m[2], mi(m[1]), m[3]), m };
+  if ((m = /\btoday\b/.exec(s))) return { d: now, m };
+  if ((m = /\btomorrow\b/.exec(s))) return { d: add(1), m };
+  if ((m = /\bin (\d+) (day|week)s?\b/.exec(s))) return { d: add(m[1] * (m[2] === 'week' ? 7 : 1)), m };
+  if ((m = new RegExp('\\b(?:on )?(next )?' + DOWRE + '\\b').exec(s))) {
+    let n = (DOW.indexOf(m[2].slice(0, 3)) - now.getDay() + 7) % 7 || 7;
+    if (m[1]) n += 7;
+    return { d: add(n), m };
+  }
+  return null;
+}
+function findTime(s) {
+  let m = /\b(?:at )?noon\b/.exec(s);
+  if (m) return { h: 12, mi: 0, m };
+  m = /\bat (\d{1,2})(?::(\d\d))? ?(am|pm)?\b/.exec(s) || /\b(\d{1,2}):(\d\d) ?(am|pm)?\b/.exec(s) || /\b(\d{1,2})() ?(am|pm)\b/.exec(s);
+  if (!m) return null;
+  let h = +m[1]; const mi = +(m[2] || 0);
+  if (m[3] === 'pm' && h < 12) h += 12;
+  if (m[3] === 'am' && h === 12) h = 0;
+  if (h > 23 || mi > 59) return null;
+  return { h, mi, m };
+}
+T.daysUntil = a => {
+  const f = findDate(a.s); if (!f) return null;
+  const n = Math.round((f.d - day0(new Date())) / 864e5);
+  return { read: ['days from', { v: 'today' }, 'to', { v: fmtDate(f.d) }], value: n, html: `<div class="big">${n} <small>day${Math.abs(n) === 1 ? '' : 's'}</small></div><div class="sub">${Math.floor(Math.abs(n) / 7)} weeks and ${Math.abs(n) % 7} days</div>`, trace: [`dates.parse("${a.s}") → ${f.d.toDateString()}`, 'difference in whole days'], py: `(date("${iso(f.d)}") - date.today()).days` };
+};
+T.weekday = a => {
+  const f = findDate(a.s); if (!f) return null;
+  return { read: ['weekday of', { v: fmtDate(f.d) }], html: `<div class="big">${f.d.toLocaleDateString('en-GB', { weekday: 'long' })}</div>`, trace: [`dates.parse("${a.s}")`, 'Gregorian weekday'], py: `date("${iso(f.d)}").strftime("%A")` };
+};
+
+/* ==== src/20-field-table.js ==== */
+/* ── orientation: true thickness + stereonet ───────────────── */
+const p3 = x => String(Math.round(x) % 360).padStart(3, '0'), p2 = x => String(Math.round(x)).padStart(2, '0');
+const vLine = (tr, pl) => [Math.sin(rad(tr)) * Math.cos(rad(pl)), Math.cos(rad(tr)) * Math.cos(rad(pl)), -Math.sin(rad(pl))];
+const vPole = (dd, dip) => [Math.sin(rad(dd)) * Math.sin(rad(dip)), Math.cos(rad(dd)) * Math.sin(rad(dip)), Math.cos(rad(dip))];
+function proj(tr, pl, R) { const r = R * Math.SQRT2 * Math.sin(rad((90 - pl) / 2)); return [r * Math.sin(rad(tr)), -r * Math.cos(rad(tr))]; }
+function net(planes, lines) {
+  const R = 84, c = 104, lab = (x, y, t) => `<text x="${(c + x + (x > 20 ? -7 : 7)).toFixed(1)}" y="${(c + y - 6).toFixed(1)}" text-anchor="${x > 20 ? 'end' : 'start'}">${esc(t)}</text>`;
+  let s = `<svg viewBox="0 0 208 208" width="208" height="208" role="img" aria-label="Lower-hemisphere equal-area stereonet"><circle class="netbg" cx="${c}" cy="${c}" r="${R}"/><path class="grid" d="M${c - 5} ${c}h10M${c} ${c - 5}v10"/><path class="ax" d="M${c} ${c - R}v-7"/><text x="${c}" y="10" text-anchor="middle">N</text>`;
+  planes.forEach(p => {
+    const sv = [Math.sin(rad(p.dd - 90)), Math.cos(rad(p.dd - 90)), 0], dv = vLine(p.dd, p.dip), pts = [];
+    for (let k = 0; k <= 60; k++) {
+      const th = Math.PI * k / 60, v = sv.map((x, i) => Math.cos(th) * x + Math.sin(th) * dv[i]);
+      const [x, y] = proj(deg(Math.atan2(v[0], v[1])), deg(Math.asin(Math.min(1, Math.max(0, -v[2])))), R);
+      pts.push((c + x).toFixed(1) + ' ' + (c + y).toFixed(1));
+    }
+    const [px, py] = proj(p.dd + 180, 90 - p.dip, R);
+    s += `<path class="ln" d="M${pts.join('L')}"/><rect class="pole" x="${(c + px - 3.5).toFixed(1)}" y="${(c + py - 3.5).toFixed(1)}" width="7" height="7"/>${lab(px, py, 'pole')}`;
+  });
+  lines.forEach(l => { const [x, y] = proj(l.tr, l.pl, R); s += `<circle class="pt" cx="${(c + x).toFixed(1)}" cy="${(c + y).toFixed(1)}" r="4"/>${lab(x, y, l.label)}`; });
+  return s + '</svg>';
+}
+const planeDD = a => a.conv === 'sd' ? (a.a1 + 90) % 360 : a.a1;
+const convSlot = a => ({ v: `${p3(a.a1)}/${p2(a.a2)} as ${a.conv === 'sd' ? 'strike/dip (right-hand)' : 'dip direction/dip'}`, key: 'conv', alts: ['dd', 'sd'], cur: a.conv || 'dd' });
+
+T.thickness = a => {
+  const dd = planeDD(a), h = vLine(a.htr, a.hpl), n = vPole(dd, a.a2);
+  const c = Math.abs(h[0] * n[0] + h[1] * n[1] + h[2] * n[2]), tt = a.len * c, ang = deg(Math.acos(Math.min(1, c)));
+  return {
+    read: ['true thickness of', { v: fmt(a.len) + ' m' }, 'in hole', { v: `${p3(a.htr)}/${p2(a.hpl)} trend/plunge` }, 'through', convSlot(a)],
+    value: tt,
+    html: `<div class="big">${fmt(tt, 4)} <small>m true thickness</small></div>${net([{ dd, dip: a.a2 }], [{ tr: a.htr, pl: a.hpl, label: 'hole' }])}
+      <dl class="kv"><dt>hole to pole</dt><dd>${fmt(ang, 3)}°</dd><dt>hole to plane</dt><dd>${fmt(90 - ang, 3)}°</dd><dt>factor</dt><dd>${fmt(c, 4)} of downhole length</dd></dl><div class="src">@gcu/bearing · lower hemisphere, equal area</div>`,
+    trace: [`plane → dip direction ${p3(dd)}, dip ${p2(a.a2)}; pole ${p3(dd + 180)}/${p2(90 - a.a2)}`, `hole axis ${p3(a.htr)}/${p2(a.hpl)} as unit vector`, `|hole · pole| = ${fmt(c, 5)}`, `${fmt(a.len)} m × ${fmt(c, 5)} = ${fmt(tt, 5)} m`],
+    py: `bearing.true_thickness(${a.len}, hole=(${a.htr}, ${a.hpl}), plane=(${dd}, ${a.a2}))`
+  };
+};
+T.plane = a => {
+  const dd = planeDD(a);
+  return { read: ['plot plane', convSlot(a)], html: `${net([{ dd, dip: a.a2 }], [])}<dl class="kv"><dt>strike</dt><dd>${p3(dd + 270)}</dd><dt>dip</dt><dd>${p2(a.a2)}° toward ${p3(dd)}</dd><dt>pole</dt><dd>${p3(dd + 180)}/${p2(90 - a.a2)}</dd></dl><div class="src">@gcu/bearing</div>`, trace: ['plane → great circle and pole', 'equal-area projection, lower hemisphere'], py: `stereonet.plane(${dd}, ${a.a2})` };
+};
+
+/* ── table: synthetic drillholes, histogram, variogram ─────── */
+function mulberry(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function makeData() {
+  const r = mulberry(20261008), g = () => Math.sqrt(-2 * Math.log(1 - r())) * Math.cos(2 * Math.PI * r()), rows = [], MU = { GRD: Math.log(.25), BRX: Math.log(.8), DYK: Math.log(.03) };
+  for (let h = 1; h <= 8; h++) {
+    const depth = 90 + 2 * Math.floor(r() * 20), L = h % 2 ? 1 : 2; let y = g(), lith = 'GRD', buf = [];
+    for (let d = 0; d < depth; d++) {
+      if (r() < .05) lith = lith === 'GRD' ? (r() < .7 ? 'BRX' : 'DYK') : 'GRD';
+      y = .92 * y + Math.sqrt(1 - .92 * .92) * g();
+      const cu = Math.exp(MU[lith] + .6 * y + .15 * g());
+      buf.push({ lith, cu, au: cu * .4 * Math.exp(.35 * g()) });
+      if (buf.length === L) {
+        const cuM = buf.reduce((s, b) => s + b.cu, 0) / L, auM = buf.reduce((s, b) => s + b.au, 0) / L;
+        rows.push({ hole: 'DH-0' + h, from: d + 1 - L, to: d + 1, lith: buf[0].lith, cu: +cuM.toFixed(3), au: auM < .02 ? -.01 : +auM.toFixed(3) });
+        buf = [];
+      }
+    }
+  }
+  return rows;
+}
+function stats(v) {
+  const s = [...v].sort((a, b) => a - b), n = s.length, mean = s.reduce((a, b) => a + b, 0) / n, va = s.reduce((a, b) => a + (b - mean) ** 2, 0) / (n - 1);
+  return { n, mean, sd: Math.sqrt(va), va, min: s[0], med: n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2, max: s[n - 1] };
+}
+const UNIT = { cu: '%', au: 'g/t' }, COL = { cu: 'Cu', au: 'Au' };
+function needData(a, trace) {
+  if (S.data) return null;
+  if (!a.auto) return { prompt: 'No table is open. Open the sample table first?', options: [{ label: 'open assays.csv', value: true }], set: (x, v) => { x.auto = v; } };
+  S.data = makeData(); trace.push('open assays.csv (precondition, added to the plan)');
+  return null;
+}
+T.open = a => {
+  S.data = makeData();
+  const d = S.data, holes = new Set(d.map(r => r.hole)).size, n1 = d.filter(r => r.to - r.from === 1).length, neg = d.filter(r => r.au < 0).length;
+  return {
+    read: ['open table', { v: 'assays.csv' }],
+    html: `<dl class="kv"><dt>rows</dt><dd>${d.length} samples in ${holes} holes</dd><dt>columns</dt><dd>hole (id) · from, to (m) · lith (category) · cu (%) · au (g/t)</dd><dt>lengths</dt><dd>${n1} samples of 1 m, ${d.length - n1} of 2 m</dd><dt>lith</dt><dd>${[...new Set(d.map(r => r.lith))].join(', ')}</dd></dl>
+      ${neg ? `<div class="note">${neg} Au values are −0.01. That looks like a below-detection code. Statistics leave them out until you say what they mean.</div>` : ''}<div class="src">synthetic table generated for this mock · sadpan + tare checks</div>`,
+    trace: ['read assays.csv → typed columns', 'tare: intervals contiguous, no overlaps', `tare: ${neg} negative Au values flagged`], py: 'dh = read_csv("assays.csv")'
+  };
+};
+T.hist = a => {
+  const trace = [], ask = needData(a, trace);
+  const read = ['histogram of', { v: COL[a.col] }, { v: a.log ? 'log scale' : 'linear scale', key: 'log', alts: [false, true], cur: !!a.log }];
+  if (ask) return { read, ask, html: '', trace: ['blocked: needs an open table'] };
+  const raw = S.data.map(r => r[a.col]), v = raw.filter(x => x > 0), st = stats(v), f = a.log ? Math.log10 : x => x, lo = a.log ? f(st.min) : 0, hi = f(st.max), nb = 18, bins = new Array(nb).fill(0);
+  v.forEach(x => { bins[Math.min(nb - 1, Math.floor((f(x) - lo) / (hi - lo) * nb))]++; });
+  const W = 340, H = 150, x0 = 30, bw = (W - x0 - 6) / nb, top = Math.max(...bins), inv = t => a.log ? Math.pow(10, t) : t;
+  let s = `<svg viewBox="0 0 ${W} ${H + 24}" width="${W}" height="${H + 24}" role="img" aria-label="Histogram of ${COL[a.col]}"><path class="ax" d="M${x0} 6V${H}H${W - 6}"/><text x="${x0 - 4}" y="12" text-anchor="end">${top}</text><text x="${x0 - 4}" y="${H}" text-anchor="end">0</text>`;
+  bins.forEach((b, i) => { const h = b / top * (H - 10); s += `<rect class="barfill" x="${(x0 + i * bw + 1).toFixed(1)}" y="${(H - h).toFixed(1)}" width="${(bw - 2).toFixed(1)}" height="${h.toFixed(1)}"/>`; });
+  [0, .5, 1].forEach(t => { s += `<text x="${(x0 + t * (W - x0 - 6)).toFixed(1)}" y="${H + 14}" text-anchor="${t === 0 ? 'start' : t === 1 ? 'end' : 'middle'}">${fmt(inv(lo + t * (hi - lo)), 2)}</text>`; });
+  s += '</svg>';
+  trace.push(`select ${a.col}; drop ${raw.length - v.length} non-positive values`, `bin into ${nb} ${a.log ? 'log10' : 'linear'} classes`);
+  return {
+    read, amend: 'hist',
+    html: `${s}<dl class="kv"><dt>n</dt><dd>${st.n}</dd><dt>mean</dt><dd>${fmt(st.mean, 3)} ${UNIT[a.col]}</dd><dt>median</dt><dd>${fmt(st.med, 3)} ${UNIT[a.col]}</dd><dt>cv</dt><dd>${fmt(st.sd / st.mean, 3)}</dd><dt>range</dt><dd>${fmt(st.min, 3)} to ${fmt(st.max, 3)} ${UNIT[a.col]}</dd></dl><div class="src">sadpan · sample-count weighted, not declustered</div>`,
+    trace, py: `plot.hist(dh["${a.col}"][dh["${a.col}"] > 0], bins=${nb}${a.log ? ', log=True' : ''})`
+  };
+};
+T.vario = a => {
+  const trace = [], read = ['downhole variogram of', { v: COL[a.col] }];
+  let ask = needData(a, trace);
+  if (!ask && !a.comp) {
+    const n1 = S.data.filter(r => r.to - r.from === 1).length;
+    ask = { prompt: `A variogram needs samples of equal length. This table has ${n1} samples of 1 m and ${S.data.length - n1} of 2 m. Composite to what length?`, options: [2, 3, 4].map(v => ({ label: v + ' m', value: v })), set: (x, v) => { x.comp = v; } };
+  }
+  if (ask) return { read, ask, html: '', trace: ['blocked: precondition not met'] };
+  read.push('composited to', { v: a.comp + ' m', key: 'comp', alts: [2, 3, 4], cur: a.comp });
+  const L = a.comp, byHole = {};
+  S.data.forEach(r => { if (r[a.col] > 0) (byHole[r.hole] = byHole[r.hole] || []).push(r); });
+  const comps = {}; let nc = 0; const all = [];
+  Object.entries(byHole).forEach(([h, rs]) => {
+    const end = Math.max(...rs.map(r => r.to)), out = [];
+    for (let k = 0; (k + 1) * L <= end; k++) {
+      let w = 0, sum = 0;
+      rs.forEach(r => { const o = Math.min(r.to, (k + 1) * L) - Math.max(r.from, k * L); if (o > 0) { w += o; sum += o * r[a.col]; } });
+      out.push(w >= L / 2 ? sum / w : null);
+      if (w >= L / 2) { nc++; all.push(sum / w); }
+    }
+    comps[h] = out;
+  });
+  const sill = stats(all).va, lags = [];
+  for (let k = 1; k <= 12; k++) {
+    let s2 = 0, np = 0;
+    Object.values(comps).forEach(c => { for (let i = 0; i + k < c.length; i++) if (c[i] != null && c[i + k] != null) { s2 += (c[i] - c[i + k]) ** 2; np++; } });
+    if (np) lags.push({ h: k * L, g: s2 / (2 * np), np });
+  }
+  const W = 340, H = 150, x0 = 38, hx = lags[lags.length - 1].h, gy = Math.max(sill, ...lags.map(l => l.g)) * 1.1, X = h => x0 + h / hx * (W - x0 - 10), Y = g => H - g / gy * (H - 10);
+  let s = `<svg viewBox="0 0 ${W} ${H + 24}" width="${W}" height="${H + 24}" role="img" aria-label="Downhole variogram of ${COL[a.col]}"><path class="ax" d="M${x0} 6V${H}H${W - 6}"/><path class="ln2" d="M${x0} ${Y(sill).toFixed(1)}H${W - 6}"/><text x="${W - 8}" y="${(Y(sill) - 4).toFixed(1)}" text-anchor="end">variance ${fmt(sill, 3)}</text><text x="${x0 - 4}" y="12" text-anchor="end">${fmt(gy, 2)}</text><text x="${x0 - 4}" y="${H}" text-anchor="end">0</text><path class="ln" d="M${lags.map(l => X(l.h).toFixed(1) + ' ' + Y(l.g).toFixed(1)).join('L')}"/>`;
+  lags.forEach(l => { s += `<circle class="pt" cx="${X(l.h).toFixed(1)}" cy="${Y(l.g).toFixed(1)}" r="3.2"/>`; });
+  [lags[0].h, lags[Math.floor(lags.length / 2)].h, hx].forEach(h => { s += `<text x="${X(h).toFixed(1)}" y="${H + 14}" text-anchor="middle">${h} m</text>`; });
+  s += '</svg>';
+  trace.push(`drop non-positive ${a.col} values`, `composite to ${L} m, length weighted, keep ≥ 50% coverage → ${nc} composites`, `pair composites down each hole at lags of ${L} m → ${lags.length} lags`);
+  return {
+    read,
+    html: `${s}<dl class="kv"><dt>composites</dt><dd>${nc} at ${L} m</dd><dt>first lag</dt><dd>γ(${L} m) = ${fmt(lags[0].g, 3)}, ${fmt(lags[0].g / sill * 100, 3)}% of the variance, ${lags[0].np} pairs</dd><dt>last lag</dt><dd>γ(${hx} m) = ${fmt(lags[lags.length - 1].g, 3)}, ${lags[lags.length - 1].np} pairs</dd></dl><div class="src">@gcu/drillhole → gsjs · experimental only, no model fitted</div>`,
+    trace, py: `comp = drillhole.composite(dh[dh["${a.col}"] > 0], ${L})\ngsjs.variogram(comp, "${a.col}", direction="downhole", lag=${L}, nlags=12)`
+  };
+};
+
+/* ==== src/30-knowledge-device.js ==== */
+/* ── records: Factbook sample (rounded) ────────────────────── */
+const FB = [['Australia', 'Canberra', 7741220, 26.8e6, 0], ['Brazil', 'Brasília', 8515770, 220.1e6, 0], ['Canada', 'Ottawa', 9984670, 38.8e6, 0], ['Chile', 'Santiago', 756102, 18.7e6, 0],
+  ['Germany', 'Berlin', 357022, 84.1e6, 0], ['Indonesia', 'Jakarta', 1904569, 281.6e6, 0], ['Ireland', 'Dublin', 70273, 5.2e6, 0], ['Japan', 'Tokyo', 377915, 123.2e6, 0],
+  ['Kazakhstan', 'Astana', 2724900, 20.3e6, 1], ['Mongolia', 'Ulaanbaatar', 1564116, 3.3e6, 1], ['Peru', 'Lima', 1285216, 32.6e6, 0], ['Portugal', 'Lisbon', 92090, 10.2e6, 0],
+  ['South Africa', 'Pretoria', 1219090, 60.4e6, 0], ['Zambia', 'Lusaka', 752618, 20.8e6, 1]];
+const fbFind = n => FB.find(r => r[0].toLowerCase() === n.trim().replace(/^the /, ''));
+const FBSRC = '<div class="src">factbook pack · 14-country rounded sample in this mock</div>';
+T.fact = a => {
+  const r = fbFind(a.country); if (!r) return null;
+  const read = [a.field, 'of', { v: r[0] }], trace = [`factbook.get("${r[0]}")`]; let big, py = `data("factbook")["${r[0]}"].${a.field}`;
+  if (a.field === 'capital') big = `<div class="big">${r[1]}</div>`;
+  else if (a.field === 'population') big = `<div class="big">${fmt(r[3], 4)} <small>people</small></div>`;
+  else if (a.field === 'area') {
+    let un = a.unit && parseUnit(a.unit); if (!un || un.dim !== 'A') un = parseUnit('km²');
+    read.push('in', { v: un.name }); big = `<div class="big">${fmt(r[2] * 1e6 / un.f, 5)} <small>${un.name}</small></div>`;
+    trace.push(`area ${fmt(r[2], 9)} km² → ${un.name}`); py = `units.convert(${py}, "km²", "${un.name}")`;
+  } else {
+    const mi = /mi/.test(a.unit || ''), v = r[3] / r[2] * (mi ? 2.589988110336 : 1), per = mi ? 'sq mi' : 'km²';
+    read.push('in', { v: 'people / ' + per }); big = `<div class="big">${fmt(v, 3)} <small>people per ${per}</small></div>`;
+    trace.push(`population ${fmt(r[3], 4)} ÷ area ${fmt(r[2], 9)} km²`, mi ? 'units: per km² → per sq mi' : 'no unit change');
+    py = `c = data("factbook")["${r[0]}"]\nunits.convert(c.population / c.area, "1/km²", "1/${per}")`;
+  }
+  return { read, amend: 'fact', html: big + FBSRC, trace, py };
+};
+T.factList = a => {
+  const k = a.by === 'population' ? 3 : 2, rows = FB.filter(r => r[4]).sort((x, y) => y[k] - x[k]);
+  return { read: ['filter countries where', { v: 'landlocked' }, 'sort by', { v: a.by, key: 'by', alts: ['area', 'population'], cur: a.by }],
+    html: `<div class="tbl"><table><tr><th>Country</th><th class="n">Area km²</th><th class="n">Population</th></tr>${rows.map(r => `<tr><td>${r[0]}</td><td class="n">${fmt(r[2], 9)}</td><td class="n">${fmt(r[3], 4)}</td></tr>`).join('')}</table></div><div class="sub">${rows.length} of ${FB.length} records match.</div>${FBSRC}`,
+    trace: ['factbook.records → 14', 'filter landlocked = true', `sort by ${a.by}, descending`], py: `data("factbook").filter(landlocked=True).sort("${a.by}", desc=True)` };
+};
+
+/* ── minerals: properties + identification key ─────────────── */
+const MIN = {
+  pyrite: ['FeS₂', '6–6.5', '4.9–5.2', 'greenish black', 'm', 'dark', 3, 'n', 'n', 'yellow'], chalcopyrite: ['CuFeS₂', '3.5–4', '4.1–4.3', 'greenish black', 'm', 'dark', 2, 'n', 'n', 'yellow'],
+  galena: ['PbS', '2.5', '7.4–7.6', 'lead grey', 'm', 'dark', 2, 'n', 'n', 'grey'], magnetite: ['Fe₃O₄', '5.5–6.5', '5.2', 'black', 'm', 'dark', 3, 'y', 'n', 'black'],
+  hematite: ['Fe₂O₃', '5.5–6.5', '5.3', 'red-brown', 'm', 'red', 3, 'n', 'n', 'grey'], molybdenite: ['MoS₂', '1–1.5', '4.6–4.7', 'bluish grey', 'm', 'dark', 1, 'n', 'n', 'grey'],
+  gold: ['Au', '2.5–3', '19.3 when pure', 'golden yellow', 'm', 'gold', 2, 'n', 'n', 'yellow'], sphalerite: ['ZnS', '3.5–4', '3.9–4.1', 'brown to pale yellow', 'n', 'brown', 2, 'n', 'n', 'brown'],
+  quartz: ['SiO₂', '7', '2.65', 'white', 'n', 'white', 3, 'n', 'n', 'clear'], calcite: ['CaCO₃', '3', '2.71', 'white', 'n', 'white', 2, 'n', 'y', 'clear'],
+  fluorite: ['CaF₂', '4', '3.18', 'white', 'n', 'white', 2, 'n', 'n', 'clear'], malachite: ['Cu₂CO₃(OH)₂', '3.5–4', '3.6–4.0', 'light green', 'n', 'green', 2, 'n', 'y', 'green']
+};
+const MATTR = { lus: 4, st: 5, hard: 6, mag: 7, hcl: 8, col: 9 };
+const KEYQ = {
+  lus: ['What is the lustre?', { m: 'metallic', n: 'non-metallic' }],
+  st: ['What colour is the streak on a porcelain plate?', { dark: 'black or dark grey', red: 'red-brown', gold: 'golden yellow', white: 'white', green: 'green', brown: 'brown to pale yellow' }],
+  hard: ['How hard is it?', { 1: 'a fingernail scratches it', 2: 'a knife scratches it', 3: 'a knife does not scratch it' }],
+  col: ['What colour is a fresh surface?', { yellow: 'brass or golden yellow', grey: 'grey to silver', black: 'black', clear: 'colourless or pale', brown: 'brown', green: 'green' }],
+  mag: ['Does a magnet pick it up?', { y: 'yes', n: 'no' }], hcl: ['Does it fizz in dilute HCl?', { y: 'yes', n: 'no' }]
+};
+const minCard = n => { const m = MIN[n]; return `<dl class="kv"><dt>formula</dt><dd>${m[0]}</dd><dt>hardness</dt><dd>${m[1]} Mohs</dd><dt>density</dt><dd>${m[2]} g/cm³</dd><dt>streak</dt><dd>${m[3]}</dd><dt>lustre</dt><dd>${m[4] === 'm' ? 'metallic' : 'non-metallic'}</dd></dl><div class="src">minerals pack (proposed) · 12 minerals in this mock</div>`; };
+T.mineral = a => {
+  const m = MIN[a.name]; if (!m) return null;
+  const i = { formula: 0, hardness: 1, density: 2, streak: 3 }[a.prop], unit = a.prop === 'density' ? ' g/cm³' : a.prop === 'hardness' ? ' Mohs' : '';
+  if (i == null) return { read: ['describe mineral', { v: a.name }], html: minCard(a.name), trace: [`minerals.get("${a.name}")`], py: `data("minerals")["${a.name}"]` };
+  return { read: [a.prop, 'of mineral', { v: a.name }], html: `<div class="big">${m[i]}<small>${unit}</small></div><div class="src">minerals pack (proposed)</div>`, trace: [`minerals.get("${a.name}").${a.prop}`], py: `data("minerals")["${a.name}"].${a.prop}` };
+};
+T.key = a => {
+  a.ans = a.ans || {};
+  const cand = Object.keys(MIN).filter(n => Object.entries(a.ans).every(([k, v]) => String(MIN[n][MATTR[k]]) === String(v)));
+  const read = ['identify a mineral', ...Object.entries(a.ans).map(([k, v]) => ({ v: KEYQ[k][1][v] }))];
+  const trace = [`minerals pack → ${Object.keys(MIN).length} candidates`, ...Object.entries(a.ans).map(([k, v]) => `keep ${k} = ${v}`), `${cand.length} left`];
+  let best = null, bn = 1;
+  Object.keys(MATTR).forEach(k => { if (k in a.ans) return; const n = new Set(cand.map(c => MIN[c][MATTR[k]])).size; if (n > bn) { bn = n; best = k; } });
+  if (cand.length > 1 && best) {
+    const vals = [...new Set(cand.map(c => String(MIN[c][MATTR[best]])))];
+    return { read, trace, html: `<div class="sub">${cand.length} candidates: ${cand.join(', ')}</div>`,
+      ask: { prompt: KEYQ[best][0], options: vals.map(v => ({ label: KEYQ[best][1][v], value: v })), set: (x, v) => { x.ans = { ...x.ans, [best]: v }; } } };
+  }
+  const n = Object.keys(a.ans).length;
+  return { read, trace, html: `<div class="big">${cand.join(' or ')}</div><div class="sub">Reached in ${n} question${n === 1 ? '' : 's'}. Each question was the one that split the remaining candidates most.</div>${cand.length === 1 ? minCard(cand[0]) : ''}`, py: `key("minerals").identify(${JSON.stringify(a.ans)})` };
+};
+
+/* ── text: ODS term index + Strunk (1918) check ────────────── */
+const ODS = { skiplist: ['4 Skiplists', '4.1 The Basic Structure'], 'hash table': ['5 Hash Tables', '5.1 ChainedHashTable'], 'binary heap': ['10 Heaps', '10.1 BinaryHeap'], treap: ['7 Random Binary Search Trees', '7.2 Treap'], 'scapegoat tree': ['8 Scapegoat Trees', '8.1 ScapegoatTree'], 'red-black tree': ['9 Red-Black Trees', '9.2 RedBlackTree'], 'b-tree': ['14 External Memory Searching', '14.2 B-Trees'] };
+const ODSA = { 'skip list': 'skiplist', heap: 'binary heap', 'red black tree': 'red-black tree', btree: 'b-tree', 'b tree': 'b-tree', hashtable: 'hash table' };
+T.define = a => {
+  const t = a.term.replace(/s$/, ''), k = ODS[t] ? t : ODSA[t];
+  if (k) return { read: ['find the definition of', { v: k }], html: `<div class="big" style="font-size:17px">Open Data Structures, ch. ${ODS[k][0]}</div><div class="sub">Defined in §${ODS[k][1]}.</div><div class="note">The app shows the defining passage here and opens the reader at that section. This mock carries only the locator.</div><div class="opts"><a class="btn" href="https://gentropic.github.io/gcu-library/read.html?book=ods" target="_blank" rel="noopener">Open in the library reader</a></div><div class="src">ods pack · CC BY 2.5 · Pat Morin · sample term index</div>`, trace: [`index.lookup("${k}") across installed packs`, 'hit: ods, glossary facet'], py: `library.define("${k}")` };
+  if (MIN[t]) return T.mineral({ name: t });
+  return null;
+};
+const LINT = [
+  [/\bthe question as to whether\b/gi, 13, 'whether'], [/\bthere is no doubt but that\b/gi, 13, 'no doubt'], [/\bused for fuel purposes\b/gi, 13, 'used for fuel'],
+  [/\bin a hasty manner\b/gi, 13, 'hastily'], [/\bthis is a subject which\b/gi, 13, 'this subject'], [/\bowing to the fact that\b/gi, 13, 'since'],
+  [/\bin spite of the fact that\b/gi, 13, 'though'], [/\bcall your attention to the fact that\b/gi, 13, 'remind you'], [/\bthe fact that\b/gi, 13, 'recast without it'],
+  [/\bnot honest\b/gi, 12, 'dishonest'], [/\bnot important\b/gi, 12, 'trifling'], [/\bdid not remember\b/gi, 12, 'forgot'], [/\bdid not pay any attention to\b/gi, 12, 'ignored'], [/\bdid not have much confidence in\b/gi, 12, 'distrusted'],
+  [/\b(?:is|are|was|were|be|been|being) (?:\w{3,}ed|lost|taken|given|made|done|found|sent|written|shown)\b(?: by\b)?/gi, 11, 'name who did it']
+];
+const RULE = { 11: 'Use the active voice.', 12: 'Put statements in positive form.', 13: 'Omit needless words.' };
+T.lint = a => {
+  const hits = [];
+  LINT.forEach(([re, rule, fix]) => { re.lastIndex = 0; let m; while ((m = re.exec(a.text))) if (!hits.some(h => m.index < h.e && m.index + m[0].length > h.s)) hits.push({ s: m.index, e: m.index + m[0].length, rule, fix }); });
+  hits.sort((x, y) => x.s - y.s);
+  let out = '', p = 0; hits.forEach(h => { out += esc(a.text.slice(p, h.s)) + '<mark>' + esc(a.text.slice(h.s, h.e)) + '</mark>'; p = h.e; }); out += esc(a.text.slice(p));
+  return { read: ['check text against', { v: 'The Elements of Style (1918)' }],
+    html: `<div class="sub" style="color:var(--au-fg)">${out}</div>${hits.length ? `<div class="tbl"><table><tr><th>Found</th><th>Rule</th><th>Try</th></tr>${hits.map(h => `<tr><td>${esc(a.text.slice(h.s, h.e))}</td><td>${h.rule}. ${RULE[h.rule]}</td><td>${h.fix}</td></tr>`).join('')}</table></div>` : '<div class="note ok">No rule in the pack matched this text.</div>'}<div class="src">elements-of-style pack · public domain · ${LINT.length} patterns compiled from rules 11 to 13</div>`,
+    trace: [`style.rules("elements-of-style") → ${LINT.length} patterns`, `scan ${a.text.length} characters → ${hits.length} matches`], py: `style.check(text, pack="elements-of-style")` };
+};
+
+/* ── device hand-offs (simulated) ──────────────────────────── */
+const hand = (label, intent, perm, msg) => `<dl class="kv"><dt>hand-off</dt><dd><code style="font:12px var(--mono)">${intent}</code></dd><dt>permission</dt><dd>${perm}</dd></dl><div class="opts"><button class="btn go" type="button" data-act="handoff" data-msg="${esc(msg)}">${label}</button>`;
+T.event = a => {
+  const d = new Date(a.date), s = new Date(d.getFullYear(), d.getMonth(), d.getDate(), a.timed ? a.h : 0, a.timed ? a.mi : 0), e = new Date(+s + a.dur * 6e4);
+  const hm = x => String(x.getHours()).padStart(2, '0') + ':' + String(x.getMinutes()).padStart(2, '0'), st = x => iso(x).replace(/-/g, '') + (a.timed ? 'T' + hm(x).replace(':', '') + '00' : '');
+  const ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//GCU//golem mock//EN', 'BEGIN:VEVENT', `UID:${+s}@golem`, `DTSTAMP:${new Date().toISOString().replace(/[-:]|\.\d+/g, '')}`,
+    a.timed ? `DTSTART:${st(s)}` : `DTSTART;VALUE=DATE:${st(s)}`, ...(a.timed ? [`DTEND:${st(e)}`] : []), `SUMMARY:${a.title}`, 'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
+  const read = ['new event', { v: a.title }, 'on', { v: fmtDate(s) }];
+  if (a.timed) read.push('at', { v: hm(s) }, 'for', { v: a.dur + ' min', key: 'dur', alts: [30, 60, 120], cur: a.dur }); else read.push({ v: 'all day' });
+  return { read, copy: ics,
+    html: `<div class="big" style="font-size:18px">${esc(a.title)}</div><div class="sub">${fmtDate(s)}${a.timed ? `, ${hm(s)} to ${hm(e)}` : ', all day'}</div>${hand('Add to calendar', 'ACTION_INSERT → CalendarContract.Events', 'none: your calendar app shows the event for you to save', 'On Android this opens your calendar app with these fields filled in. Nothing is sent from the mock.')}<button class="btn" type="button" data-act="copy">Copy .ics</button></div>`,
+    trace: [`dates.parse → ${fmtDate(s)}${a.timed ? ' ' + hm(s) : ''}`, 'title = what is left after removing date and time words', 'build intent extras: title, begin, end'], py: `device.calendar.insert(title="${a.title}", begin="${iso(s)}${a.timed ? 'T' + hm(s) : ''}", minutes=${a.dur})` };
+};
+T.timer = a => {
+  if (!a.end) a.end = Date.now() + a.sec * 1000;
+  return { read: ['start a timer for', { v: a.sec >= 60 ? fmt(a.sec / 60) + ' min' : a.sec + ' s' }],
+    html: `<div class="big" data-end="${a.end}">--:--</div>${hand('Hand to the Clock app', 'AlarmClock.ACTION_SET_TIMER, EXTRA_LENGTH=' + a.sec, 'SET_ALARM, granted at install', 'On Android the Clock app takes over the timer and rings when golem is closed. Here it counts down in the page.')}</div>`,
+    trace: [`duration → ${a.sec} s`, 'build intent: ACTION_SET_TIMER'], py: `device.timer(${a.sec})` };
+};
+T.alarm = a => {
+  const t = String(a.h).padStart(2, '0') + ':' + String(a.mi).padStart(2, '0');
+  return { read: ['set an alarm at', { v: t }], html: `<div class="big">${t}</div>${hand('Hand to the Clock app', `AlarmClock.ACTION_SET_ALARM, HOUR=${a.h}, MINUTES=${a.mi}`, 'SET_ALARM, granted at install', 'On Android this creates the alarm in the Clock app. Nothing happens in the mock.')}</div>`, trace: [`time → ${t}`, 'build intent: ACTION_SET_ALARM'], py: `device.alarm("${t}")` };
+};
+
+/* ── memory + teaching ─────────────────────────────────────── */
+T.remember = a => { if (!a.done) { S.facts.push(a.text); a.done = true; } return { read: ['store note', { v: a.text }], html: `<div class="note ok">Stored on this device. ${S.facts.length} note${S.facts.length === 1 ? '' : 's'} in memory.</div>`, trace: ['notes.add(text)', 'index words for recall'], py: `notes.add("${a.text}")` }; };
+T.recall = a => {
+  const w = a.about.split(/\s+/).filter(Boolean), hit = S.facts.filter(f => w.every(x => f.toLowerCase().includes(x)));
+  return { read: ['recall notes about', { v: a.about }], html: hit.length ? `<ul style="margin:0;padding-left:18px">${hit.map(f => `<li>${esc(f)}</li>`).join('')}</ul>` : `<div class="note">No stored note mentions “${esc(a.about)}”. I only know what you asked me to remember.</div>`, trace: [`notes.search("${a.about}") → ${hit.length}`], py: `notes.search("${a.about}")` };
+};
+T.teach = a => { S.aliases[a.word] = a.means; return { read: ['learn that', { v: a.word }, 'means', { v: a.means }], html: `<div class="note ok">Learned. From now on “${esc(a.word)}” reads as “${esc(a.means)}” on this device.</div>`, trace: ['lexicon.add(word → meaning)', 'retrain: instant, the lexicon is a table'] }; };
+
+/* ==== src/40-read-render.js ==== */
+/* ── session state ─────────────────────────────────────────── */
+const S = { cards: [], n: 0, aliases: {}, facts: [], data: null, awake: true };
+
+const SKILLS = [
+  ['Compute', 'Unit conversion', '@gcu/units', 1, 'Grades, lengths, masses, areas, pressures, temperatures. Refuses mismatched dimensions.', ['0.35 oz per short ton in g/t', '2.7 g/cm3 in lb/ft3', '1500 psi in mpa', '5 km in kg']],
+  ['Compute', 'Arithmetic', '@gcu/expr', 1, 'Parsed and evaluated, never eval. Trigonometry in degrees.', ['14 * cos(22) + 3^2', 'sqrt(2) * 84']],
+  ['Compute', 'Dates', 'built in', 1, 'Day counts and weekdays.', ['days until 25 december', 'what day is 15 nov 2027']],
+  ['Compute', 'Step-by-step algebra', 'new package', 0, 'Solve and show the derivation. The monorepo has no symbolic algebra yet.', []],
+  ['Field', 'True thickness', '@gcu/bearing', 1, 'Intercept length, hole orientation and plane give thickness and a stereonet.', ['true thickness of a 14 m intercept, hole 270/60, bedding 045/30']],
+  ['Field', 'Stereonet', '@gcu/bearing', 1, 'Planes and poles, equal area, lower hemisphere.', ['plot plane 120/55']],
+  ['Field', 'Mineral key', 'minerals pack', 1, 'golem asks the questions and narrows the candidates.', ['identify a mineral', 'density of chalcopyrite']],
+  ['Field', 'Compass capture', 'lead-acid sensors', 0, 'Measure a plane with the phone and add it to a set by voice or text.', []],
+  ['Field', 'Munsell from camera', '@gcu/swatch', 0, 'Point at a rock, get the nearest chip.', []],
+  ['Field', 'Kinematic check', 'daylight', 0, 'Planar, wedge and toppling tests against a slope face.', []],
+  ['Table', 'Open and validate', 'sadpan · tare', 1, 'Typed columns, interval checks, flags for suspicious codes.', ['open assays.csv']],
+  ['Table', 'Histogram', 'sadpan · @gcu/plot', 1, 'Amend it afterwards with “log scale”.', ['histogram of cu']],
+  ['Table', 'Variogram', '@gcu/drillhole · gsjs', 1, 'A missing precondition becomes a question, then a step in the plan.', ['variogram of cu']],
+  ['Table', 'Transform by example', 'new package', 0, 'Show two examples (BH-001A → 1) and it derives the rule for the column.', []],
+  ['Table', 'Report paragraph', 'templates', 0, 'A method paragraph written from the plan parameters.', []],
+  ['Knowledge', 'Records', 'factbook pack', 1, 'Lookups, unit changes and filters across records.', ['population density of mongolia in people per square mile', 'landlocked countries by population', 'area of brazil in square miles']],
+  ['Knowledge', 'Definitions', 'ods pack', 1, 'Finds where a term is defined and opens the reader there.', ['what is a skiplist']],
+  ['Knowledge', 'Style check', 'elements-of-style pack', 1, 'Rules compiled into a checker that cites the rule.', ['check: owing to the fact that the samples were lost by the lab, there is no doubt but that the assay was not important']],
+  ['Knowledge', 'Your documents', 'librarian · glass', 0, 'Retrieval over files you add. Returns the passage and its location.', []],
+  ['Device', 'Calendar event', 'lead-acid intent', 1, 'Fills the event and hands it to your calendar app.', ['remind me to send the samples to the lab on friday at 9', 'schedule core shed visit tomorrow at 14:30 for 2 hours']],
+  ['Device', 'Timer and alarm', 'lead-acid intent', 1, 'Handed to the Clock app.', ['set a timer for 5 min', 'set an alarm for 6:15']],
+  ['Device', 'Map, dial, share', 'lead-acid intent', 0, 'Show a place, start a call, share the last result.', []],
+  ['Session', 'Explain', 'plan', 1, 'Shows the plan behind the last answer.', ['why']],
+  ['Session', 'Amend, repeat, undo', 'dispatch-meta', 1, 'Change the last card without retyping it.', ['in feet', 'log scale', 'and chile', 'again', 'undo']],
+  ['Session', 'Teach a word', 'lexicon', 1, 'Stays on the device.', ['vario means variogram']],
+  ['Session', 'Notes', 'glass', 1, 'Remembers only what you ask it to.', ['remember that hole 12 collar was resurveyed in march', 'what do you know about hole 12']],
+  ['Session', 'Sessions and history', 'plan store', 1, 'Sessions name themselves from the tools that ran. Search covers all of them.', ['new session', 'name this session friday lab run', 'history']],
+  ['Session', 'Export the plan', 'adder', 1, 'The session as a script. Every line is a tool call it made.', ['export as script']]
+];
+const PACKS = [
+  ['factbook', 'CIA World Factbook', '2.8 MB · CC0', 'samp', 'Records: lookup, convert, filter, rank.'],
+  ['factbook-full', 'Factbook, full profiles', '2.3 MB · CC0', 'plan', 'Deeper filters, such as exports and resources.'],
+  ['ods', 'Open Data Structures', '1.9 MB · CC BY 2.5', 'samp', 'Term index into the reader. Listings can run in adder.'],
+  ['elements-of-style', 'The Elements of Style (1918)', '36 kB · public domain', 'live', 'Rules compiled into a text checker.'],
+  ['rtow · rtnw · rtrol', 'Ray Tracing series', '11.5 MB · CC0', 'plan', 'Reader only until a term index is built.'],
+  ['arcr', 'arcr / gewgaw manual', '26 kB · CC0', 'plan', 'Reader only.'],
+  ['minerals', 'Mineral properties and key', 'proposed', 'samp', 'Properties plus an identification key. 12 minerals here.'],
+  ['geonames', 'Gazetteer', 'proposed · check licence', 'plan', 'Places, coordinates, distances.'],
+  ['wikidata-core', 'Wikidata subset', 'proposed · check licence', 'plan', 'Who, what, when and where as structured facts.'],
+  ['usgs-mcs', 'USGS commodity summaries', 'proposed · check licence', 'plan', 'Production and reserves by country.'],
+  ['wordnet', 'WordNet', 'proposed · check licence', 'plan', 'Synonyms for the parser, so fewer words need teaching.']
+];
+const ALLEX = SKILLS.flatMap(s => s[5]);
+const VOCAB = new Set(ALLEX.filter(e => !/ means /.test(e)).join(' ').toLowerCase().split(/[^a-z]+/).filter(w => w.length > 3));
+
+/* ── reading a query ───────────────────────────────────────── */
+const norm = s => s.trim().replace(/\s+/g, ' ').replace(/[?.!]+$/, '');
+function parseEvent(str) {
+  const low = str.toLowerCase(), d = findDate(low), t = findTime(low), du = /\bfor (\d+(?:\.\d+)?) ?(h|hr|hrs|hours?|min|mins|minutes?)\b/.exec(low);
+  if (!d && !t) return null;
+  let title = str;
+  [d && d.m, t && t.m, du].filter(Boolean).sort((a, b) => b.index - a.index).forEach(m => { title = title.slice(0, m.index) + title.slice(m.index + m[0].length); });
+  title = title.replace(/\s+/g, ' ').trim().replace(/^to /i, '').replace(/\b(on|at|for)$/i, '').trim();
+  return { title: title ? title[0].toUpperCase() + title.slice(1) : 'Event', date: +(d ? d.d : day0(new Date())), timed: !!t, h: t ? t.h : 0, mi: t ? t.mi : 0, dur: du ? Math.round(du[1] * (du[2][0] === 'h' ? 60 : 1)) : 60 };
+}
+function grammar(text, q, rung) {
+  let m, r;
+  const go = (tool, args) => { const res = T[tool](args); return res ? { tool, args, rung, res } : null; };
+  const col = w => w[0] === 'c' ? 'cu' : 'au';
+  if ((m = /^(.+?) means (.+)$/.exec(q))) return go('teach', { word: m[1], means: m[2] });
+  if (/^(export|save|give me)\b.*\b(script|notebook|python|adder)$/.test(q)) return go('export', {});
+  if ((m = /^(?:set |start )?(?:a )?timer (?:for |of )?(\d+(?:\.\d+)?) ?(s|sec|secs|seconds?|m|min|mins|minutes?|h|hr|hours?)$/.exec(q))) return go('timer', { sec: Math.round(m[1] * (m[2][0] === 's' ? 1 : m[2][0] === 'm' ? 60 : 3600)) });
+  if ((m = /^(?:set )?(?:an )?alarm (?:for |at )?(.+)$/.exec(q) || /^wake me(?: up)? at (.+)$/.exec(q))) { const t = findTime('at ' + m[1]); if (t) return go('alarm', { h: t.h, mi: t.mi }); }
+  if ((m = /^(?:remind me to|remind me|add (?:an )?event|new event|schedule)[:,]? (.+)$/.exec(q))) { const e = parseEvent(text.slice(text.length - m[1].length)); if (e) return go('event', e); }
+  if (/^remember /.test(q)) return go('remember', { text: text.replace(/^remember (that )?/i, '') });
+  if ((m = /^what do you (?:know|remember) about (.+)$/.exec(q))) return go('recall', { about: m[1] });
+  if (/^open (.+\.csv|the sample|sample|assays)$/.test(q)) return go('open', {});
+  if ((m = /^hist(?:ogram)? (?:of )?(cu|au|copper|gold)( (?:in )?log(?: scale)?)?$/.exec(q))) return go('hist', { col: col(m[1]), log: !!m[2] });
+  if ((m = /^(?:downhole )?variogram (?:of )?(cu|au|copper|gold)(?: at (\d) ?m)?$/.exec(q))) return go('vario', { col: col(m[1]), comp: m[2] ? +m[2] : undefined });
+  if (/true thickness/.test(q)) {
+    const len = /(\d+(?:\.\d+)?) ?m\b/.exec(q), h = /hole (\d{1,3})\/(\d{1,2})/.exec(q), p = /(?:bedding|vein|foliation|plane|contact|fault) (\d{1,3})\/(\d{1,2})/.exec(q);
+    if (len && h && p) return go('thickness', { len: +len[1], htr: +h[1], hpl: +h[2], a1: +p[1], a2: +p[2], conv: 'dd' });
+  }
+  if ((m = /^(?:plot|stereonet(?: of)?|show)(?: plane| bedding)? (\d{1,3})\/(\d{1,2})$/.exec(q))) return go('plane', { a1: +m[1], a2: +m[2], conv: 'dd' });
+  if ((m = /^(?:what is |what's )?(?:the )?(capital|population density|density|population|area) of (.+?)(?: in (.+))?$/.exec(q)) && (r = go('fact', { field: m[1] === 'population density' ? 'density' : m[1], country: m[2], unit: m[3] }))) return r;
+  if ((m = /^(?:what is |what's )?(?:the )?(density|hardness|formula|streak) of (\w+)$/.exec(q)) && (r = go('mineral', { prop: m[1], name: m[2] }))) return r;
+  if ((m = /^(?:which |list |show )?landlocked countries(?: (?:by|sorted by) (area|population))?$/.exec(q))) return go('factList', { by: m[1] || 'area' });
+  if (/^(?:identify|key out|id)(?: a| this| the)? (?:mineral|rock|sample)$|^what mineral is this$/.test(q)) return go('key', {});
+  if ((m = /^(?:check|lint|review)(?: this| the)?(?: text| sentence| paragraph)?[:,]? (.+)$/i.exec(text))) return go('lint', { text: m[1] });
+  if ((m = /^(?:how many )?days (?:until|till|to|before) (.+)$/.exec(q)) && (r = go('daysUntil', { s: m[1] }))) return r;
+  if ((m = /^what (?:day|weekday) (?:is|was|will be) (.+)$/.exec(q)) && (r = go('weekday', { s: m[1] }))) return r;
+  if ((m = /^(?:convert )?(-?[\d.,]*\d) ?(.+?) (?:in|to|as|into) (.+)$/.exec(q)) && (r = go('convert', { v: parseFloat(m[1].replace(/,/g, '')), from: m[2], to: m[3] }))) return r;
+  if ((m = /^(?:what is |what's |calc(?:ulate)? |compute )?([-+*/^().,\d\sa-z×÷]+)$/.exec(q)) && /\d/.test(m[1]) && (r = go('calc', { x: m[1].trim() }))) return r;
+  if ((m = /^(?:what is|what's|define|explain|describe)(?: an?| the)? (.+)$/.exec(q)) && (r = go('define', { term: m[1] }))) return r;
+  return null;
+}
+function context(q, last) {
+  if (!last) return null;
+  let m, res; const am = last.res.amend;
+  const go = args => { res = T[last.tool](args); return res ? { tool: last.tool, args, rung: 'context', amends: last.id, res } : null; };
+  if (/^(why|how|how so|show (me )?(the )?(plan|trace|work|steps))$/.test(q)) return { tool: 'why', args: { ref: last.id }, rung: 'context', amends: last.id, res: T.why({ ref: last.id }) };
+  if ((m = /^(?:and |now |same (?:but )?)?(?:in|to|as) (.+)$/.exec(q))) {
+    if (am === 'unit') return go({ ...last.args, to: m[1] });
+    if (am === 'fact' && /area|density/.test(last.args.field)) return go({ ...last.args, unit: m[1] });
+  }
+  if (am === 'hist' && (m = /^(?:in )?(log|linear)(?: scale)?$/.exec(q))) return go({ ...last.args, log: m[1] === 'log' });
+  if (am === 'fact' && (m = /^(?:and|same for|what about|now|and for)(?: the)? (.+)$/.exec(q)) && fbFind(m[1])) return go({ ...last.args, country: m[1] });
+  return null;
+}
+function taught(text, q) {
+  let q2 = ' ' + q + ' ', t2 = ' ' + text + ' ';
+  Object.entries(S.aliases).forEach(([k, v]) => { const re = new RegExp('(?<=\\s)' + k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?=\\s)', 'gi'); q2 = q2.replace(re, v); t2 = t2.replace(re, v); });
+  q2 = q2.trim(); if (q2 === q) return null;
+  const r = grammar(t2.trim(), q2, 'taught');
+  if (r) r.res.trace.unshift(`lexicon: "${q}" → "${q2}"`);
+  return r;
+}
+function lev(a, b) { const d = Array.from({ length: a.length + 1 }, (_, i) => [i]); for (let j = 1; j <= b.length; j++) d[0][j] = j; for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] !== b[j - 1])); return d[a.length][b.length]; }
+T.none = a => {
+  const qt = new Set(a.q.split(/[^a-z0-9]+/).filter(Boolean));
+  const near = ALLEX.map(e => { const et = e.toLowerCase().split(/[^a-z0-9]+/); return { e, s: et.filter(t => qt.has(t)).length / Math.sqrt(et.length * (qt.size || 1)) }; }).filter(x => x.s > 0).sort((x, y) => y.s - x.s).slice(0, 3);
+  let teach = null;
+  for (const t of a.q.split(/[^a-z]+/)) {
+    if (t.length < 3 || VOCAB.has(t) || S.aliases[t]) continue;
+    const c = [...VOCAB].find(v => v.length > t.length && v.startsWith(t)) || [...VOCAB].find(v => Math.abs(v.length - t.length) <= 1 && lev(v, t) === 1);
+    if (c) { teach = `${t} means ${c}`; break; }
+  }
+  const chip = x => `<button class="chip" type="button" data-act="run" data-q="${esc(x)}">${esc(x)}</button>`;
+  return { read: [], html: `<div class="note err">No reading, so no answer. I do not guess.</div>${near.length ? `<div class="lbl">Nearest skills</div><div class="opts">${near.map(x => chip(x.e)).join('')}</div>` : '<div class="sub">Nothing close. The Skills tab lists what I can do.</div>'}${teach ? `<div class="lbl">Teach me the word</div><div class="opts">${chip(teach)}</div>` : ''}`,
+    trace: ['context: no open question, no amendment fits', 'grammar: no rule matched', 'lexicon: no taught phrase applies', 'stop'] };
+};
+T.why = a => {
+  const c = S.cards.find(x => x.id === a.ref);
+  return { read: ['explain card', { v: '#' + String(c.id).padStart(2, '0') }], html: `<ol style="margin:0;padding-left:20px;font:12.5px/1.6 var(--mono)">${c.res.trace.map(t => `<li>${esc(t)}</li>`).join('')}</ol><div class="sub">These are the steps that ran, with their inputs. I can show how an answer was computed. I cannot say why the data looks the way it does.</div>`, trace: ['plan.of(card) → steps'] };
+};
+T.export = () => {
+  const body = S.cards.filter(c => c.res.py).map(c => `# ${c.raw}\n${c.res.py}`).join('\n\n');
+  const src = `# golem session, exported ${iso(new Date())}\n# every line is a tool call the session made\nfrom gcu import *\n\n${body || '# nothing to export yet'}`;
+  return { read: ['export session as', { v: 'adder script' }], copy: src, html: `<pre>${esc(src)}</pre><div class="opts"><button class="btn" type="button" data-act="copy">Copy script</button></div><div class="src">plan → adder · names are illustrative, the real packages decide the API</div>`, trace: ['collect the tool call behind each card', 'emit as adder source'] };
+};
+
+/* ── rendering ─────────────────────────────────────────────── */
+const RUNG = { grammar: 'grammar', context: 'context', taught: 'taught', none: 'no reading' };
+function cardEl(c) {
+  const el = document.createElement('article');
+  el.className = 'card'; el.dataset.id = c.id;
+  const r = c.res, read = r.read.map(x => typeof x === 'string' ? esc(x) : x.alts ? `<button class="slot" type="button" data-act="slot" data-key="${x.key}" title="Tap to change this reading">${esc(x.v)}</button>` : `<span class="slot">${esc(x.v)}</span>`).join(' ');
+  const ask = r.ask ? `<div class="note">${esc(r.ask.prompt)}</div><div class="opts">${r.ask.options.map((o, i) => `<button class="btn" type="button" data-act="answer" data-i="${i}">${esc(o.label)}</button>`).join('')}</div>` : '';
+  el.innerHTML = `<div class="chead"><span>#${String(c.id).padStart(2, '0')}</span><span class="rung ${c.rung}">${RUNG[c.rung]}</span>${c.amends ? `<span>from #${String(c.amends).padStart(2, '0')}</span>` : ''}<span class="ms">${c.ms < 10 ? c.ms.toFixed(1) : Math.round(c.ms)} ms</span></div>
+    <div class="q">${esc(c.raw)}</div>${read ? `<div class="read"><span class="lbl">read as</span> ${read}</div>` : ''}
+    <div class="ans">${r.html}${ask}</div>
+    <details class="trace"><summary>plan · ${r.trace.length} step${r.trace.length === 1 ? '' : 's'}</summary><ol>${r.trace.map(t => `<li>${esc(t)}</li>`).join('')}</ol></details>`;
+  return el;
+}
+let statusT;
+function status(msg) { $('status').textContent = msg; clearTimeout(statusT); statusT = setTimeout(() => { $('status').textContent = ''; }, 5000); }
+function addCard(raw, r, ms, quiet) {
+  const c = { id: ++S.n, raw, tool: r.tool, args: r.args, rung: r.rung, amends: r.amends, res: r.res, ms };
+  S.cards.push(c);
+  const el = cardEl(c); $('stream').appendChild(el);
+  if (!quiet) { showTab('ask'); el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
+  tick(); renderPacks(); touch();
+}
+function rerun(c) {
+  const t0 = performance.now(); c.res = T[c.tool](c.args); c.ms = performance.now() - t0;
+  const old = $('stream').querySelector(`[data-id="${c.id}"]`), el = cardEl(c);
+  old.replaceWith(el); tick(); renderPacks(); touch();
+}
+function submit(raw, quiet) {
+  raw = raw.trim(); if (!raw) return;
+  if (!S.awake) { status('Asleep. Tap wake at the top right.'); return; }
+  const t0 = performance.now(), text = norm(raw), q = text.toLowerCase(), last = S.cards[S.cards.length - 1];
+  let m;
+  if (/^(start )?(a )?new session$/.test(q)) { newSession(); status('New session.'); return; }
+  if (/^(sessions|history|menu)$/.test(q)) { openDrawer(); return; }
+  if ((m = /^(?:(?:name|call|rename) this(?: session)?|rename(?: the)? session)(?: to| as)? (.+)$/.exec(q))) { cur.name = text.slice(-m[1].length); cur.auto = false; touch(); status(`Session named “${cur.name}”.`); return; }
+  if (last && last.res.ask) {
+    const os = last.res.ask.options, o = os.find(x => x.label.toLowerCase() === q || String(x.value) === q) || os.find(x => x.label.toLowerCase().startsWith(q) || q.includes(x.label.toLowerCase())) || (os.length === 1 && /^(yes|ok|okay|sure|do it|go)$/.test(q) ? os[0] : null);
+    if (o) { last.res.ask.set(last.args, o.value); rerun(last); status(`Answered #${String(last.id).padStart(2, '0')}: ${o.label}`); return; }
+  }
+  if (/^undo( that)?$/.test(q)) {
+    const c = S.cards.pop(); if (!c) { status('Nothing to undo.'); return; }
+    $('stream').querySelector(`[data-id="${c.id}"]`).remove(); touch(); status(`Removed #${String(c.id).padStart(2, '0')}: ${c.raw}`); return;
+  }
+  if (/^(again|repeat|rerun|do it again)$/.test(q)) { if (last) submit(last.raw); else status('Nothing to repeat.'); return; }
+  const r = context(q, last) || grammar(text, q, 'grammar') || taught(text, q) || { tool: 'none', args: { q }, rung: 'none', res: T.none({ q }) };
+  addCard(raw, r, performance.now() - t0, quiet);
+}
+function tick() {
+  document.querySelectorAll('[data-end]').forEach(el => {
+    const s = Math.ceil((+el.dataset.end - Date.now()) / 1000);
+    el.textContent = s <= 0 ? 'done' : String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+  });
+}
+setInterval(tick, 500);
+
+/* ── tabs, catalog, packs ──────────────────────────────────── */
+function showTab(t) {
+  ['ask', 'skills', 'packs'].forEach(k => { $('v-' + k).hidden = k !== t; });
+  document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === t));
+}
+function renderSkills() {
+  const live = SKILLS.filter(s => s[3]).length; let h = `<div class="sub">${live} skills run in this mock. ${SKILLS.length - live} more are planned from packages that already exist or are named here. Tap an example to run it.</div>`, g = '';
+  SKILLS.forEach(([grp, name, from, on, d, ex]) => {
+    if (grp !== g) { h += `<div class="lbl">${grp}</div>`; g = grp; }
+    h += `<div class="item"><h3>${name} <span class="tag ${on ? 'live' : 'plan'}">${on ? 'in mock' : 'planned'}</span></h3><p>${d}</p><div class="from">${from}</div>${ex.length ? `<div class="opts">${ex.map(x => `<button class="chip" type="button" data-q="${esc(x)}" style="white-space:normal;text-align:left">${esc(x)}</button>`).join('')}</div>` : ''}</div>`;
+  });
+  $('v-skills').innerHTML = h;
+}
+function renderPacks() {
+  const lab = { live: 'in mock', samp: 'sample in mock', plan: 'not wired' };
+  let h = '<div class="sub">golem knows what its installed packs hold. These are the gcu-library entries plus packs worth adding.</div><div class="lbl">Library</div>';
+  PACKS.forEach(([id, name, meta, st, d]) => { h += `<div class="item"><h3>${name} <span class="tag ${st}">${lab[st]}</span></h3><p>${d}</p><div class="from">${id} · ${meta}</div></div>`; });
+  const al = Object.entries(S.aliases);
+  h += `<div class="lbl">On this device</div><div class="item"><h3>Taught words</h3><p>${al.length ? al.map(([k, v]) => `${esc(k)} → ${esc(v)}`).join('<br>') : 'None yet. Try “vario means variogram”.'}</p></div><div class="item"><h3>Notes</h3><p>${S.facts.length ? S.facts.map(esc).join('<br>') : 'None yet. Try “remember that …”.'}</p></div><div class="item"><h3>Open table</h3><p>${S.data ? `assays.csv · ${S.data.length} rows` : 'None.'}</p></div>`;
+  $('v-packs').innerHTML = h;
+}
+
+/* ── wiring ────────────────────────────────────────────────── */
+$('f').addEventListener('submit', e => { e.preventDefault(); const v = $('q').value; $('q').value = ''; submit(v); });
+document.querySelector('.tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) showTab(b.dataset.tab); });
+$('v-skills').addEventListener('click', e => { const b = e.target.closest('[data-q]'); if (b) submit(b.dataset.q); });
+$('sugg').addEventListener('click', e => { const b = e.target.closest('[data-q]'); if (b) submit(b.dataset.q); });
+$('stream').addEventListener('click', e => {
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  const c = S.cards.find(x => x.id === +b.closest('.card').dataset.id), act = b.dataset.act;
+  if (act === 'run') return submit(b.dataset.q);
+  if (!S.awake) return status('Asleep. Tap wake at the top right.');
+  if (act === 'slot') { const s = c.res.read.find(x => x.key === b.dataset.key); c.args[s.key] = s.alts[(s.alts.indexOf(s.cur) + 1) % s.alts.length]; rerun(c); }
+  else if (act === 'answer') { const o = c.res.ask.options[+b.dataset.i]; c.res.ask.set(c.args, o.value); rerun(c); }
+  else if (act === 'handoff') { const n = document.createElement('div'); n.className = 'note ok'; n.textContent = b.dataset.msg; b.replaceWith(n); }
+  else if (act === 'copy') {
+    const fail = () => { const p = document.createElement('pre'); p.textContent = c.res.copy; b.closest('.ans').appendChild(p); status('Copy was blocked here. The text is shown so you can select it.'); };
+    try { navigator.clipboard.writeText(c.res.copy).then(() => status('Copied.'), fail); } catch (err) { fail(); }
+  }
+});
+$('power').addEventListener('click', () => {
+  S.awake = !S.awake; $('phone').classList.toggle('asleep', !S.awake); $('st-on').textContent = S.awake ? 'awake' : 'asleep'; $('q').disabled = !S.awake;
+  $('power').textContent = S.awake ? 'sleep' : 'wake'; $('power').setAttribute('aria-pressed', String(!S.awake));
+  status(S.awake ? 'Awake.' : 'Asleep. Nothing runs until you wake it.');
+});
+$('sugg').innerHTML = ['vario means variogram', 'variogram of cu', 'histogram of cu', 'log scale', 'identify a mineral', 'population density of mongolia in people per square mile', 'and chile', 'set a timer for 5 min', 'what is a skiplist', 'why', 'export as script', 'undo']
+  .map(x => `<button class="chip" type="button" data-q="${esc(x)}">${esc(x)}</button>`).join('');
+
+/* ==== src/50-sessions.js ==== */
+/* ── sessions: stored as plans, replayed on open, named from their tools ── */
+let SS = [], cur = null, sid = 0, ren = null, del = null;
+const KEY = 'golem.mock.v2';
+const spec = c => ({ id: c.id, raw: c.raw, tool: c.tool, args: c.args, rung: c.rung, amends: c.amends, ms: c.ms });
+function persist() {
+  try { localStorage.setItem(KEY, JSON.stringify({ cur: cur.id, sid, aliases: S.aliases, facts: S.facts, ss: SS.map(s => ({ ...s, cards: s.cards.map(spec) })) })); } catch (e) { /* storage is optional */ }
+}
+function tagOf(c) {
+  const a = c.args;
+  switch (c.tool) {
+    case 'convert': return [a.from + ' → ' + a.to, 1];
+    case 'calc': return ['Arithmetic', .5];
+    case 'daysUntil': case 'weekday': return ['Dates', .5];
+    case 'thickness': return ['True thickness', 3];
+    case 'plane': return ['Stereonet ' + p3(a.a1) + '/' + p2(a.a2), 2];
+    case 'hist': return [COL[a.col] + ' histogram', 3];
+    case 'vario': return [COL[a.col] + ' variogram', 3];
+    case 'fact': return [fbFind(a.country)[0] + ' ' + a.field, 2];
+    case 'factList': return ['Landlocked countries', 2];
+    case 'mineral': return [a.name, 2];
+    case 'key': return ['Mineral key', 3];
+    case 'define': return [a.term, 2];
+    case 'lint': return ['Style check', 2];
+    case 'event': return [a.title, 2];
+    case 'timer': return ['Timer', 1];
+    case 'alarm': return ['Alarm', 1];
+    case 'remember': case 'recall': return ['Notes', 1];
+    default: return null;
+  }
+}
+function autoName(cards) {
+  const table = cards.some(c => ['open', 'hist', 'vario'].includes(c.tool)), w = new Map();
+  cards.forEach((c, i) => {
+    if (table && !['hist', 'vario'].includes(c.tool)) return;
+    const t = tagOf(c); if (t) w.set(t[0], (w.get(t[0]) || 0) + t[1] + i * 1e-3);
+  });
+  const top = [...w.entries()].sort((x, y) => y[1] - x[1]).map(x => x[0]);
+  if (table) return 'assays.csv' + (top.length ? ': ' + top.slice(0, 2).join(', ') : '');
+  if (!top.length) return 'New session';
+  const two = top.slice(0, 2).join(', ');
+  return two.length > 40 ? top[0] : two;
+}
+function renderBar() { $('sname').textContent = cur.name; }
+function touch() { cur.updated = Date.now(); if (cur.auto) cur.name = autoName(S.cards); renderBar(); persist(); }
+function load(s, focus) {
+  cur = s; const specs = s.cards;
+  S.cards = []; s.cards = S.cards; S.data = null; S.n = 0; $('stream').innerHTML = '';
+  specs.forEach(c => {
+    let res = null; try { res = T[c.tool](c.args); } catch (e) { res = null; }
+    if (!res) return;
+    const card = { ...spec(c), res }; S.cards.push(card); S.n = Math.max(S.n, card.id); $('stream').appendChild(cardEl(card));
+  });
+  $('exlbl').hidden = !s.example; tick(); renderBar(); renderPacks(); showTab('ask');
+  const el = focus && $('stream').querySelector(`[data-id="${focus}"]`);
+  if (el) el.scrollIntoView({ block: 'start' }); else $('v-ask').scrollTop = 0;
+}
+function newSession(example) {
+  const s = { id: ++sid, name: 'New session', auto: true, example: !!example, created: Date.now(), updated: Date.now(), cards: [] };
+  SS.push(s); load(s); persist(); return s;
+}
+const when = t => { const d = new Date(t), n = new Date(); return d.toDateString() === n.toDateString() ? d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }); };
+function renderDrawer() {
+  const q = $('hq').value.trim().toLowerCase(); let h;
+  if (q) {
+    const hits = []; SS.forEach(s => s.cards.forEach(c => { if (c.raw.toLowerCase().includes(q)) hits.push([s, c]); }));
+    h = `<div class="lbl">${hits.length} match${hits.length === 1 ? '' : 'es'} in history</div>` + hits.slice(0, 40).map(([s, c]) => `<div class="srow"><button class="open" type="button" data-s="${s.id}" data-c="${c.id}" style="font:13px var(--mono)">&gt; ${esc(c.raw)}</button><div class="meta"><span>${esc(s.name)}</span></div></div>`).join('');
+  } else {
+    h = '<div class="lbl">Sessions</div>' + [...SS].sort((x, y) => y.updated - x.updated || y.id - x.id).map(s => `<div class="srow" aria-current="${s === cur}">${ren === s.id ? `<input class="ren" data-id="${s.id}" value="${esc(s.name)}" aria-label="Session name. Leave empty to name it automatically.">` : `<button class="open" type="button" data-s="${s.id}">${esc(s.name)}</button>`}<div class="meta"><span>${s.cards.length} card${s.cards.length === 1 ? '' : 's'} · ${when(s.updated)}</span>${s.auto ? '<span class="tag plan">auto name</span>' : ''}${s.example ? '<span class="tag samp">example</span>' : ''}<button class="link" type="button" data-ren="${s.id}">rename</button><button class="link" type="button" data-del="${s.id}">${del === s.id ? 'confirm delete' : 'delete'}</button></div></div>`).join('');
+  }
+  $('dlist').innerHTML = h;
+  const i = $('dlist').querySelector('.ren'); if (i) { i.focus(); i.select(); }
+}
+function openDrawer() { ren = del = null; $('hq').value = ''; renderDrawer(); $('drawer').hidden = false; $('scrim').hidden = false; }
+function closeDrawer() { $('drawer').hidden = true; $('scrim').hidden = true; }
+function commitName(inp) {
+  const s = SS.find(x => x.id === +inp.dataset.id), v = inp.value.trim(); if (!s) return;
+  if (v) { s.name = v; s.auto = false; } else { s.auto = true; s.name = autoName(s.cards); }
+  ren = null; renderBar(); persist(); renderDrawer();
+}
+$('menu').addEventListener('click', openDrawer);
+$('sname').addEventListener('click', openDrawer);
+$('dclose').addEventListener('click', closeDrawer);
+$('scrim').addEventListener('click', closeDrawer);
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('drawer').hidden) closeDrawer(); });
+$('newsess').addEventListener('click', () => { newSession(); closeDrawer(); status('New session.'); $('q').focus(); });
+$('hq').addEventListener('input', renderDrawer);
+$('dlist').addEventListener('keydown', e => { if (e.target.classList.contains('ren') && e.key === 'Enter') commitName(e.target); });
+$('dlist').addEventListener('focusout', e => { if (e.target.classList.contains('ren') && ren != null) commitName(e.target); });
+$('dlist').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.s) { const s = SS.find(x => x.id === +b.dataset.s); load(s, b.dataset.c); persist(); closeDrawer(); }
+  else if (b.dataset.ren) { ren = +b.dataset.ren; del = null; renderDrawer(); }
+  else if (b.dataset.del) {
+    const id = +b.dataset.del;
+    if (del !== id) { del = id; renderDrawer(); return; }
+    SS = SS.filter(x => x.id !== id); del = null;
+    if (cur.id === id) { if (SS.length) load([...SS].sort((x, y) => y.updated - x.updated)[0]); else newSession(); }
+    persist(); renderDrawer();
+  }
+});
+
+/* ── start: restore saved sessions, or seed two examples ───── */
+function seed() {
+  SS = []; sid = 0;
+  newSession(true); ['open assays.csv', 'histogram of cu', 'log scale', 'variogram of cu', '2 m'].forEach(x => submit(x, true));
+  newSession(true); ['0.35 oz per short ton in g/t', 'true thickness of a 14 m intercept, hole 270/60, bedding 045/30', 'remind me to send the samples to the lab on friday at 9', 'vario of cu'].forEach(x => submit(x, true));
+  $('v-ask').scrollTop = 0; $('status').textContent = '';
+}
+function restore() {
+  try {
+    const d = JSON.parse(localStorage.getItem(KEY));
+    if (!d || !Array.isArray(d.ss) || !d.ss.length) return false;
+    SS = d.ss; sid = d.sid || Math.max(...SS.map(s => s.id)); S.aliases = d.aliases || {}; S.facts = d.facts || [];
+    load(SS.find(s => s.id === d.cur) || SS[0]); return true;
+  } catch (e) { return false; }
+}
+renderSkills(); renderPacks();
+if (!restore()) seed();
+
+</script>
+</body>
+</html>

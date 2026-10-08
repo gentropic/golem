@@ -1,0 +1,15 @@
+{
+  "name": "golem",
+  "version": "0.0.1",
+  "private": true,
+  "description": "golem: an assistant with no model at runtime. Interactive mock and spec.",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node build.mjs && node test/smoke.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.64.0"
+  }
+}
