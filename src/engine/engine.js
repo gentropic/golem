@@ -17,6 +17,7 @@ import './convert.js';
 import './calendar.js';
 import './estimate.js';
 import './chem.js';
+import './text.js';
 import './notes.js';
 import { norm, grammar, context, taught } from './reading.js';
 import { current, newSession, renameSession, touch } from './sessions.js';
@@ -56,7 +57,7 @@ export function submit(raw) {
   }
   if (/^undo( that)?$/.test(q)) { const c = undo(); return c ? { kind: 'undo', card: c } : { kind: 'nothing', msg: 'Nothing to undo.' }; }
   if (/^(again|repeat|rerun|do it again)$/.test(q)) return last ? submit(last.raw) : { kind: 'nothing', msg: 'Nothing to repeat.' };
-  const r = context(q, last) || grammar(text, q, 'grammar') || taught(text, q) || { tool: 'none', args: { q }, rung: 'none', res: T.none({ q }) };
+  const r = context(q, last) || grammar(text, q, 'grammar', raw) || taught(text, q, raw) || { tool: 'none', args: { q }, rung: 'none', res: T.none({ q }) };
   return { kind: 'card', card: addCard(raw, r, performance.now() - t0) };
 }
 

@@ -34,10 +34,10 @@ const describeVerdict = r => `clause: ${r.status}${r.reasons ? ' — ' + r.reaso
 
 /* ── rung 2, second half: the regex rules the declarations carry, by rank ── */
 const readers = () => TOOLS.filter(d => d.read).sort((a, b) => a.rank - b.rank);
-export function grammar(text, q, rung) {
+export function grammar(text, q, rung, raw) {
   const c = clauseRead(text, rung); if (c.tool) return c;
   for (const d of readers()) {
-    const args = d.read(text, q); if (!args) continue;
+    const args = d.read(text, q, raw); if (!args) continue;
     const res = runTool(d.name, args); if (res) return { tool: d.name, args, rung, res };
   }
   return null;
@@ -57,11 +57,11 @@ export function context(q, last) {
   return null;
 }
 /* ── rung 3: taught words rewrite the query, then the grammar reads it again ── */
-export function taught(text, q) {
+export function taught(text, q, raw) {
   let q2 = ' ' + q + ' ', t2 = ' ' + text + ' ';
   Object.entries(S.aliases).forEach(([k, v]) => { const re = new RegExp('(?<=\\s)' + k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?=\\s)', 'gi'); q2 = q2.replace(re, v); t2 = t2.replace(re, v); });
   q2 = q2.trim(); if (q2 === q) return null;
-  const r = grammar(t2.trim(), q2, 'taught');
+  const r = grammar(t2.trim(), q2, 'taught', raw);
   if (r) r.res.trace.unshift(`lexicon: "${q}" → "${q2}"`);
   return r;
 }

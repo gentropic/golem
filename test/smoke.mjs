@@ -44,7 +44,8 @@ const STEPS = [
   ['is 21 apr 2027 a working day', 'grammar', 'Tiradentes'],
   ['9am sao paulo in perth', 'grammar', '20:00'],
   ['2.6 to 2.9 t/m3 * 1.2 to 1.5 Mm3', 'grammar', 'exact 3.7125'],
-  ['molar mass of CuFeS2', 'grammar', '183.51']
+  ['molar mass of CuFeS2', 'grammar', '183.51'],
+  ['word count: the quick brown fox jumps over the lazy dog. it was not amused.', 'grammar', 'Flesch']
 ];
 
 const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
@@ -69,7 +70,7 @@ const nameOk = name === 'assays.csv: Au histogram, Cu histogram';
 console.log(`${nameOk ? 'ok  ' : 'FAIL'} session auto-name: ${name}`);
 await page.reload(); await page.waitForSelector('#stream .card');
 const kept = await page.locator('#stream .card').count();
-console.log(`${kept === 16 ? 'ok  ' : 'FAIL'} session replays after reload: ${kept} cards`);
+console.log(`${kept === 17 ? 'ok  ' : 'FAIL'} session replays after reload: ${kept} cards`);
 const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 console.log(`${overflow <= 0 ? 'ok  ' : 'FAIL'} no horizontal overflow at 420 px`);
 // a real file through the picker, then a table question on it
@@ -85,5 +86,5 @@ console.log(`${queryOk ? 'ok  ' : 'FAIL'} a grouped mean on the opened file`);
 if (!fileOk || !queryOk) failed++;
 errors.forEach(e => console.log('FAIL ' + e));
 await browser.close();
-if (failed || !nameOk || kept !== 16 || overflow > 0 || errors.length) { console.log('\nsmoke test failed'); process.exit(1); }
+if (failed || !nameOk || kept !== 17 || overflow > 0 || errors.length) { console.log('\nsmoke test failed'); process.exit(1); }
 console.log('\nsmoke test passed');

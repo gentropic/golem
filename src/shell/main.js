@@ -94,7 +94,10 @@ function restore() { try { return hydrate(JSON.parse(localStorage.getItem(KEY)))
 onChange(() => { renderBar(); persist(); });
 
 /* ── wiring ── */
-$('f').addEventListener('submit', e => { e.preventDefault(); const v = $('q').value; $('q').value = ''; run(v); });
+$('f').addEventListener('submit', e => { e.preventDefault(); const v = $('q').value; $('q').value = ''; grow(); run(v); });
+function grow() { const q = $('q'); q.style.height = 'auto'; q.style.height = Math.min(q.scrollHeight, window.innerHeight * 0.4) + 'px'; }
+$('q').addEventListener('input', grow);
+$('q').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('f').requestSubmit(); } });
 // a file from the picker (the lead-acid shell routes <input type=file> to the system picker): text in, a card out
 $('attach').addEventListener('click', () => { if (awake) $('file').click(); });
 $('file').addEventListener('change', e => {
