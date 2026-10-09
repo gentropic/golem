@@ -164,6 +164,7 @@ Status: **mock** = works in `src/` today; **planned** = named, not built.
 | Compute | Unit conversion with dimension checks | mock (own table, checked against `@gcu/units`) | `@gcu/units`, `@gcu/dimensions` |
 | Compute | Arithmetic, trig in degrees | mock (own parser) | `@gcu/expr` if it fits, else keep the parser |
 | Compute | Dates: day counts, weekdays | mock | built in |
+| Compute | Molar mass, element-to-oxide factors, element fractions, the periodic table | mock (8 Oct 2026) over `src/engine/data/elements.js`: IUPAC CIAAW 2024 weights abridged to five figures, source in the file; no mineral names until a minerals pack exists | the periodic table as a records pack |
 | Compute | Estimates with ranges: arithmetic over "a to b" and "a ± b" by simulation, units carried through, mean and 10th/50th/90th percentiles, the seed in the plan | mock (own sampler, 8 Oct 2026); distributions are slots | `@gcu/scitra` for the samplers once vendored |
 | Compute | Working days and rosters: counts, N working days from a date, is-it-a-working-day, on/off rosters; the calendar is a slot (Brazil federal, weekdays only) | `@gcu/plan` calendar and holidays vendored (8 Oct 2026); municipal calendars and the plan what-ifs are not | `@gcu/plan` |
 | Compute | Time zones: a time in one place as it reads in another, now in a place, shared hours across places; named days (Easter, Carnival, Christmas) | mock, Intl only (8 Oct 2026) | built in |

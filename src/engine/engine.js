@@ -16,6 +16,7 @@ import './explain.js';
 import './convert.js';
 import './calendar.js';
 import './estimate.js';
+import './chem.js';
 import './notes.js';
 import { norm, grammar, context, taught } from './reading.js';
 import { current, newSession, renameSession, touch } from './sessions.js';
