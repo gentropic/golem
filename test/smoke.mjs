@@ -88,6 +88,11 @@ console.log(`${fileOk ? 'ok  ' : 'FAIL'} a CSV opens through the picker`);
 await page.fill('#q', 'mean cu by litho'); await page.press('#q', 'Enter'); await page.waitForTimeout(60);
 const grouped = await page.evaluate(() => [...document.querySelectorAll('#stream .card')].pop().textContent);
 const queryOk = /BRX/.test(grouped) && /holes\.csv/.test(grouped);
+await page.fill('#q', 'true thickness of every intercept with hole 270/60, bedding 045/30'); await page.press('#q', 'Enter'); await page.waitForTimeout(60);
+const applied = await page.evaluate(() => [...document.querySelectorAll('#stream .card')].pop().textContent);
+const applyOk = /true thickness over/.test(applied);
+console.log(`${applyOk ? 'ok  ' : 'FAIL'} a skill applied to every intercept`);
+if (!applyOk) failed++;
 console.log(`${queryOk ? 'ok  ' : 'FAIL'} a grouped mean on the opened file`);
 if (!fileOk || !queryOk) failed++;
 // the dm fixture after the CSV questions, since opening it replaces the open table

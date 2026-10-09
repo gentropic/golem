@@ -23,6 +23,7 @@ import './econ.js';
 import './log.js';
 import './places.js';
 import './sky.js';
+import './apply.js';
 import { convertBinary } from './formats.js';
 import './notes.js';
 import { norm, grammar, context, taught } from './reading.js';

@@ -16,6 +16,7 @@ Open `dist/golem.html`, then:
 - Type `why` after any card, or `export as script`.
 - Open the menu (top left) for sessions and history search.
 - Ask `how old is the permian`, `what period is 250 ma`, `stages of the triassic`: the ICS chart, 171 units, CC BY 4.0 via Macrostrat.
+- With a table open, try `true thickness of every intercept with hole 270/60, bedding 045/30` or `apparent dip of each plane on a section at 090`.
 - Open an `.xlsx` or a Datamine `.dm` with the paperclip: it is converted once, kept, and every table question works on it.
 - Try `home is -19.92, -43.94`, `distance from home to -6.07,-50.16`, `-19.92, -43.94 in utm`, `sunrise tomorrow in home`, `moon phase on 25 dec`.
 - Try `log 5 km run yesterday`, `how many km did i run this month`, `mean weight by week`, `open the log` then `count by activity`.
@@ -64,6 +65,7 @@ src/engine/                  no DOM, no storage: everything that reads and compu
   estimate.js                arithmetic over ranges by simulation, units carried through, the seed in args
   chem.js                    formulas parsed; molar mass, oxide factors, fractions over data/elements.js (IUPAC weights)
   text.js                    payloads after a colon or the first line: word count and readability, TextRank sentences, Myers diff
+  apply.js                   a skill on every row of the table, columns bound by name, constants for the rest
   formats.js                 xlsx and .dm converted to text per table at open time (sheet, dm vendored)
   places.js sky.js           saved places, Vincenty distance, Krüger UTM; NOAA sun times, mean-cycle moon phase
   log.js                     the log: a device table written from cards, asked in plain words, opened as the table
@@ -94,6 +96,7 @@ test/chem.test.mjs           the elements table is whole; CuFeS2, Fe→Fe2O3, Cu
 test/text.test.mjs           counts and Flesch, TextRank order, Myers edits, the payload rule
 test/forms.test.mjs          the decision matrix end to end, and the formulas with their terms asked
 test/log.test.mjs            the log: rows, corrections, undo, replay, questions, opened as a table
+test/apply.test.mjs          thickness and apparent dip over every row, against the single-value tools
 test/formats.test.mjs        xlsx (written by the vendored sheet) and the .dm fixture through openBinary, replay, the sheet slot
 test/places.test.mjs         Vincenty against the Geoscience Australia test line, UTM round trips and the meridian arc, sun and moon
 test/oracle.test.mjs         golem's arithmetic against the GCU packages it does not vendor
