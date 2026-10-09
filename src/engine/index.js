@@ -13,6 +13,8 @@ export { parseFormula, molarMass } from './chem.js';
 export { payloadOf, sentences, syllables, textrank, myers } from './text.js';
 export { numberAsk, listAsk, listOf, firstNeed } from './forms.js';
 export { readLog, logTable } from './log.js';
+export { placeOf, vincenty, toUTM, fromUTM, utmZone } from './places.js';
+export { solar } from './sky.js';
 
 // the words of a result, in reading order: what a person would see on the card
 export function textOf(c) {

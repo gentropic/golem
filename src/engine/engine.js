@@ -21,6 +21,8 @@ import './text.js';
 import './forms.js';
 import './econ.js';
 import './log.js';
+import './places.js';
+import './sky.js';
 import './notes.js';
 import { norm, grammar, context, taught } from './reading.js';
 import { current, newSession, renameSession, touch } from './sessions.js';

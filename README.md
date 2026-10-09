@@ -16,6 +16,7 @@ Open `dist/golem.html`, then:
 - Type `why` after any card, or `export as script`.
 - Open the menu (top left) for sessions and history search.
 - Ask `how old is the permian`, `what period is 250 ma`, `stages of the triassic`: the ICS chart, 171 units, CC BY 4.0 via Macrostrat.
+- Try `home is -19.92, -43.94`, `distance from home to -6.07,-50.16`, `-19.92, -43.94 in utm`, `sunrise tomorrow in home`, `moon phase on 25 dec`.
 - Try `log 5 km run yesterday`, `how many km did i run this month`, `mean weight by week`, `open the log` then `count by activity`.
 - Try `help me decide between perth, vancouver and santiago` (it asks for criteria, weights and scores), `cutoff grade for copper at 9000 usd/t, 88% recovery, processing 14 usd/t, g&a 3 usd/t`, `cueq of 0.8% cu and 0.3 g/t au at 9000 usd/t and 2300 usd/oz`.
 - Try `word count: …`, `summarise this: …` (six sentences or more), `diff these:` with the two blocks on the lines below separated by `---`.
@@ -62,6 +63,7 @@ src/engine/                  no DOM, no storage: everything that reads and compu
   estimate.js                arithmetic over ranges by simulation, units carried through, the seed in args
   chem.js                    formulas parsed; molar mass, oxide factors, fractions over data/elements.js (IUPAC weights)
   text.js                    payloads after a colon or the first line: word count and readability, TextRank sentences, Myers diff
+  places.js sky.js           saved places, Vincenty distance, Krüger UTM; NOAA sun times, mean-cycle moon phase
   log.js                     the log: a device table written from cards, asked in plain words, opened as the table
   forms.js econ.js           the form card (questions asked in turn, answers as slots) and the decision matrix; Gy, cutoff, NSR, equivalents
   knowledge.js device.js     packs sample, device hand-offs
@@ -90,6 +92,7 @@ test/chem.test.mjs           the elements table is whole; CuFeS2, Fe→Fe2O3, Cu
 test/text.test.mjs           counts and Flesch, TextRank order, Myers edits, the payload rule
 test/forms.test.mjs          the decision matrix end to end, and the formulas with their terms asked
 test/log.test.mjs            the log: rows, corrections, undo, replay, questions, opened as a table
+test/places.test.mjs         Vincenty against the Geoscience Australia test line, UTM round trips and the meridian arc, sun and moon
 test/oracle.test.mjs         golem's arithmetic against the GCU packages it does not vendor
 test/smoke.mjs               browser smoke test on the built file
 dist/golem.html              the built mock (committed, so it opens without a build)

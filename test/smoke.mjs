@@ -49,7 +49,9 @@ const STEPS = [
   ['cutoff grade for copper at 9000 usd/t, 88% recovery, processing 14 usd/t, g&a 3 usd/t', 'grammar', 'Selling cost'],
   ['0', 'grammar', '0.2146'],
   ['log 5 km run', 'grammar', 'Logged'],
-  ['how many km did i run this week', 'grammar', '5']
+  ['how many km did i run this week', 'grammar', '5'],
+  ['0, -45 in utm', 'grammar', '23N 500,000 E 0 N'],
+  ['distance from 0,0 to 0,1', 'grammar', '111.3']
 ];
 
 const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
@@ -74,7 +76,7 @@ const nameOk = name === 'assays.csv: Au histogram, Cu histogram';
 console.log(`${nameOk ? 'ok  ' : 'FAIL'} session auto-name: ${name}`);
 await page.reload(); await page.waitForSelector('#stream .card');
 const kept = await page.locator('#stream .card').count();
-console.log(`${kept === 20 ? 'ok  ' : 'FAIL'} session replays after reload: ${kept} cards`);
+console.log(`${kept === 22 ? 'ok  ' : 'FAIL'} session replays after reload: ${kept} cards`);
 const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 console.log(`${overflow <= 0 ? 'ok  ' : 'FAIL'} no horizontal overflow at 420 px`);
 // a real file through the picker, then a table question on it
@@ -90,5 +92,5 @@ console.log(`${queryOk ? 'ok  ' : 'FAIL'} a grouped mean on the opened file`);
 if (!fileOk || !queryOk) failed++;
 errors.forEach(e => console.log('FAIL ' + e));
 await browser.close();
-if (failed || !nameOk || kept !== 20 || overflow > 0 || errors.length) { console.log('\nsmoke test failed'); process.exit(1); }
+if (failed || !nameOk || kept !== 22 || overflow > 0 || errors.length) { console.log('\nsmoke test failed'); process.exit(1); }
 console.log('\nsmoke test passed');
