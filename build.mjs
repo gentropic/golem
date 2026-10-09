@@ -71,7 +71,11 @@ function fontFaces() {
 if (process.argv[1] && posix(process.argv[1]).endsWith('/build.mjs')) {
   const shell = readFileSync(join(src, 'shell', 'index.html'), 'utf8');
   if (!shell.includes('/*__FONTS__*/')) throw new Error('build: src/shell/index.html needs a /*__FONTS__*/ marker inside a <style>');
-  const js = bundle('shell/main.js');
+  const strip = s => s.replace(/^import\s+.*['"].*['"];?\s*$/gm, '').replace(/^import\s*\{[\s\S]*?\}\s*from\s*['"].*['"];?\s*$/gm, '').replace(/^export (async function\*?|function\*?|const|let|class) /gm, '$1 ').replace(/^export\s*\{[^}]*\};?\s*$/gm, '').replace(/^export\s+default\s+.*$/gm, '');
+  const worker = ['vendor/adder/parse.js', 'vendor/adder/builtins.js', 'vendor/adder/eval.js', 'vendor/adder/runner.js', 'worker/py-driver.js'].map(f => `/* ==== src/${f} ==== */\n` + strip(readFileSync(join(src, f), 'utf8'))).join('\n;\n') + "\n;self.onmessage = async e => { self.postMessage(await pyRun({ run, pyRepr, adderParse }, e.data)); };\n";
+  if (/^\s*(import|export)\b/m.test(worker)) throw new Error('build: module syntax left in the Python worker');
+  const js = bundle('shell/main.js').replace("/*__PY_WORKER__*/''", () => JSON.stringify("'use strict';\n" + worker).replace(/</g, '\\u003c'));
+  if (!js.includes('self.onmessage')) throw new Error('build: the Python worker was not embedded (marker missing in src/shell/main.js)');
   // the shell file starts with <title> and <style>; everything from the first <div class="wrap"> on is the body
   const cut = shell.indexOf('<div class="wrap">');
   const head = shell.slice(0, cut).replace('/*__FONTS__*/', fontFaces());

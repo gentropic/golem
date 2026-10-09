@@ -1,6 +1,6 @@
 // Sessions: stored as plans (card specs), replayed on open, named from the tools that ran.
 // The shell persists whatever `serialize()` returns and feeds it back through `hydrate()`.
-import { S, toolByName, runTool } from './core.js';
+import { S, toolByName, runTool, startJobs, clearResults } from './core.js';
 
 let SS = [], cur = null;
 let sid = 0;
@@ -39,6 +39,8 @@ export function load(s) {
     if (!res) return;
     const card = { ...spec(c), res }; S.cards.push(card); S.n = Math.max(S.n, card.id);
   });
+  const loaded = S.cards;
+  startJobs(loaded, card => { card.res = runTool(card.tool, card.args); });
   return S.cards;
 }
 export function openSession(id) { const s = SS.find(x => x.id === id); if (!s) return null; load(s); changed(); return s; }
@@ -79,5 +81,5 @@ export function hydrate(d) {
 }
 // forget everything: sessions, device state, working state (tests start here)
 export function reset() {
-  SS = []; cur = null; sid = 0; S.cards = []; S.n = 0; S.aliases = {}; S.facts = []; S.files = {}; S.tables = {}; S.table = null; S.clause = null;
+  SS = []; cur = null; sid = 0; S.cards = []; S.n = 0; S.aliases = {}; S.facts = []; S.files = {}; S.tables = {}; S.table = null; S.clause = null; clearResults();
 }

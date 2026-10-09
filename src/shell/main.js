@@ -3,6 +3,7 @@
 import { S } from '../engine/core.js';
 import { submit, flipSlot, answer, seedExamples, openFile, openBinary } from '../engine/engine.js';
 import { BINARY } from '../engine/formats.js';
+import { setRunner, onJobDone } from '../engine/core.js';
 import { sessions, current, newSession, openSession, renameSession, deleteSession, searchHistory, serialize, hydrate, onChange } from '../engine/sessions.js';
 import { skills, PACKS, SUGGESTIONS } from '../engine/skills.js';
 import { shell } from '../vendor/leadacid.js';
@@ -95,6 +96,19 @@ function restore() { try { return hydrate(JSON.parse(localStorage.getItem(KEY)))
 onChange(() => { renderBar(); persist(); });
 
 /* ── wiring ── */
+/* ── Python: adder in a fresh Web Worker per run, built from the page itself; no network ── */
+const PY_WORKER_SRC = /*__PY_WORKER__*/'';
+setRunner('python', req => new Promise(done => {
+  if (!PY_WORKER_SRC || typeof Worker === 'undefined') { done({ stdout: '', stderr: '', value: null, error: { type: 'RunnerError', message: 'this page has no Python worker', line: null }, ms: 0, trace: null }); return; }
+  const url = URL.createObjectURL(new Blob([PY_WORKER_SRC], { type: 'text/javascript' })), w = new Worker(url);
+  const end = r => { clearTimeout(kill); w.terminate(); URL.revokeObjectURL(url); done(r); };
+  const kill = setTimeout(() => end({ stdout: '', stderr: '', value: null, error: { type: 'BudgetExceeded', message: `no answer in ${req.ms / 1000 + 1} s, so the worker was stopped`, line: null }, ms: req.ms + 1000, trace: null }), req.ms + 1000);
+  w.onmessage = e => end(e.data);
+  w.onerror = e => { e.preventDefault(); end({ stdout: '', stderr: '', value: null, error: { type: 'RunnerError', message: e.message || 'the worker failed', line: null }, ms: 0, trace: null }); };
+  w.postMessage(req);
+}));
+onJobDone(c => { replaceCard(c); });
+
 $('f').addEventListener('submit', e => { e.preventDefault(); const v = $('q').value; $('q').value = ''; grow(); run(v); });
 function grow() { const q = $('q'); q.style.height = 'auto'; q.style.height = Math.min(q.scrollHeight, window.innerHeight * 0.4) + 'px'; }
 $('q').addEventListener('input', grow);

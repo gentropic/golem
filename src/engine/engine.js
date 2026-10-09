@@ -1,6 +1,6 @@
 // The entry point: submit(raw) reads a request and returns what happened. Cards are recomputed in
 // place by rerun(); answers and slot flips go through it, so args stay the only state that matters.
-import { S, T, runTool, toolByName } from './core.js';
+import { S, T, runTool, toolByName, startJobs } from './core.js';
 import './units.js';
 import './calc.js';
 import './dates.js';
@@ -24,6 +24,7 @@ import './log.js';
 import './places.js';
 import './sky.js';
 import './apply.js';
+import './python.js';
 import { convertBinary } from './formats.js';
 import './notes.js';
 import { norm, grammar, context, taught } from './reading.js';
@@ -31,10 +32,10 @@ import { current, newSession, renameSession, touch } from './sessions.js';
 
 export function addCard(raw, r, ms) {
   const c = { id: ++S.n, raw, tool: r.tool, args: r.args, rung: r.rung, amends: r.amends, res: r.res, ms };
-  S.cards.push(c); touch(); return c;
+  S.cards.push(c); touch(); startJobs([c], rerun); return c;
 }
 export function rerun(c) {
-  const t0 = performance.now(); c.res = runTool(c.tool, c.args); c.ms = performance.now() - t0; touch(); return c;
+  const t0 = performance.now(); c.res = runTool(c.tool, c.args); c.ms = performance.now() - t0; touch(); startJobs([c], rerun); return c;
 }
 // an ambiguous slot cycles through its alternatives
 export function flipSlot(c, key) {

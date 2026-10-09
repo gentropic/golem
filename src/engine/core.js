@@ -42,6 +42,26 @@ export function frame(f) { FRAMES.push(f); return f; }
 export const CONDITIONS = {};
 export function condition(name, c) { CONDITIONS[name] = c; return c; }
 const readOf = r => r.read.map(x => typeof x === 'string' ? x : x.v).join(' ');
+// Jobs: a tool that needs an asynchronous runner (Python in a worker) returns res.pending = { job, req }.
+// The engine starts the job, keeps the plain-JSON result under the request's key, and recomputes the card,
+// which then finds it through result(job, req). Results are working state: replay runs the job again.
+const RUNNERS = {}, RESULTS = new Map(), INFLIGHT = new Map(), DONE = [];
+export function setRunner(job, fn) { RUNNERS[job] = fn; }
+export function onJobDone(fn) { DONE.push(fn); }
+const keyOf = (job, req) => job + ':' + JSON.stringify(req);
+// undefined: not run yet (start it); null: no runner here; otherwise the kept result
+export function result(job, req) { const k = keyOf(job, req); if (RESULTS.has(k)) return RESULTS.get(k); return RUNNERS[job] ? undefined : null; }
+export function clearResults() { RESULTS.clear(); }
+export function startJobs(cards, redo) {
+  for (const c of cards) {
+    const p = c.res && c.res.pending; if (!p || !RUNNERS[p.job]) continue;
+    const k = keyOf(p.job, p.req);
+    if (!INFLIGHT.has(k)) INFLIGHT.set(k, Promise.resolve().then(() => RUNNERS[p.job](p.req)).then(r => r, e => ({ stdout: '', stderr: '', value: null, error: { type: 'RunnerError', message: String(e && e.message || e), line: null }, ms: 0, trace: null })).then(r => { RESULTS.set(k, r); INFLIGHT.delete(k); }));
+    INFLIGHT.get(k).then(() => { if (c.res && c.res.pending) { redo(c); DONE.forEach(f => f(c)); } });
+  }
+}
+// every job started so far has finished and its cards are recomputed (tests wait on this)
+export async function settle() { while (INFLIGHT.size) await Promise.all([...INFLIGHT.values()]); await Promise.resolve(); await Promise.resolve(); }
 export function runTool(name, args) {
   const d = toolByName(name);
   if (!d || !d.run) return null;
