@@ -19,6 +19,7 @@ Sections 1 to 11 describe the target. Section 12 says what the mock does today. 
 6. **Offline and self-contained.** Zero network requests in normal use. Knowledge arrives as installed packs.
 7. **Knowledge is installed, not baked.** What golem knows is the union of its tools and its packs. Breadth grows by adding either.
 8. **Single-file deploy.** The web build is one HTML file. The Android build wraps the same file.
+9. **Not a sealed build.** golem is a personal assistant, not a tool a company audits, so it does not carry the monorepo's seal attestation (decided 8 Oct 2026). The rules above stand on their own: no network, no model, deterministic replay, and parsers that stay parsers. What this loosens: Wasm built from source in the monorepo (natra's kernels) is allowed; binaries golem did not build are not. Runtime code generation (`eval`, `new Function`) stays out of the engine and the parsers; the one documented escape hatch is adder's AIR path for code the person typed, to be taken only if the tree-walking interpreter proves too slow in use.
 
 ### Non-goals
 
@@ -308,7 +309,7 @@ Default to the user-confirms route: the app then requests no dangerous permissio
 
 - **Web:** one HTML file, service worker from `@gcu/sw`, installable as a PWA.
 - **Android:** the same file inside the lead-acid shell, published through the Geoscientific Chaos Union Play organisation account.
-- **Capability declaration:** `@gcu/seal` output (hash, `capability.json`, CSP, SBOM). The intended declaration is zero network in normal use; pack installation from the registry is the one network path and should be explicit and user-initiated.
+- **Capability declaration:** a plain statement in the listing and in the app: zero network in normal use; pack installation from the registry is the one network path and should be explicit and user-initiated. golem is not a sealed build (principle 9); `@gcu/seal` is used, if at all, only to sign a field log on request.
 - **Locale:** English first. pt-BR arrives as a locale bank for the grammar and for dispatch, the same way dispatch plans it. Taught words are per device and can be in any language.
 
 ---
@@ -364,7 +365,7 @@ In order. Each step leaves something that runs.
 8. **Packs.** Install from a registry, define the `golem` facet, build it for `factbook`, `ods` and `elements-of-style`.
 9. **Session store** on `@gcu/vfs`; export and import a session as a file.
 10. **lead-acid.** The intent route in the shell; the web fallback in the page.
-11. **Release.** Service worker, seal artifacts, licence attributions, pt-BR bank, store listing. (Fonts are embedded since 8 Oct 2026.)
+11. **Release.** Service worker, licence attributions, the capability statement, pt-BR bank, store listing. (Fonts are embedded since 8 Oct 2026; no seal artifacts, see principle 9.)
 
 ---
 
