@@ -6,6 +6,7 @@ export { skills, examples, vocab, PACKS, SUGGESTIONS } from './skills.js';
 export { norm, grammar, context, taught, clauseRead, clauseEngine } from './reading.js';
 export { ontology } from './ontology.js';
 export { tableFromText, colOf, whereToSift, stats } from './table.js';
+export { sha256, tableText } from './convert.js';
 
 // the words of a result, in reading order: what a person would see on the card
 export function textOf(c) {

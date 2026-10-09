@@ -384,6 +384,15 @@
         ],
         "notebook": [
           "notebook"
+        ],
+        "csv": [
+          "csv"
+        ],
+        "tsv": [
+          "tsv"
+        ],
+        "json": [
+          "json"
         ]
       },
       "words_pt": {
@@ -395,6 +404,15 @@
         "notebook": [
           "notebook",
           "caderno"
+        ],
+        "csv": [
+          "csv"
+        ],
+        "tsv": [
+          "tsv"
+        ],
+        "json": [
+          "json"
         ]
       }
     },

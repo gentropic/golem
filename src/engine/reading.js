@@ -113,5 +113,5 @@ tool({
 frame({
   name: 'export', label: 'Export', words: ['export', 'save'], theme: [], required: ['as'], roles: { as: { preps: ['as', 'to'], types: ['format'] } },
   words_pt: ['exportar', 'exporta', 'salvar', 'salva'], label_pt: 'Exportar',
-  bind: () => ({ tool: 'export', args: {} })
+  bind: c => { const as = c.roles.as && c.roles.as[0] && c.roles.as[0].value; return ['csv', 'tsv', 'json'].includes(as) ? { tool: 'tableExport', args: { fmt: as } } : { tool: 'export', args: {} }; }
 });

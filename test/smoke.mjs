@@ -38,7 +38,9 @@ const STEPS = [
   ['export as script', 'grammar', 'plot.hist'],
   ['how old is the permian', 'grammar', '298.9'],
   ['explain cron: 0 9 * * 1-5', 'grammar', 'At 09:00, Monday to Friday'],
-  ['chmod 754', 'grammar', 'rwxr-xr--']
+  ['chmod 754', 'grammar', 'rwxr-xr--'],
+  ['sha256: abc', 'grammar', 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad'],
+  ['the table as tsv', 'grammar', 'Save assays.tsv']
 ];
 
 const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
@@ -63,7 +65,7 @@ const nameOk = name === 'assays.csv: Au histogram, Cu histogram';
 console.log(`${nameOk ? 'ok  ' : 'FAIL'} session auto-name: ${name}`);
 await page.reload(); await page.waitForSelector('#stream .card');
 const kept = await page.locator('#stream .card').count();
-console.log(`${kept === 10 ? 'ok  ' : 'FAIL'} session replays after reload: ${kept} cards`);
+console.log(`${kept === 12 ? 'ok  ' : 'FAIL'} session replays after reload: ${kept} cards`);
 const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 console.log(`${overflow <= 0 ? 'ok  ' : 'FAIL'} no horizontal overflow at 420 px`);
 // a real file through the picker, then a table question on it
@@ -79,5 +81,5 @@ console.log(`${queryOk ? 'ok  ' : 'FAIL'} a grouped mean on the opened file`);
 if (!fileOk || !queryOk) failed++;
 errors.forEach(e => console.log('FAIL ' + e));
 await browser.close();
-if (failed || !nameOk || kept !== 10 || overflow > 0 || errors.length) { console.log('\nsmoke test failed'); process.exit(1); }
+if (failed || !nameOk || kept !== 12 || overflow > 0 || errors.length) { console.log('\nsmoke test failed'); process.exit(1); }
 console.log('\nsmoke test passed');
