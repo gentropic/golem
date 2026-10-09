@@ -8,7 +8,7 @@ import { importNotebook } from '../vendor/ipynb.js';
 
 const BUDGET = { steps: 2000000, ms: 5000 };
 // in the worker: scitra (for scipy) and sadpan (for pandas); not yet: natra (numpy), plot (matplotlib), learn (sklearn)
-const NOT_YET = { natra: 'natra (numpy) compiles its kernels on the device and needs the atra compiler in the worker. line is here, imported by its own name (import line as np): it covers arrays, reductions and small linear algebra, but it is not numpy, and round, eigh, lstsq and comparisons differ', plot: 'plot (matplotlib) draws on a canvas, which the worker does not have yet', plt: 'plot (matplotlib, imported as plt) draws on a canvas, which the worker does not have yet', learn: 'learn (sklearn) is 418 kB and not in the worker yet' };
+const NOT_YET = { natra: 'natra (numpy) compiles its kernels on the device and needs the atra compiler in the worker. line is here, imported by its own name (import line as np): it covers arrays, reductions and small linear algebra, but it is not numpy, and round, eigh, lstsq, comparisons and printing differ', plot: 'plot (matplotlib) draws on a canvas, which the worker does not have yet', plt: 'plot (matplotlib, imported as plt) draws on a canvas, which the worker does not have yet', learn: 'learn (sklearn) is 418 kB and not in the worker yet' };
 // numpy → natra and friends, through @gcu/ipynb's own substitution table
 export function rewriteForGcu(code) {
   try {
