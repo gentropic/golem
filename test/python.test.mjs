@@ -10,7 +10,7 @@ import { pyWorkerSource } from '../build.mjs';
 const script = new vm.Script(pyWorkerSource(), { filename: 'py-worker.js' });
 const worker = req => new Promise(res => {
   const self = { postMessage: r => res(JSON.parse(JSON.stringify(r))) };   // a structured clone, as postMessage gives
-  script.runInContext(vm.createContext({ self, console, atob, btoa, TextEncoder, TextDecoder, performance, setTimeout, clearTimeout, queueMicrotask }));
+  script.runInContext(vm.createContext({ self, importScripts() { throw new Error('importScripts is not used') }, console, atob, btoa, TextEncoder, TextDecoder, performance, setTimeout, clearTimeout, queueMicrotask }));
   self.onmessage({ data: req });
 });
 let runs = 0;
@@ -59,6 +59,7 @@ test('numpy and friends are rewritten to the GCU names and shown; their absence 
   const ln = await ran('run this: import line as np\nm = np.array([[3.0, 1.0], [1.0, 2.0]])\nnp.linalg.solve(m, np.array([9.0, 8.0])).tolist()');
   assert.equal(ln.res.value, '[2, 3]', 'line is importable by its own name');
   assert.ok(!g.textOf(ln).includes('rewritten'), 'and nothing was rewritten to reach it');
+  assert.equal((await ran('run this: import line as np\nnp.mean([1, 2, 3])')).res.value, '2', 'a plain list as the first call: line is attached before the run');
 });
 
 test('trace: a table of lines and what changed; "trace it" amends a run; export carries the code; replay reruns', async () => {

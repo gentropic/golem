@@ -1,4 +1,4 @@
-// ⚠ VENDORED — DO NOT EDIT. @gcu/line's adder bridge (numpy-shaped module), copied from ../auditable/ext/line/adder.js at auditable 4e4b7363 (9 Oct 2026, MIT).
+// ⚠ VENDORED — DO NOT EDIT. @gcu/line's adder bridge (numpy-shaped module), copied from ../auditable/ext/line/adder.js at auditable 6fd9b601 (9 Oct 2026, MIT).
 // Loaded only inside the Python worker. Re-vendor by copying that file here.
 
 // vec/adder — TypedArray-backed numerical bridge for adder (Python) cells.
@@ -28,14 +28,31 @@ function _isVecModule(mod) {
     && typeof mod.matmul === 'function';
 }
 
+// the notebook's import cache, scanned synchronously (line may be load()-ed after the bridge)
+function _fromImportCache() {
+  if (typeof window === 'undefined' || !window._importCache) return null;
+  for (const mod of Object.values(window._importCache)) if (_isVecModule(mod)) return mod;
+  return null;
+}
+
+// A host that is not the notebook (a Web Worker, a single-file app) hands the
+// bridge its library instead of letting it search window._importCache or
+// import('./index.js'), which a blob worker cannot resolve. Idempotent; the last
+// attach wins. (line-attach-spec.md)
+export function attachLine(lib) {
+  if (!_isVecModule(lib)) throw new TypeError('attachLine: expected the @gcu/line module');
+  _vec = lib;
+  _initPromise = Promise.resolve(lib);
+  return _module;
+}
+
 async function _ensureVec() {
   if (_vec) return _vec;
   if (_initPromise) return _initPromise;
   _initPromise = (async () => {
+    const found = _fromImportCache();
+    if (found) { _vec = found; return _vec; }
     if (typeof window !== 'undefined' && window._importCache) {
-      for (const mod of Object.values(window._importCache)) {
-        if (_isVecModule(mod)) { _vec = mod; return _vec; }
-      }
       throw new Error('line not loaded — call load("./ext/line/index.js") first');
     }
     // Node tests / Deno / Bun: dynamic import resolves from this file.
@@ -45,9 +62,13 @@ async function _ensureVec() {
   return _initPromise;
 }
 
+// Synchronous access. Resolves from the import cache when the library arrived
+// after the bridge, so the FIRST numpy-shaped call of a run can be np.mean([…])
+// — no array has to be created first any more (line-attach-spec §3).
 function _v() {
+  if (!_vec) { const found = _fromImportCache(); if (found) _vec = found; }
   if (!_vec) {
-    throw new Error('vec not initialized — create an array first (e.g. np.array(...))');
+    throw new Error('line not attached — the host calls attachLine(lib), or the notebook load()s @gcu/line first');
   }
   return _vec;
 }
@@ -425,6 +446,19 @@ const _module = {
   LineArray,
 };
 
+// ── resolution at load (no top-level await: the bridge stays a valid classic script) ──
+// Notebook: line already in the import cache → attached now, before any cell runs.
+// Node: the relative import, in the background; `lineReady` resolves when attached.
+// A blob worker: that import fails quietly and the host calls attachLine(lib).
+let lineReady;
+{
+  const found = _fromImportCache();
+  if (found) { attachLine(found); lineReady = Promise.resolve(_module); }
+  else if (typeof window !== 'undefined' && window._importCache) lineReady = Promise.resolve(_module);   // the notebook will load() it later
+  else if (typeof importScripts === 'function') lineReady = Promise.resolve(_module);   // a worker: no request; the host attaches
+  else lineReady = import('./index.js').then((m) => (_vec ? _module : attachLine(m)), () => _module);
+}
+
 // ── registration ──
 
 if (typeof window !== 'undefined') {
@@ -442,4 +476,4 @@ if (typeof window !== 'undefined') {
   }
 }
 
-export { _module as vecAdder, LineArray };
+export { _module as vecAdder, LineArray, lineReady };
