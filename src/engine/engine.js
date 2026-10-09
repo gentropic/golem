@@ -1,6 +1,6 @@
 // The entry point: submit(raw) reads a request and returns what happened. Cards are recomputed in
 // place by rerun(); answers and slot flips go through it, so args stay the only state that matters.
-import { S, T } from './core.js';
+import { S, T, runTool } from './core.js';
 import './units.js';
 import './calc.js';
 import './dates.js';
@@ -21,7 +21,7 @@ export function addCard(raw, r, ms) {
   S.cards.push(c); touch(); return c;
 }
 export function rerun(c) {
-  const t0 = performance.now(); c.res = T[c.tool](c.args); c.ms = performance.now() - t0; touch(); return c;
+  const t0 = performance.now(); c.res = runTool(c.tool, c.args); c.ms = performance.now() - t0; touch(); return c;
 }
 // an ambiguous slot cycles through its alternatives
 export function flipSlot(c, key) {

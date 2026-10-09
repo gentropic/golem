@@ -1,7 +1,7 @@
 // The open table: a real delimited file typed by @gcu/recon, or the synthetic sample; a histogram; and
 // table questions in controlled English answered through @gcu/sadpan and @gcu/sift (all vendored).
 // Sample data stays labelled as sample data; a file is named on every card that reads it.
-import { S, tool, frame, fmt } from './core.js';
+import { S, tool, frame, condition, fmt } from './core.js';
 import { series } from '../vendor/sadpan.js';
 import { sniff, detectAnalyte, NULL_SENTINELS } from '../vendor/recon.js';
 import { parsePredicate, evaluatePredicate, predicateToString } from '../vendor/sift.js';
@@ -88,13 +88,12 @@ function wstats(v, w) {
 }
 
 /* ── the precondition: a table is open ─────────────────────── */
-// asked once, then satisfied as a plan step the args remember
-function needTable(a, trace) {
-  if (S.table) return null;
-  if (!a.auto) return { prompt: 'No table is open. Open the sample table first?', options: [{ label: 'open assays.csv', value: true }], set: (x, v) => { x.auto = v; } };
-  openTable(sampleTable()); trace.push('open assays.csv (precondition, added to the plan)');
-  return null;
-}
+// established by opening the sample, or a file this device has seen
+condition('table', {
+  holds: () => !!S.table,
+  prompt: 'No table is open. Open {one} first?',
+  establish: () => [{ label: 'open assays.csv', tool: 'open', args: {} }, ...Object.values(S.files).map(f => ({ label: `open ${f.name}`, tool: 'open', args: { file: { name: f.name, hash: f.hash } } }))]
+});
 tool({
   name: 'open', rank: 50,
   skill: { group: 'Table', title: 'Open and validate', on: '@gcu/recon · sadpan', about: 'A CSV or TSV from your files, typed by recon: numbers, categories, units, analytes, hole and interval columns.', examples: ['open assays.csv'] },
@@ -144,15 +143,13 @@ const BDL = ['exclude', 'half', 'limit', 'zero'];
 const bdlSlot = (a, skipped) => skipped.bdl ? [{ v: `below detection: ${a.bdl || 'exclude'}`, key: 'bdl', alts: BDL, cur: a.bdl || 'exclude' }] : [];
 
 tool({
-  name: 'hist', rank: 51,
+  name: 'hist', rank: 51, pre: ['table'],
   skill: { group: 'Table', title: 'Histogram', on: '@gcu/sadpan · @gcu/plot', about: 'Any numeric column of the open table. Amend it afterwards with “log scale”.', examples: ['histogram of cu'] },
   read: (text, q) => { const m = /^hist(?:ogram)? (?:of )?(\w+)( (?:in )?log(?: scale)?)?$/.exec(q); return m ? { col: m[1], log: !!m[2] } : null; },
   amend: [{ arg: 'log', match: /^(?:in )?(log|linear)(?: scale)?$/, value: m => m[1] === 'log' }],
   topic: a => [`${shown(a.col)} histogram`, 3],
   run: a => {
-    const trace = [], ask = needTable(a, trace);
-    if (ask) return { read: ['histogram of', { v: a.col }], ask, body: [], trace: ['blocked: needs an open table'] };
-    const c = colOf(a.col); if (!c) return null;
+    const trace = [], c = colOf(a.col); if (!c) return null;
     if (c.type !== 'numeric') return { read: ['histogram of', { v: c.name }], body: [{ t: 'note', kind: 'err', text: `${c.name} is a category, not a number. Try "count by ${c.name}".` }], trace: [...trace, 'column is categorical'] };
     const unit = c.unit || '';
     const { v: all, skipped } = column(S.table.rows, c.name, a.bdl), v = all.filter(x => x > 0);
@@ -234,7 +231,7 @@ function aggregate(agg, v, w) {
   return st[agg];
 }
 tool({
-  name: 'query', rank: 49,
+  name: 'query', rank: 49, pre: ['table'],
   skill: { group: 'Table', title: 'Table questions', on: '@gcu/sift · @gcu/sadpan', about: 'Means, medians, percentiles, counts, lists and correlations in controlled English, with where and by.', examples: ['mean cu by lith where au > 0.1', 'how many samples where cu > 0.5 and lith is BRX', 'top 5 rows sorted by au descending', 'check intervals'] },
   read: readQuery,
   amend: [
@@ -246,9 +243,8 @@ tool({
   ],
   topic: a => a.kind === 'agg' ? [`${a.cols.map(shown).join(', ')} ${a.aggs.map(aggLabel).join(', ')}`, 2] : [`${a.kind} ${a.cols ? a.cols.map(shown).join(', ') : ''}`.trim(), 2],
   run: a => {
-    const trace = [], ask = needTable(a, trace);
+    const trace = [];
     const refuse = (read, text) => ({ read, body: [{ t: 'note', kind: 'err', text }, { t: 'src', text: S.table ? srcLine(S.table) : '' }], trace: [...trace, 'stop'] });
-    if (ask) return { read: [a.kind, 'over the table'], ask, body: [], trace: ['blocked: needs an open table'] };
     const T = S.table, R = T.roles;
     const want = (a.cols || []).map(w => [w, colOf(w)]), missing = want.find(([, c]) => !c);
     if (missing) return refuse([a.kind, { v: missing[0] }], `No column called "${missing[0]}". The table has ${colNames(T)}.`);

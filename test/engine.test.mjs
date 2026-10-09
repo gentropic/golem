@@ -80,9 +80,10 @@ test('an open question is answered by option, and args carry the answer', () => 
   const c = last();
   assert.ok(c.res.ask && /No table is open/.test(c.res.ask.prompt), 'asks to open the table');
   g.answer(c, 0);
-  assert.equal(c.args.auto, true);
+  assert.deepEqual(c.args.plan, [{ label: 'open assays.csv', tool: 'open', args: {} }], 'the chosen step lives in args');
   assert.ok(!c.res.ask);
   assert.ok(g.textOf(c).includes('median'));
+  assert.ok(c.res.trace[0].startsWith('plan: open assays.csv'), 'the step shows in the plan');
 });
 
 test('undo, again, rename and the no-reading card', () => {
@@ -160,6 +161,26 @@ test('timers read like a person says them, and a bare timer asks for how long', 
   const bare = g.submit('start a timer').card;
   assert.equal(bare.rung, 'none');
   assert.ok(g.textOf(bare).includes('Not enough to act on'), 'the parser read it and says what is missing');
+});
+
+test('the planner offers every way to establish a condition, and replay runs the chosen step', () => {
+  g.reset();
+  g.openFile('holes.csv', 'HOLEID,FROM,TO,CU\nA,0,1,0.5\nA,1,2,1.5\n');
+  g.submit('new session');
+  const c = g.submit('mean cu').card;
+  assert.ok(c.res.ask, 'no table in the new session: asks');
+  assert.deepEqual(c.res.ask.options.map(o => o.label), ['open assays.csv', 'open holes.csv']);
+  g.answer(c, 1);
+  assert.equal(c.args.plan[0].tool, 'open'); assert.equal(c.args.plan[0].args.file.name, 'holes.csv');
+  assert.equal(g.S.table.name, 'holes.csv');
+  assert.ok(Math.abs(c.res.value - 1.0) < 1e-9, 'length-weighted mean of the two rows');
+  const saved = JSON.parse(JSON.stringify(g.serialize()));
+  g.reset(); g.hydrate(saved);
+  assert.equal(g.S.table.name, 'holes.csv', 'replay ran the plan step');
+  assert.ok(Math.abs(g.S.cards[0].res.value - 1.0) < 1e-9);
+  const old = { id: 1, raw: 'histogram of cu', tool: 'hist', args: { col: 'cu', auto: true }, rung: 'grammar' };
+  g.reset(); g.hydrate({ cur: 1, sid: 1, ss: [{ id: 1, name: 'x', auto: true, cards: [old] }] });
+  assert.ok(g.textOf(g.S.cards[0]).includes('median'), 'a card from before the planner still replays');
 });
 
 test('every result is plain data: no HTML strings, args survive JSON', () => {

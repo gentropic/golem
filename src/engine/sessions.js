@@ -1,6 +1,6 @@
 // Sessions: stored as plans (card specs), replayed on open, named from the tools that ran.
 // The shell persists whatever `serialize()` returns and feeds it back through `hydrate()`.
-import { S, T, toolByName } from './core.js';
+import { S, toolByName, runTool } from './core.js';
 
 let SS = [], cur = null;
 let sid = 0;
@@ -35,7 +35,7 @@ export function load(s) {
   cur = s; const specs = s.cards;
   S.cards = []; s.cards = S.cards; S.table = null; S.n = 0; S.clause = null;
   specs.forEach(c => {
-    let res = null; try { res = T[c.tool](c.args); } catch (e) { res = null; }
+    let res = null; try { res = runTool(c.tool, c.args); } catch (e) { res = null; }
     if (!res) return;
     const card = { ...spec(c), res }; S.cards.push(card); S.n = Math.max(S.n, card.id);
   });

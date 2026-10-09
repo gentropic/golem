@@ -269,7 +269,7 @@ svg text{font:10px var(--mono);fill:var(--au-fg-muted)}
 <script>
 'use strict';
 /* ==== src/engine/core.js ==== */
-const { S, T, TOOLS, tool, toolByName, FRAMES, frame, clock, fmt, iso, rad, deg, p3, p2, qty } = (() => {
+const { S, T, TOOLS, tool, toolByName, FRAMES, frame, CONDITIONS, condition, runTool, clock, fmt, iso, rad, deg, p3, p2, qty } = (() => {
 // The engine's shared ground: working state, the tool table, declarations, and small helpers.
 // Nothing under src/engine/ touches a DOM, a window, or storage; the shell does that.
 
@@ -307,6 +307,32 @@ const toolByName = name => TOOLS.find(d => d.name === name);
 const FRAMES = [];
 function frame(f) { FRAMES.push(f); return f; }
 
+// Conditions a tool may declare in `pre`. Each knows whether it holds now and how it can be established:
+// a list of steps { label, tool, args }. When a tool's condition is unmet, runTool() asks which step to
+// take; the answer is stored in args.plan and runs before the tool, on every rerun and on replay.
+//   condition('table', { holds, prompt, establish: () => [{ label, tool, args }] })
+const CONDITIONS = {};
+function condition(name, c) { CONDITIONS[name] = c; return c; }
+const readOf = r => r.read.map(x => typeof x === 'string' ? x : x.v).join(' ');
+function runTool(name, args) {
+  const d = toolByName(name);
+  if (!d || !d.run) return null;
+  if (args && args.auto === true && !args.plan) args.plan = [{ label: 'open assays.csv', tool: 'open', args: {} }];   // cards from before the planner
+  const steps = (args && args.plan) || [], traces = [];
+  for (const s of steps) { const r = T[s.tool] && T[s.tool](s.args); if (r) traces.push(`plan: ${s.label} → ${readOf(r)}`); else traces.push(`plan: ${s.label} failed`); }
+  for (const c of d.pre || []) {
+    const C = CONDITIONS[c]; if (!C) throw new Error(`tool ${name} needs an unknown condition ${c}`);
+    if (C.holds()) continue;
+    const options = C.establish();
+    if (!options.length) return { read: [name], body: [{ t: 'note', kind: 'err', text: C.none || `${c} is needed and nothing here can provide it.` }], trace: [...traces, `blocked: ${c} (precondition, no step can establish it)`] };
+    return { read: [name], body: [], trace: [...traces, `blocked: ${c} (precondition)`],
+      ask: { prompt: options.length === 1 ? C.prompt.replace('{one}', options[0].label) : C.prompt.replace('{one}', 'which?'), options: options.map(o => ({ label: o.label, value: o })), set: (a, v) => { a.plan = [...(a.plan || []), { label: v.label, tool: v.tool, args: v.args }]; } } };
+  }
+  const res = T[name](args);
+  if (res && traces.length) res.trace.unshift(...traces);
+  return res;
+}
+
 // The clock, so tests can pin "today".
 const clock = { now: () => new Date() };
 
@@ -323,7 +349,7 @@ const p3 = x => String(Math.round(x) % 360).padStart(3, '0');
 const p2 = x => String(Math.round(x)).padStart(2, '0');
 // a quantity node from the parser as a number in a base unit, given the unit's factor
 const qty = (node, f) => node && node.type === 'quantity' ? node.n * f(node.unit) : null;
-  return { S, T, TOOLS, tool, toolByName, FRAMES, frame, clock, fmt, iso, rad, deg, p3, p2, qty };
+  return { S, T, TOOLS, tool, toolByName, FRAMES, frame, CONDITIONS, condition, runTool, clock, fmt, iso, rad, deg, p3, p2, qty };
 })();
 
 /* ==== src/engine/units.js ==== */
@@ -7484,13 +7510,12 @@ function wstats(v, w) {
 }
 
 /* ── the precondition: a table is open ─────────────────────── */
-// asked once, then satisfied as a plan step the args remember
-function needTable(a, trace) {
-  if (S.table) return null;
-  if (!a.auto) return { prompt: 'No table is open. Open the sample table first?', options: [{ label: 'open assays.csv', value: true }], set: (x, v) => { x.auto = v; } };
-  openTable(sampleTable()); trace.push('open assays.csv (precondition, added to the plan)');
-  return null;
-}
+// established by opening the sample, or a file this device has seen
+condition('table', {
+  holds: () => !!S.table,
+  prompt: 'No table is open. Open {one} first?',
+  establish: () => [{ label: 'open assays.csv', tool: 'open', args: {} }, ...Object.values(S.files).map(f => ({ label: `open ${f.name}`, tool: 'open', args: { file: { name: f.name, hash: f.hash } } }))]
+});
 tool({
   name: 'open', rank: 50,
   skill: { group: 'Table', title: 'Open and validate', on: '@gcu/recon · sadpan', about: 'A CSV or TSV from your files, typed by recon: numbers, categories, units, analytes, hole and interval columns.', examples: ['open assays.csv'] },
@@ -7540,15 +7565,13 @@ const BDL = ['exclude', 'half', 'limit', 'zero'];
 const bdlSlot = (a, skipped) => skipped.bdl ? [{ v: `below detection: ${a.bdl || 'exclude'}`, key: 'bdl', alts: BDL, cur: a.bdl || 'exclude' }] : [];
 
 tool({
-  name: 'hist', rank: 51,
+  name: 'hist', rank: 51, pre: ['table'],
   skill: { group: 'Table', title: 'Histogram', on: '@gcu/sadpan · @gcu/plot', about: 'Any numeric column of the open table. Amend it afterwards with “log scale”.', examples: ['histogram of cu'] },
   read: (text, q) => { const m = /^hist(?:ogram)? (?:of )?(\w+)( (?:in )?log(?: scale)?)?$/.exec(q); return m ? { col: m[1], log: !!m[2] } : null; },
   amend: [{ arg: 'log', match: /^(?:in )?(log|linear)(?: scale)?$/, value: m => m[1] === 'log' }],
   topic: a => [`${shown(a.col)} histogram`, 3],
   run: a => {
-    const trace = [], ask = needTable(a, trace);
-    if (ask) return { read: ['histogram of', { v: a.col }], ask, body: [], trace: ['blocked: needs an open table'] };
-    const c = colOf(a.col); if (!c) return null;
+    const trace = [], c = colOf(a.col); if (!c) return null;
     if (c.type !== 'numeric') return { read: ['histogram of', { v: c.name }], body: [{ t: 'note', kind: 'err', text: `${c.name} is a category, not a number. Try "count by ${c.name}".` }], trace: [...trace, 'column is categorical'] };
     const unit = c.unit || '';
     const { v: all, skipped } = column(S.table.rows, c.name, a.bdl), v = all.filter(x => x > 0);
@@ -7630,7 +7653,7 @@ function aggregate(agg, v, w) {
   return st[agg];
 }
 tool({
-  name: 'query', rank: 49,
+  name: 'query', rank: 49, pre: ['table'],
   skill: { group: 'Table', title: 'Table questions', on: '@gcu/sift · @gcu/sadpan', about: 'Means, medians, percentiles, counts, lists and correlations in controlled English, with where and by.', examples: ['mean cu by lith where au > 0.1', 'how many samples where cu > 0.5 and lith is BRX', 'top 5 rows sorted by au descending', 'check intervals'] },
   read: readQuery,
   amend: [
@@ -7642,9 +7665,8 @@ tool({
   ],
   topic: a => a.kind === 'agg' ? [`${a.cols.map(shown).join(', ')} ${a.aggs.map(aggLabel).join(', ')}`, 2] : [`${a.kind} ${a.cols ? a.cols.map(shown).join(', ') : ''}`.trim(), 2],
   run: a => {
-    const trace = [], ask = needTable(a, trace);
+    const trace = [];
     const refuse = (read, text) => ({ read, body: [{ t: 'note', kind: 'err', text }, { t: 'src', text: S.table ? srcLine(S.table) : '' }], trace: [...trace, 'stop'] });
-    if (ask) return { read: [a.kind, 'over the table'], ask, body: [], trace: ['blocked: needs an open table'] };
     const T = S.table, R = T.roles;
     const want = (a.cols || []).map(w => [w, colOf(w)]), missing = want.find(([, c]) => !c);
     if (missing) return refuse([a.kind, { v: missing[0] }], `No column called "${missing[0]}". The table has ${colNames(T)}.`);
@@ -11028,7 +11050,7 @@ function verdictOf(text, session) {
 function clauseRead(text, rung) {
   const { r, b } = verdictOf(text, clauseSession());
   if (!b) return { verdict: r };
-  const res = T[b.tool](b.args); if (!res) return { verdict: r };
+  const res = runTool(b.tool, b.args); if (!res) return { verdict: r };
   res.trace.unshift(`clause: ${r.echo}`, ...r.diag.notes.map(n => `clause: ${n}`));
   return { tool: b.tool, args: b.args, rung, res };
 }
@@ -11040,7 +11062,7 @@ function grammar(text, q, rung) {
   const c = clauseRead(text, rung); if (c.tool) return c;
   for (const d of readers()) {
     const args = d.read(text, q); if (!args) continue;
-    const res = T[d.name](args); if (res) return { tool: d.name, args, rung, res };
+    const res = runTool(d.name, args); if (res) return { tool: d.name, args, rung, res };
   }
   return null;
 }
@@ -11053,7 +11075,7 @@ function context(q, last) {
     if (am.when && !am.when(last.args)) continue;
     const m = am.match.exec(q); if (!m) continue;
     const v = am.value ? am.value(m, last.args) : m[1]; if (v == null) continue;
-    const args = { ...last.args, [am.arg]: v }, res = T[last.tool](args);
+    const args = { ...last.args, [am.arg]: v }, res = runTool(last.tool, args);
     if (res) return { tool: last.tool, args, rung: 'context', amends: last.id, res };
   }
   return null;
@@ -11158,7 +11180,7 @@ function load(s) {
   cur = s; const specs = s.cards;
   S.cards = []; s.cards = S.cards; S.table = null; S.n = 0; S.clause = null;
   specs.forEach(c => {
-    let res = null; try { res = T[c.tool](c.args); } catch (e) { res = null; }
+    let res = null; try { res = runTool(c.tool, c.args); } catch (e) { res = null; }
     if (!res) return;
     const card = { ...spec(c), res }; S.cards.push(card); S.n = Math.max(S.n, card.id);
   });
@@ -11217,7 +11239,7 @@ function addCard(raw, r, ms) {
   S.cards.push(c); touch(); return c;
 }
 function rerun(c) {
-  const t0 = performance.now(); c.res = T[c.tool](c.args); c.ms = performance.now() - t0; touch(); return c;
+  const t0 = performance.now(); c.res = runTool(c.tool, c.args); c.ms = performance.now() - t0; touch(); return c;
 }
 // an ambiguous slot cycles through its alternatives
 function flipSlot(c, key) {

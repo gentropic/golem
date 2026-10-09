@@ -151,7 +151,7 @@ A tool whose precondition is unmet does not fail. The planner does one of two th
 - **Another tool can establish it** (no table open → `table.open`): add that step to the plan. Ask first when the step has a choice in it.
 - **A value is missing** (a timer with no duration, a table question naming no column): ask, with options. The answer is stored in `args` and becomes an editable slot on the card.
 
-The mock implements this by hand (`needTable()` for the open table, and the parser's clarify for a missing value). The target is a small STRIPS-style search over declared `pre`/`post` conditions: bounded depth, deterministic tie-breaking, and a plan the user sees before anything irreversible runs. The plan DAG is a UI object: every unbound parameter is editable.
+Since 8 Oct 2026 the first half is declared data: a tool lists the conditions it needs in `pre` (`hist` and `query` need `table`), and each condition (`condition()` in `src/engine/core.js`) says whether it holds and which steps can establish it, each step a `{ label, tool, args }`. `runTool()` checks the conditions before every run; an unmet one becomes an open question listing the steps (open the sample, or any file this device has seen), the chosen step is stored in `args.plan`, and it runs before the tool on every rerun and on replay, showing in the trace as `plan: …`. A condition nothing can establish is a refusal, not a guess. The second half, a missing value, is still the parser's clarify. What remains of the target is depth: one step per condition today, no search over chains, no `post` conditions, and a plan shown as trace lines rather than an editable DAG.
 
 ---
 
@@ -308,7 +308,7 @@ Default to the user-confirms route: the app then requests no dangerous permissio
 
 **Simulated:** all device hand-offs. The timer counts down in the page.
 
-**Absent:** rung 4 (the statistical dispatcher), the planner (preconditions are hand-coded), real packs, pt-BR in the shell.
+**Absent:** rung 4 (the statistical dispatcher), multi-step planning (one declared step per condition today), real packs, pt-BR in the shell.
 
 **Declarations** (since 8 Oct 2026): every tool is one declaration (`tool()` in `src/engine/core.js`) carrying its reader, its amendments, its session-name topic and its catalog row; verb frames (`frame()`) say how a parsed command becomes a tool call. The Skills tab, the amendment table, session names and the ontology derive from them.
 

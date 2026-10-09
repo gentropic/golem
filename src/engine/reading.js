@@ -1,7 +1,7 @@
 // The reading ladder: context (amendments, meta-intents), grammar (the clause parser, then the regex
 // rules the declarations carry), taught words (device lexicon rewrites, then grammar again). Plus the
 // tools that talk about the session itself: none, why, export.
-import { S, T, TOOLS, FRAMES, tool, frame, toolByName, iso } from './core.js';
+import { S, T, TOOLS, FRAMES, tool, frame, toolByName, runTool, iso } from './core.js';
 import { examples, vocab } from './skills.js';
 import { ontology } from './ontology.js';
 import { createEngine, makeSession, ENGLISH } from '../vendor/dispatch.js';
@@ -26,7 +26,7 @@ function verdictOf(text, session) {
 export function clauseRead(text, rung) {
   const { r, b } = verdictOf(text, clauseSession());
   if (!b) return { verdict: r };
-  const res = T[b.tool](b.args); if (!res) return { verdict: r };
+  const res = runTool(b.tool, b.args); if (!res) return { verdict: r };
   res.trace.unshift(`clause: ${r.echo}`, ...r.diag.notes.map(n => `clause: ${n}`));
   return { tool: b.tool, args: b.args, rung, res };
 }
@@ -38,7 +38,7 @@ export function grammar(text, q, rung) {
   const c = clauseRead(text, rung); if (c.tool) return c;
   for (const d of readers()) {
     const args = d.read(text, q); if (!args) continue;
-    const res = T[d.name](args); if (res) return { tool: d.name, args, rung, res };
+    const res = runTool(d.name, args); if (res) return { tool: d.name, args, rung, res };
   }
   return null;
 }
@@ -51,7 +51,7 @@ export function context(q, last) {
     if (am.when && !am.when(last.args)) continue;
     const m = am.match.exec(q); if (!m) continue;
     const v = am.value ? am.value(m, last.args) : m[1]; if (v == null) continue;
-    const args = { ...last.args, [am.arg]: v }, res = T[last.tool](args);
+    const args = { ...last.args, [am.arg]: v }, res = runTool(last.tool, args);
     if (res) return { tool: last.tool, args, rung: 'context', amends: last.id, res };
   }
   return null;

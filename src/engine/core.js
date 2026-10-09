@@ -35,6 +35,32 @@ export const toolByName = name => TOOLS.find(d => d.name === name);
 export const FRAMES = [];
 export function frame(f) { FRAMES.push(f); return f; }
 
+// Conditions a tool may declare in `pre`. Each knows whether it holds now and how it can be established:
+// a list of steps { label, tool, args }. When a tool's condition is unmet, runTool() asks which step to
+// take; the answer is stored in args.plan and runs before the tool, on every rerun and on replay.
+//   condition('table', { holds, prompt, establish: () => [{ label, tool, args }] })
+export const CONDITIONS = {};
+export function condition(name, c) { CONDITIONS[name] = c; return c; }
+const readOf = r => r.read.map(x => typeof x === 'string' ? x : x.v).join(' ');
+export function runTool(name, args) {
+  const d = toolByName(name);
+  if (!d || !d.run) return null;
+  if (args && args.auto === true && !args.plan) args.plan = [{ label: 'open assays.csv', tool: 'open', args: {} }];   // cards from before the planner
+  const steps = (args && args.plan) || [], traces = [];
+  for (const s of steps) { const r = T[s.tool] && T[s.tool](s.args); if (r) traces.push(`plan: ${s.label} → ${readOf(r)}`); else traces.push(`plan: ${s.label} failed`); }
+  for (const c of d.pre || []) {
+    const C = CONDITIONS[c]; if (!C) throw new Error(`tool ${name} needs an unknown condition ${c}`);
+    if (C.holds()) continue;
+    const options = C.establish();
+    if (!options.length) return { read: [name], body: [{ t: 'note', kind: 'err', text: C.none || `${c} is needed and nothing here can provide it.` }], trace: [...traces, `blocked: ${c} (precondition, no step can establish it)`] };
+    return { read: [name], body: [], trace: [...traces, `blocked: ${c} (precondition)`],
+      ask: { prompt: options.length === 1 ? C.prompt.replace('{one}', options[0].label) : C.prompt.replace('{one}', 'which?'), options: options.map(o => ({ label: o.label, value: o })), set: (a, v) => { a.plan = [...(a.plan || []), { label: v.label, tool: v.tool, args: v.args }]; } } };
+  }
+  const res = T[name](args);
+  if (res && traces.length) res.trace.unshift(...traces);
+  return res;
+}
+
 // The clock, so tests can pin "today".
 export const clock = { now: () => new Date() };
 
