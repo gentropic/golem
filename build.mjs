@@ -17,21 +17,31 @@ const posix = p => p.split(sep).join('/');
 // run, pyRepr and adderParse among them, stay in scope), each library wrapped in a function that returns its
 // exports so its private names cannot meet adder's, the registrations, golem's driver, and the message handler.
 // The page embeds this text; the Node tests evaluate the same text in a fresh context per run.
-// Each bridge is handed its library by the host (attachScitra, attachLine) and makes no request at load in a worker.
+// Each bridge is handed its library by the host (attachScitra, attachLine, attachLearn) and makes no request at
+// load in a worker. A library's static imports of another @gcu package become bindings from that package's
+// wrapper, which must come earlier in the list; the build checks every imported name is really exported.
 const PY_LIBS = [['SCITRA', 'vendor/scitra.js'], ['SCITRA_ADDER', 'vendor/scitra-adder.js'], ['SADPAN', 'vendor/sadpan.js'],
-  ['LINE', 'vendor/line.js'], ['LINE_ADDER', 'vendor/line-adder.js']];
-function wrapModule(name, code, rel) {
+  ['LINE', 'vendor/line.js'], ['LINE_ADDER', 'vendor/line-adder.js'],
+  ['MIMIC', 'vendor/mimic-io.js'], ['LEARN', 'vendor/learn.js'], ['LEARN_ADDER', 'vendor/learn-adder.js']];
+const PY_IMPORTS = { '@gcu/line': 'LINE', '@gcu/scitra': 'SCITRA', '@gcu/mimic-io': 'MIMIC' };
+function wrapModule(name, code, rel, exported) {
   const names = [];
+  code = code.replace(/^import\s*\{([^}]*)\}\s*from\s*['"]([^'"]+)['"];?[^\n]*$/gm, (_, inner, spec) => {
+    const ns = PY_IMPORTS[spec]; if (!ns || !exported[ns]) throw new Error(`build: ${rel}: imports ${spec}, which is not wrapped before it in the Python worker`);
+    const binds = inner.split(',').map(x => x.trim()).filter(Boolean).map(x => { const m = /^([A-Za-z_$][\w$]*)(?:\s+as\s+([A-Za-z_$][\w$]*))?$/.exec(x); if (!m) throw new Error(`build: ${rel}: cannot read the import "${x}"`); if (!exported[ns].has(m[1])) throw new Error(`build: ${rel}: ${spec} does not export ${m[1]}`); return m[2] ? `${m[1]}: ${m[2]}` : m[1]; });
+    return `const { ${binds.join(', ')} } = ${ns};`;
+  });
   code = code.replace(/^export\s*\{([^}]*)\};?[^\n]*$/gm, (_, inner) => { inner.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '').split(',').map(x => x.trim()).filter(Boolean).forEach(x => { const m = /^([A-Za-z_$][\w$]*)(?:\s+as\s+([A-Za-z_$][\w$]*))?$/.exec(x); if (!m) throw new Error(`build: ${rel}: cannot read the export "${x}"`); names.push([m[2] || m[1], m[1]]); }); return ''; });
   code = code.replace(/^export\s+(async\s+function\*?|function\*?|const|let|class)\s+([A-Za-z_$][\w$]*)/gm, (_, kind, id) => { names.push([id, id]); return `${kind} ${id}`; });
   if (/^\s*(?:import|export)\s/m.test(code)) throw new Error(`build: ${rel}: module syntax the worker wrapper cannot carry`);
+  exported[name] = new Set(names.map(([k]) => k));
   return `/* ==== src/${rel} ==== */\nconst ${name} = (() => {\n${code}\nreturn { ${names.map(([k, v]) => k === v ? k : `${k}: ${v}`).join(', ')} };\n})();\n`;
 }
 export function pyWorkerSource() {
   const adder = readFileSync(join(src, 'vendor/adder.js'), 'utf8').replace(/^export\s*\{\s*adder\s*\};?\s*$/m, '');
   if (/^\s*(?:import|export)\s/m.test(adder)) throw new Error('build: module syntax left in vendor/adder.js');
   const driver = readFileSync(join(src, 'worker/py-driver.js'), 'utf8').replace(/^export (async function) /m, '$1 ');
-  const libs = PY_LIBS.map(([n, rel]) => wrapModule(n, readFileSync(join(src, rel), 'utf8'), rel)).join('\n');
+  const exported = {}, libs = PY_LIBS.map(([n, rel]) => wrapModule(n, readFileSync(join(src, rel), 'utf8'), rel, exported)).join('\n');
   const setup = `
 /* ==== the worker: register the GCU modules, then answer one request ==== */
 SCITRA_ADDER.attachScitra(SCITRA);
@@ -39,6 +49,18 @@ adder.registerModule('scitra', SCITRA_ADDER.scitraAdder);
 adder.registerModule('sadpan', SADPAN);
 LINE_ADDER.attachLine(LINE);
 adder.registerModule('line', LINE_ADDER.vecAdder);
+// learn's source has an opt-in .compile() for tree models that builds predict functions with new Function. Its
+// bundle never installs it (installCompile is exported, not called), so .compile() is the base no-op and Python
+// cannot reach the helpers. Should a later bundle install it, this guard makes it refuse: golem runs no generated
+// code (SPEC principle 9). fit and predict are unaffected either way.
+(function noCompile(seen, v, depth) {
+  if (!v || depth > 3 || seen.has(v) || (typeof v !== 'object' && typeof v !== 'function')) return; seen.add(v);
+  if (typeof v === 'function' && v.prototype && Object.prototype.hasOwnProperty.call(v.prototype, 'compile') && v !== LEARN.BaseEstimator)
+    v.prototype.compile = function () { throw new Error('compile() is not available in golem: it builds code at run time. predict() gives the same answer.'); };
+  if (typeof v === 'object') for (const k of Object.keys(v)) noCompile(seen, v[k], depth + 1);
+})(new Set(), LEARN, 0);
+LEARN_ADDER.attachLearn(LEARN);
+adder.registerModule('learn', LEARN_ADDER.learnAdder);
 self.onmessage = async e => { self.postMessage(await pyRun({ run, pyRepr, adderParse }, e.data)); };
 `;
   return "'use strict';\n/* ==== src/vendor/adder.js ==== */\n" + adder + '\n;\n' + libs + '\n/* ==== src/worker/py-driver.js ==== */\n' + driver + setup;

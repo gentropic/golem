@@ -79,7 +79,7 @@ src/engine/                  no DOM, no storage: everything that reads and compu
   sessions.js                sessions, replay, auto-naming, serialize and hydrate
   engine.js                  submit, rerun, slot flips, answers, undo
   index.js                   the surface Node tests import
-src/vendor/                  copies, never edited here: @gcu/dispatch (the parser), @gcu/bearing, @gcu/sadpan, @gcu/recon, @gcu/sift, @gcu/wmm, @gcu/units (tables only), @gcu/plan (calendar and holidays only), @gcu/sheet, @gcu/dm, @gcu/ipynb (its substitution table), @gcu/adder, @gcu/scitra and @gcu/line with their adder bridges (inside the Python worker only, assembled by `pyWorkerSource()` in build.mjs), the lead-acid shim
+src/vendor/                  copies, never edited here: @gcu/dispatch (the parser), @gcu/bearing, @gcu/sadpan, @gcu/recon, @gcu/sift, @gcu/wmm, @gcu/units (tables only), @gcu/plan (calendar and holidays only), @gcu/sheet, @gcu/dm, @gcu/ipynb (its substitution table), @gcu/adder, @gcu/scitra, @gcu/line and @gcu/learn (with @gcu/mimic-io) and their adder bridges (inside the Python worker only, assembled by `pyWorkerSource()` in build.mjs), the lead-acid shim
 src/shell/                   the browser: markup, rendering, wiring, storage
   index.html                 markup, Switchboard tokens, styles, bench notes
   fonts/                     Barlow and Space Mono (OFL), embedded by the build

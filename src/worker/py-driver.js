@@ -22,7 +22,9 @@ export async function pyRun(api, req) {
   const steps = req.steps || 2000000, ms = req.ms || 5000, t0 = Date.now(), out = [], err = [], trace = [];
   const prep = withLast(api, req.code);
   let count = 0, prevLine = null, prevSnap = null, traceCut = false;
-  const repr = v => { try { return clip(api.pyRepr(v)); } catch (e) { return '…'; } };
+  // typed arrays (learn returns Float64Array, with a `shape` for 2-D results) shown as lists, not as JS objects
+  const plain = v => { if (!ArrayBuffer.isView(v) || v instanceof DataView) return v; const s = v.shape; if (Array.isArray(s) && s.length === 2 && s[0] * s[1] === v.length) { const out = []; for (let i = 0; i < s[0]; i++) out.push(Array.from(v.subarray(i * s[1], (i + 1) * s[1]))); return out; } return Array.from(v); };
+  const repr = v => { try { return clip(api.pyRepr(plain(v))); } catch (e) { return '…'; } };
   const snap = view => { const m = new Map(); try { for (const [k, v] of view.entries()) if (k !== '__golem_last__' && typeof v !== 'function') m.set(k, repr(v)); } catch (e) { /* a frame we cannot read */ } return m; };
   const diff = (a, b) => { const ch = []; for (const [k, v] of b) if (!a || a.get(k) !== v) ch.push(`${k} = ${v}`); return ch; };
   const onStep = req.trace ? ev => {

@@ -60,6 +60,13 @@ test('numpy and friends are rewritten to the GCU names and shown; their absence 
   assert.equal(ln.res.value, '[2, 3]', 'line is importable by its own name');
   assert.ok(!g.textOf(ln).includes('rewritten'), 'and nothing was rewritten to reach it');
   assert.equal((await ran('run this: import line as np\nnp.mean([1, 2, 3])')).res.value, '2', 'a plain list as the first call: line is attached before the run');
+  const lr = await ran('run this: from sklearn.linear_model import LinearRegression\nm = LinearRegression().fit([[1.0], [2.0], [3.0]], [3.0, 5.0, 7.0])\nm.predict([[4.0]])');
+  assert.ok(g.textOf(lr).includes('sklearn.linear_model → learn.linear_model'), g.textOf(lr));
+  assert.ok(/^\[(8\.99999|9\.0000)/.test(lr.res.value), 'a typed array shown as a list: ' + lr.res.value);
+  const km = await ran('run this: from sklearn.cluster import KMeans\nKMeans(n_clusters=2, random_state=0).fit([[0.0, 0.0], [0.1, 0.0], [5.0, 5.0], [5.1, 5.0]]).labels_');
+  assert.ok(['[0, 0, 1, 1]', '[1, 1, 0, 0]'].includes(km.res.value), km.res.value);
+  const sc = await ran('run this: from sklearn.preprocessing import StandardScaler\nStandardScaler().fit_transform([[1.0], [2.0], [3.0]])');
+  assert.ok(/^\[\[-1\.2247.*\], \[0\], \[1\.2247/.test(sc.res.value), '2-D results nest by their shape: ' + sc.res.value);
 });
 
 test('trace: a table of lines and what changed; "trace it" amends a run; export carries the code; replay reruns', async () => {
