@@ -1,5 +1,5 @@
-// ⚠ VENDORED — DO NOT EDIT. @gcu/line, copied from ../auditable/ext/line/index.js at auditable 4e4b7363 (9 Oct 2026, MIT).
-// Pure JS ndarray and dense linear algebra; loaded only inside the Python worker, for numpy. Re-vendor by copying that file here.
+// ⚠ VENDORED — DO NOT EDIT. @gcu/line (pure JS ndarray and dense linear algebra), copied from ../auditable/ext/line/index.js at auditable 774234c3 (9 Oct 2026, MIT).
+// Loaded only inside the Python worker. Re-vendor by copying that file here.
 
 // @gcu/line — Linear algebra for JS (TypedArray-based ndarray + BLAS-1/2 + small dense linalg).
 // Auto-generated from ext/line/src/ — do not edit directly.

@@ -29,7 +29,7 @@ export function textOf(c) {
     else if (b.t === 'list' || b.t === 'steps' || b.t === 'chips') out.push(...b.items);
     else if (b.t === 'hbars') b.rows.forEach(([k, , t]) => out.push(k, t));
     else if (b.t === 'actions') out.push(...b.items.map(i => i.label));
-    else if (b.t === 'net' || b.t === 'bars' || b.t === 'curve') out.push(b.label || '');
+    else if (b.t === 'net' || b.t === 'bars' || b.t === 'curve' || b.t === 'figure') out.push(b.label || '');
     else out.push(b.text || '');
   }
   if (r.ask) out.push(r.ask.prompt, ...r.ask.options.map(o => o.label));

@@ -4,7 +4,7 @@
 //   pyRun({ run, pyRepr, adderParse }, { code, trace, steps, ms }) → Promise<result>
 // result: { stdout, stderr, value, error: { type, message, line } | null, steps, ms, trace, traceCut }
 
-const SHOW = 80, TRACE_MAX = 200;
+const SHOW = 80, TRACE_MAX = 200, FIG_MAX = 4000000;
 const clip = s => s.length > SHOW ? s.slice(0, SHOW - 1) + '…' : s;
 
 // the last top-level statement, when it is a bare expression, becomes an assignment so its value can be shown
@@ -12,6 +12,8 @@ function withLast(api, code) {
   let ast; try { ast = api.adderParse(code); } catch (e) { return { code, last: false }; }
   const body = ast && (ast.body || ast.stmts || []), tail = body[body.length - 1];
   if (!tail || tail.type !== 'Expr' || !tail.line) return { code, last: false };
+  // a statement before it on the same line (a; b; c): the line cannot be wrapped whole, so no last value
+  if (body.length > 1 && body[body.length - 2].line === tail.line) return { code, last: false };
   const lines = code.split('\n'), head = lines.slice(0, tail.line - 1), expr = lines.slice(tail.line - 1).join('\n').replace(/\s+$/, '');
   if (/^\s/.test(expr)) return { code, last: false };
   // the closing bracket on its own line, so a trailing comment cannot swallow it; the expression keeps its line number
@@ -42,6 +44,10 @@ export async function pyRun(api, req) {
     const m = !error.line && /line (\d+)/.exec(String(e.message)); if (m) error.line = +m[1];
   }
   if (req.trace && prevLine != null && trace.length < TRACE_MAX && scope) { const last = new Map(Object.entries(scope).filter(([k, v]) => k !== '__golem_last__' && typeof v !== 'function').map(([k, v]) => [k, repr(v)])); trace.push([prevLine, diff(prevSnap, last).join(', ')]); }
-  const value = scope && prep.last && scope.__golem_last__ !== undefined && scope.__golem_last__ !== null ? repr(scope.__golem_last__) : null;
-  return { stdout: out.join(''), stderr: err.join(''), value, error, steps: req.trace ? count : null, ms: Date.now() - t0, trace: req.trace ? trace : null, traceCut, budget: { steps, ms } };
+  const lastV = scope && prep.last ? scope.__golem_last__ : null, isFigure = v => v && typeof v === 'object' && typeof v.toDrawList === 'function';
+  const value = lastV !== undefined && lastV !== null && !isFigure(lastV) ? repr(lastV) : null;   // a figure shows as a figure, not as its repr
+  // figures the code showed (plot's draw lists, plain JSON), up to FIG_MAX characters in all
+  let figures = [], figuresCut = 0;
+  if (api.figures) { try { let size = 0; for (const f of api.figures()) { const n = JSON.stringify(f).length; if (size + n > FIG_MAX) { figuresCut++; continue; } size += n; figures.push(f); } } catch (e) { err.push(`figures: ${e.message}\n`); } }
+  return { stdout: out.join(''), stderr: err.join(''), value, error, steps: req.trace ? count : null, ms: Date.now() - t0, trace: req.trace ? trace : null, traceCut, figures, figuresCut, budget: { steps, ms } };
 }

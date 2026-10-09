@@ -1,4 +1,4 @@
-// ⚠ VENDORED — DO NOT EDIT. @gcu/learn (sklearn-shaped estimators; its tree .compile() uses new Function and is replaced by a refusal in the worker), copied from ../auditable/ext/learn/index.js at auditable 6fd9b601 (9 Oct 2026, MIT).
+// ⚠ VENDORED — DO NOT EDIT. @gcu/learn (sklearn-shaped estimators; its tree .compile() uses new Function and is refused in the worker), copied from ../auditable/ext/learn/index.js at auditable 774234c3 (9 Oct 2026, MIT).
 // Loaded only inside the Python worker. Re-vendor by copying that file here.
 
 // @gcu/learn — bundled from src/
@@ -10761,6 +10761,15 @@ const neighbors = {
 };
 const mixture = { GaussianMixture };
 const cross_decomposition = { PLSRegression };
+
+// The .compile() override for the tree family (SPEC §6.5), as src/main.js does it.
+// Without this call the bundle shipped the base no-op and every tree stayed interpreted.
+installCompile({
+  DecisionTreeClassifier, DecisionTreeRegressor,
+  RandomForestClassifier, RandomForestRegressor,
+  ExtraTreesClassifier, ExtraTreesRegressor,
+  GradientBoostingRegressor,
+});
 
 // ── exports ──
 export {

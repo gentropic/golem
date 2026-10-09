@@ -1,4 +1,4 @@
-// ⚠ VENDORED — DO NOT EDIT. @gcu/learn's adder bridge (sklearn-shaped module), copied from ../auditable/ext/learn/adder.js at auditable 6fd9b601 (9 Oct 2026, MIT).
+// ⚠ VENDORED — DO NOT EDIT. @gcu/learn's adder bridge (sklearn-shaped module), copied from ../auditable/ext/learn/adder.js at auditable 774234c3 (9 Oct 2026, MIT).
 // Loaded only inside the Python worker. Re-vendor by copying that file here.
 
 // @gcu/learn — adder cell bridge.

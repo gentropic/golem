@@ -25,7 +25,7 @@ Open `dist/golem.html`, then:
 - Try `molar mass of CuFeS2`, `fe to fe2o3`, `convert 45.2% fe2o3 to fe`, `how much cu in CuFeS2`, `element 26`.
 - Try `2.6 to 2.9 t/m3 * 1.2 to 1.5 Mm3`, `(120 to 180) * (0.4 to 0.6) / 7`, `2.7 ± 0.1 t/m3 * 1.35 Mm3`.
 - Try `is 21 apr 2027 a working day`, `working days until 20 dec`, `14 on 14 off from 6 oct, am i off at christmas`, `9am sao paulo in perth`, `when is easter 2027`.
-- Try `run this: print(sum(range(10)))`, or paste several lines after `python` on the first line; `trace it` adds a step table.
+- Try `run this: print(sum(range(10)))`, numpy (`import numpy as np`), or a figure (`python`, then `import matplotlib.pyplot as plt`, `plt.plot([1, 4, 9])`, `plt.show()` on the lines below), or paste several lines after `python` on the first line; `trace it` adds a step table.
 - Try `sha256: abc`, `base64 decode: SGVsbG8=`, `the table as json` (it asks to open one first).
 - Try `explain cron: 0 9 * * 1-5`, `what is 1700000000`, `chmod 754`, `explain regex: ^\d{3}-\d{2}$`.
 - Try `mass of 1 m of nq core at 2.7`, `200 mesh in microns`, `rqd of 12, 8, 25, 4, 31 and 9 cm in a 100 cm run`.
@@ -79,7 +79,7 @@ src/engine/                  no DOM, no storage: everything that reads and compu
   sessions.js                sessions, replay, auto-naming, serialize and hydrate
   engine.js                  submit, rerun, slot flips, answers, undo
   index.js                   the surface Node tests import
-src/vendor/                  copies, never edited here: @gcu/dispatch (the parser), @gcu/bearing, @gcu/sadpan, @gcu/recon, @gcu/sift, @gcu/wmm, @gcu/units (tables only), @gcu/plan (calendar and holidays only), @gcu/sheet, @gcu/dm, @gcu/ipynb (its substitution table), @gcu/adder, @gcu/scitra, @gcu/line and @gcu/learn (with @gcu/mimic-io) and their adder bridges (inside the Python worker only, assembled by `pyWorkerSource()` in build.mjs), the lead-acid shim
+src/vendor/                  copies, never edited here: @gcu/dispatch (the parser), @gcu/bearing, @gcu/sadpan, @gcu/recon, @gcu/sift, @gcu/wmm, @gcu/units (tables only), @gcu/plan (calendar and holidays only), @gcu/sheet, @gcu/dm, @gcu/ipynb (its substitution table), @gcu/adder, @gcu/natra with @gcu/atra and alpack, @gcu/scitra, @gcu/line, @gcu/learn (with @gcu/mimic-io), @gcu/plot and their adder bridges (inside the Python worker only, assembled by `pyWorkerSource()` in build.mjs), the lead-acid shim
 src/shell/                   the browser: markup, rendering, wiring, storage
   index.html                 markup, Switchboard tokens, styles, bench notes
   fonts/                     Barlow and Space Mono (OFL), embedded by the build

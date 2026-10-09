@@ -9,7 +9,7 @@ import { pyWorkerSource } from '../build.mjs';
 
 const script = new vm.Script(pyWorkerSource(), { filename: 'py-worker.js' });
 const worker = req => new Promise(res => {
-  const self = { postMessage: r => res(JSON.parse(JSON.stringify(r))) };   // a structured clone, as postMessage gives
+  const self = { postMessage: r => res(JSON.parse(JSON.stringify(r))) };   // a structured clone, as postMessage gives (plain JSON is all golem sends)
   script.runInContext(vm.createContext({ self, importScripts() { throw new Error('importScripts is not used') }, console, atob, btoa, TextEncoder, TextDecoder, performance, setTimeout, clearTimeout, queueMicrotask }));
   self.onmessage({ data: req });
 });
@@ -41,12 +41,15 @@ test('errors carry their type and line; the budget stops a loop; js and remote i
   assert.ok(g.textOf(await ran('run this: def f(:\n  pass')).includes('SyntaxError'));
 });
 
-test('numpy and friends are rewritten to the GCU names and shown; their absence is said plainly', async () => {
+test('numpy, scipy, pandas, sklearn and matplotlib: rewritten to the GCU names, shown, and answering like the originals', async () => {
   g.reset();
   assert.deepEqual(g.rewriteForGcu('import numpy as np\nfrom scipy.stats import norm').rewrites.map(r => r.rewritten), ['natra', 'scitra.stats']);
-  const c = await ran('run this: import numpy as np\nprint(np.pi)');
+  const c = await ran('run this: import numpy as np\nm = np.array([[3.0, 1.0], [1.0, 2.0]])\nprint(np.linalg.inv(m))\nnp.round(np.array([1.0, 0.3333, 0.6667]), 2)');
   const t = g.textOf(c);
-  assert.ok(t.includes('numpy → natra') && t.includes('needs the atra compiler'), t);
+  assert.ok(t.includes('numpy → natra') && !c.res.body.some(b => b.kind === 'err'), t);
+  assert.equal(c.res.body.find(b => b.t === 'pre').text, '[[ 0.4 -0.2]\n [-0.2  0.6]]\n', 'printed as numpy prints');
+  assert.equal(c.res.value, 'array([1.  , 0.33, 0.67])', 'rounded as numpy rounds');
+  assert.equal((await ran('run this: import numpy as np\nnp.linalg.eigh(np.array([[2.0, 0.0], [0.0, 3.0]]))[0]')).res.value, 'array([2., 3.])', 'eigenvalues ascending');
   assert.ok((await ran('run this: import math\nmath.sqrt(2)')).res.value.startsWith('1.414'), 'the built-in modules work');
   const sp = await ran('run this: from scipy.stats import norm\nprint(norm.cdf(0))\nnorm.ppf(0.975)');
   assert.ok(g.textOf(sp).includes('scipy.stats → scitra.stats'), g.textOf(sp));
@@ -54,8 +57,15 @@ test('numpy and friends are rewritten to the GCU names and shown; their absence 
   const pd = await ran('run this: import pandas as pd\nt = pd.table({"a": [1, 2, 3], "b": [4.0, 5.0, 6.0]})\nprint(t)');
   assert.ok(g.textOf(pd).includes('pandas → sadpan') && !pd.res.body.some(b => b.kind === 'err'), g.textOf(pd));
   assert.ok(pd.res.body.find(b => b.t === 'pre').text.includes('"a":3'), 'a sadpan table from Python');
-  assert.ok(g.textOf(await ran('run this: import matplotlib.pyplot as plt')).includes('canvas'));
-  assert.ok(t.includes('import line as np'), 'the numpy refusal points at line');
+  const fig = await ran('run this: import matplotlib.pyplot as plt\nplt.plot([1, 2, 3], [1, 4, 9])\nplt.title("squares")\nplt.show()');
+  const fb = fig.res.body.find(b => b.t === 'figure');
+  assert.ok(fb && fb.w > 0 && fb.h > 0 && fb.ops.length > 10, 'a figure block with a draw list');
+  assert.ok(fb.ops.some(o => o[0] === 'fillText' && o[1] === 'squares') && fb.label.includes('squares'), fb.label);
+  assert.equal(JSON.stringify(JSON.parse(JSON.stringify(fb))), JSON.stringify(fb), 'the block is plain JSON');
+  assert.ok(!fig.res.body.some(b => b.kind === 'ok'), 'a figure counts as output');
+  assert.ok(g.textOf(await ran('run this: from sklearn.tree import DecisionTreeClassifier\nt = DecisionTreeClassifier().fit([[0.0], [1.0], [2.0], [3.0]], [0, 0, 1, 1])\nt.compile()')).includes('not available in golem'), 'compile() builds code at run time and is refused');
+  const pr = (await ran('run this: from sklearn.linear_model import LinearRegression\nprint(LinearRegression().fit([[1.0], [2.0]], [3.0, 5.0]).coef_, float("inf"))')).res.body.find(b => b.t === 'pre').text;
+  assert.ok(/^\[\d/.test(pr) && pr.endsWith(' inf\n') && !pr.includes('{'), 'print shows typed arrays as lists and inf as Python does: ' + pr);
   const ln = await ran('run this: import line as np\nm = np.array([[3.0, 1.0], [1.0, 2.0]])\nnp.linalg.solve(m, np.array([9.0, 8.0])).tolist()');
   assert.equal(ln.res.value, '[2, 3]', 'line is importable by its own name');
   assert.ok(!g.textOf(ln).includes('rewritten'), 'and nothing was rewritten to reach it');
@@ -93,4 +103,13 @@ test('without a runner the card says so instead of hanging', () => {
   const c = card('run this: print(1)');
   assert.ok(g.textOf(c).includes('not available'));
   g.setRunner('python', req => worker(req));
+});
+
+test('every example on the Python card runs as written, so a tapped chip works', async () => {
+  g.reset();
+  const d = g.TOOLS.find(t => t.name === 'python');
+  for (const ex of d.skill.examples) {
+    const c = await ran(ex);
+    assert.ok(!c.res.body.some(b => b.kind === 'err'), `${ex}: ${g.textOf(c)}`);
+  }
 });

@@ -1,4 +1,4 @@
-// ⚠ VENDORED — DO NOT EDIT. @gcu/scitra, copied from ../auditable/ext/scitra/index.js at auditable ef1a314a (9 Oct 2026, MIT).
+// ⚠ VENDORED — DO NOT EDIT. @gcu/scitra, copied from ../auditable/ext/scitra/index.js at auditable 774234c3 (9 Oct 2026, MIT).
 // Loaded only inside the Python worker. Re-vendor by copying that file here.
 
 // @gcu/scitra — scipy-shaped scientific-computing primitives.

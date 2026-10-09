@@ -22,7 +22,9 @@ const posix = p => p.split(sep).join('/');
 // wrapper, which must come earlier in the list; the build checks every imported name is really exported.
 const PY_LIBS = [['SCITRA', 'vendor/scitra.js'], ['SCITRA_ADDER', 'vendor/scitra-adder.js'], ['SADPAN', 'vendor/sadpan.js'],
   ['LINE', 'vendor/line.js'], ['LINE_ADDER', 'vendor/line-adder.js'],
-  ['MIMIC', 'vendor/mimic-io.js'], ['LEARN', 'vendor/learn.js'], ['LEARN_ADDER', 'vendor/learn-adder.js']];
+  ['MIMIC', 'vendor/mimic-io.js'], ['LEARN', 'vendor/learn.js'], ['LEARN_ADDER', 'vendor/learn-adder.js'],
+  ['ATRA', 'vendor/atra.js'], ['ALPACK', 'vendor/alpack.js'], ['NATRA', 'vendor/natra.js'], ['NATRA_ADDER', 'vendor/natra-adder.js'],
+  ['PLOT', 'vendor/plot.js']];
 const PY_IMPORTS = { '@gcu/line': 'LINE', '@gcu/scitra': 'SCITRA', '@gcu/mimic-io': 'MIMIC' };
 function wrapModule(name, code, rel, exported) {
   const names = [];
@@ -49,10 +51,9 @@ adder.registerModule('scitra', SCITRA_ADDER.scitraAdder);
 adder.registerModule('sadpan', SADPAN);
 LINE_ADDER.attachLine(LINE);
 adder.registerModule('line', LINE_ADDER.vecAdder);
-// learn's source has an opt-in .compile() for tree models that builds predict functions with new Function. Its
-// bundle never installs it (installCompile is exported, not called), so .compile() is the base no-op and Python
-// cannot reach the helpers. Should a later bundle install it, this guard makes it refuse: golem runs no generated
-// code (SPEC principle 9). fit and predict are unaffected either way.
+// learn's tree models have an opt-in .compile() that builds predict functions with new Function, and the bundle
+// installs it. golem's principle 9 keeps generated JavaScript out (natra's Wasm, built from source, is allowed), so
+// in the worker that method refuses; fit and predict are unaffected.
 (function noCompile(seen, v, depth) {
   if (!v || depth > 3 || seen.has(v) || (typeof v !== 'object' && typeof v !== 'function')) return; seen.add(v);
   if (typeof v === 'function' && v.prototype && Object.prototype.hasOwnProperty.call(v.prototype, 'compile') && v !== LEARN.BaseEstimator)
@@ -61,7 +62,14 @@ adder.registerModule('line', LINE_ADDER.vecAdder);
 })(new Set(), LEARN, 0);
 LEARN_ADDER.attachLearn(LEARN);
 adder.registerModule('learn', LEARN_ADDER.learnAdder);
-self.onmessage = async e => { self.postMessage(await pyRun({ run, pyRepr, adderParse }, e.data)); };
+// numpy: natra, compiling its kernels here with atra from the alpack sources (Wasm built from source, principle 9)
+NATRA.attachAtra(ATRA, ALPACK);
+NATRA_ADDER.attachNatra(NATRA);
+adder.registerModule('natra', NATRA_ADDER.natraAdder);
+// matplotlib: plot, whose figures leave the worker as draw lists (plain JSON) that golem's shell replays
+adder.registerModule('plt', PLOT.pltAdder);
+const figures = () => PLOT.pltAdder.shown().map(f => f.toDrawList());
+self.onmessage = async e => { self.postMessage(await pyRun({ run, pyRepr, adderParse, figures }, e.data)); };
 `;
   return "'use strict';\n/* ==== src/vendor/adder.js ==== */\n" + adder + '\n;\n' + libs + '\n/* ==== src/worker/py-driver.js ==== */\n' + driver + setup;
 }

@@ -1,4 +1,4 @@
-// ⚠ VENDORED — DO NOT EDIT. @gcu/mimic-io (estimator serialisation, a dependency of learn), copied from ../auditable/ext/mimic-io/index.js at auditable 6fd9b601 (9 Oct 2026, MIT).
+// ⚠ VENDORED — DO NOT EDIT. @gcu/mimic-io (estimator serialisation, a dependency of learn), copied from ../auditable/ext/mimic-io/index.js at auditable 774234c3 (9 Oct 2026, MIT).
 // Loaded only inside the Python worker. Re-vendor by copying that file here.
 
 // ⚠ GENERATED FILE — DO NOT EDIT. Source: src/  Build: @gcu/build src/main.js

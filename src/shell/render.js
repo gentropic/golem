@@ -61,6 +61,7 @@ function blockHtml(b) {
       : `<button class="btn${i.go ? ' go' : ''}" type="button" data-act="${escHtml(i.act)}"${i.msg ? ` data-msg="${escHtml(i.msg)}"` : ''}>${escHtml(i.label)}</button>`).join('')}</div>`;
     case 'net': return svgNet(b);
     case 'bars': return svgBars(b);
+    case 'figure': return `<figure class="fig"><canvas data-fig width="${+b.w || 400}" height="${+b.h || 300}" role="img" aria-label="${escHtml(b.label || 'Figure')}"></canvas><figcaption>${escHtml(b.label || 'Figure')}</figcaption></figure>`;
     case 'curve': return svgCurve(b);
     default: return `<div class="note err">unknown block ${escHtml(b.t)}</div>`;
   }
@@ -76,5 +77,32 @@ export function cardEl(c) {
     <div class="q">${escHtml(c.raw)}</div>${read ? `<div class="read"><span class="lbl">read as</span> ${read}</div>` : ''}
     <div class="ans">${r.body.map(blockHtml).join('')}${ask}</div>
     <details class="trace"><summary>plan · ${r.trace.length} step${r.trace.length === 1 ? '' : 's'}</summary><ol>${r.trace.map(t => `<li>${escHtml(t)}</li>`).join('')}</ol></details>`;
+  const figs = r.body.filter(b => b.t === 'figure');
+  el.querySelectorAll('canvas[data-fig]').forEach((cv, i) => { try { drawFigure(cv, figs[i]); } catch (e) { cv.replaceWith(Object.assign(document.createElement('div'), { className: 'note err', textContent: `The figure could not be drawn: ${e.message}` })); } });
   return el;
+}
+
+/* ── figures: plot's draw lists (plain JSON from the Python worker) replayed on a canvas, through allowlists ── */
+const FIG_METHODS = new Set(['save', 'restore', 'beginPath', 'closePath', 'moveTo', 'lineTo', 'arc', 'arcTo', 'rect', 'ellipse', 'quadraticCurveTo', 'bezierCurveTo', 'fill', 'stroke', 'clip', 'fillRect', 'strokeRect', 'clearRect', 'fillText', 'strokeText', 'translate', 'rotate', 'scale', 'transform', 'setTransform', 'resetTransform', 'setLineDash']);
+const FIG_PROPS = new Set(['fillStyle', 'strokeStyle', 'lineWidth', 'font', 'textAlign', 'textBaseline', 'globalAlpha', 'lineCap', 'lineJoin', 'miterLimit', 'lineDashOffset', 'imageSmoothingEnabled']);
+function drawFigure(cv, f) {
+  const dpr = window.devicePixelRatio || 1, w = +f.w || 400, h = +f.h || 300;
+  cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+  const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  for (const op of f.ops || []) {
+    const [name, ...args] = op;
+    if (name === 'set') { if (FIG_PROPS.has(args[0])) ctx[args[0]] = args[1]; continue; }
+    if (name === 'image') { figImage(ctx, ...args); continue; }
+    if (!FIG_METHODS.has(name)) throw new Error(`unknown drawing step "${name}"`);
+    if (name === 'setTransform') { const [a, b, c, d, e, g] = args; ctx.setTransform(a * dpr, b * dpr, c * dpr, d * dpr, e * dpr, g * dpr); continue; }
+    if (name === 'resetTransform') { ctx.setTransform(dpr, 0, 0, dpr, 0, 0); continue; }
+    ctx[name](...args);
+  }
+}
+function figImage(ctx, x, y, w, h, cols, rows, b64) {
+  const bin = atob(b64), bytes = new Uint8ClampedArray(bin.length); for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  if (bytes.length !== cols * rows * 4) throw new Error('an image of the wrong size');
+  const scratch = Object.assign(document.createElement('canvas'), { width: cols, height: rows });
+  scratch.getContext('2d').putImageData(new ImageData(bytes, cols, rows), 0, 0);
+  const smooth = ctx.imageSmoothingEnabled; ctx.imageSmoothingEnabled = false; ctx.drawImage(scratch, x, y, w, h); ctx.imageSmoothingEnabled = smooth;
 }

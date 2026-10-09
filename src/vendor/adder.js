@@ -1,4 +1,4 @@
-// ⚠ VENDORED — DO NOT EDIT. @gcu/adder (the single-file build, with run and the sandbox options), copied from ../auditable/ext/adder/index.js at auditable ef1a314a (9 Oct 2026, MIT).
+// ⚠ VENDORED — DO NOT EDIT. @gcu/adder (the single-file build, with run and the sandbox options), copied from ../auditable/ext/adder/index.js at auditable 774234c3 (9 Oct 2026, MIT).
 // Loaded only inside the Python worker. Re-vendor by copying that file here.
 
 // ⚠ GENERATED FILE — DO NOT EDIT. Source: ext/adder/src/  Build: node ext/adder/build.js
@@ -1907,13 +1907,57 @@ function pyBool(v) {
   return true;
 }
 
+// Python spells the non-finite floats inf / -inf / nan, never JS's Infinity / NaN
+function _numRepr(v) {
+  if (v !== v) return 'nan';
+  if (v === Infinity) return 'inf';
+  if (v === -Infinity) return '-inf';
+  return String(v);
+}
+
+// A typed array prints as the Python list of its elements (learn and friends hand them
+// back raw). A float-typed array's integral elements keep their '.0'; a `shape` property
+// whose product is the length nests the list row-major. Uint8Array is bytes, not here.
+function _isListLikeTyped(v) {
+  return ArrayBuffer.isView(v) && !(v instanceof DataView) && !(v instanceof Uint8Array);
+}
+function _typedRepr(v) {
+  const isFloat = v instanceof Float64Array || v instanceof Float32Array;
+  const el = (x) => {
+    if (typeof x === 'bigint') return String(x);
+    if (isFloat && Number.isInteger(x) && Math.abs(x) < 1e16) return Object.is(x, -0) ? '-0.0' : `${x}.0`;
+    return _numRepr(x);
+  };
+  const shape = v.shape;
+  const n = v.length;
+  if (Array.isArray(shape) && shape.length >= 2 && shape.every((d) => Number.isInteger(d) && d >= 0)
+      && shape.reduce((a, b) => a * b, 1) === n) {
+    const rec = (axis, off) => {
+      if (axis === shape.length - 1) {
+        const parts = [];
+        for (let i = 0; i < shape[axis]; i++) parts.push(el(v[off + i]));
+        return `[${parts.join(', ')}]`;
+      }
+      const stride = shape.slice(axis + 1).reduce((a, b) => a * b, 1);
+      const parts = [];
+      for (let i = 0; i < shape[axis]; i++) parts.push(rec(axis + 1, off + i * stride));
+      return `[${parts.join(', ')}]`;
+    };
+    return rec(0, 0);
+  }
+  const parts = [];
+  for (let i = 0; i < n; i++) parts.push(el(v[i]));
+  return `[${parts.join(', ')}]`;
+}
+
 function pyRepr(v) {
   if (v === null || v === undefined) return 'None';
   if (v === true) return 'True';
   if (v === false) return 'False';
   if (typeof v === 'string') return `'${v.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
-  if (typeof v === 'number') return String(v);
+  if (typeof v === 'number') return _numRepr(v);
   if (Array.isArray(v)) return `[${v.map(pyRepr).join(', ')}]`;
+  if (_isListLikeTyped(v)) return _typedRepr(v);
   if (v instanceof Map) {
     const items = [...v.entries()].map(([k, val]) => `${pyRepr(k)}: ${pyRepr(val)}`);
     return `{${items.join(', ')}}`;
@@ -1992,7 +2036,13 @@ function pyFormatValue(value, spec) {
   if (i < spec.length) ftype = spec[i];
 
   let result;
-  if (ftype === 'd') {
+  if (typeof value === 'number' && !Number.isFinite(value) && 'fFeEgG%n'.includes(ftype || 'f')) {
+    result = value !== value ? 'nan' : 'inf';
+    if ('FEG'.includes(ftype) && ftype) result = result.toUpperCase();
+    if (value === -Infinity) result = '-' + result;
+    else if (sign === '+') result = '+' + result;
+    if (ftype === '%') result += '%';
+  } else if (ftype === 'd') {
     result = Math.trunc(Number(value)).toString();
     if (sign === '+' && !result.startsWith('-')) result = '+' + result;
   } else if (ftype === 'f' || ftype === 'F') {
@@ -2029,7 +2079,7 @@ function pyFormatValue(value, spec) {
   } else {
     // auto: number vs string
     if (typeof value === 'number') {
-      result = precision >= 0 ? value.toFixed(precision) : String(value);
+      result = precision >= 0 ? value.toFixed(precision) : _numRepr(value);
       if (sign === '+' && !result.startsWith('-')) result = '+' + result;
     } else {
       result = pyStr(value);

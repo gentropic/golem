@@ -108,6 +108,21 @@ const pyText = await page.waitForFunction(() => { const c = [...document.querySe
 const pyOk = !!pyText;
 console.log(`${pyOk ? 'ok  ' : 'FAIL'} Python runs in a worker${pyOk ? '' : ': ' + (await page.evaluate(() => [...document.querySelectorAll('#stream .card')].pop().textContent)).slice(0, 200)}`);
 if (!pyOk) failed++;
+// a matplotlib figure: plot draws in the worker, the draw list crosses as JSON, the shell replays it on a canvas
+await page.fill('#q', 'run this: import matplotlib.pyplot as plt\nplt.plot([1, 2, 3], [1, 4, 9])\nplt.title("squares")\nplt.show()'); await page.press('#q', 'Enter');
+const inked = await page.waitForFunction(() => {
+  const cv = [...document.querySelectorAll('#stream .card')].pop()?.querySelector('canvas[data-fig]'); if (!cv || !cv.width) return null;
+  const d = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data; let n = 0;
+  for (let i = 3; i < d.length; i += 4) if (d[i] > 0) n++;
+  return n > 1000 ? n : null;
+}, null, { timeout: 8000 }).then(h => h.jsonValue(), () => 0);
+console.log(`${inked ? 'ok  ' : 'FAIL'} a figure drawn on the card${inked ? ` (${inked} pixels inked)` : ''}`);
+if (!inked) failed++;
+// numpy: natra compiles its Wasm kernels with atra inside the blob worker
+await page.fill('#q', 'run this: import numpy as np\nnp.round(np.array([1.0, 0.3333, 0.6667]), 2)'); await page.press('#q', 'Enter');
+const npText = await page.waitForFunction(() => { const c = [...document.querySelectorAll('#stream .card')].pop(); return c && /array\(\[1\.\s+, 0\.33, 0\.67\]\)/.test(c.textContent) ? c.textContent : null; }, null, { timeout: 8000 }).then(h => h.jsonValue(), () => null);
+console.log(`${npText ? 'ok  ' : 'FAIL'} numpy in a real worker${npText ? '' : ': ' + (await page.evaluate(() => [...document.querySelectorAll('#stream .card')].pop().textContent)).slice(0, 240)}`);
+if (!npText) failed++;
 errors.forEach(e => console.log('FAIL ' + e));
 await browser.close();
 if (failed || !nameOk || kept !== 22 || overflow > 0 || errors.length) { console.log('\nsmoke test failed'); process.exit(1); }
