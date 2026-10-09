@@ -55,6 +55,10 @@ test('numpy and friends are rewritten to the GCU names and shown; their absence 
   assert.ok(g.textOf(pd).includes('pandas → sadpan') && !pd.res.body.some(b => b.kind === 'err'), g.textOf(pd));
   assert.ok(pd.res.body.find(b => b.t === 'pre').text.includes('"a":3'), 'a sadpan table from Python');
   assert.ok(g.textOf(await ran('run this: import matplotlib.pyplot as plt')).includes('canvas'));
+  assert.ok(t.includes('import line as np'), 'the numpy refusal points at line');
+  const ln = await ran('run this: import line as np\nm = np.array([[3.0, 1.0], [1.0, 2.0]])\nnp.linalg.solve(m, np.array([9.0, 8.0])).tolist()');
+  assert.equal(ln.res.value, '[2, 3]', 'line is importable by its own name');
+  assert.ok(!g.textOf(ln).includes('rewritten'), 'and nothing was rewritten to reach it');
 });
 
 test('trace: a table of lines and what changed; "trace it" amends a run; export carries the code; replay reruns', async () => {

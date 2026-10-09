@@ -17,24 +17,28 @@ const posix = p => p.split(sep).join('/');
 // run, pyRepr and adderParse among them, stay in scope), each library wrapped in a function that returns its
 // exports so its private names cannot meet adder's, the registrations, golem's driver, and the message handler.
 // The page embeds this text; the Node tests evaluate the same text in a fresh context per run.
-const PY_LIBS = [['SCITRA', 'vendor/scitra.js'], ['SCITRA_ADDER', 'vendor/scitra-adder.js'], ['SADPAN', 'vendor/sadpan.js']];
-function wrapModule(name, code, rel) {
+// A bridge that looks for its library in the notebook's `window._importCache` gets a `window` local to its own
+// wrapper holding just that library: no global window exists in the worker, and nothing else sees this one.
+const PY_LIBS = [['SCITRA', 'vendor/scitra.js'], ['SCITRA_ADDER', 'vendor/scitra-adder.js'], ['SADPAN', 'vendor/sadpan.js'],
+  ['LINE', 'vendor/line.js'], ['LINE_ADDER', 'vendor/line-adder.js', 'const window = { _importCache: { line: LINE } };']];
+function wrapModule(name, code, rel, prelude = '') {
   const names = [];
   code = code.replace(/^export\s*\{([^}]*)\};?[^\n]*$/gm, (_, inner) => { inner.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '').split(',').map(x => x.trim()).filter(Boolean).forEach(x => { const m = /^([A-Za-z_$][\w$]*)(?:\s+as\s+([A-Za-z_$][\w$]*))?$/.exec(x); if (!m) throw new Error(`build: ${rel}: cannot read the export "${x}"`); names.push([m[2] || m[1], m[1]]); }); return ''; });
   code = code.replace(/^export\s+(async\s+function\*?|function\*?|const|let|class)\s+([A-Za-z_$][\w$]*)/gm, (_, kind, id) => { names.push([id, id]); return `${kind} ${id}`; });
   if (/^\s*(?:import|export)\s/m.test(code)) throw new Error(`build: ${rel}: module syntax the worker wrapper cannot carry`);
-  return `/* ==== src/${rel} ==== */\nconst ${name} = (() => {\n${code}\nreturn { ${names.map(([k, v]) => k === v ? k : `${k}: ${v}`).join(', ')} };\n})();\n`;
+  return `/* ==== src/${rel} ==== */\nconst ${name} = (() => {\n${prelude ? prelude + '\n' : ''}${code}\nreturn { ${names.map(([k, v]) => k === v ? k : `${k}: ${v}`).join(', ')} };\n})();\n`;
 }
 export function pyWorkerSource() {
   const adder = readFileSync(join(src, 'vendor/adder.js'), 'utf8').replace(/^export\s*\{\s*adder\s*\};?\s*$/m, '');
   if (/^\s*(?:import|export)\s/m.test(adder)) throw new Error('build: module syntax left in vendor/adder.js');
   const driver = readFileSync(join(src, 'worker/py-driver.js'), 'utf8').replace(/^export (async function) /m, '$1 ');
-  const libs = PY_LIBS.map(([n, rel]) => wrapModule(n, readFileSync(join(src, rel), 'utf8'), rel)).join('\n');
+  const libs = PY_LIBS.map(([n, rel, prelude]) => wrapModule(n, readFileSync(join(src, rel), 'utf8'), rel, prelude)).join('\n');
   const setup = `
 /* ==== the worker: register the GCU modules, then answer one request ==== */
 SCITRA_ADDER.attachScitra(SCITRA);
 adder.registerModule('scitra', SCITRA_ADDER.scitraAdder);
 adder.registerModule('sadpan', SADPAN);
+adder.registerModule('line', LINE_ADDER.vecAdder);
 self.onmessage = async e => { self.postMessage(await pyRun({ run, pyRepr, adderParse }, e.data)); };
 `;
   return "'use strict';\n/* ==== src/vendor/adder.js ==== */\n" + adder + '\n;\n' + libs + '\n/* ==== src/worker/py-driver.js ==== */\n' + driver + setup;

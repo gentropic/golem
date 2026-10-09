@@ -8,7 +8,7 @@ import { importNotebook } from '../vendor/ipynb.js';
 
 const BUDGET = { steps: 2000000, ms: 5000 };
 // in the worker: scitra (for scipy) and sadpan (for pandas); not yet: natra (numpy), plot (matplotlib), learn (sklearn)
-const NOT_YET = { natra: 'natra (numpy) compiles its kernels on the device and needs the atra compiler in the worker', plot: 'plot (matplotlib) draws on a canvas, which the worker does not have yet', plt: 'plot (matplotlib, imported as plt) draws on a canvas, which the worker does not have yet', learn: 'learn (sklearn) is 418 kB and not in the worker yet' };
+const NOT_YET = { natra: 'natra (numpy) compiles its kernels on the device and needs the atra compiler in the worker. line is here, imported by its own name (import line as np): it covers arrays, reductions and small linear algebra, but it is not numpy, and round, eigh, lstsq and comparisons differ', plot: 'plot (matplotlib) draws on a canvas, which the worker does not have yet', plt: 'plot (matplotlib, imported as plt) draws on a canvas, which the worker does not have yet', learn: 'learn (sklearn) is 418 kB and not in the worker yet' };
 // numpy → natra and friends, through @gcu/ipynb's own substitution table
 export function rewriteForGcu(code) {
   try {
@@ -23,7 +23,7 @@ const HEAD = /^(?:run|run this|run it|python|py|execute|exec|eval(?:uate)?(?: th
 
 tool({
   name: 'python', rank: 41,
-  skill: { group: 'Compute', title: 'Run and trace Python', on: '@gcu/adder', about: 'Python run on the device by adder, a pure-JS interpreter: output, the last value, the error with its line. "trace it" adds a table of lines and the variables they changed. No network, no page access, a statement budget; numpy, pandas and scipy imports are rewritten to the GCU names and shown; scipy (scitra) and pandas (sadpan) are there, numpy is not yet.', examples: ['run this: print(sum(range(10)))', 'trace this: a = 1\\nfor i in range(3):\\n    a *= 2'] },
+  skill: { group: 'Compute', title: 'Run and trace Python', on: '@gcu/adder', about: 'Python run on the device by adder, a pure-JS interpreter: output, the last value, the error with its line. "trace it" adds a table of lines and the variables they changed. No network, no page access, a statement budget; numpy, pandas and scipy imports are rewritten to the GCU names and shown; scipy (scitra) and pandas (sadpan) are there; numpy is not, but line is, by its own name.', examples: ['run this: print(sum(range(10)))', 'trace this: a = 1\\nfor i in range(3):\\n    a *= 2'] },
   read: (text, q, raw) => { const p = payloadOf(raw || text); if (!p || !p.body || !HEAD.test(p.head)) return null; return { code: p.body.replace(/\r\n/g, '\n'), trace: /^(?:trace|step)/i.test(p.head) }; },
   amend: [{ arg: 'trace', match: /^(?:trace it|trace|step through it|show the steps)$/, value: () => true }, { arg: 'trace', match: /^(?:no trace|just run it)$/, value: () => false }],
   topic: () => ['Python', 1],
