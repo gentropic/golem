@@ -164,6 +164,7 @@ Status: **mock** = works in `src/` today; **planned** = named, not built.
 | Compute | Unit conversion with dimension checks | mock (own table, checked against `@gcu/units`) | `@gcu/units`, `@gcu/dimensions` |
 | Compute | Arithmetic, trig in degrees | mock (own parser) | `@gcu/expr` if it fits, else keep the parser |
 | Compute | Dates: day counts, weekdays | mock | built in |
+| Compute | Explainers: cron schedules, epoch times, chmod modes, URLs, ECMAScript regular expressions | mock (own parsers, 8 Oct 2026); JWT waits for sensitive arguments, PCRE dialect not read | built in |
 | Compute | Step-by-step algebra | planned | new package; nothing symbolic was found in the monorepo |
 | Field | True thickness from intercept, hole and plane | `@gcu/bearing` vendored | `@gcu/bearing` |
 | Field | Stereonet: planes, poles, lines | `@gcu/bearing` vendored (projection); own SVG | `@gcu/bearing`, `@gcu/stereonet` |

@@ -60,8 +60,8 @@ frame({
   words_pt: ['cronômetro', 'cronometro', 'timer', 'temporizador', 'me lembra em', 'me avisa em'], label_pt: 'Iniciar',
   bind: c => {
     const t = c.theme[0], q = (t && t.type === 'quantity') ? t : (t && t.attrs && t.attrs.duration) || (c.roles.for && c.roles.for[0]);
-    const u = q && parseUnit(q.unit);
-    if (!q) return { clarify: 'for how long? Say "for 30 minutes"' };
+    if (!q || q.unit == null) return { clarify: 'for how long? Say "for 30 minutes"' };
+    const u = parseUnit(q.unit);
     return u && u.dim === 't' ? { tool: 'timer', args: { sec: Math.round(q.n * u.f) } } : { clarify: `${q.n} ${q.unit} is not a duration` };
   }
 });

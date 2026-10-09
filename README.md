@@ -16,6 +16,7 @@ Open `dist/golem.html`, then:
 - Type `why` after any card, or `export as script`.
 - Open the menu (top left) for sessions and history search.
 - Ask `how old is the permian`, `what period is 250 ma`, `stages of the triassic`: the ICS chart, 171 units, CC BY 4.0 via Macrostrat.
+- Try `explain cron: 0 9 * * 1-5`, `what is 1700000000`, `chmod 754`, `explain regex: ^\d{3}-\d{2}$`.
 - Try `mass of 1 m of nq core at 2.7`, `200 mesh in microns`, `rqd of 12, 8, 25, 4, 31 and 9 cm in a 100 cm run`.
 - Try `apparent dip of 000/30 on a section at 045`, `intersection of 090/45 and 270/45`, `core alpha 40 beta 230 in hole 270/60`, `declination at -19.92, -43.94`.
 - Tap the paperclip and open a CSV of your own. `mean cu by lith where au > 0.1`, `how many rows where cu > 1`, `top 5 rows sorted by au descending`, `check intervals`, `histogram of fe`: the column names come from the file.
@@ -48,6 +49,7 @@ src/engine/                  no DOM, no storage: everything that reads and compu
   orientation.js table.js    true thickness and the stereonet; the open table (a file through recon, or the sample), histogram, table questions
   structure.js geo.js        apparent dip, three-point, intersection, rake, oriented core, Fisher mean; declination from wmm
   sample.js timescale.js     core and sample arithmetic; the ICS timescale (data/timescale.js)
+  explain.js                 explainers: cron, epoch time, chmod, URL, regex, each with its own parser
   knowledge.js device.js     packs sample, device hand-offs
   notes.js skills.js         notes and taught words; the skills and packs catalog
   reading.js                 the reading ladder: context, grammar (clause, then the rules), taught; none, why, export
@@ -66,6 +68,7 @@ test/files.test.mjs          a real CSV: recon typing, table questions, table no
 test/structure.test.mjs      the structural geometry and declination checks from the skills spec
 test/timescale.test.mjs      the timescale pack: the chart's consistency and the spec's checks
 test/sample.test.mjs         core and sample arithmetic checks
+test/explain.test.mjs        the explainers: the spec's checks and the parsers' edges
 test/oracle.test.mjs         golem's arithmetic against the GCU packages it does not vendor
 test/smoke.mjs               browser smoke test on the built file
 dist/golem.html              the built mock (committed, so it opens without a build)

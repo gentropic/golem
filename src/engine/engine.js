@@ -12,6 +12,7 @@ import './structure.js';
 import './geo.js';
 import './timescale.js';
 import './sample.js';
+import './explain.js';
 import './notes.js';
 import { norm, grammar, context, taught } from './reading.js';
 import { current, newSession, renameSession, touch } from './sessions.js';
