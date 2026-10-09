@@ -16,6 +16,7 @@ Open `dist/golem.html`, then:
 - Type `why` after any card, or `export as script`.
 - Open the menu (top left) for sessions and history search.
 - Ask `how old is the permian`, `what period is 250 ma`, `stages of the triassic`: the ICS chart, 171 units, CC BY 4.0 via Macrostrat.
+- Try `2.6 to 2.9 t/m3 * 1.2 to 1.5 Mm3`, `(120 to 180) * (0.4 to 0.6) / 7`, `2.7 ± 0.1 t/m3 * 1.35 Mm3`.
 - Try `is 21 apr 2027 a working day`, `working days until 20 dec`, `14 on 14 off from 6 oct, am i off at christmas`, `9am sao paulo in perth`, `when is easter 2027`.
 - Try `sha256: abc`, `base64 decode: SGVsbG8=`, `the table as json` (it asks to open one first).
 - Try `explain cron: 0 9 * * 1-5`, `what is 1700000000`, `chmod 754`, `explain regex: ^\d{3}-\d{2}$`.
@@ -54,6 +55,7 @@ src/engine/                  no DOM, no storage: everything that reads and compu
   explain.js                 explainers: cron, epoch time, chmod, URL, regex, each with its own parser
   convert.js                 SHA-256, base64/hex/URL encoding, the open table as CSV, TSV or JSON
   calendar.js                working days and rosters over the vendored plan calendar; time zones through Intl
+  estimate.js                arithmetic over ranges by simulation, units carried through, the seed in args
   knowledge.js device.js     packs sample, device hand-offs
   notes.js skills.js         notes and taught words; the skills and packs catalog
   reading.js                 the reading ladder: context, grammar (clause, then the rules), taught; none, why, export
@@ -75,6 +77,7 @@ test/sample.test.mjs         core and sample arithmetic checks
 test/explain.test.mjs        the explainers: the spec's checks and the parsers' edges
 test/convert.test.mjs        hashes against known digests, encodings both ways, the table written out
 test/calendar.test.mjs       working days, rosters and time zones on a pinned clock
+test/estimate.test.mjs       ranges: the 3.7125 Mt check, units, refusals, replay by seed
 test/oracle.test.mjs         golem's arithmetic against the GCU packages it does not vendor
 test/smoke.mjs               browser smoke test on the built file
 dist/golem.html              the built mock (committed, so it opens without a build)

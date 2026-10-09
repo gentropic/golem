@@ -8,6 +8,7 @@ export { ontology } from './ontology.js';
 export { tableFromText, colOf, whereToSift, stats } from './table.js';
 export { sha256, tableText } from './convert.js';
 export { zonesOf, offsetOf, instantOf } from './calendar.js';
+export { unitWord } from './estimate.js';
 
 // the words of a result, in reading order: what a person would see on the card
 export function textOf(c) {
