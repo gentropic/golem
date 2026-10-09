@@ -7,8 +7,8 @@
   "license": "MIT",
   "scripts": {
     "build": "node build.mjs",
-    "test:engine": "node --test test/engine.test.mjs test/files.test.mjs test/structure.test.mjs test/timescale.test.mjs test/sample.test.mjs test/explain.test.mjs test/convert.test.mjs test/calendar.test.mjs test/estimate.test.mjs test/chem.test.mjs test/text.test.mjs test/forms.test.mjs test/log.test.mjs test/places.test.mjs test/oracle.test.mjs",
-    "test": "node build.mjs && node --test test/engine.test.mjs test/files.test.mjs test/structure.test.mjs test/timescale.test.mjs test/sample.test.mjs test/explain.test.mjs test/convert.test.mjs test/calendar.test.mjs test/estimate.test.mjs test/chem.test.mjs test/text.test.mjs test/forms.test.mjs test/log.test.mjs test/places.test.mjs test/oracle.test.mjs && node test/smoke.mjs"
+    "test:engine": "node --test test/engine.test.mjs test/files.test.mjs test/structure.test.mjs test/timescale.test.mjs test/sample.test.mjs test/explain.test.mjs test/convert.test.mjs test/calendar.test.mjs test/estimate.test.mjs test/chem.test.mjs test/text.test.mjs test/forms.test.mjs test/log.test.mjs test/places.test.mjs test/formats.test.mjs test/oracle.test.mjs",
+    "test": "node build.mjs && node --test test/engine.test.mjs test/files.test.mjs test/structure.test.mjs test/timescale.test.mjs test/sample.test.mjs test/explain.test.mjs test/convert.test.mjs test/calendar.test.mjs test/estimate.test.mjs test/chem.test.mjs test/text.test.mjs test/forms.test.mjs test/log.test.mjs test/places.test.mjs test/formats.test.mjs test/oracle.test.mjs && node test/smoke.mjs"
   },
   "devDependencies": {
     "playwright": "^1.64.0"

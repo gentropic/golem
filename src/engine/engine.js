@@ -23,6 +23,7 @@ import './econ.js';
 import './log.js';
 import './places.js';
 import './sky.js';
+import { convertBinary } from './formats.js';
 import './notes.js';
 import { norm, grammar, context, taught } from './reading.js';
 import { current, newSession, renameSession, touch } from './sessions.js';
@@ -79,6 +80,17 @@ export function openFile(name, text) {
   if (!current()) newSession();
   const t0 = performance.now(), hash = hashOf(text);
   S.files[hash] = { name, hash, text, size: text.length };
+  const args = { file: { name, hash } }, res = T.open(args);
+  return { kind: 'card', card: addCard(`open ${name}`, { tool: 'open', args, rung: 'grammar', res }, performance.now() - t0) };
+}
+
+// an xlsx or .dm from the picker: converted to text per table by the vendored readers, kept, then opened
+export async function openBinary(name, buffer) {
+  if (!current()) newSession();
+  const t0 = performance.now();
+  let conv; try { conv = await convertBinary(name, buffer); } catch (e) { return { kind: 'nothing', msg: `Could not read ${name}: ${e.message}.` }; }
+  const names = Object.keys(conv.tables), text = conv.tables[names[0]], hash = hashOf(names.map(n => n + '\n' + conv.tables[n]).join('\n'));
+  S.files[hash] = { name, hash, text, size: names.reduce((s, n) => s + conv.tables[n].length, 0), from: conv.from, lost: conv.lost, convTrace: conv.trace, ...(names.length > 1 ? { tables: conv.tables } : { sheet: names[0] }) };
   const args = { file: { name, hash } }, res = T.open(args);
   return { kind: 'card', card: addCard(`open ${name}`, { tool: 'open', args, rung: 'grammar', res }, performance.now() - t0) };
 }

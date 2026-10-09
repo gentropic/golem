@@ -16,6 +16,7 @@ Open `dist/golem.html`, then:
 - Type `why` after any card, or `export as script`.
 - Open the menu (top left) for sessions and history search.
 - Ask `how old is the permian`, `what period is 250 ma`, `stages of the triassic`: the ICS chart, 171 units, CC BY 4.0 via Macrostrat.
+- Open an `.xlsx` or a Datamine `.dm` with the paperclip: it is converted once, kept, and every table question works on it.
 - Try `home is -19.92, -43.94`, `distance from home to -6.07,-50.16`, `-19.92, -43.94 in utm`, `sunrise tomorrow in home`, `moon phase on 25 dec`.
 - Try `log 5 km run yesterday`, `how many km did i run this month`, `mean weight by week`, `open the log` then `count by activity`.
 - Try `help me decide between perth, vancouver and santiago` (it asks for criteria, weights and scores), `cutoff grade for copper at 9000 usd/t, 88% recovery, processing 14 usd/t, g&a 3 usd/t`, `cueq of 0.8% cu and 0.3 g/t au at 9000 usd/t and 2300 usd/oz`.
@@ -63,6 +64,7 @@ src/engine/                  no DOM, no storage: everything that reads and compu
   estimate.js                arithmetic over ranges by simulation, units carried through, the seed in args
   chem.js                    formulas parsed; molar mass, oxide factors, fractions over data/elements.js (IUPAC weights)
   text.js                    payloads after a colon or the first line: word count and readability, TextRank sentences, Myers diff
+  formats.js                 xlsx and .dm converted to text per table at open time (sheet, dm vendored)
   places.js sky.js           saved places, Vincenty distance, Krüger UTM; NOAA sun times, mean-cycle moon phase
   log.js                     the log: a device table written from cards, asked in plain words, opened as the table
   forms.js econ.js           the form card (questions asked in turn, answers as slots) and the decision matrix; Gy, cutoff, NSR, equivalents
@@ -73,7 +75,7 @@ src/engine/                  no DOM, no storage: everything that reads and compu
   sessions.js                sessions, replay, auto-naming, serialize and hydrate
   engine.js                  submit, rerun, slot flips, answers, undo
   index.js                   the surface Node tests import
-src/vendor/                  copies, never edited here: @gcu/dispatch (the parser), @gcu/bearing, @gcu/sadpan, @gcu/recon, @gcu/sift, @gcu/wmm, @gcu/units (tables only), @gcu/plan (calendar and holidays only), the lead-acid shim
+src/vendor/                  copies, never edited here: @gcu/dispatch (the parser), @gcu/bearing, @gcu/sadpan, @gcu/recon, @gcu/sift, @gcu/wmm, @gcu/units (tables only), @gcu/plan (calendar and holidays only), @gcu/sheet, @gcu/dm, the lead-acid shim
 src/shell/                   the browser: markup, rendering, wiring, storage
   index.html                 markup, Switchboard tokens, styles, bench notes
   fonts/                     Barlow and Space Mono (OFL), embedded by the build
@@ -92,6 +94,7 @@ test/chem.test.mjs           the elements table is whole; CuFeS2, Fe→Fe2O3, Cu
 test/text.test.mjs           counts and Flesch, TextRank order, Myers edits, the payload rule
 test/forms.test.mjs          the decision matrix end to end, and the formulas with their terms asked
 test/log.test.mjs            the log: rows, corrections, undo, replay, questions, opened as a table
+test/formats.test.mjs        xlsx (written by the vendored sheet) and the .dm fixture through openBinary, replay, the sheet slot
 test/places.test.mjs         Vincenty against the Geoscience Australia test line, UTM round trips and the meridian arc, sun and moon
 test/oracle.test.mjs         golem's arithmetic against the GCU packages it does not vendor
 test/smoke.mjs               browser smoke test on the built file

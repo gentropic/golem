@@ -202,7 +202,7 @@ svg text{font:10px var(--mono);fill:var(--au-fg-muted)}
         <div id="status" aria-live="polite"></div>
         <div class="sugg" id="sugg"></div>
         <form class="ask" id="f" autocomplete="off">
-          <button class="attach" id="attach" type="button" title="Open a CSV or TSV from your files" aria-label="Open a file">📎</button><input type="file" id="file" accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values,text/plain" hidden>
+          <button class="attach" id="attach" type="button" title="Open a CSV or TSV from your files" aria-label="Open a file">📎</button><input type="file" id="file" accept=".csv,.tsv,.txt,.xlsx,.xlsm,.dm,text/csv,text/tab-separated-values,text/plain" hidden>
           <textarea id="q" rows="1" placeholder="ask, compute, or act" aria-label="Query" enterkeyhint="go"></textarea>
           <button class="btn go" type="submit">Run</button>
         </form>
@@ -7515,7 +7515,7 @@ function colOf(word, table = S.table) {
 }
 const colNames = t => t.cols.map(c => c.name).join(', ');
 const shown = w => { const c = colOf(w, S.table || { cols: SAMPLE_COLS }); return c ? (c.analyte || c.name) : w; };
-const srcLine = t => t.source === 'sample' ? 'assays.csv · synthetic sample generated for this mock' : t.source === 'device' ? `the ${t.name} · ${t.rows.length} rows · a table on this device` : `${t.name} · ${t.rows.length} rows · typed by @gcu/recon`;
+const srcLine = t => t.source === 'sample' ? 'assays.csv · synthetic sample generated for this mock' : t.source === 'device' ? `the ${t.name} · ${t.rows.length} rows · a table on this device` : `${t.name}${t.sheet && t.from === 'xlsx' ? ' · sheet ' + t.sheet : ''} · ${t.rows.length} rows · ${t.from === 'xlsx' ? 'read by @gcu/sheet, ' : t.from === 'dm' ? 'read by @gcu/dm, ' : ''}typed by @gcu/recon`;
 
 /* ── statistics, weighted or not ───────────────────────────── */
 function stats(v) {
@@ -7540,7 +7540,7 @@ condition('table', {
 });
 tool({
   name: 'open', rank: 50,
-  skill: { group: 'Table', title: 'Open and validate', on: '@gcu/recon · sadpan', about: 'A CSV or TSV from your files, typed by recon: numbers, categories, units, analytes, hole and interval columns.', examples: ['open assays.csv'] },
+  skill: { group: 'Table', title: 'Open and validate', on: '@gcu/recon · sheet · dm', about: 'A CSV, TSV, xlsx or Datamine .dm from your files, typed by recon: numbers, categories, units, analytes, hole and interval columns. A workbook with several sheets asks which.', examples: ['open assays.csv'] },
   read: (text, q) => { let m; if (/^open (?:the sample|sample|assays|assays\.csv)$/.test(q)) return {}; if ((m = /^open (?:the |my )?(log)$/.exec(q))) return { device: m[1] }; if ((m = /^open (.+)$/.exec(q))) { const f = Object.values(S.files).find(f => f.name.toLowerCase() === m[1]); return f ? { file: { name: f.name, hash: f.hash } } : null; } return null; },
   topic: () => null,
   run: a => {
@@ -7551,7 +7551,11 @@ tool({
     } else if (a.file) {
       const f = S.files[a.file.hash];
       if (!f) return { read: ['open table', { v: a.file.name }], body: [{ t: 'note', kind: 'err', text: `${a.file.name} is not kept on this device. Open it again from your files.` }], trace: ['file: not in the device store'] };
-      t = tableFromText(a.file.name, f.text, a.file.hash);
+      if (a.sheet) a.file = { ...a.file, sheet: a.sheet };
+      if (f.tables && !a.file.sheet) return { read: ['open table', { v: a.file.name }], body: [{ t: 'kv', rows: [['sheets', Object.keys(f.tables).join(', ')]] }], ask: { prompt: `${a.file.name} has ${Object.keys(f.tables).length} sheets. Which one?`, options: Object.keys(f.tables).map(k => ({ label: k, value: k })), set: (x, v) => { x.file = { ...x.file, sheet: v }; } }, trace: ['blocked: several sheets'] };
+      if (f.tables && !f.tables[a.file.sheet]) return { read: ['open table', { v: a.file.name }], body: [{ t: 'note', kind: 'err', text: `${a.file.name} has no sheet called ${a.file.sheet}. It has ${Object.keys(f.tables).join(', ')}.` }], trace: ['sheet: not found'] };
+      t = tableFromText(a.file.name, f.tables ? f.tables[a.file.sheet] : f.text, a.file.hash);
+      if (t) { t.from = f.from || null; t.sheet = f.tables ? a.file.sheet : f.sheet || null; t.lost = f.lost || null; t.convTrace = f.convTrace || null; }
       if (!t) return { read: ['open table', { v: a.file.name }], body: [{ t: 'note', kind: 'err', text: `${a.file.name} has no table in it: fewer than two lines.` }], trace: ['recon: nothing to type'] };
     } else t = sampleTable();
     openTable(t);
@@ -7560,10 +7564,10 @@ tool({
     const nulls = t.rows.reduce((n, r) => n + Object.values(r).filter(v => v == null).length, 0);
     const rows = [['rows', `${t.rows.length}${holes ? ` samples in ${holes} holes` : ''}`], ['columns', t.cols.map(c => `${c.name} (${c.type === 'numeric' ? (c.unit || 'number') : 'category'}${c.analyte ? ', ' + c.analyte : ''})`).join(' · ')]];
     if (t.roles.from) rows.push(['intervals', `${t.roles.from} to ${t.roles.to}${t.roles.hole ? ' by ' + t.roles.hole : ''}; ${n1} samples of 1 m`]);
-    const trace = [t.source === 'sample' ? 'generate the sample table' : t.source === 'device' ? `device table ${t.name}: ${t.rows.length} rows` : `recon.sniff(${t.name}) → delimiter "${t.delimiter}", ${t.cols.length} columns typed`, `roles: ${Object.entries(t.roles).map(([k, v]) => `${k} = ${v}`).join(', ') || 'none found'}`, `tare: ${nulls} blank or sentinel cells, ${bdl.map(([c, n]) => `${n} negative ${c}`).join(', ') || 'no negative codes'}`];
+    const trace = [...(t.convTrace || []), t.source === 'sample' ? 'generate the sample table' : t.source === 'device' ? `device table ${t.name}: ${t.rows.length} rows` : `recon.sniff(${t.name}) → delimiter "${t.delimiter}", ${t.cols.length} columns typed`, `roles: ${Object.entries(t.roles).map(([k, v]) => `${k} = ${v}`).join(', ') || 'none found'}`, `tare: ${nulls} blank or sentinel cells, ${bdl.map(([c, n]) => `${n} negative ${c}`).join(', ') || 'no negative codes'}`];
     return {
-      read: ['open table', { v: t.name }],
-      body: [{ t: 'kv', rows }, ...(bdl.length ? [{ t: 'note', text: `${bdl.map(([c, n]) => `${n} ${c} values are negative`).join('; ')}. That looks like a below-detection code. Statistics leave them out until you choose a policy on a card.` }] : []), { t: 'src', text: srcLine(t) }],
+      read: ['open table', { v: t.name }, ...(t.sheet && t.from === 'xlsx' ? [{ v: `sheet ${t.sheet}`, key: 'sheet', alts: Object.keys((S.files[t.hash] || {}).tables || {}).length > 1 ? Object.keys(S.files[t.hash].tables) : [t.sheet], cur: t.sheet }] : [])],
+      body: [{ t: 'kv', rows }, ...(t.from ? [{ t: 'note', text: `Converted from ${t.from === 'xlsx' ? 'xlsx by @gcu/sheet' : 'Datamine .dm by @gcu/dm'} when the file was opened${t.lost && t.lost.length ? '; ' + t.lost.join('; ') : ''}.` }] : []), ...(bdl.length ? [{ t: 'note', text: `${bdl.map(([c, n]) => `${n} ${c} values are negative`).join('; ')}. That looks like a below-detection code. Statistics leave them out until you choose a policy on a card.` }] : []), { t: 'src', text: srcLine(t) }],
       trace, py: t.source === 'device' ? `dh = device.table("${t.name}")` : `dh = read_csv("${t.name}")`
     };
   }
@@ -11137,6 +11141,1549 @@ tool({
   return { solar };
 })();
 
+/* ==== src/vendor/sheet.js ==== */
+const { sheet, census, openSheet } = (() => {
+// ⚠ VENDORED — DO NOT EDIT. @gcu/sheet, copied from ../auditable/ext/sheet/index.js (built from its src/ by @gcu/build, MIT).
+// Re-vendor by copying that file here. Reading is asynchronous (DecompressionStream), so golem converts at open time, not in a tool.
+
+// ⚠ GENERATED FILE — DO NOT EDIT. Source: src/  Build: @gcu/build src/main.js
+// @gcu/sheet — XLSX file reader and writer in pure JavaScript. Zero runtime dependencies — bundles its own zip and XML handling.
+
+// ── src/zip.js ──
+
+// ── CRC32 ──
+
+const CRC32_TABLE = new Uint32Array(256);
+for (let i = 0; i < 256; i++) {
+  let c = i;
+  for (let j = 0; j < 8; j++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+  CRC32_TABLE[i] = c;
+}
+
+function crc32(bytes) {
+  let crc = 0xFFFFFFFF;
+  for (let i = 0; i < bytes.length; i++) {
+    crc = CRC32_TABLE[(crc ^ bytes[i]) & 0xFF] ^ (crc >>> 8);
+  }
+  return (crc ^ 0xFFFFFFFF) >>> 0;
+}
+
+// ── Helpers ──
+
+const encoder = new TextEncoder();
+const decoder = new TextDecoder();
+
+async function deflateRaw(data) {
+  const cs = new CompressionStream('deflate-raw');
+  const writer = cs.writable.getWriter();
+  writer.write(data);
+  writer.close();
+  return new Uint8Array(await new Response(cs.readable).arrayBuffer());
+}
+
+async function inflateRaw(data) {
+  const ds = new DecompressionStream('deflate-raw');
+  const writer = ds.writable.getWriter();
+  writer.write(data);
+  writer.close();
+  return new Uint8Array(await new Response(ds.readable).arrayBuffer());
+}
+
+function readU16(buf, off) { return buf[off] | (buf[off + 1] << 8); }
+function readU32(buf, off) { return (buf[off] | (buf[off + 1] << 8) | (buf[off + 2] << 16) | (buf[off + 3] << 24)) >>> 0; }
+
+function writeU16(buf, off, val) { buf[off] = val & 0xFF; buf[off + 1] = (val >> 8) & 0xFF; }
+function writeU32(buf, off, val) { buf[off] = val & 0xFF; buf[off + 1] = (val >> 8) & 0xFF; buf[off + 2] = (val >> 16) & 0xFF; buf[off + 3] = (val >> 24) & 0xFF; }
+
+// ── Unzip ──
+
+async function unzip(bytes) {
+  const buf = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  const entries = new Map();
+
+  // find End of Central Directory (search backwards for signature 0x06054b50)
+  let eocdOff = -1;
+  for (let i = buf.length - 22; i >= 0 && i >= buf.length - 65557; i--) {
+    if (readU32(buf, i) === 0x06054B50) { eocdOff = i; break; }
+  }
+  if (eocdOff === -1) throw new Error('not a ZIP file: EOCD not found');
+
+  const entryCount = readU16(buf, eocdOff + 10);
+  let cdOff = readU32(buf, eocdOff + 16);
+
+  for (let e = 0; e < entryCount; e++) {
+    if (readU32(buf, cdOff) !== 0x02014B50) throw new Error('bad central directory entry');
+
+    const method = readU16(buf, cdOff + 10);
+    const crc = readU32(buf, cdOff + 16);
+    const compSize = readU32(buf, cdOff + 20);
+    const uncompSize = readU32(buf, cdOff + 24);
+    const nameLen = readU16(buf, cdOff + 28);
+    const extraLen = readU16(buf, cdOff + 30);
+    const commentLen = readU16(buf, cdOff + 32);
+    const localOff = readU32(buf, cdOff + 42);
+
+    const name = decoder.decode(buf.subarray(cdOff + 46, cdOff + 46 + nameLen));
+    cdOff += 46 + nameLen + extraLen + commentLen;
+
+    // skip directories
+    if (name.endsWith('/')) continue;
+
+    // read local file header to find data offset
+    const localNameLen = readU16(buf, localOff + 26);
+    const localExtraLen = readU16(buf, localOff + 28);
+    const dataOff = localOff + 30 + localNameLen + localExtraLen;
+    const compressed = buf.subarray(dataOff, dataOff + compSize);
+
+    let data;
+    if (method === 0) {
+      // stored
+      data = compressed.slice();
+    } else if (method === 8) {
+      // deflated
+      data = await inflateRaw(compressed);
+    } else {
+      throw new Error(`unsupported compression method ${method} for ${name}`);
+    }
+
+    if (crc32(data) !== crc) throw new Error(`CRC mismatch for ${name}`);
+    entries.set(name, data);
+  }
+
+  return entries;
+}
+
+// ── Zip ──
+
+async function zip(entries) {
+  // entries: Map<string, Uint8Array> or array of [name, data]
+  const items = entries instanceof Map ? [...entries] : entries;
+  const localHeaders = [];
+  const centralEntries = [];
+  let offset = 0;
+
+  for (const [name, raw] of items) {
+    const nameBytes = encoder.encode(name);
+    const crc = crc32(raw);
+    const compressed = await deflateRaw(raw);
+
+    // use deflated only if smaller
+    const useDeflate = compressed.length < raw.length;
+    const stored = useDeflate ? compressed : raw;
+    const method = useDeflate ? 8 : 0;
+
+    // local file header (30 + nameLen)
+    const local = new Uint8Array(30 + nameBytes.length + stored.length);
+    writeU32(local, 0, 0x04034B50);    // signature
+    writeU16(local, 4, 20);            // version needed
+    writeU16(local, 6, 0);             // flags
+    writeU16(local, 8, method);        // compression method
+    writeU16(local, 10, 0);            // mod time
+    writeU16(local, 12, 0);            // mod date
+    writeU32(local, 14, crc);          // CRC-32
+    writeU32(local, 18, stored.length);  // compressed size
+    writeU32(local, 22, raw.length);     // uncompressed size
+    writeU16(local, 26, nameBytes.length);
+    writeU16(local, 28, 0);            // extra field length
+    local.set(nameBytes, 30);
+    local.set(stored, 30 + nameBytes.length);
+    localHeaders.push(local);
+
+    // central directory entry (46 + nameLen)
+    const central = new Uint8Array(46 + nameBytes.length);
+    writeU32(central, 0, 0x02014B50);
+    writeU16(central, 4, 20);          // version made by
+    writeU16(central, 6, 20);          // version needed
+    writeU16(central, 8, 0);           // flags
+    writeU16(central, 10, method);
+    writeU16(central, 12, 0);          // mod time
+    writeU16(central, 14, 0);          // mod date
+    writeU32(central, 16, crc);
+    writeU32(central, 20, stored.length);
+    writeU32(central, 24, raw.length);
+    writeU16(central, 28, nameBytes.length);
+    writeU16(central, 30, 0);          // extra field length
+    writeU16(central, 32, 0);          // comment length
+    writeU16(central, 34, 0);          // disk number
+    writeU16(central, 36, 0);          // internal attributes
+    writeU32(central, 38, 0);          // external attributes
+    writeU32(central, 42, offset);     // local header offset
+    central.set(nameBytes, 46);
+    centralEntries.push(central);
+
+    offset += local.length;
+  }
+
+  // End of Central Directory
+  const cdOffset = offset;
+  let cdSize = 0;
+  for (const c of centralEntries) cdSize += c.length;
+
+  const eocd = new Uint8Array(22);
+  writeU32(eocd, 0, 0x06054B50);
+  writeU16(eocd, 4, 0);               // disk number
+  writeU16(eocd, 6, 0);               // disk with central dir
+  writeU16(eocd, 8, items.length);     // entries on this disk
+  writeU16(eocd, 10, items.length);    // total entries
+  writeU32(eocd, 12, cdSize);          // central dir size
+  writeU32(eocd, 16, cdOffset);        // central dir offset
+  writeU16(eocd, 20, 0);              // comment length
+
+  // concatenate all parts
+  const total = offset + cdSize + 22;
+  const result = new Uint8Array(total);
+  let pos = 0;
+  for (const l of localHeaders) { result.set(l, pos); pos += l.length; }
+  for (const c of centralEntries) { result.set(c, pos); pos += c.length; }
+  result.set(eocd, pos);
+
+  return result;
+}
+
+// ── src/xml.js ──
+
+// ── XML builder ──
+
+function tag(name, attrs, ...children) {
+  let s = '<' + name;
+  if (attrs) {
+    for (const k in attrs) {
+      const v = attrs[k];
+      if (v !== undefined && v !== null) s += ` ${k}="${escape(String(v))}"`;
+    }
+  }
+  if (children.length === 0) return s + '/>';
+  s += '>';
+  for (const child of children) {
+    if (child !== undefined && child !== null) s += String(child);
+  }
+  return s + `</${name}>`;
+}
+
+function escape(str) {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+}
+
+function unescape(str) {
+  return str.replace(/&apos;/g, "'").replace(/&quot;/g, '"')
+            .replace(/&gt;/g, '>').replace(/&lt;/g, '<').replace(/&amp;/g, '&');
+}
+
+// Strip namespace prefix: "x:row" → "row"
+function stripNS(name) {
+  const i = name.indexOf(':');
+  return i === -1 ? name : name.substring(i + 1);
+}
+
+// ── Minimal XML parser ──
+// Handles the subset xlsx uses: elements, attributes, text. No CDATA, no DTD.
+
+function parseXml(str) {
+  const root = { tag: '', attrs: {}, children: [], text: '' };
+  const stack = [root];
+  let i = 0;
+
+  while (i < str.length) {
+    if (str[i] === '<') {
+      // processing instruction
+      if (str[i + 1] === '?') {
+        i = str.indexOf('?>', i) + 2;
+        continue;
+      }
+      // closing tag
+      if (str[i + 1] === '/') {
+        i = str.indexOf('>', i) + 1;
+        stack.pop();
+        continue;
+      }
+      const end = str.indexOf('>', i);
+      const selfClose = str[end - 1] === '/';
+      const raw = str.substring(i + 1, selfClose ? end - 1 : end);
+
+      // split tag name from attributes
+      const sp = raw.search(/[\s]/);
+      const tagName = stripNS(sp === -1 ? raw : raw.substring(0, sp));
+      const attrs = {};
+
+      if (sp !== -1) {
+        const attrStr = raw.substring(sp);
+        const re = /([\w:.+-]+)="([^"]*)"/g;
+        let m;
+        while ((m = re.exec(attrStr)) !== null) {
+          attrs[stripNS(m[1])] = unescape(m[2]);
+        }
+      }
+
+      const node = { tag: tagName, attrs, children: [], text: '' };
+      stack[stack.length - 1].children.push(node);
+      if (!selfClose) stack.push(node);
+      i = end + 1;
+    } else {
+      const next = str.indexOf('<', i);
+      const text = next === -1 ? str.substring(i) : str.substring(i, next);
+      if (text) stack[stack.length - 1].text += text;
+      i = next === -1 ? str.length : next;
+    }
+  }
+
+  return root.children[0] || root;
+}
+
+// ── Tree navigation ──
+
+function find(node, tagName) {
+  if (node.tag === tagName) return node;
+  for (const child of node.children) {
+    const found = find(child, tagName);
+    if (found) return found;
+  }
+  return null;
+}
+
+function findAll(node, tagName) {
+  const results = [];
+  if (node.tag === tagName) results.push(node);
+  for (const child of node.children) {
+    findAll(child, tagName).forEach(n => results.push(n));
+  }
+  return results;
+}
+
+// ── src/util.js ──
+
+// ── Cell address helpers ──
+
+function colLetter(index) {
+  let s = '';
+  let n = index + 1;
+  while (n > 0) {
+    n--;
+    s = String.fromCharCode(65 + (n % 26)) + s;
+    n = Math.floor(n / 26);
+  }
+  return s;
+}
+
+function colIndex(letter) {
+  let index = 0;
+  for (let i = 0; i < letter.length; i++) {
+    index = index * 26 + (letter.charCodeAt(i) - 64);
+  }
+  return index - 1;
+}
+
+function cellRef(col, row, absolute) {
+  const l = colLetter(col);
+  const r = row + 1;
+  return absolute ? `$${l}$${r}` : `${l}${r}`;
+}
+
+function parseRef(ref) {
+  const m = ref.match(/^\$?([A-Z]+)\$?(\d+)$/);
+  if (!m) return null;
+  return { col: colIndex(m[1]), row: parseInt(m[2]) - 1 };
+}
+
+// ── Date conversion ──
+// Excel date serial: days since 1899-12-30
+// Serial 1 = Jan 1, 1900. Serial 60 = Feb 29, 1900 (doesn't exist — 1900 leap year bug).
+
+const EPOCH = Date.UTC(1899, 11, 31); // Dec 31, 1899 = "serial 0"
+const MS_PER_DAY = 86400000;
+
+function dateToSerial(date) {
+  const utc = Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
+  const days = Math.round((utc - EPOCH) / MS_PER_DAY);
+  return days > 59 ? days + 1 : days;
+}
+
+function serialToDate(serial) {
+  const adjusted = serial > 59 ? serial - 1 : serial;
+  return new Date(EPOCH + adjusted * MS_PER_DAY);
+}
+
+// ── src/reader.js ──
+
+// ── Shared strings ──
+
+function parseSharedStrings(xml) {
+  if (!xml) return [];
+  const doc = parseXml(xml);
+  const strings = [];
+  for (const si of findAll(doc, 'si')) {
+    // simple text: <si><t>text</t></si>
+    const t = find(si, 't');
+    if (t && si.children.length === 1) {
+      strings.push(t.text);
+      continue;
+    }
+    // rich text: <si><r><rPr>...</rPr><t>part</t></r>...</si>
+    let text = '';
+    for (const r of findAll(si, 'r')) {
+      const rt = find(r, 't');
+      if (rt) text += rt.text;
+    }
+    strings.push(text || (t ? t.text : ''));
+  }
+  return strings;
+}
+
+// ── Styles / date detection ──
+
+// built-in date format IDs (14-22)
+const BUILTIN_DATE_IDS = new Set([14, 15, 16, 17, 18, 19, 20, 21, 22]);
+
+function parseDateFormats(xml) {
+  if (!xml) return new Set();
+  const doc = parseXml(xml);
+  const dateIds = new Set(BUILTIN_DATE_IDS);
+
+  // custom number formats
+  for (const fmt of findAll(doc, 'numFmt')) {
+    const id = parseInt(fmt.attrs.numFmtId);
+    const code = (fmt.attrs.formatCode || '').toLowerCase();
+    // date/time tokens: y, m, d, h, s (but not in # patterns like #,##0)
+    if (/[ydhsap]/i.test(code) && !/[#0]/.test(code)) {
+      dateIds.add(id);
+    } else if (/(?:^|[^#0])m(?:[^#0]|$)/.test(code) && /[ydhs]/i.test(code)) {
+      dateIds.add(id);
+    }
+  }
+
+  // build map: style index → numFmtId
+  const styleNumFmts = [];
+  const cellXfs = find(doc, 'cellXfs');
+  if (cellXfs) {
+    for (const xf of findAll(cellXfs, 'xf')) {
+      styleNumFmts.push(parseInt(xf.attrs.numFmtId || '0'));
+    }
+  }
+
+  return { dateIds, styleNumFmts };
+}
+
+// ── Workbook / relationships ──
+
+function parseWorkbook(wbXml, relsXml) {
+  const wb = parseXml(wbXml);
+  const rels = parseXml(relsXml);
+  const sheets = [];
+
+  // build relationship map: rId → target path
+  const relMap = {};
+  for (const rel of findAll(rels, 'Relationship')) {
+    relMap[rel.attrs.Id] = rel.attrs.Target;
+  }
+
+  for (const sheet of findAll(wb, 'sheet')) {
+    const name = sheet.attrs.name;
+    const rId = sheet.attrs.id;
+    const target = relMap[rId];
+    if (target) sheets.push({ name, path: 'xl/' + target });
+  }
+
+  return sheets;
+}
+
+// ── Worksheet parsing ──
+
+function parseWorksheet(xml, sharedStrings, styles, options) {
+  const doc = parseXml(xml);
+  const sheetData = find(doc, 'sheetData');
+  if (!sheetData) return { columns: {}, headers: [], rows: 0 };
+
+  const { dateIds, styleNumFmts } = styles || { dateIds: new Set(), styleNumFmts: [] };
+  const headerRow = (options && options.headerRow) || 1;
+
+  // parse range filter if specified
+  let rangeFilter = null;
+  if (options && options.range) {
+    const parts = options.range.split(':');
+    const tl = parseRef(parts[0]);
+    const br = parseRef(parts[1]);
+    if (tl && br) rangeFilter = { minCol: tl.col, maxCol: br.col, minRow: tl.row, maxRow: br.row };
+  }
+
+  // collect raw cells: { col, row, value, type }
+  // type: 'n' | 's' | 'b' | 'd' (date numeric)
+  const rawCells = [];
+  let maxCol = -1;
+  let maxRow = -1;
+
+  for (const rowNode of findAll(sheetData, 'row')) {
+    for (const c of findAll(rowNode, 'c')) {
+      const ref = c.attrs.r;
+      if (!ref) continue;
+      const parsed = parseRef(ref);
+      if (!parsed) continue;
+      const { col, row } = parsed;
+
+      // apply range filter
+      if (rangeFilter) {
+        if (col < rangeFilter.minCol || col > rangeFilter.maxCol) continue;
+        if (row < rangeFilter.minRow || row > rangeFilter.maxRow) continue;
+      }
+
+      const t = c.attrs.t || '';
+      const s = parseInt(c.attrs.s || '0');
+      const vNode = find(c, 'v');
+      const vText = vNode ? vNode.text : '';
+
+      // Extract formula element
+      const fNode = find(c, 'f');
+      const formula = fNode ? fNode.text : null;
+
+      let value, type;
+
+      if (t === 's') {
+        // shared string
+        const idx = parseInt(vText);
+        value = sharedStrings[idx] !== undefined ? sharedStrings[idx] : '';
+        type = 's';
+      } else if (t === 'str' || t === 'inlineStr') {
+        // inline string
+        if (t === 'inlineStr') {
+          const is = find(c, 'is');
+          const tNode = is ? find(is, 't') : null;
+          value = tNode ? tNode.text : '';
+        } else {
+          value = vText;
+        }
+        type = 's';
+      } else if (t === 'b') {
+        value = vText === '1';
+        type = 'b';
+      } else if (t === 'e') {
+        value = vText; // error string like "#REF!"
+        type = 's';
+      } else {
+        // number (or date)
+        if (!vText && vText !== '0') continue; // blank cell
+        value = parseFloat(vText);
+        if (isNaN(value)) continue;
+        // check if date format
+        const numFmtId = styleNumFmts[s] || 0;
+        type = dateIds.has(numFmtId) ? 'd' : 'n';
+      }
+
+      rawCells.push({ col, row, value, type, formula });
+      if (col > maxCol) maxCol = col;
+      if (row > maxRow) maxRow = row;
+    }
+  }
+
+  if (rawCells.length === 0) return { columns: {}, headers: [], rows: 0 };
+
+  // determine headers
+  const headerCells = rawCells.filter(c => c.row === headerRow - 1);
+  const allHeadersAreStrings = headerCells.length > 0 &&
+    headerCells.every(c => c.type === 's');
+
+  const headers = [];
+  const headerMap = {};
+  if (allHeadersAreStrings) {
+    for (const c of headerCells) {
+      headerMap[c.col] = c.value;
+    }
+  }
+
+  // determine columns present
+  const colSet = new Set(rawCells.map(c => c.col));
+  const colList = [...colSet].sort((a, b) => a - b);
+
+  for (const col of colList) {
+    const name = headerMap[col] || colLetter(col);
+    headers.push(name);
+  }
+
+  // determine data rows (exclude header row)
+  const dataCells = allHeadersAreStrings
+    ? rawCells.filter(c => c.row !== headerRow - 1)
+    : rawCells;
+
+  // determine row range
+  const dataRows = dataCells.map(c => c.row);
+  const minDataRow = dataRows.length > 0 ? Math.min(...dataRows) : 0;
+  const maxDataRow = dataRows.length > 0 ? Math.max(...dataRows) : 0;
+  const rowCount = maxDataRow - minDataRow + 1;
+
+  // group cells by column, determine types
+  const colCells = {};
+  for (const col of colList) colCells[col] = [];
+  for (const c of dataCells) colCells[c.col].push(c);
+
+  const columns = {};
+  for (let ci = 0; ci < colList.length; ci++) {
+    const col = colList[ci];
+    const name = headers[ci];
+    const cells = colCells[col];
+
+    // count types
+    const typeCounts = { n: 0, s: 0, b: 0, d: 0 };
+    for (const c of cells) typeCounts[c.type]++;
+
+    const total = cells.length;
+    let colType;
+    if (total === 0) {
+      colType = 's'; // empty column defaults to string
+    } else if (typeCounts.n === total) {
+      colType = 'n';
+    } else if (typeCounts.d === total) {
+      colType = 'd';
+    } else if (typeCounts.b === total) {
+      colType = 'b';
+    } else if (typeCounts.s === total) {
+      colType = 's';
+    } else {
+      colType = 's'; // mixed → string
+    }
+
+    // build typed array
+    if (colType === 'n' || colType === 'd') {
+      const arr = new Float64Array(rowCount);
+      arr.fill(NaN);
+      for (const c of cells) arr[c.row - minDataRow] = c.value;
+      columns[name] = arr;
+    } else if (colType === 'b') {
+      const arr = new Uint8Array(rowCount);
+      for (const c of cells) arr[c.row - minDataRow] = c.value ? 1 : 0;
+      columns[name] = arr;
+    } else {
+      const arr = new Array(rowCount).fill('');
+      for (const c of cells) arr[c.row - minDataRow] = String(c.value);
+      columns[name] = arr;
+    }
+  }
+
+  // Build parallel formulas object
+  const formulas = {};
+  for (let ci = 0; ci < colList.length; ci++) {
+    const col = colList[ci];
+    const name = headers[ci];
+    const cells = colCells[col];
+    const hasFormulas = cells.some(c => c.formula);
+    if (hasFormulas) {
+      const arr = new Array(rowCount).fill(null);
+      for (const c of cells) {
+        if (c.formula) arr[c.row - minDataRow] = c.formula;
+      }
+      formulas[name] = arr;
+    }
+  }
+
+  // Map column letter → header name for formula decompilation
+  const colLetterMap = {};
+  for (let ci = 0; ci < colList.length; ci++) {
+    colLetterMap[colLetter(colList[ci])] = headers[ci];
+  }
+
+  return { columns, headers, rows: rowCount, formulas, colLetterMap };
+}
+
+// ── Public API ──
+
+async function read(source, options) {
+  const bytes = source instanceof Uint8Array ? source : new Uint8Array(source);
+  const files = await unzip(bytes);
+
+  const decode = (path) => {
+    const data = files.get(path);
+    return data ? new TextDecoder().decode(data) : null;
+  };
+
+  const sharedStrings = parseSharedStrings(decode('xl/sharedStrings.xml'));
+  const styles = parseDateFormats(decode('xl/styles.xml'));
+
+  const wbXml = decode('xl/workbook.xml');
+  const relsXml = decode('xl/_rels/workbook.xml.rels');
+  if (!wbXml || !relsXml) throw new Error('invalid xlsx: missing workbook');
+
+  const sheetDefs = parseWorkbook(wbXml, relsXml);
+  const filterSheet = options && options.sheet;
+
+  const sheets = [];
+  for (const def of sheetDefs) {
+    if (filterSheet && def.name !== filterSheet) continue;
+    const wsXml = decode(def.path);
+    if (!wsXml) continue;
+    const result = parseWorksheet(wsXml, sharedStrings, styles, options);
+    sheets.push({ name: def.name, ...result });
+  }
+
+  return { sheets };
+}
+
+// ── src/table.js ──
+
+// @gcu/sheet — the TABLE-DOCUMENT adapter.
+//
+// `read()` already resolves a worksheet into typed columns (Float64Array for
+// numbers and dates, Uint8Array for booleans, string arrays otherwise). This
+// exposes that as the same table-document shape the rest of GCU speaks —
+// { header: { table, columns, count, numericColumns }, rows, at } — so a
+// consumer can hand a worksheet to anything that reads a table WITHOUT a
+// round-trip through CSV. Types come from Excel; nothing is re-sniffed.
+//
+// A workbook is not a coordinate system: nothing here infers geometry. A sheet
+// is a table. Promoting one to something spatial is the host's explicit act.
+
+const bytesOf = async (source) => {
+  if (source instanceof Uint8Array) return source;
+  if (source && typeof source.arrayBuffer === 'function') return new Uint8Array(await source.arrayBuffer());
+  return new Uint8Array(source);
+};
+
+// A cheap look inside: what sheets are in here, and how big are they? Enough to
+// draw a picker without committing to a full parse of every sheet.
+async function census(source, options) {
+  const { sheets } = await read(await bytesOf(source), options);
+  return {
+    sheets: sheets.map((s) => ({
+      name: s.name,
+      rows: s.rows,
+      columns: s.headers.length,
+      headers: s.headers,
+      empty: !s.rows || !s.headers.length,
+    })),
+  };
+}
+
+// One worksheet → a table document. `sheet` names it; omitted takes the first.
+async function openSheet(source, { sheet = null, headerRow = 1 } = {}) {
+  const { sheets } = await read(await bytesOf(source), { sheet: sheet || undefined, headerRow });
+  const ws = sheet ? sheets.find((s) => s.name === sheet) : sheets[0];
+  if (!ws) throw new Error(`sheet "${sheet}" not found`);
+  const columns = ws.headers.map((h, i) => (String(h).trim() || `col${i + 1}`));
+  const data = columns.map((name, i) => ws.columns[ws.headers[i]]);
+  // a column is numeric because EXCEL says so (Float64Array), not because a
+  // string parsed — dates included (they arrive as serial numbers)
+  const numericColumns = [];
+  columns.forEach((name, i) => { if (data[i] instanceof Float64Array) numericColumns.push({ i, name }); });
+  const count = ws.rows || 0;
+  const cell = (ci, r) => {
+    const col = data[ci];
+    if (!col) return '';
+    const v = col[r];
+    if (v == null) return '';
+    if (col instanceof Float64Array) return Number.isNaN(v) ? '' : v;
+    if (col instanceof Uint8Array) return v ? 'true' : 'false';
+    return v;
+  };
+  return {
+    header: {
+      table: true, sheet: ws.name, columns, count,
+      numericColumns, mapping: null, grid: null, bbox: null,
+    },
+    // one row as an array of field values, in column order (the shape every
+    // table consumer already reads)
+    at: (r) => columns.map((_, ci) => cell(ci, r)),
+    // batched iteration, so a host can stream it like any other table
+    async *rows({ batch = 4096 } = {}) {
+      for (let start = 0; start < count; start += batch) {
+        const end = Math.min(count, start + batch);
+        const out = [];
+        for (let r = start; r < end; r++) out.push(columns.map((_, ci) => cell(ci, r)));
+        yield out;
+      }
+    },
+  };
+}
+
+// ── src/writer.js ──
+
+const XML_HEADER = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
+
+// ── Shared strings ──
+
+function buildSharedStrings(sheets) {
+  const map = new Map(); // string → index
+  const list = [];
+
+  const intern = (s) => {
+    if (map.has(s)) return map.get(s);
+    const idx = list.length;
+    map.set(s, idx);
+    list.push(s);
+    return idx;
+  };
+
+  for (const sheet of sheets) {
+    const cols = sheet.columns;
+    const colNames = Object.keys(cols);
+    // intern header names
+    for (const name of colNames) intern(name);
+    // intern string values
+    for (const name of colNames) {
+      const col = cols[name];
+      const values = Array.isArray(col) || ArrayBuffer.isView(col) ? col : col.values;
+      if (!values) continue;
+      for (const v of values) {
+        if (typeof v === 'string') intern(v);
+      }
+    }
+  }
+
+  return { map, list };
+}
+
+function emitSharedStrings(list) {
+  const items = list.map(s => tag('si', null, tag('t', null, escape(s)))).join('');
+  return XML_HEADER + tag('sst', {
+    xmlns: 'http://schemas.openxmlformats.org/spreadsheetml/2006/main',
+    count: list.length, uniqueCount: list.length
+  }, items);
+}
+
+// ── Styles ──
+
+function buildStyles(sheets) {
+  // collect unique format codes, assign numFmtId starting at 164
+  const formatMap = new Map(); // formatCode → numFmtId
+  let nextFmtId = 164;
+  let hasDateValues = false;
+
+  for (const sheet of sheets) {
+    for (const name of Object.keys(sheet.columns)) {
+      const col = sheet.columns[name];
+      if (col && typeof col === 'object' && !Array.isArray(col) && !ArrayBuffer.isView(col)) {
+        if (col.format) {
+          if (!formatMap.has(col.format)) formatMap.set(col.format, nextFmtId++);
+        }
+      }
+      // check for Date values (need default date style)
+      const values = Array.isArray(col) || ArrayBuffer.isView(col) ? col : (col ? col.values : null);
+      if (values) {
+        for (const v of values) {
+          if (v instanceof Date) { hasDateValues = true; break; }
+        }
+      }
+    }
+  }
+
+  // default date format if Date values found but no explicit format
+  const defaultDateFmt = 'yyyy-mm-dd';
+  if (hasDateValues && !formatMap.has(defaultDateFmt)) {
+    formatMap.set(defaultDateFmt, nextFmtId++);
+  }
+
+  // xf entries: index 0 = default, then one per unique format
+  // returns { xml, colStyleIndex(col) }
+  const fmtEntries = [...formatMap.entries()];
+
+  return { formatMap, fmtEntries, hasDateValues, defaultDateFmt };
+}
+
+function emitStyles(styleInfo) {
+  const { fmtEntries } = styleInfo;
+
+  let numFmts = '';
+  if (fmtEntries.length > 0) {
+    const items = fmtEntries.map(([code, id]) =>
+      tag('numFmt', { numFmtId: id, formatCode: code })
+    ).join('');
+    numFmts = tag('numFmts', { count: fmtEntries.length }, items);
+  } else {
+    numFmts = tag('numFmts', { count: 0 });
+  }
+
+  const fonts = tag('fonts', { count: 1 },
+    tag('font', null, tag('sz', { val: 11 }), tag('name', { val: 'Calibri' }))
+  );
+  const fills = tag('fills', { count: 2 },
+    tag('fill', null, tag('patternFill', { patternType: 'none' })),
+    tag('fill', null, tag('patternFill', { patternType: 'gray125' }))
+  );
+  const borders = tag('borders', { count: 1 },
+    tag('border', null, tag('left'), tag('right'), tag('top'), tag('bottom'), tag('diagonal'))
+  );
+  const cellStyleXfs = tag('cellStyleXfs', { count: 1 },
+    tag('xf', { numFmtId: 0, fontId: 0, fillId: 0, borderId: 0 })
+  );
+
+  // cellXfs: index 0 = default, then one per format
+  const xfItems = [tag('xf', { numFmtId: 0, fontId: 0, fillId: 0, borderId: 0, xfId: 0 })];
+  for (const [, numFmtId] of fmtEntries) {
+    xfItems.push(tag('xf', { numFmtId, fontId: 0, fillId: 0, borderId: 0, xfId: 0, applyNumberFormat: 1 }));
+  }
+  const cellXfs = tag('cellXfs', { count: xfItems.length }, ...xfItems);
+
+  return XML_HEADER + tag('styleSheet', {
+    xmlns: 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'
+  }, numFmts, fonts, fills, borders, cellStyleXfs, cellXfs);
+}
+
+// ── Worksheet ──
+
+function emitWorksheet(sheet, ssMap, styleInfo, tableRIds) {
+  const cols = sheet.columns;
+  const colNames = Object.keys(cols);
+  if (colNames.length === 0) return XML_HEADER + tag('worksheet', {
+    xmlns: 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'
+  }, tag('sheetData'));
+
+  // determine row count
+  let rowCount = 0;
+  for (const name of colNames) {
+    const col = cols[name];
+    const values = Array.isArray(col) || ArrayBuffer.isView(col) ? col : (col ? col.values || [] : []);
+    if (values.length > rowCount) rowCount = values.length;
+  }
+
+  const { formatMap, fmtEntries, defaultDateFmt } = styleInfo;
+
+  // helper: get style index for a column
+  const getStyleIdx = (col) => {
+    if (col && typeof col === 'object' && !Array.isArray(col) && !ArrayBuffer.isView(col) && col.format) {
+      const idx = fmtEntries.findIndex(([code]) => code === col.format);
+      return idx >= 0 ? idx + 1 : 0;
+    }
+    return 0;
+  };
+
+  // helper: get date style index
+  const dateStyleIdx = () => {
+    const idx = fmtEntries.findIndex(([code]) => code === defaultDateFmt);
+    return idx >= 0 ? idx + 1 : 0;
+  };
+
+  let sharedFormulaIdx = 0;
+  const rows = [];
+
+  // header row
+  const headerCells = [];
+  for (let ci = 0; ci < colNames.length; ci++) {
+    const ref = cellRef(ci, 0);
+    const ssIdx = ssMap.get(colNames[ci]);
+    headerCells.push(tag('c', { r: ref, t: 's' }, tag('v', null, String(ssIdx))));
+  }
+  rows.push(tag('row', { r: 1 }, ...headerCells));
+
+  // data rows
+  for (let ri = 0; ri < rowCount; ri++) {
+    const rowCells = [];
+    const excelRow = ri + 2; // 1-indexed, after header
+
+    for (let ci = 0; ci < colNames.length; ci++) {
+      const ref = cellRef(ci, ri + 1);
+      const col = cols[colNames[ci]];
+      const values = Array.isArray(col) || ArrayBuffer.isView(col) ? col : (col ? col.values || [] : []);
+      const formulas = (col && !Array.isArray(col) && !ArrayBuffer.isView(col)) ? col.formulas : null;
+      const sharedFormula = (col && !Array.isArray(col) && !ArrayBuffer.isView(col)) ? col.sharedFormula : null;
+      const value = ri < values.length ? values[ri] : null;
+
+      if (value === null || value === undefined) continue;
+
+      const attrs = { r: ref };
+      let children = '';
+
+      // handle shared formula
+      if (sharedFormula && ri === 0) {
+        const fText = sharedFormula.base.startsWith('=') ? sharedFormula.base.slice(1) : sharedFormula.base;
+        children += tag('f', { t: 'shared', ref: sharedFormula.ref, si: sharedFormulaIdx }, escape(fText));
+      } else if (sharedFormula && ri > 0) {
+        children += tag('f', { t: 'shared', si: sharedFormulaIdx });
+      }
+
+      // per-cell formula
+      if (!sharedFormula && formulas && ri < formulas.length && formulas[ri]) {
+        const fText = formulas[ri].startsWith('=') ? formulas[ri].slice(1) : formulas[ri];
+        children += tag('f', null, escape(fText));
+      }
+
+      // value
+      if (value instanceof Date) {
+        const serial = dateToSerial(value);
+        attrs.s = dateStyleIdx();
+        children += tag('v', null, String(serial));
+      } else if (typeof value === 'boolean') {
+        attrs.t = 'b';
+        children += tag('v', null, value ? '1' : '0');
+      } else if (typeof value === 'number') {
+        const si = getStyleIdx(col);
+        if (si > 0) attrs.s = si;
+        children += tag('v', null, String(value));
+      } else if (typeof value === 'string') {
+        attrs.t = 's';
+        const ssIdx = ssMap.get(value);
+        children += tag('v', null, String(ssIdx));
+      }
+
+      rowCells.push(tag('c', attrs, children));
+    }
+
+    if (rowCells.length > 0) rows.push(tag('row', { r: excelRow }, ...rowCells));
+
+    // increment shared formula index at end of column processing
+    // (handled per-column below instead)
+  }
+
+  // count shared formulas used
+  for (const name of colNames) {
+    const col = cols[name];
+    if (col && typeof col === 'object' && !Array.isArray(col) && !ArrayBuffer.isView(col) && col.sharedFormula) {
+      sharedFormulaIdx++;
+    }
+  }
+
+  let wsContent = tag('sheetData', null, ...rows);
+
+  // table parts
+  if (tableRIds && tableRIds.length > 0) {
+    const parts = tableRIds.map(rId => tag('tablePart', { 'r:id': rId })).join('');
+    wsContent += tag('tableParts', { count: tableRIds.length }, parts);
+  }
+
+  return XML_HEADER + tag('worksheet', {
+    xmlns: 'http://schemas.openxmlformats.org/spreadsheetml/2006/main',
+    'xmlns:r': 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
+  }, wsContent);
+}
+
+// ── Tables ──
+
+function emitTable(tableId, tableDef, colNames) {
+  const style = tableDef.style || 'TableStyleMedium2';
+  const tableCols = [];
+
+  // parse ref to get column range
+  const parts = tableDef.ref.split(':');
+  const tl = { col: 0, row: 0 };
+  const br = { col: colNames.length - 1, row: 0 };
+  const refMatch1 = parts[0].match(/([A-Z]+)(\d+)/);
+  const refMatch2 = parts[1].match(/([A-Z]+)(\d+)/);
+  if (refMatch1 && refMatch2) {
+    const startCol = colLetter(0); // we use all columns
+  }
+
+  for (let i = 0; i < colNames.length; i++) {
+    tableCols.push(tag('tableColumn', { id: i + 1, name: colNames[i] }));
+  }
+
+  return XML_HEADER + tag('table', {
+    xmlns: 'http://schemas.openxmlformats.org/spreadsheetml/2006/main',
+    id: tableId, name: tableDef.name, displayName: tableDef.name,
+    ref: tableDef.ref, totalsRowShown: 0
+  },
+    tag('autoFilter', { ref: tableDef.ref }),
+    tag('tableColumns', { count: colNames.length }, ...tableCols),
+    tag('tableStyleInfo', {
+      name: style, showFirstColumn: 0, showLastColumn: 0,
+      showRowStripes: 1, showColumnStripes: 0
+    })
+  );
+}
+
+// ── Content Types & Relationships ──
+
+function emitContentTypes(sheetCount, tableCount, hasSharedStrings) {
+  const overrides = [];
+  overrides.push(tag('Override', {
+    PartName: '/xl/workbook.xml',
+    ContentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml'
+  }));
+  for (let i = 1; i <= sheetCount; i++) {
+    overrides.push(tag('Override', {
+      PartName: `/xl/worksheets/sheet${i}.xml`,
+      ContentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml'
+    }));
+  }
+  if (hasSharedStrings) {
+    overrides.push(tag('Override', {
+      PartName: '/xl/sharedStrings.xml',
+      ContentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml'
+    }));
+  }
+  overrides.push(tag('Override', {
+    PartName: '/xl/styles.xml',
+    ContentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml'
+  }));
+  for (let i = 1; i <= tableCount; i++) {
+    overrides.push(tag('Override', {
+      PartName: `/xl/tables/table${i}.xml`,
+      ContentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.table+xml'
+    }));
+  }
+
+  return XML_HEADER + tag('Types', {
+    xmlns: 'http://schemas.openxmlformats.org/package/2006/content-types'
+  },
+    tag('Default', { Extension: 'rels', ContentType: 'application/vnd.openxmlformats-package.relationships+xml' }),
+    tag('Default', { Extension: 'xml', ContentType: 'application/xml' }),
+    ...overrides
+  );
+}
+
+function emitRootRels() {
+  return XML_HEADER + tag('Relationships', {
+    xmlns: 'http://schemas.openxmlformats.org/package/2006/relationships'
+  },
+    tag('Relationship', {
+      Id: 'rId1',
+      Type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument',
+      Target: 'xl/workbook.xml'
+    })
+  );
+}
+
+function emitWorkbook(sheets, definedNames) {
+  const sheetTags = sheets.map((s, i) =>
+    tag('sheet', { name: s.name, sheetId: i + 1, 'r:id': `rId${i + 1}` })
+  ).join('');
+
+  let extra = '';
+  if (definedNames && definedNames.length > 0) {
+    const names = definedNames.map(d =>
+      tag('definedName', { name: d.name }, escape(d.formula))
+    ).join('');
+    extra = tag('definedNames', null, names);
+  }
+
+  return XML_HEADER + tag('workbook', {
+    xmlns: 'http://schemas.openxmlformats.org/spreadsheetml/2006/main',
+    'xmlns:r': 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
+  }, tag('sheets', null, sheetTags), extra);
+}
+
+function emitWorkbookRels(sheetCount, hasSharedStrings) {
+  const rels = [];
+  for (let i = 1; i <= sheetCount; i++) {
+    rels.push(tag('Relationship', {
+      Id: `rId${i}`,
+      Type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet',
+      Target: `worksheets/sheet${i}.xml`
+    }));
+  }
+  let nextId = sheetCount + 1;
+  if (hasSharedStrings) {
+    rels.push(tag('Relationship', {
+      Id: `rId${nextId++}`,
+      Type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings',
+      Target: 'sharedStrings.xml'
+    }));
+  }
+  rels.push(tag('Relationship', {
+    Id: `rId${nextId}`,
+    Type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles',
+    Target: 'styles.xml'
+  }));
+
+  return XML_HEADER + tag('Relationships', {
+    xmlns: 'http://schemas.openxmlformats.org/package/2006/relationships'
+  }, ...rels);
+}
+
+// ── Public API ──
+
+async function write(workbook) {
+  const sheets = workbook.sheets || [];
+  const encoder = new TextEncoder();
+  const parts = new Map();
+
+  // build shared strings
+  const { map: ssMap, list: ssList } = buildSharedStrings(sheets);
+  const hasSharedStrings = ssList.length > 0;
+
+  // build styles
+  const styleInfo = buildStyles(sheets);
+
+  // count tables across all sheets
+  let totalTables = 0;
+  let tableId = 1;
+
+  // emit worksheets
+  for (let si = 0; si < sheets.length; si++) {
+    const sheet = sheets[si];
+    const sheetTables = sheet.tables || [];
+    const tableRIds = [];
+
+    // emit tables for this sheet
+    if (sheetTables.length > 0) {
+      const colNames = Object.keys(sheet.columns);
+
+      for (let ti = 0; ti < sheetTables.length; ti++) {
+        const tDef = sheetTables[ti];
+        const tXml = emitTable(tableId, tDef, colNames);
+        parts.set(`xl/tables/table${tableId}.xml`, encoder.encode(tXml));
+        tableRIds.push(`rId${ti + 1}`);
+        tableId++;
+        totalTables++;
+      }
+
+      // worksheet rels for tables
+      const wsRels = sheetTables.map((_, ti) =>
+        tag('Relationship', {
+          Id: `rId${ti + 1}`,
+          Type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/table',
+          Target: `../tables/table${totalTables - sheetTables.length + ti + 1}.xml`
+        })
+      ).join('');
+      parts.set(`xl/worksheets/_rels/sheet${si + 1}.xml.rels`,
+        encoder.encode(XML_HEADER + tag('Relationships', {
+          xmlns: 'http://schemas.openxmlformats.org/package/2006/relationships'
+        }, wsRels))
+      );
+    }
+
+    const wsXml = emitWorksheet(sheet, ssMap, styleInfo, tableRIds);
+    parts.set(`xl/worksheets/sheet${si + 1}.xml`, encoder.encode(wsXml));
+  }
+
+  // emit shared strings
+  if (hasSharedStrings) {
+    parts.set('xl/sharedStrings.xml', encoder.encode(emitSharedStrings(ssList)));
+  }
+
+  // emit styles
+  parts.set('xl/styles.xml', encoder.encode(emitStyles(styleInfo)));
+
+  // emit workbook
+  parts.set('xl/workbook.xml', encoder.encode(emitWorkbook(sheets, workbook.definedNames)));
+  parts.set('xl/_rels/workbook.xml.rels',
+    encoder.encode(emitWorkbookRels(sheets.length, hasSharedStrings)));
+
+  // emit root rels
+  parts.set('_rels/.rels', encoder.encode(emitRootRels()));
+
+  // emit content types
+  parts.set('[Content_Types].xml',
+    encoder.encode(emitContentTypes(sheets.length, totalTables, hasSharedStrings)));
+
+  return zip(parts);
+}
+
+// ── src/api.js ──
+
+// Public API — assembles the sheet object from all modules
+
+
+const sheet = {
+  read, write, census, openSheet,
+  colLetter, colIndex, cellRef, parseRef,
+  dateToSerial, serialToDate,
+  // internals for testing
+  _crc32: crc32, _zip: zip, _unzip: unzip,
+  _tag: tag, _escape: escape, _parseXml: parseXml, _find: find, _findAll: findAll,
+};
+
+// ── src/main.js ──
+
+// sheet — ES module entry point (import order doubles as build manifest)
+// the table-document adapter (typed columns, no CSV round-trip)
+  return { sheet, census, openSheet };
+})();
+
+/* ==== src/vendor/dm.js ==== */
+const { readDM, detectDM, parseHeader, recordRange, decodeRecord, readField, DMFormatError } = (() => {
+// ⚠ VENDORED — DO NOT EDIT. @gcu/dm, the read-only Datamine .dm reader, copied from ../auditable/ext/dm/index.js (MIT).
+// Re-vendor by copying that file here.
+
+// ⚠ GENERATED FILE — DO NOT EDIT. Source: src/  Build: @gcu/build src/main.js
+// @gcu/dm — Read-only reader for Datamine .DM files (block models, drillholes, wireframes, strings) — SP/EP precision, endianness auto-detection, multi-word alpha, file constants, missing-value sentinels. Zero-dependency, browser-native, windowed (header + per-record) for arbitrarily large files. Format reverse-engineered from public sources (VMine + Maccelari BSD dmfile.h); excluded from copyright under the EU Software Directive.
+
+// ── src/dm.js ──
+
+// @gcu/dm — Datamine .DM file reader (READ-ONLY). Zero-dependency, browser-native.
+//
+// Provenance / legal: the format is reverse-engineered from two public,
+// independent sources — VMine.com's format description (explicitly NOT from
+// Constellation/Datamine copyright material) and Jeremy Maccelari's BSD-licensed
+// ParaViewGeo `dmfile.h` (1999). The .DM file format is excluded from copyright
+// under the EU Software Directive. Full spec + references: SPEC.md. MIT.
+//
+// Two sub-formats share the .dm extension: Single Precision (SP, 2048-byte pages,
+// Float32, 4-byte words) and Extended Precision (EP, 4096-byte pages, Float64,
+// 8-byte words). Page 1 = Data Definition (fields); pages 2+ = packed records.
+// The last 16 bytes of every page are a legacy security block (skipped). Both
+// variants leave 508 usable words per page.
+
+class DMFormatError extends Error {
+  constructor(msg) { super(msg); this.name = 'DMFormatError'; }
+}
+
+const USABLE_WORDS = 508;      // per page, both SP and EP (16-byte security tail)
+const SENTINEL = 0.9e30;       // |value| above this = a Datamine special (missing/inf/trace)
+
+const toDV = (b) => (b instanceof DataView ? b : new DataView(b.buffer ? b.buffer : b, b.byteOffset || 0, b.byteLength));
+
+// Read N words as text: 4 ASCII chars per word (in EP, the first 4 bytes of each
+// 8-byte word; the rest is padding). Non-printable bytes dropped; result trimmed.
+function readText(dv, off, nWords, ws) {
+  let s = '';
+  for (let w = 0; w < nWords; w++) {
+    const base = off + w * ws;
+    for (let b = 0; b < 4; b++) {
+      if (base + b >= dv.byteLength) break;
+      const ch = dv.getUint8(base + b);
+      if (ch >= 32 && ch < 127) s += String.fromCharCode(ch);
+    }
+  }
+  return s.trim();
+}
+
+// Recover an EP extended field name (>8, up to 24 chars), or null if the entry
+// isn't flagged long. EP-only: SP's 4-byte words have no high half. Leapfrog and
+// other modern exporters hide chars 9–24 in bytes a legacy 8-char reader skips,
+// flagged by ASCII "LONG" in the high half of the type word — so old readers
+// still see a valid 8-char name (the encoding is purely additive). Chars 1–8 =
+// low halves of words 0–1; 9–16 = their high halves; 17–24 = word 5 (low then
+// high). Internal spaces kept; trailing pad stripped. Reverse-engineered from
+// real Leapfrog EP exports (independent byte observation), not from Datamine
+// copyright material. See SPEC §3.2.1.
+function readLongName(dv, o, ws) {
+  if (ws !== 8) return null;                              // EP-only mechanism
+  if (o + ws * 5 + 8 > dv.byteLength) return null;        // truncated buffer → legacy path
+  const flag = o + ws * 2 + 4;                            // high half of the type word
+  const LONG = [0x4C, 0x4F, 0x4E, 0x47];                  // "LONG"
+  for (let b = 0; b < 4; b++) if (dv.getUint8(flag + b) !== LONG[b]) return null;
+  const segs = [o, o + ws, o + 4, o + ws + 4, o + ws * 5, o + ws * 5 + 4];
+  //           low(w0) low(w1) high(w0) high(w1) low(w5)   high(w5)
+  let s = '';
+  for (const base of segs)
+    for (let b = 0; b < 4; b++) {
+      const c = dv.getUint8(base + b);
+      s += (c >= 32 && c < 127) ? String.fromCharCode(c) : ' ';
+    }
+  return s.replace(/\s+$/, '') || null;                   // strip trailing pad, keep internal spaces
+}
+
+const FMTS = [['sp', 'le'], ['sp', 'be'], ['ep', 'le'], ['ep', 'be']];
+const wordSize = (p) => (p === 'ep' ? 8 : 4);
+const pageSize = (p) => (p === 'ep' ? 4096 : 2048);
+const dateOffOf = (p) => (p === 'ep' ? 192 : 96);
+
+/**
+ * Detect { precision: 'sp'|'ep', byteOrder: 'le'|'be' } from the file head
+ * (≥ one page recommended), or null if it isn't a recognizable .dm. There's no
+ * magic number: validate NVAR (1–500, integral) + a printable first field name.
+ */
+function detectDM(bytes) {
+  const dv = toDV(bytes);
+  for (const [precision, byteOrder] of FMTS) {
+    const ws = wordSize(precision), isLE = byteOrder === 'le';
+    const fcOff = dateOffOf(precision) + ws;                         // NVAR position
+    if (fcOff + ws > dv.byteLength) continue;
+    const fc = precision === 'ep' ? dv.getFloat64(fcOff, isLE) : dv.getFloat32(fcOff, isLE);
+    const n = Math.round(fc);
+    if (n < 1 || n > 500 || Math.abs(fc - n) > 0.01) continue;
+    const fieldStart = dateOffOf(precision) + ws * 4;
+    let printable = fieldStart + 4 <= dv.byteLength;
+    for (let b = 0; printable && b < 4; b++) { const c = dv.getUint8(fieldStart + b); if (c < 32 || c >= 127) printable = false; }
+    if (printable) return { precision, byteOrder };
+  }
+  return null;
+}
+
+/**
+ * Parse the Data Definition (page 1) into a header: field schema, record layout,
+ * and counts. `fmt` (from detectDM) is optional — detected if omitted. `bytes`
+ * need only cover the first page.
+ */
+function parseHeader(bytes, fmt) {
+  const dv = toDV(bytes);
+  const f = fmt || detectDM(bytes);
+  if (!f) throw new DMFormatError('not a recognizable .dm file (no SP/EP + endianness matched)');
+  const { precision, byteOrder } = f;
+  const ws = wordSize(precision), ps = pageSize(precision), isLE = byteOrder === 'le';
+  const readNum = precision === 'ep' ? (o) => dv.getFloat64(o, isLE) : (o) => dv.getFloat32(o, isLE);
+
+  const dateOff = dateOffOf(precision);
+  const filename = readText(dv, 0, 2, ws);
+  const description = readText(dv, precision === 'ep' ? 32 : 16, 20, ws);
+  const dateNum = Math.round(readNum(dateOff));
+  const nvar = Math.round(readNum(dateOff + ws));
+  const lastPage = Math.round(readNum(dateOff + ws * 2));
+  const lastRec = Math.round(readNum(dateOff + ws * 3));
+  if (nvar < 1 || nvar > 256) throw new DMFormatError(`NVAR out of range: ${nvar}`);
+
+  // Field-definition entries (28 bytes SP / 56 EP each; alpha >4 chars span
+  // multiple entries sharing a name with incrementing WORDNO).
+  const fieldStart = dateOff + ws * 4, fieldSize = ws * 7;
+  const raw = [];
+  for (let i = 0; i < nvar; i++) {
+    const o = fieldStart + i * fieldSize;
+    if (o + fieldSize > ps) break;                                   // single-page DD (spec §3.2)
+    raw.push({
+      name: readLongName(dv, o, ws) ?? readText(dv, o, 2, ws),   // §3.2.1 EP long names, else legacy 8-char
+      type: (readText(dv, o + ws * 2, 1, ws).charAt(0) || 'N').toUpperCase(),
+      sw: Math.round(readNum(o + ws * 3)),
+      wordno: Math.round(readNum(o + ws * 4)),
+      def: readNum(o + ws * 6),
+    });
+  }
+
+  // Reconstruct logical columns (group entries by name).
+  const map = new Map();
+  for (const e of raw) {
+    if (!map.has(e.name)) map.set(e.name, { name: e.name, type: e.type, entries: [] });
+    map.get(e.name).entries.push(e);
+  }
+  let maxLen = 0;
+  const columns = [];
+  for (const c of map.values()) {
+    const sorted = c.entries.slice().sort((a, b) => a.wordno - b.wordno);
+    const sw = sorted.map((e) => e.sw);
+    for (const p of sw) if (p > maxLen) maxLen = p;
+    const isConstant = sorted[0].sw === 0;
+    let constantValue = null;
+    if (isConstant) {
+      if (c.type === 'A') constantValue = decodeAlphaDefault(sorted, precision, isLE);
+      else { const v = sorted[0].def; constantValue = Math.abs(v) > SENTINEL ? null : v; }
+    }
+    columns.push({ name: c.name, type: c.type, sw, width: c.type === 'A' ? sw.length * 4 : undefined, isConstant, constantValue });
+  }
+
+  const recordsPerPage = maxLen > 0 ? Math.floor(USABLE_WORDS / maxLen) : 0;
+  const recordCount = lastPage > 1 ? (lastPage - 2) * recordsPerPage + lastRec : lastRec;
+
+  return {
+    precision, byteOrder, wordSize: ws, pageSize: ps,
+    filename, description, date: dmDate(dateNum),
+    nvar, lastPage, lastRec, maxLen, recordsPerPage, recordCount,
+    columns,
+    schema: columns.map((c) => ({ name: c.name, type: c.type === 'A' ? 'string' : 'number' })),
+  };
+}
+
+function decodeAlphaDefault(entries, precision, isLE) {
+  let s = '';
+  const buf = new ArrayBuffer(precision === 'ep' ? 8 : 4);
+  const dv = new DataView(buf);
+  for (const e of entries) {
+    if (precision === 'ep') dv.setFloat64(0, e.def, isLE); else dv.setFloat32(0, e.def, isLE);
+    for (let b = 0; b < 4; b++) { const c = dv.getUint8(b); if (c >= 32 && c < 127) s += String.fromCharCode(c); }
+  }
+  return s.trim();
+}
+
+function dmDate(n) {
+  if (!n || n < 10000) return null;                                 // 10000×year + 100×month + day
+  const year = Math.floor(n / 10000), month = Math.floor((n % 10000) / 100), day = n % 100;
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  return new Date(Date.UTC(year, month - 1, day));
+}
+
+/** Byte range of record `i` (0-based) in the file — a contiguous slice (records
+ *  never span a page). Read it and pass to decodeRecord. */
+function recordRange(h, i) {
+  const dataPage = Math.floor(i / h.recordsPerPage) + 2;            // 1-based; page 1 = DD
+  const recInPage = i % h.recordsPerPage;
+  return { offset: (dataPage - 1) * h.pageSize + recInPage * h.maxLen * h.wordSize, length: h.maxLen * h.wordSize };
+}
+
+/** Read ONE field of the record whose words begin at byte `recBase` in `dv`:
+ *  number | null (missing/sentinel) for numeric columns, trimmed string for
+ *  alpha, the header value for constants (no body access). This is the strided
+ *  projection primitive — a caller reads a single COLUMN by striding recBase =
+ *  pageBase + r·maxLen·wordSize across records, decoding only the field it wants
+ *  instead of the whole record. `dv` may span many records (a page run); the
+ *  offsets are relative to recBase. */
+function readField(dv, h, col, recBase) {
+  if (col.isConstant) return col.constantValue;
+  const ws = h.wordSize, isLE = h.byteOrder === 'le';
+  if (col.type === 'A') {
+    let s = '';
+    for (const sw of col.sw) { const b0 = recBase + (sw - 1) * ws; for (let b = 0; b < 4; b++) { if (b0 + b >= dv.byteLength) break; const c = dv.getUint8(b0 + b); if (c >= 32 && c < 127) s += String.fromCharCode(c); } }
+    return s.trim();
+  }
+  const off = recBase + (col.sw[0] - 1) * ws;
+  if (off + ws > dv.byteLength) return null;
+  const v = h.precision === 'ep' ? dv.getFloat64(off, isLE) : dv.getFloat32(off, isLE);
+  return Math.abs(v) > SENTINEL ? null : v;
+}
+
+/** Decode one record's word slice (from recordRange) into positional values:
+ *  number | null (missing/sentinel) for numeric columns, string for alpha. */
+function decodeRecord(bytes, h) {
+  const dv = toDV(bytes);
+  return h.columns.map((col) => readField(dv, h, col, 0));   // record bytes start at 0
+}
+
+/**
+ * Whole-file convenience: detect + parse + record access over an ArrayBuffer /
+ * Uint8Array. For huge files prefer the windowed path (detectDM → parseHeader →
+ * recordRange → decodeRecord over a File you slice).
+ */
+function readDM(buffer) {
+  const u8 = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+  if (u8.byteLength < 2048) throw new DMFormatError('file too small for a .dm page');
+  const fmt = detectDM(u8.subarray(0, Math.min(4096, u8.byteLength)));
+  if (!fmt) throw new DMFormatError('not a recognizable .dm file');
+  const h = parseHeader(u8, fmt);
+  const sliceRec = (i) => { const { offset, length } = recordRange(h, i); return u8.subarray(offset, offset + length); };
+  return {
+    filename: h.filename, description: h.description, date: h.date,
+    precision: h.precision, byteOrder: h.byteOrder, fields: h.schema, recordCount: h.recordCount, header: h,
+    getRecord(i) {
+      if (i < 0 || i >= h.recordCount) return null;
+      const vals = decodeRecord(sliceRec(i), h);
+      const obj = {};
+      h.columns.forEach((c, k) => { obj[c.name] = vals[k]; });
+      return obj;
+    },
+    getColumns() {
+      const n = h.recordCount;
+      const out = {};
+      const numArr = h.precision === 'ep' ? Float64Array : Float32Array;
+      h.columns.forEach((c, k) => {
+        if (c.isConstant) { out[c.name] = c.constantValue; return; }
+        out[c.name] = c.type === 'A' ? new Array(n) : new numArr(n);
+      });
+      for (let i = 0; i < n; i++) {
+        const vals = decodeRecord(sliceRec(i), h);
+        h.columns.forEach((c, k) => {
+          if (c.isConstant) return;
+          if (c.type === 'A') out[c.name][i] = vals[k];
+          else out[c.name][i] = vals[k] == null ? NaN : vals[k];     // missing → NaN in typed arrays
+        });
+      }
+      return out;
+    },
+    * [Symbol.iterator]() { for (let i = 0; i < h.recordCount; i++) yield this.getRecord(i); },
+  };
+}
+
+// ── src/main.js ──
+
+// @gcu/dm — public surface (manifest-is-truth; build.js bundles from here).
+  return { readDM, detectDM, parseHeader, recordRange, decodeRecord, readField, DMFormatError };
+})();
+
+/* ==== src/engine/formats.js ==== */
+const { BINARY, gridText, convertBinary } = (() => {
+// Binary table formats, converted to text when a file is opened: xlsx through @gcu/sheet (one text per
+// sheet), Datamine .dm through @gcu/dm. Tools stay synchronous and the device keeps the converted text,
+// so a session replays from it. What did not carry over is said on the card.
+
+const BINARY = /\.(xlsx|xlsm|dm)$/i;
+const cell = v => v == null || (typeof v === 'number' && isNaN(v)) ? '' : v instanceof Date ? v.toISOString().slice(0, 10) : String(v).replace(/[\t\r\n]+/g, ' ');
+const gridText = (headers, rows) => [headers.map(cell).join('\t'), ...rows.map(r => r.map(cell).join('\t'))].join('\n') + '\n';
+
+// → { from, tables: { name: text }, lost: [what did not carry over], trace }
+async function convertBinary(name, buffer) {
+  const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+  if (/\.xls[xm]$/i.test(name)) {
+    const wb = await sheet.read(bytes), tables = {}, lost = [];
+    for (const s of wb.sheets) {
+      if (!s.rows) continue;
+      const rows = Array.from({ length: s.rows }, (_, i) => s.headers.map(h => s.columns[h] ? s.columns[h][i] : null));
+      tables[s.name] = gridText(s.headers, rows);
+      if (s.formulas && Object.keys(s.formulas).length) lost.push(`${Object.keys(s.formulas).length} formulas in ${s.name} kept only as their values`);
+    }
+    if (!Object.keys(tables).length) throw new Error(`${name} has no sheet with rows in it`);
+    lost.push('cell formats, merged cells and charts do not carry over');
+    return { from: 'xlsx', tables, lost, trace: [`sheet.read(${name}) → ${wb.sheets.length} sheet${wb.sheets.length === 1 ? '' : 's'}: ${wb.sheets.map(s => `${s.name} (${s.rows} rows)`).join(', ')}`] };
+  }
+  if (/\.dm$/i.test(name)) {
+    const dm = readDM(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)), headers = dm.fields.map(f => f.name);
+    const rows = Array.from({ length: dm.recordCount }, (_, i) => { const r = dm.getRecord(i); return headers.map(h => r[h]); });
+    return { from: 'dm', tables: { [name.replace(/\.dm$/i, '')]: gridText(headers, rows) }, lost: ['the Datamine missing value (±1e30) is read as blank; field precision is as stored'], trace: [`dm.readDM(${name}) → ${dm.recordCount} records, ${headers.length} fields`] };
+  }
+  throw new Error(`${name}: not a format I read (xlsx or dm)`);
+}
+  return { BINARY, gridText, convertBinary };
+})();
+
 /* ==== src/engine/notes.js ==== */
 (() => {
 // Notes and taught words. Both belong to the device and are shared by every session.
@@ -13243,7 +14790,7 @@ function reset() {
 })();
 
 /* ==== src/engine/engine.js ==== */
-const { addCard, rerun, flipSlot, answer, undo, submit, hashOf, openFile, seedExamples } = (() => {
+const { addCard, rerun, flipSlot, answer, undo, submit, hashOf, openFile, openBinary, seedExamples } = (() => {
 // The entry point: submit(raw) reads a request and returns what happened. Cards are recomputed in
 // place by rerun(); answers and slot flips go through it, so args stay the only state that matters.
 
@@ -13303,12 +14850,23 @@ function openFile(name, text) {
   return { kind: 'card', card: addCard(`open ${name}`, { tool: 'open', args, rung: 'grammar', res }, performance.now() - t0) };
 }
 
+// an xlsx or .dm from the picker: converted to text per table by the vendored readers, kept, then opened
+async function openBinary(name, buffer) {
+  if (!current()) newSession();
+  const t0 = performance.now();
+  let conv; try { conv = await convertBinary(name, buffer); } catch (e) { return { kind: 'nothing', msg: `Could not read ${name}: ${e.message}.` }; }
+  const names = Object.keys(conv.tables), text = conv.tables[names[0]], hash = hashOf(names.map(n => n + '\n' + conv.tables[n]).join('\n'));
+  S.files[hash] = { name, hash, text, size: names.reduce((s, n) => s + conv.tables[n].length, 0), from: conv.from, lost: conv.lost, convTrace: conv.trace, ...(names.length > 1 ? { tables: conv.tables } : { sheet: names[0] }) };
+  const args = { file: { name, hash } }, res = T.open(args);
+  return { kind: 'card', card: addCard(`open ${name}`, { tool: 'open', args, rung: 'grammar', res }, performance.now() - t0) };
+}
+
 // two example sessions for a first visit
 function seedExamples() {
   newSession(true); ['open assays.csv', 'histogram of cu', 'log scale', 'histogram of au'].forEach(x => submit(x));
   newSession(true); ['0.35 oz per short ton in g/t', 'true thickness of a 14 m intercept, hole 270/60, bedding 045/30', 'remind me to send the samples to the lab on friday at 9', 'pop of mongolia'].forEach(x => submit(x));
 }
-  return { addCard, rerun, flipSlot, answer, undo, submit, hashOf, openFile, seedExamples };
+  return { addCard, rerun, flipSlot, answer, undo, submit, hashOf, openFile, openBinary, seedExamples };
 })();
 
 /* ==== src/vendor/leadacid.js ==== */
@@ -14121,7 +15679,8 @@ $('attach').addEventListener('click', () => { if (awake) $('file').click(); });
 $('file').addEventListener('change', e => {
   const f = e.target.files && e.target.files[0]; if (!f) return;
   if (f.size > 20e6) { status('That file is over 20 MB. golem reads smaller tables for now.'); e.target.value = ''; return; }
-  f.text().then(text => { show(openFile(f.name, text)); status(`Opened ${f.name}.`); }, () => status('Could not read that file.'));
+  if (BINARY.test(f.name)) f.arrayBuffer().then(buf => openBinary(f.name, buf)).then(o => { show(o); if (o.kind === 'card') status(`Opened ${f.name}.`); }, () => status('Could not read that file.'));
+  else f.text().then(text => { show(openFile(f.name, text)); status(`Opened ${f.name}.`); }, () => status('Could not read that file.'));
   e.target.value = '';
 });
 document.querySelector('.tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) showTab(b.dataset.tab); });

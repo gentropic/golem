@@ -1,7 +1,8 @@
 // The shell: wiring, tabs, the session drawer, storage, and the sleep switch. Everything that touches
 // the DOM or the browser lives here or in render.js; the engine never does.
 import { S } from '../engine/core.js';
-import { submit, flipSlot, answer, seedExamples, openFile } from '../engine/engine.js';
+import { submit, flipSlot, answer, seedExamples, openFile, openBinary } from '../engine/engine.js';
+import { BINARY } from '../engine/formats.js';
 import { sessions, current, newSession, openSession, renameSession, deleteSession, searchHistory, serialize, hydrate, onChange } from '../engine/sessions.js';
 import { skills, PACKS, SUGGESTIONS } from '../engine/skills.js';
 import { shell } from '../vendor/leadacid.js';
@@ -103,7 +104,8 @@ $('attach').addEventListener('click', () => { if (awake) $('file').click(); });
 $('file').addEventListener('change', e => {
   const f = e.target.files && e.target.files[0]; if (!f) return;
   if (f.size > 20e6) { status('That file is over 20 MB. golem reads smaller tables for now.'); e.target.value = ''; return; }
-  f.text().then(text => { show(openFile(f.name, text)); status(`Opened ${f.name}.`); }, () => status('Could not read that file.'));
+  if (BINARY.test(f.name)) f.arrayBuffer().then(buf => openBinary(f.name, buf)).then(o => { show(o); if (o.kind === 'card') status(`Opened ${f.name}.`); }, () => status('Could not read that file.'));
+  else f.text().then(text => { show(openFile(f.name, text)); status(`Opened ${f.name}.`); }, () => status('Could not read that file.'));
   e.target.value = '';
 });
 document.querySelector('.tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) showTab(b.dataset.tab); });
