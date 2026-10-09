@@ -1,16 +1,20 @@
-// Run and trace Python: the card, the job path, the sandbox, replay. adder runs in-process here through the
-// same driver the page's worker uses.
+// Run and trace Python: the card, the job path, the sandbox, the GCU modules, replay. The runner here
+// evaluates the very worker text the page embeds (build.mjs pyWorkerSource), in a fresh context per run,
+// with only what a worker has: no window, no document, no network helpers handed in.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import vm from 'node:vm';
 import * as g from '../src/engine/index.js';
-import { run } from '../src/vendor/adder/runner.js';
-import { pyRepr } from '../src/vendor/adder/builtins.js';
-import { adderParse } from '../src/vendor/adder/parse.js';
-import { pyRun } from '../src/worker/py-driver.js';
+import { pyWorkerSource } from '../build.mjs';
 
-const api = { run, pyRepr, adderParse };
+const script = new vm.Script(pyWorkerSource(), { filename: 'py-worker.js' });
+const worker = req => new Promise(res => {
+  const self = { postMessage: r => res(JSON.parse(JSON.stringify(r))) };   // a structured clone, as postMessage gives
+  script.runInContext(vm.createContext({ self, console, atob, btoa, TextEncoder, TextDecoder, performance, setTimeout, clearTimeout, queueMicrotask }));
+  self.onmessage({ data: req });
+});
 let runs = 0;
-g.setRunner('python', req => { runs++; return pyRun(api, req); });
+g.setRunner('python', req => { runs++; return worker(req); });
 const card = q => { const o = g.submit(q); assert.equal(o.kind, 'card', q); return o.card; };
 const ran = async q => { const c = card(q); assert.ok(c.res.pending, 'starts as a pending card'); assert.ok(g.textOf(c).includes('Running')); await g.settle(); assert.ok(!c.res.pending, 'recomputed from the result'); return c; };
 
@@ -42,8 +46,15 @@ test('numpy and friends are rewritten to the GCU names and shown; their absence 
   assert.deepEqual(g.rewriteForGcu('import numpy as np\nfrom scipy.stats import norm').rewrites.map(r => r.rewritten), ['natra', 'scitra.stats']);
   const c = await ran('run this: import numpy as np\nprint(np.pi)');
   const t = g.textOf(c);
-  assert.ok(t.includes('numpy → natra') && t.includes('GCU stack, which golem does not carry yet'), t);
+  assert.ok(t.includes('numpy → natra') && t.includes('needs the atra compiler'), t);
   assert.ok((await ran('run this: import math\nmath.sqrt(2)')).res.value.startsWith('1.414'), 'the built-in modules work');
+  const sp = await ran('run this: from scipy.stats import norm\nprint(norm.cdf(0))\nnorm.ppf(0.975)');
+  assert.ok(g.textOf(sp).includes('scipy.stats → scitra.stats'), g.textOf(sp));
+  assert.equal(sp.res.body.find(b => b.t === 'pre').text, '0.5\n'); assert.ok(sp.res.value.startsWith('1.95996'), sp.res.value);
+  const pd = await ran('run this: import pandas as pd\nt = pd.table({"a": [1, 2, 3], "b": [4.0, 5.0, 6.0]})\nprint(t)');
+  assert.ok(g.textOf(pd).includes('pandas → sadpan') && !pd.res.body.some(b => b.kind === 'err'), g.textOf(pd));
+  assert.ok(pd.res.body.find(b => b.t === 'pre').text.includes('"a":3'), 'a sadpan table from Python');
+  assert.ok(g.textOf(await ran('run this: import matplotlib.pyplot as plt')).includes('canvas'));
 });
 
 test('trace: a table of lines and what changed; "trace it" amends a run; export carries the code; replay reruns', async () => {
@@ -60,7 +71,7 @@ test('trace: a table of lines and what changed; "trace it" amends a run; export 
   const script = card('export as script');
   assert.ok(g.textOf(script).includes('n ** 2'), 'the exported script carries the code itself');
   const before = runs, saved = JSON.parse(JSON.stringify(g.serialize()));
-  g.reset(); g.setRunner('python', req => { runs++; return pyRun(api, req); }); g.hydrate(saved); await g.settle();
+  g.reset(); g.setRunner('python', req => { runs++; return worker(req); }); g.hydrate(saved); await g.settle();
   assert.ok(runs > before, 'replay ran the code again');
   assert.equal(g.S.cards.find(c => c.args.code === 'n = 3\nn ** 2' && !c.args.trace).res.value, '9');
 });
@@ -69,5 +80,5 @@ test('without a runner the card says so instead of hanging', () => {
   g.reset(); g.setRunner('python', null);
   const c = card('run this: print(1)');
   assert.ok(g.textOf(c).includes('not available'));
-  g.setRunner('python', req => pyRun(api, req));
+  g.setRunner('python', req => worker(req));
 });

@@ -14,7 +14,8 @@ function withLast(api, code) {
   if (!tail || tail.type !== 'Expr' || !tail.line) return { code, last: false };
   const lines = code.split('\n'), head = lines.slice(0, tail.line - 1), expr = lines.slice(tail.line - 1).join('\n').replace(/\s+$/, '');
   if (/^\s/.test(expr)) return { code, last: false };
-  return { code: [...head, `__golem_last__ = (${expr})`].join('\n'), last: true };
+  // the closing bracket on its own line, so a trailing comment cannot swallow it; the expression keeps its line number
+  return { code: [...head, `__golem_last__ = (${expr}`, ')'].join('\n'), last: true };
 }
 
 export async function pyRun(api, req) {

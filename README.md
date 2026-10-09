@@ -79,7 +79,7 @@ src/engine/                  no DOM, no storage: everything that reads and compu
   sessions.js                sessions, replay, auto-naming, serialize and hydrate
   engine.js                  submit, rerun, slot flips, answers, undo
   index.js                   the surface Node tests import
-src/vendor/                  copies, never edited here: @gcu/dispatch (the parser), @gcu/bearing, @gcu/sadpan, @gcu/recon, @gcu/sift, @gcu/wmm, @gcu/units (tables only), @gcu/plan (calendar and holidays only), @gcu/sheet, @gcu/dm, @gcu/ipynb (its substitution table), @gcu/adder (the four `run` modules, see src/vendor/adder/README.md), the lead-acid shim
+src/vendor/                  copies, never edited here: @gcu/dispatch (the parser), @gcu/bearing, @gcu/sadpan, @gcu/recon, @gcu/sift, @gcu/wmm, @gcu/units (tables only), @gcu/plan (calendar and holidays only), @gcu/sheet, @gcu/dm, @gcu/ipynb (its substitution table), @gcu/adder and @gcu/scitra with its adder bridge (inside the Python worker only, assembled by `pyWorkerSource()` in build.mjs), the lead-acid shim
 src/shell/                   the browser: markup, rendering, wiring, storage
   index.html                 markup, Switchboard tokens, styles, bench notes
   fonts/                     Barlow and Space Mono (OFL), embedded by the build
@@ -98,7 +98,7 @@ test/chem.test.mjs           the elements table is whole; CuFeS2, Fe→Fe2O3, Cu
 test/text.test.mjs           counts and Flesch, TextRank order, Myers edits, the payload rule
 test/forms.test.mjs          the decision matrix end to end, and the formulas with their terms asked
 test/log.test.mjs            the log: rows, corrections, undo, replay, questions, opened as a table
-test/python.test.mjs         adder through the same driver as the page worker: output, errors, budget, sandbox, trace, replay
+test/python.test.mjs         the page's own worker text in a fresh context per run: output, errors, budget, sandbox, scipy and pandas, trace, replay
 test/apply.test.mjs          thickness and apparent dip over every row, against the single-value tools
 test/formats.test.mjs        xlsx (written by the vendored sheet) and the .dm fixture through openBinary, replay, the sheet slot
 test/places.test.mjs         Vincenty against the Geoscience Australia test line, UTM round trips and the meridian arc, sun and moon
