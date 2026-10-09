@@ -2,8 +2,8 @@
 import { tool, frame, fmt } from './core.js';
 
 export const U = {};
-export const UNITS = [];
-const u = (dim, f, ...n) => { UNITS.push({ dim, f, name: n[0], words: n }); n.forEach(k => { U[k] = { dim, f, name: n[0] }; }); };
+export const UNIT_TABLE = [];
+const u = (dim, f, ...n) => { UNIT_TABLE.push({ dim, f, name: n[0], words: n }); n.forEach(k => { U[k] = { dim, f, name: n[0] }; }); };
 u('L', 1, 'm', 'meter', 'metre'); u('L', 1000, 'km', 'kilometer', 'kilometre'); u('L', .01, 'cm'); u('L', .001, 'mm');
 u('L', .3048, 'ft', 'foot', 'feet'); u('L', .0254, 'inch', 'inches', '"'); u('L', 1609.344, 'mi', 'mile'); u('L', .9144, 'yd', 'yard');
 u('M', 1e-3, 'g', 'gram'); u('M', 1, 'kg', 'kilogram'); u('M', 1000, 't', 'tonne', 'metric ton'); u('M', .45359237, 'lb', 'lbs', 'pound');
@@ -17,11 +17,11 @@ u('V', .028316846592, 'ft³', 'ft3', 'cubic foot', 'cubic feet'); u('V', .003785
 u('P', 1, 'Pa', 'pa'); u('P', 1e3, 'kPa', 'kpa'); u('P', 1e6, 'MPa', 'mpa'); u('P', 6894.757293168, 'psi'); u('P', 1e5, 'bar');
 u('t', 1, 's', 'sec', 'second'); u('t', 60, 'min', 'minute'); u('t', 3600, 'h', 'hr', 'hour'); u('t', 86400, 'day');
 [['°C', 1, 273.15, 'c', '°c', 'celsius'], ['°F', 5 / 9, 459.67, 'f', '°f', 'fahrenheit'], ['K', 1, 0, 'k', 'kelvin']]
-  .forEach(([name, f, off, ...n]) => { UNITS.push({ dim: 'T', f, off, name, words: n }); n.forEach(k => { U[k] = { dim: 'T', f, off, name }; }); });
+  .forEach(([name, f, off, ...n]) => { UNIT_TABLE.push({ dim: 'T', f, off, name, words: n }); n.forEach(k => { U[k] = { dim: 'T', f, off, name }; }); });
 export const DIM = { L: 'length', M: 'mass', R: 'mass ratio', T: 'temperature', A: 'area', V: 'volume', P: 'pressure', t: 'time' };
 // compound units the parser should know as single words (parseUnit composes them from the table)
 export const COMPOUNDS = ['g/cm3', 'g/cc', 'lb/ft3', 'oz per short ton', 'oz/t', 'troy oz per short ton', 't/m3', 'kg/m3'];
-const byName = new Map(UNITS.map(x => [x.name, U[x.words[0]]]));
+const byName = new Map(UNIT_TABLE.map(x => [x.name, U[x.words[0]]]));
 
 function unit1(s, oz) {
   s = s.trim();

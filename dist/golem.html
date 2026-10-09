@@ -327,12 +327,12 @@ const qty = (node, f) => node && node.type === 'quantity' ? node.n * f(node.unit
 })();
 
 /* ==== src/engine/units.js ==== */
-const { U, UNITS, DIM, COMPOUNDS, parseUnit, dimName } = (() => {
+const { U, UNIT_TABLE, DIM, COMPOUNDS, parseUnit, dimName } = (() => {
 // Unit conversion with dimension checks. A small table until @gcu/units stands under it.
 
 const U = {};
-const UNITS = [];
-const u = (dim, f, ...n) => { UNITS.push({ dim, f, name: n[0], words: n }); n.forEach(k => { U[k] = { dim, f, name: n[0] }; }); };
+const UNIT_TABLE = [];
+const u = (dim, f, ...n) => { UNIT_TABLE.push({ dim, f, name: n[0], words: n }); n.forEach(k => { U[k] = { dim, f, name: n[0] }; }); };
 u('L', 1, 'm', 'meter', 'metre'); u('L', 1000, 'km', 'kilometer', 'kilometre'); u('L', .01, 'cm'); u('L', .001, 'mm');
 u('L', .3048, 'ft', 'foot', 'feet'); u('L', .0254, 'inch', 'inches', '"'); u('L', 1609.344, 'mi', 'mile'); u('L', .9144, 'yd', 'yard');
 u('M', 1e-3, 'g', 'gram'); u('M', 1, 'kg', 'kilogram'); u('M', 1000, 't', 'tonne', 'metric ton'); u('M', .45359237, 'lb', 'lbs', 'pound');
@@ -346,11 +346,11 @@ u('V', .028316846592, 'ft³', 'ft3', 'cubic foot', 'cubic feet'); u('V', .003785
 u('P', 1, 'Pa', 'pa'); u('P', 1e3, 'kPa', 'kpa'); u('P', 1e6, 'MPa', 'mpa'); u('P', 6894.757293168, 'psi'); u('P', 1e5, 'bar');
 u('t', 1, 's', 'sec', 'second'); u('t', 60, 'min', 'minute'); u('t', 3600, 'h', 'hr', 'hour'); u('t', 86400, 'day');
 [['°C', 1, 273.15, 'c', '°c', 'celsius'], ['°F', 5 / 9, 459.67, 'f', '°f', 'fahrenheit'], ['K', 1, 0, 'k', 'kelvin']]
-  .forEach(([name, f, off, ...n]) => { UNITS.push({ dim: 'T', f, off, name, words: n }); n.forEach(k => { U[k] = { dim: 'T', f, off, name }; }); });
+  .forEach(([name, f, off, ...n]) => { UNIT_TABLE.push({ dim: 'T', f, off, name, words: n }); n.forEach(k => { U[k] = { dim: 'T', f, off, name }; }); });
 const DIM = { L: 'length', M: 'mass', R: 'mass ratio', T: 'temperature', A: 'area', V: 'volume', P: 'pressure', t: 'time' };
 // compound units the parser should know as single words (parseUnit composes them from the table)
 const COMPOUNDS = ['g/cm3', 'g/cc', 'lb/ft3', 'oz per short ton', 'oz/t', 'troy oz per short ton', 't/m3', 'kg/m3'];
-const byName = new Map(UNITS.map(x => [x.name, U[x.words[0]]]));
+const byName = new Map(UNIT_TABLE.map(x => [x.name, U[x.words[0]]]));
 
 function unit1(s, oz) {
   s = s.trim();
@@ -397,7 +397,7 @@ frame({
   words_pt: ['converter', 'converte', 'converta', 'passar', 'passa'], label_pt: 'Converter',
   bind: c => { const q = c.theme[0], to = c.roles.unit && c.roles.unit[0]; return q && q.type === 'quantity' && to ? { tool: 'convert', args: { v: q.n, from: q.unit, to: to.unit } } : null; }
 });
-  return { U, UNITS, DIM, COMPOUNDS, parseUnit, dimName };
+  return { U, UNIT_TABLE, DIM, COMPOUNDS, parseUnit, dimName };
 })();
 
 /* ==== src/engine/calc.js ==== */
@@ -8639,6 +8639,469 @@ frame({
   return { RANKS, unitByName, parentOf, chainOf, childrenOf, beforeOf, afterOf, atAge };
 })();
 
+/* ==== src/vendor/units.js ==== */
+const { UNITS, convert, length, mass, grade, density, area, volume, angle, magnetic, sieve, core, format } = (() => {
+// ⚠ VENDORED — DO NOT EDIT. @gcu/units, copied from ../auditable/ext/units/index.js (built from its src/ by @gcu/build).
+// Re-vendor by copying that file here. golem uses the sieve and core tables; conversions stay in src/engine/units.js
+// until this package's factors are exact (they are rounded to six figures) and it covers the units golem needs.
+
+// ⚠ GENERATED FILE — DO NOT EDIT. Source: src/  Build: @gcu/build src/main.js
+// @gcu/units — Unit conversion for length, mass, area, volume, angle, grade, density, and magnetic quantities. Sieve mesh conversions, drill core utilities, formatting helpers.
+
+// ── src/convert.js ──
+
+// Unit dimension registry and convert function
+
+const PI = Math.PI;
+
+const UNITS = {
+  // length (canonical: m)
+  um:  { dim: 'length', mul: 1e-6 },
+  mm:  { dim: 'length', mul: 1e-3 },
+  cm:  { dim: 'length', mul: 1e-2 },
+  m:   { dim: 'length', mul: 1 },
+  km:  { dim: 'length', mul: 1e3 },
+  in:  { dim: 'length', mul: 0.0254 },
+  ft:  { dim: 'length', mul: 0.3048 },
+
+  // mass (canonical: g)
+  mg:      { dim: 'mass', mul: 1e-3 },
+  g:       { dim: 'mass', mul: 1 },
+  kg:      { dim: 'mass', mul: 1e3 },
+  t:       { dim: 'mass', mul: 1e6 },
+  kt:      { dim: 'mass', mul: 1e9 },
+  Mt:      { dim: 'mass', mul: 1e12 },
+  st:      { dim: 'mass', mul: 907185 },
+  lt_mass: { dim: 'mass', mul: 1016047 },
+  oz:      { dim: 'mass', mul: 28.3495 },
+  lb:      { dim: 'mass', mul: 453.592 },
+  ozt:     { dim: 'mass', mul: 31.1035 },
+
+  // concentration / grade (canonical: fraction, dimensionless 0–1)
+  fraction: { dim: 'grade', mul: 1 },
+  ppm:      { dim: 'grade', mul: 1e-6 },
+  ppb:      { dim: 'grade', mul: 1e-9 },
+  pct:      { dim: 'grade', mul: 1e-2 },
+  'g/t':    { dim: 'grade', mul: 1e-6 },
+  'mg/kg':  { dim: 'grade', mul: 1e-6 },
+  'oz/t':   { dim: 'grade', mul: 31.1035 / 907185 },   // troy oz per short ton
+  'oz/lt':  { dim: 'grade', mul: 31.1035 / 1016047 },   // troy oz per long ton
+
+  // density (canonical: g/cm3)
+  'g/cm3':  { dim: 'density', mul: 1 },
+  'kg/m3':  { dim: 'density', mul: 1e-3 },
+  't/m3':   { dim: 'density', mul: 1 },
+  'lb/ft3': { dim: 'density', mul: 0.016018 },
+
+  // area (canonical: m2)
+  mm2: { dim: 'area', mul: 1e-6 },
+  cm2: { dim: 'area', mul: 1e-4 },
+  m2:  { dim: 'area', mul: 1 },
+  ha:  { dim: 'area', mul: 1e4 },
+  km2: { dim: 'area', mul: 1e6 },
+
+  // volume (canonical: m3)
+  cm3: { dim: 'volume', mul: 1e-6 },
+  L:   { dim: 'volume', mul: 1e-3 },
+  m3:  { dim: 'volume', mul: 1 },
+
+  // angle (canonical: rad)
+  deg:  { dim: 'angle', mul: PI / 180 },
+  rad:  { dim: 'angle', mul: 1 },
+  grad: { dim: 'angle', mul: PI / 200 },
+  mrad: { dim: 'angle', mul: 1e-3 },
+
+  // magnetic field (canonical: T)
+  T:  { dim: 'magnetic', mul: 1 },
+  mT: { dim: 'magnetic', mul: 1e-3 },
+  uT: { dim: 'magnetic', mul: 1e-6 },
+  nT: { dim: 'magnetic', mul: 1e-9 },
+  Oe: { dim: 'magnetic', mul: 1e-4 },  // 1 Oe = 1 G = 1e-4 T (free space)
+};
+
+function convert(value, from, to, opts) {
+  const f = UNITS[from], t = UNITS[to];
+  if (!f) throw new Error(`unknown unit: ${from}`);
+  if (!t) throw new Error(`unknown unit: ${to}`);
+  if (f.dim !== t.dim) throw new Error(`incompatible dimensions: ${f.dim} → ${t.dim}`);
+  const factor = f.mul / t.mul;
+  if (typeof value === 'number') return value * factor;
+  // typed array / array-like (duck-type on .length + indexing)
+  const data = value.data || value;
+  if (opts?.inplace) {
+    for (let i = 0; i < data.length; i++) data[i] *= factor;
+    return value;
+  }
+  if (typeof data.constructor === 'function' && data.constructor !== Object && typeof data.length === 'number') {
+    const out = new data.constructor(data.length);
+    for (let i = 0; i < data.length; i++) out[i] = data[i] * factor;
+    return out;
+  }
+  // plain array
+  const out = new Array(data.length);
+  for (let i = 0; i < data.length; i++) out[i] = data[i] * factor;
+  return out;
+}
+
+// Convenience aliases
+const length = {
+  cmToMm: v => convert(v, 'cm', 'mm'),
+  mmToCm: v => convert(v, 'mm', 'cm'),
+  umToCm: v => convert(v, 'um', 'cm'),
+  cmToUm: v => convert(v, 'cm', 'um'),
+  ftToM:  v => convert(v, 'ft', 'm'),
+  mToFt:  v => convert(v, 'm', 'ft'),
+  kmToM:  v => convert(v, 'km', 'm'),
+  inToCm: v => convert(v, 'in', 'cm'),
+};
+
+const mass = {
+  kgToG:  v => convert(v, 'kg', 'g'),
+  gToKg:  v => convert(v, 'g', 'kg'),
+  tToKg:  v => convert(v, 't', 'kg'),
+  lbToKg: v => convert(v, 'lb', 'kg'),
+  ozToG:  v => convert(v, 'oz', 'g'),
+  oztToG: v => convert(v, 'ozt', 'g'),
+};
+
+const grade = {
+  oztToGt:       v => convert(v, 'oz/t', 'g/t'),
+  gtToOzt:       v => convert(v, 'g/t', 'oz/t'),
+  gtToPpm:       v => convert(v, 'g/t', 'ppm'),
+  gtToPct:       v => convert(v, 'g/t', 'pct'),
+  pctToFraction: v => convert(v, 'pct', 'fraction'),
+  fractionToPct: v => convert(v, 'fraction', 'pct'),
+};
+
+const density = {
+  kgm3ToGcm3: v => convert(v, 'kg/m3', 'g/cm3'),
+  gcm3ToKgm3: v => convert(v, 'g/cm3', 'kg/m3'),
+};
+
+const area = {
+  haToM2:  v => convert(v, 'ha', 'm2'),
+  km2ToM2: v => convert(v, 'km2', 'm2'),
+  m2ToHa:  v => convert(v, 'm2', 'ha'),
+};
+
+const volume = {
+  cm3ToM3: v => convert(v, 'cm3', 'm3'),
+  lToM3:   v => convert(v, 'L', 'm3'),
+  m3ToL:   v => convert(v, 'm3', 'L'),
+};
+
+const angle = {
+  degToRad:  v => convert(v, 'deg', 'rad'),
+  radToDeg:  v => convert(v, 'rad', 'deg'),
+  gradToRad: v => convert(v, 'grad', 'rad'),
+};
+
+const magnetic = {
+  nTToT:  v => convert(v, 'nT', 'T'),
+  oeToT:  v => convert(v, 'Oe', 'T'),
+  uTToNT: v => convert(v, 'uT', 'nT'),
+};
+
+// ── src/sieve.js ──
+
+// Tyler / ASTM mesh ↔ µm lookup table
+
+const TABLE = [
+  { mesh: 635, aperture_um: 20 },
+  { mesh: 500, aperture_um: 25 },
+  { mesh: 450, aperture_um: 32 },
+  { mesh: 400, aperture_um: 38 },
+  { mesh: 325, aperture_um: 45 },
+  { mesh: 270, aperture_um: 53 },
+  { mesh: 230, aperture_um: 63 },
+  { mesh: 200, aperture_um: 75 },
+  { mesh: 170, aperture_um: 90 },
+  { mesh: 150, aperture_um: 106 },
+  { mesh: 120, aperture_um: 125 },
+  { mesh: 100, aperture_um: 150 },
+  { mesh: 80,  aperture_um: 180 },
+  { mesh: 70,  aperture_um: 212 },
+  { mesh: 60,  aperture_um: 250 },
+  { mesh: 50,  aperture_um: 300 },
+  { mesh: 45,  aperture_um: 355 },
+  { mesh: 40,  aperture_um: 425 },
+  { mesh: 35,  aperture_um: 500 },
+  { mesh: 30,  aperture_um: 600 },
+  { mesh: 25,  aperture_um: 710 },
+  { mesh: 20,  aperture_um: 850 },
+  { mesh: 18,  aperture_um: 1000 },
+  { mesh: 16,  aperture_um: 1180 },
+  { mesh: 14,  aperture_um: 1400 },
+  { mesh: 12,  aperture_um: 1700 },
+  { mesh: 10,  aperture_um: 2000 },
+  { mesh: 8,   aperture_um: 2360 },
+  { mesh: 7,   aperture_um: 2800 },
+  { mesh: 6,   aperture_um: 3350 },
+  { mesh: 5,   aperture_um: 4000 },
+  { mesh: 4,   aperture_um: 4750 },
+];
+
+// index by mesh number for O(1) lookup
+const BY_MESH = {};
+for (const row of TABLE) BY_MESH[row.mesh] = row.aperture_um;
+
+const sieve = {
+  toMicrons(mesh) {
+    const um = BY_MESH[mesh];
+    if (um === undefined) throw new Error(`unknown mesh: ${mesh}`);
+    return um;
+  },
+
+  toMesh(um) {
+    // exact match first
+    for (const row of TABLE) {
+      if (row.aperture_um === um) return row.mesh;
+    }
+    // nearest
+    let best = TABLE[0], bestDist = Math.abs(TABLE[0].aperture_um - um);
+    for (let i = 1; i < TABLE.length; i++) {
+      const d = Math.abs(TABLE[i].aperture_um - um);
+      if (d < bestDist) { best = TABLE[i]; bestDist = d; }
+    }
+    return { nearest: best.mesh, exact: false, aperture_um: best.aperture_um };
+  },
+
+  toCm(mesh) {
+    return sieve.toMicrons(mesh) / 10000;
+  },
+
+  table() {
+    return TABLE.map(r => ({ ...r }));
+  },
+};
+
+// ── src/core.js ──
+
+// DCDMA wireline diamond core sizes
+
+const CORES = [
+  { code: 'AQ',  core_mm: 27.0, hole_mm: 48.0,  variant: 'standard' },
+  { code: 'BQ',  core_mm: 36.5, hole_mm: 60.0,  variant: 'standard' },
+  { code: 'NQ',  core_mm: 47.6, hole_mm: 75.7,  variant: 'standard' },
+  { code: 'NQ2', core_mm: 50.6, hole_mm: 75.7,  variant: 'oversize' },
+  { code: 'NQ3', core_mm: 45.1, hole_mm: 75.7,  variant: 'triple_tube' },
+  { code: 'HQ',  core_mm: 63.5, hole_mm: 96.0,  variant: 'standard' },
+  { code: 'HQ3', core_mm: 61.1, hole_mm: 96.0,  variant: 'triple_tube' },
+  { code: 'PQ',  core_mm: 85.0, hole_mm: 122.6, variant: 'standard' },
+  { code: 'PQ3', core_mm: 83.0, hole_mm: 122.6, variant: 'triple_tube' },
+];
+
+const BY_CODE = {};
+for (const row of CORES) BY_CODE[row.code] = row;
+
+function lookup(code) {
+  const row = BY_CODE[code];
+  if (!row) throw new Error(`unknown core code: ${code}`);
+  return row;
+}
+
+function mmToCm(mm) {
+  return Math.round(mm * 100) / 1000;
+}
+
+const core = {
+  diameter(code) {
+    const { core_mm } = lookup(code);
+    return { mm: core_mm, cm: mmToCm(core_mm) };
+  },
+
+  holeDiameter(code) {
+    const { hole_mm } = lookup(code);
+    return { mm: hole_mm, cm: mmToCm(hole_mm) };
+  },
+
+  halfCoreDiameter(code) {
+    const { core_mm } = lookup(code);
+    const half = core_mm / 2;
+    return { mm: Math.round(half * 10) / 10, cm: mmToCm(half) };
+  },
+
+  unitVolume(code, opts) {
+    const { core_mm } = lookup(code);
+    const d_cm = core_mm / 10;
+    // cross-sectional area × 100 cm (1 metre of core)
+    let cm3 = PI / 4 * d_cm * d_cm * 100;
+    const split = opts?.split || 'whole';
+    if (split === 'half') cm3 /= 2;
+    else if (split === 'quarter') cm3 /= 4;
+    return {
+      cm3_per_m: Math.round(cm3 * 10) / 10,
+      m3_per_m: Math.round(cm3 * 1e-6 * 1e9) / 1e9,
+    };
+  },
+
+  sampleMass({ code, length_m, density_gcm3, split }) {
+    const vol = core.unitVolume(code, { split: split || 'whole' });
+    const volume_cm3 = vol.cm3_per_m * length_m;
+    const mass_g = volume_cm3 * density_gcm3;
+    return {
+      mass_g: Math.round(mass_g),
+      mass_kg: Math.round(mass_g / 100) / 10,
+      volume_cm3: Math.round(volume_cm3 * 10) / 10,
+    };
+  },
+
+  table() {
+    return CORES.map(r => ({ ...r }));
+  },
+};
+
+// ── src/format.js ──
+
+// Format values with unit labels and auto-scaling
+
+
+const UNICODE = {
+  um: 'µm', m2: 'm²', cm2: 'cm²', mm2: 'mm²', km2: 'km²',
+  m3: 'm³', cm3: 'cm³', 'g/cm3': 'g/cm³', 'kg/m3': 'kg/m³',
+  't/m3': 't/m³', 'lb/ft3': 'lb/ft³',
+};
+
+// Auto-scale chains: try each target in order, pick the first that gives a "nice" value
+const SCALE_CHAINS = {
+  length: [
+    { unit: 'km', min: 1, max: Infinity },
+    { unit: 'm',  min: 1, max: 1000 },
+    { unit: 'cm', min: 1, max: 100 },
+    { unit: 'mm', min: 1, max: 10 },
+    { unit: 'um', min: 0, max: Infinity },
+  ],
+  mass: [
+    { unit: 'Mt', min: 1, max: Infinity },
+    { unit: 'kt', min: 1, max: 1000 },
+    { unit: 't',  min: 1, max: 1000 },
+    { unit: 'kg', min: 1, max: 1000 },
+    { unit: 'g',  min: 1, max: 1000 },
+    { unit: 'mg', min: 0, max: Infinity },
+  ],
+  density: [
+    { unit: 'g/cm3', min: 0, max: Infinity },
+  ],
+  grade: [
+    { unit: 'pct', min: 1, max: Infinity },
+    { unit: 'g/t', min: 0.001, max: 10000 },
+    { unit: 'ppm', min: 0, max: Infinity },
+  ],
+};
+
+function format(value, unit, opts) {
+  const dec = opts?.decimals;
+  let displayUnit = unit;
+  let displayValue = value;
+
+  if (opts?.auto) {
+    const entry = UNITS[unit];
+    if (entry) {
+      const chain = SCALE_CHAINS[entry.dim];
+      if (chain) {
+        for (const step of chain) {
+          const v = convert(value, unit, step.unit);
+          const abs = Math.abs(v);
+          if (abs >= step.min && abs < step.max) {
+            displayValue = v;
+            displayUnit = step.unit;
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  const numStr = dec !== undefined ? displayValue.toFixed(dec) : String(displayValue);
+  const label = UNICODE[displayUnit] || displayUnit;
+
+  if (displayUnit === 'pct') return numStr + '%';
+  return numStr + ' ' + label;
+}
+
+// ── src/main.js ──
+
+// @gcu/units — entry point
+  return { UNITS, convert, length, mass, grade, density, area, volume, angle, magnetic, sieve, core, format };
+})();
+
+/* ==== src/engine/sample.js ==== */
+(() => {
+// Core and sample arithmetic: sample mass from core size, sieve sizes, specific gravity by Archimedes,
+// recovery and RQD. The DCDMA core table and the sieve table come from @gcu/units (vendored); the
+// arithmetic is golem's own and shown step by step.
+
+const SRC = { t: 'src', text: '@gcu/units · vendored · DCDMA core sizes and the sieve table' };
+const CODES = '(aq|bq|nq|nq2|nq3|hq|hq3|pq|pq3)';
+const NUM = '(\\d+(?:\\.\\d+)?)';
+
+tool({
+  name: 'coremass', rank: 76,
+  skill: { group: 'Field', title: 'Core and sample arithmetic', on: '@gcu/units', about: 'Sample mass from core size, length, split and density; sieve mesh to microns; specific gravity from mass in air and water; recovery and RQD from piece lengths.', examples: ['mass of 1 m of nq core at 2.7', '200 mesh in microns', 'sg from 120.5 g in air and 75.2 g in water', 'rqd of 12, 8, 25, 4, 31 and 9 cm in a 100 cm run'] },
+  read: (text, q) => {
+    let m = new RegExp(`^(?:sample )?mass of ${NUM} ?m of (half |quarter |whole )?${CODES}(?: core)?(?: at (?:sg |density |rho )?${NUM})?$`).exec(q);
+    if (!m) m = new RegExp(`^(half |quarter |whole )?${CODES}(?: core)?,? ${NUM} ?m,? (?:at |sg |density )${NUM}$`).exec(q) && (m => [m[0], m[3], m[1], m[2], m[4]])(new RegExp(`^(half |quarter |whole )?${CODES}(?: core)?,? ${NUM} ?m,? (?:at |sg |density )${NUM}$`).exec(q));
+    if (!m) return null;
+    return { length: +m[1], split: (m[2] || 'whole').trim(), code: m[3].toUpperCase(), density: m[4] ? +m[4] : null };
+  },
+  topic: () => ['Sample mass', 1],
+  run: a => {
+    const d = core.diameter(a.code), read = ['mass of', { v: `${fmt(a.length)} m` }, 'of', { v: `${a.split} ${a.code}`, key: 'split', alts: ['whole', 'half', 'quarter'], cur: a.split }, 'core'];
+    if (a.density == null) return { read, body: [{ t: 'note', kind: 'err', text: `At what density? Say "at 2.7" (g/cm³). ${a.code} core is ${d.mm} mm across; the density is yours to give.` }, SRC], trace: ['density missing'] };
+    const div = a.split === 'half' ? 2 : a.split === 'quarter' ? 4 : 1, vol = Math.PI / 4 * d.cm * d.cm * 100 * a.length / div, g = vol * a.density;
+    read.push('at', { v: `${fmt(a.density)} g/cm³` });
+    return {
+      read, value: g / 1000,
+      body: [{ t: 'big', v: fmt(g / 1000, 4), unit: 'kg' }, { t: 'kv', rows: [['core', `${a.code}: ${d.mm} mm diameter (DCDMA)`], ['volume', `${fmt(vol, 5)} cm³ for ${fmt(a.length)} m, ${a.split}`], ['density', `${fmt(a.density)} g/cm³, as given`]] }, SRC],
+      trace: [`units.core.diameter("${a.code}") → ${d.cm} cm`, `π/4 × ${d.cm}² × 100 × ${a.length}${div > 1 ? ' ÷ ' + div : ''} = ${fmt(vol, 6)} cm³`, `× ${a.density} g/cm³ = ${fmt(g, 6)} g`], py: `units.core.sampleMass({ code: "${a.code}", length_m: ${a.length}, density_gcm3: ${a.density}, split: "${a.split}" })`
+    };
+  }
+});
+tool({
+  name: 'sieve', rank: 77,
+  read: (text, q) => {
+    let m = /^(\d+) mesh (?:in|to|as) (?:microns?|um|µm|mm)$/.exec(q); if (m) return { mesh: +m[1] };
+    m = new RegExp(`^${NUM} ?(um|µm|microns?|mm) (?:in|to|as) mesh$`).exec(q); return m ? { um: +m[1] * (m[2] === 'mm' ? 1000 : 1) } : null;
+  },
+  topic: () => ['Sieve', 1],
+  run: a => {
+    if (a.mesh != null) {
+      let um; try { um = sieve.toMicrons(a.mesh); } catch (e) { return { read: ['sieve', { v: `${a.mesh} mesh` }], body: [{ t: 'note', kind: 'err', text: `${a.mesh} mesh is not in the sieve table. It has ${sieve.table().map(r => r.mesh).join(', ')}.` }, SRC], trace: ['not in the table'] }; }
+      return { read: ['sieve', { v: `${a.mesh} mesh` }, 'in microns'], value: um, body: [{ t: 'big', v: fmt(um), unit: 'µm' }, { t: 'sub', text: `${fmt(um / 1000, 4)} mm. The table is the one @gcu/units ships; Tyler and ASTM series differ by a few microns at some sizes.` }, SRC], trace: [`units.sieve.toMicrons(${a.mesh}) → ${um}`], py: `units.sieve.toMicrons(${a.mesh})` };
+    }
+    const mesh = sieve.toMesh(a.um), back = sieve.toMicrons(mesh);
+    return { read: ['sieve', { v: `${fmt(a.um)} µm` }, 'in mesh'], value: mesh, body: [{ t: 'big', v: String(mesh), unit: 'mesh' }, { t: 'sub', text: back === a.um ? 'An exact table size.' : `The nearest table size is ${mesh} mesh at ${back} µm.` }, SRC], trace: [`units.sieve.toMesh(${a.um}) → ${mesh}`], py: `units.sieve.toMesh(${a.um})` };
+  }
+});
+tool({
+  name: 'sg', rank: 78,
+  read: (text, q) => { const m = new RegExp(`^(?:sg|specific gravity|density) (?:of|from) ${NUM} ?g in air and ${NUM} ?g in water$`).exec(q); return m ? { air: +m[1], water: +m[2] } : null; },
+  topic: () => ['Specific gravity', 1],
+  run: a => {
+    const read = ['specific gravity from', { v: `${fmt(a.air)} g in air` }, 'and', { v: `${fmt(a.water)} g in water` }];
+    if (a.water >= a.air) return { read, body: [{ t: 'note', kind: 'err', text: 'The mass in water must be less than the mass in air; the sample would float or the readings are swapped.' }], trace: ['air ≤ water'] };
+    const sg = a.air / (a.air - a.water);
+    return { read, value: sg, body: [{ t: 'big', v: fmt(sg, 4), unit: 'specific gravity' }, { t: 'kv', rows: [['displaced water', `${fmt(a.air - a.water)} g, taken as ${fmt(a.air - a.water)} cm³ at 1.000 g/cm³`], ['assumes', 'no trapped air, water at about 4 °C; at 20 °C the result is 0.2% high']] }], trace: [`${a.air} ÷ (${a.air} − ${a.water}) = ${fmt(sg, 6)}`], py: `${a.air} / (${a.air} - ${a.water})` };
+  }
+});
+const RQD_CLASS = v => v < 25 ? 'very poor' : v < 50 ? 'poor' : v < 75 ? 'fair' : v < 90 ? 'good' : 'excellent';
+tool({
+  name: 'rqd', rank: 79,
+  read: (text, q) => { const m = new RegExp(`^(?:rqd|recovery)(?: and (?:rqd|recovery))? (?:of|for|from) ((?:\\d+(?:\\.\\d+)?,? ?(?:and )?)+?) ?cm (?:in|over|for) (?:a |an )?${NUM} ?(m|cm) run$`).exec(q); if (!m) return null; const pieces = [...m[1].matchAll(/\d+(?:\.\d+)?/g)].map(x => +x[0]); return pieces.length ? { pieces, run: +m[2] * (m[3] === 'm' ? 100 : 1) } : null; },
+  topic: () => ['RQD', 1],
+  run: a => {
+    const total = a.pieces.reduce((s, p) => s + p, 0), sound = a.pieces.filter(p => p >= 10), rqd = sound.reduce((s, p) => s + p, 0) / a.run * 100, rec = total / a.run * 100;
+    const read = ['RQD of', { v: `${a.pieces.length} pieces` }, 'in a', { v: `${fmt(a.run)} cm run` }];
+    if (total > a.run + 1e-9) return { read, body: [{ t: 'note', kind: 'err', text: `The pieces add to ${fmt(total)} cm, more than the ${fmt(a.run)} cm run.` }], trace: ['pieces exceed the run'] };
+    return {
+      read, value: rqd,
+      body: [{ t: 'big', v: fmt(rqd, 3), unit: `% RQD, ${RQD_CLASS(rqd)}` }, { t: 'kv', rows: [['recovery', `${fmt(rec, 3)}% (${fmt(total)} of ${fmt(a.run)} cm)`], ['pieces of 10 cm or more', `${sound.length} of ${a.pieces.length}: ${sound.join(', ')} cm`], ['class', `${RQD_CLASS(rqd)} (Deere, 1964)`]] }],
+      trace: [`recovery = ${fmt(total)} ÷ ${fmt(a.run)} = ${fmt(rec, 4)}%`, `RQD = Σ pieces ≥ 10 cm ÷ run = ${sound.reduce((s, p) => s + p, 0)} ÷ ${fmt(a.run)} = ${fmt(rqd, 4)}%`], py: `rqd(${JSON.stringify(a.pieces)}, run_cm=${a.run})`
+    };
+  }
+});
+})();
+
 /* ==== src/engine/notes.js ==== */
 (() => {
 // Notes and taught words. Both belong to the device and are shared by every session.
@@ -8727,7 +9190,7 @@ function variables() {
 }
 
 function ontology() {
-  const units = UNITS.map(x => ({ unit: x.name, dim: DIM[x.dim], words: uniq(x.words.map(w => w.toLowerCase())) }));
+  const units = UNIT_TABLE.map(x => ({ unit: x.name, dim: DIM[x.dim], words: uniq(x.words.map(w => w.toLowerCase())) }));
   for (const w of COMPOUNDS) { const p = parseUnit(w); if (p) units.push({ unit: w, dim: dimName(p.dim), words: [w] }); }
   units.push({ unit: 'oz', dim: 'mass', words: ['oz', 'ounce', 'ounces'] });   // troy or avoirdupois: the tool decides and shows the slot
   units.push({ unit: 'people per square mile', dim: 'population density', words: ['people per square mile', 'per square mile'], words_pt: ['pessoas por milha quadrada', 'por milha quadrada'] });

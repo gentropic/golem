@@ -2,7 +2,7 @@
 // sample packs, verb frames from the declarations. Inert data; the build writes it to dist/golem.json.
 // Portuguese synonyms are listed here by hand until packs carry them in their golem facet.
 import { FRAMES, S } from './core.js';
-import { UNITS, COMPOUNDS, DIM, parseUnit, dimName } from './units.js';
+import { UNIT_TABLE, COMPOUNDS, DIM, parseUnit, dimName } from './units.js';
 import { ELEMENT } from './table.js';
 import { FB, ODS, ODSA } from './knowledge.js';
 import { TIMESCALE } from './data/timescale.js';
@@ -15,7 +15,7 @@ function variables() {
 }
 
 export function ontology() {
-  const units = UNITS.map(x => ({ unit: x.name, dim: DIM[x.dim], words: uniq(x.words.map(w => w.toLowerCase())) }));
+  const units = UNIT_TABLE.map(x => ({ unit: x.name, dim: DIM[x.dim], words: uniq(x.words.map(w => w.toLowerCase())) }));
   for (const w of COMPOUNDS) { const p = parseUnit(w); if (p) units.push({ unit: w, dim: dimName(p.dim), words: [w] }); }
   units.push({ unit: 'oz', dim: 'mass', words: ['oz', 'ounce', 'ounces'] });   // troy or avoirdupois: the tool decides and shows the slot
   units.push({ unit: 'people per square mile', dim: 'population density', words: ['people per square mile', 'per square mile'], words_pt: ['pessoas por milha quadrada', 'por milha quadrada'] });
