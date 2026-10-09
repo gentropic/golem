@@ -334,7 +334,7 @@ function runTool(name, args) {
 }
 
 // The clock, so tests can pin "today".
-const clock = { now: () => new Date() };
+const clock = { now: () => new Date(), zone: () => Intl.DateTimeFormat().resolvedOptions().timeZone };
 
 const fmt = (x, sig = 6) => {
   if (!isFinite(x)) return String(x);
@@ -473,7 +473,7 @@ tool({
 })();
 
 /* ==== src/engine/dates.js ==== */
-const { day0, today, fmtDate, findDate, findTime } = (() => {
+const { day0, today, fmtDate, easter, findDate, findTime } = (() => {
 // Dates and times: day counts, weekdays, and the parsers the calendar tools share.
 
 const MON = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'], DOW = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
@@ -482,21 +482,32 @@ const DOWRE = '(sunday|monday|tuesday|wednesday|thursday|friday|saturday|sun|mon
 const day0 = d => new Date(d.getFullYear(), d.getMonth(), d.getDate());
 const today = () => day0(clock.now());
 const fmtDate = d => d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
-function findDate(s) {
-  const now = today();
+function easter(y) {
+  const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451), mo = Math.floor((h + l - 7 * m + 114) / 31), da = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(y, mo - 1, da);
+}
+const MOVABLE = { easter: 0, 'easter sunday': 0, 'good friday': -2, carnival: -47, 'carnival tuesday': -47, 'carnival monday': -48, 'ash wednesday': -46, 'corpus christi': 60, 'palm sunday': -7, 'pentecost': 49, 'whit sunday': 49, 'ascension': 39 };
+function findDate(s, opt = {}) {
+  const now = today(), back = !!opt.back;
   const add = n => new Date(now.getFullYear(), now.getMonth(), now.getDate() + n);
-  const md = (d, mo, y) => { let dt = new Date(y ? +y : now.getFullYear(), mo, d); if (!y && dt < now) dt = new Date(now.getFullYear() + 1, mo, d); return dt; };
+  const md = (d, mo, y) => { let dt = new Date(y ? +y : now.getFullYear(), mo, d); if (!y && !back && dt < now) dt = new Date(now.getFullYear() + 1, mo, d); if (!y && back && dt > now) dt = new Date(now.getFullYear() - 1, mo, d); return dt; };
   const mi = w => MON.indexOf(w.slice(0, 3));
   let m;
   if ((m = /\b(\d{4})-(\d\d)-(\d\d)\b/.exec(s))) return { d: new Date(+m[1], m[2] - 1, +m[3]), m };
   if ((m = new RegExp('\\b(?:on )?(?:the )?(\\d{1,2})(?:st|nd|rd|th)? (?:of )?' + MONRE + '(?: (\\d{4}))?\\b').exec(s))) return { d: md(+m[1], mi(m[2]), m[3]), m };
   if ((m = new RegExp('\\b(?:on )?' + MONRE + ' (\\d{1,2})(?:st|nd|rd|th)?(?:,? (\\d{4}))?\\b').exec(s))) return { d: md(+m[2], mi(m[1]), m[3]), m };
   if ((m = /\btoday\b/.exec(s))) return { d: now, m };
+  if ((m = /\b(?:christmas|xmas)(?: day)?(?: (\d{4}))?\b/.exec(s))) return { d: md(25, 11, m[1]), m };
+  if ((m = /\bchristmas eve(?: (\d{4}))?\b/.exec(s))) return { d: md(24, 11, m[1]), m };
+  if ((m = /\bnew year'?s?(?: day)?(?: (\d{4}))?\b/.exec(s))) return { d: md(1, 0, m[1]), m };
+  if ((m = /\bnew year'?s? eve(?: (\d{4}))?\b/.exec(s))) return { d: md(31, 11, m[1]), m };
+  if ((m = new RegExp('\\b(' + Object.keys(MOVABLE).sort((x, y) => y.length - x.length).join('|') + ')(?: (\\d{4}))?\\b').exec(s))) { let y = m[2] ? +m[2] : now.getFullYear(), e = easter(y), dt = new Date(e.getFullYear(), e.getMonth(), e.getDate() + MOVABLE[m[1]]); if (!m[2] && !back && dt < now) { e = easter(y + 1); dt = new Date(e.getFullYear(), e.getMonth(), e.getDate() + MOVABLE[m[1]]); } return { d: dt, m }; }
   if ((m = /\btomorrow\b/.exec(s))) return { d: add(1), m };
   if ((m = /\bin (\d+) (day|week)s?\b/.exec(s))) return { d: add(m[1] * (m[2] === 'week' ? 7 : 1)), m };
   if ((m = new RegExp('\\b(?:on )?(next )?' + DOWRE + '\\b').exec(s))) {
-    let n = (DOW.indexOf(m[2].slice(0, 3)) - now.getDay() + 7) % 7 || 7;
-    if (m[1]) n += 7;
+    let n = (DOW.indexOf(m[2].slice(0, 3)) - now.getDay() + 7) % 7 || (back ? 0 : 7);
+    if (back && n > 0) n -= 7;
+    if (m[1]) n += back ? -7 : 7;
     return { d: add(n), m };
   }
   return null;
@@ -524,6 +535,16 @@ tool({
   }
 });
 tool({
+  name: 'whenIs', rank: 92,
+  read: (text, q) => { const m = /^when (?:is|was|will be|falls?) (.+)$/.exec(q); return m && findDate(m[1]) ? { s: m[1] } : null; },
+  topic: () => ['Dates', .5],
+  run: a => {
+    const f = findDate(a.s); if (!f) return null;
+    const n = Math.round((f.d - today()) / 864e5), movable = /easter|carnival|friday|wednesday|corpus|palm|pentecost|whit|ascension/.test(a.s) && !/\d{1,2} \w{3}/.test(a.s);
+    return { read: ['when is', { v: a.s }], value: iso(f.d), body: [{ t: 'big', v: fmtDate(f.d), unit: '' }, { t: 'sub', text: `${n === 0 ? 'today' : n > 0 ? `in ${n} day${n === 1 ? '' : 's'}` : `${-n} day${n === -1 ? '' : 's'} ago`}${movable ? '. Set by Easter, computed by the Gregorian rule (Meeus/Jones/Butcher).' : '.'}` }], trace: [`dates.parse("${a.s}") → ${iso(f.d)}`, movable ? `easter(${f.d.getFullYear()}) = ${iso(easter(f.d.getFullYear()))}` : 'fixed date'], py: `date("${iso(f.d)}")` };
+  }
+});
+tool({
   name: 'weekday', rank: 91,
   read: (text, q) => { const m = /^what (?:day|weekday) (?:is|was|will be) (.+)$/.exec(q); return m ? { s: m[1] } : null; },
   topic: () => ['Dates', .5],
@@ -532,7 +553,7 @@ tool({
     return { read: ['weekday of', { v: fmtDate(f.d) }], body: [{ t: 'big', v: f.d.toLocaleDateString('en-GB', { weekday: 'long' }) }], trace: [`dates.parse("${a.s}")`, 'Gregorian weekday'], py: `date("${iso(f.d)}").strftime("%A")` };
   }
 });
-  return { day0, today, fmtDate, findDate, findTime };
+  return { day0, today, fmtDate, easter, findDate, findTime };
 })();
 
 /* ==== src/vendor/bearing.js ==== */
@@ -9609,6 +9630,532 @@ tool({
   }
 });
   return { sha256, tableText };
+})();
+
+/* ==== src/vendor/plan-calendar.js ==== */
+const { isWorkingDay, addWorkingDays, workingDays, nextWorkingDay, getBlockedDays, brazilHolidays, brazilCalendar, brazilMunicipalities, federalHolidays } = (() => {
+// ⚠ VENDORED — DO NOT EDIT. @gcu/plan's calendar engine and Brazilian holidays, copied from
+// ../auditable/ext/plan/src/calendar.js and src/holidays-br.js (MIT). The scheduling half of the package is not here.
+// Re-vendor by copying those two files here again and keeping the single export block at the end.
+
+// Calendar engine — all scheduling flows through these functions
+
+// Parse "YYYY-MM-DD" to Date (local midnight)
+function _parseDate(d) {
+  if (d instanceof Date) return d;
+  const [y, m, day] = d.split('-').map(Number);
+  return new Date(y, m - 1, day);
+}
+
+// Format Date to "YYYY-MM-DD"
+function _fmtDate(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+// Check if a date string falls within a range { start, end }
+function _inRange(dateStr, range) {
+  return dateStr >= range.start && dateStr <= range.end;
+}
+
+// Check if a date is a non-working day
+function _isOff(date, calendar, resource) {
+  const dow = date.getDay();
+  const weekends = calendar.weekends || [0, 6];
+  if (weekends.includes(dow)) return true;
+
+  const ds = _fmtDate(date);
+
+  // Calendar holidays
+  if (calendar.holidays) {
+    for (const h of calendar.holidays) {
+      if (h.date === ds) return true;
+    }
+  }
+
+  // Calendar blocked ranges
+  if (calendar.blocked) {
+    for (const b of calendar.blocked) {
+      if (_inRange(ds, b)) return true;
+    }
+  }
+
+  // Resource overrides (vacation, leave, etc.)
+  if (resource && resource.calendarOverrides) {
+    for (const ov of resource.calendarOverrides) {
+      if (_inRange(ds, ov)) return true;
+    }
+  }
+
+  return false;
+}
+
+// Is a given date a working day?
+function isWorkingDay(date, calendar, resource) {
+  return !_isOff(_parseDate(date), calendar, resource);
+}
+
+// Add N working days to a date (negative N for backward pass)
+function addWorkingDays(date, n, calendar, resource) {
+  const d = new Date(_parseDate(date));
+  if (n === 0) return d;
+
+  const step = n > 0 ? 1 : -1;
+  let remaining = Math.abs(n);
+
+  while (remaining > 0) {
+    d.setDate(d.getDate() + step);
+    if (!_isOff(d, calendar, resource)) remaining--;
+  }
+
+  return d;
+}
+
+// Count working days between two dates (exclusive of end)
+function workingDays(start, end, calendar, resource) {
+  const s = _parseDate(start);
+  const e = _parseDate(end);
+  if (s >= e) return 0;
+
+  let count = 0;
+  const d = new Date(s);
+  while (d < e) {
+    if (!_isOff(d, calendar, resource)) count++;
+    d.setDate(d.getDate() + 1);
+  }
+  return count;
+}
+
+// Get the next working day on or after date
+function nextWorkingDay(date, calendar, resource) {
+  const d = new Date(_parseDate(date));
+  while (_isOff(d, calendar, resource)) {
+    d.setDate(d.getDate() + 1);
+  }
+  return d;
+}
+
+// Get all blocked/off days in a range (for rendering)
+function getBlockedDays(start, end, calendar, resource) {
+  const s = _parseDate(start);
+  const e = _parseDate(end);
+  const result = [];
+  const d = new Date(s);
+
+  while (d <= e) {
+    if (_isOff(d, calendar, resource)) {
+      const ds = _fmtDate(d);
+      let reason = 'weekend';
+      const dow = d.getDay();
+      const weekends = calendar.weekends || [0, 6];
+
+      if (!weekends.includes(dow)) {
+        // Check holidays
+        if (calendar.holidays) {
+          const h = calendar.holidays.find(h => h.date === ds);
+          if (h) { reason = h.label || 'holiday'; }
+        }
+        // Check blocked
+        if (reason === 'weekend' && calendar.blocked) {
+          const b = calendar.blocked.find(b => _inRange(ds, b));
+          if (b) { reason = b.label || 'blocked'; }
+        }
+        // Check resource
+        if (reason === 'weekend' && resource && resource.calendarOverrides) {
+          const ov = resource.calendarOverrides.find(o => _inRange(ds, o));
+          if (ov) { reason = ov.label || ov.type || 'unavailable'; }
+        }
+      }
+
+      result.push({ date: new Date(d), reason });
+    }
+    d.setDate(d.getDate() + 1);
+  }
+
+  return result;
+}
+
+
+// Brazilian holidays — federal, state, and municipal
+// Returns arrays of { date: 'YYYY-MM-DD', label } compatible with plan calendar format
+
+// Easter Sunday by anonymous Gregorian algorithm (Computus)
+function _easter(year) {
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(year, month - 1, day);
+}
+
+function _fmt(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${dd}`;
+}
+
+function _offset(base, days) {
+  const d = new Date(base);
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
+// Federal holidays (national)
+function federalHolidays(year) {
+  const easter = _easter(year);
+  return [
+    { date: `${year}-01-01`, label: 'Confraternização Universal' },
+    { date: _fmt(_offset(easter, -48)), label: 'Carnaval (segunda)' },
+    { date: _fmt(_offset(easter, -47)), label: 'Carnaval (terça)' },
+    { date: _fmt(_offset(easter, -2)), label: 'Sexta-Feira Santa' },
+    { date: `${year}-04-21`, label: 'Tiradentes' },
+    { date: `${year}-05-01`, label: 'Dia do Trabalho' },
+    { date: _fmt(_offset(easter, 60)), label: 'Corpus Christi' },
+    { date: `${year}-09-07`, label: 'Independência' },
+    { date: `${year}-10-12`, label: 'Nossa Senhora Aparecida' },
+    { date: `${year}-11-02`, label: 'Finados' },
+    { date: `${year}-11-15`, label: 'Proclamação da República' },
+    { date: `${year}-11-20`, label: 'Consciência Negra' },
+    { date: `${year}-12-25`, label: 'Natal' },
+  ];
+}
+
+// State holidays by UF
+const STATE_HOLIDAYS = {
+  AC: [{ md: '01-23', label: 'Dia do Evangélico' }, { md: '06-15', label: 'Aniversário do Acre' }, { md: '09-05', label: 'Dia da Amazônia' }, { md: '11-17', label: 'Tratado de Petrópolis' }],
+  AL: [{ md: '06-24', label: 'São João' }, { md: '06-29', label: 'São Pedro' }, { md: '09-16', label: 'Emancipação de Alagoas' }],
+  AP: [{ md: '03-19', label: 'São José' }, { md: '07-25', label: 'São Tiago' }, { md: '10-05', label: 'Criação do Amapá' }],
+  AM: [{ md: '09-05', label: 'Elevação do Amazonas' }],
+  BA: [{ md: '07-02', label: 'Independência da Bahia' }],
+  CE: [{ md: '03-25', label: 'Abolição no Ceará' }],
+  DF: [],
+  ES: [],
+  GO: [],
+  MA: [{ md: '07-28', label: 'Adesão do Maranhão' }],
+  MT: [],
+  MS: [{ md: '10-11', label: 'Criação do MS' }],
+  MG: [],
+  PA: [{ md: '08-15', label: 'Adesão do Pará' }],
+  PB: [{ md: '08-05', label: 'Fundação do Estado' }],
+  PR: [{ md: '12-19', label: 'Emancipação do Paraná' }],
+  PE: [],
+  PI: [{ md: '10-19', label: 'Dia do Piauí' }],
+  RJ: [{ md: '04-23', label: 'São Jorge' }],
+  RN: [{ md: '10-03', label: 'Mártires de Cunhaú e Uruaçu' }],
+  RS: [{ md: '09-20', label: 'Revolução Farroupilha' }],
+  RO: [{ md: '01-04', label: 'Criação de Rondônia' }],
+  RR: [{ md: '10-05', label: 'Criação de Roraima' }],
+  SC: [],
+  SE: [{ md: '07-08', label: 'Emancipação de Sergipe' }],
+  SP: [{ md: '07-09', label: 'Revolução Constitucionalista' }],
+  TO: [{ md: '10-05', label: 'Criação do Tocantins' }],
+};
+
+// Municipal holidays — state capitals + mining towns
+// { key: [{ md, label }] } — key is 'city-UF' lowercase
+const MUNICIPAL_HOLIDAYS = {
+  // State capitals
+  'rio branco-ac':      [{ md: '12-28', label: 'Aniversário de Rio Branco' }],
+  'maceio-al':          [{ md: '12-05', label: 'Aniversário de Maceió' }],
+  'macapa-ap':          [{ md: '02-04', label: 'Aniversário de Macapá' }],
+  'manaus-am':          [{ md: '10-24', label: 'Aniversário de Manaus' }],
+  'salvador-ba':        [{ md: '03-29', label: 'Aniversário de Salvador' }],
+  'fortaleza-ce':       [{ md: '04-13', label: 'Aniversário de Fortaleza' }],
+  'brasilia-df':        [{ md: '04-21', label: 'Aniversário de Brasília' }],
+  'vitoria-es':         [{ md: '09-08', label: 'Aniversário de Vitória' }],
+  'goiania-go':         [{ md: '10-24', label: 'Aniversário de Goiânia' }],
+  'sao luis-ma':        [{ md: '09-08', label: 'Aniversário de São Luís' }],
+  'cuiaba-mt':          [{ md: '04-08', label: 'Aniversário de Cuiabá' }],
+  'campo grande-ms':    [{ md: '08-26', label: 'Aniversário de Campo Grande' }],
+  'belo horizonte-mg':  [{ md: '12-12', label: 'Aniversário de BH' }],
+  'belem-pa':           [{ md: '01-12', label: 'Aniversário de Belém' }],
+  'joao pessoa-pb':     [{ md: '08-05', label: 'Aniversário de João Pessoa' }],
+  'curitiba-pr':        [{ md: '03-29', label: 'Aniversário de Curitiba' }],
+  'recife-pe':          [{ md: '03-12', label: 'Aniversário de Recife' }],
+  'teresina-pi':        [{ md: '08-16', label: 'Aniversário de Teresina' }],
+  'rio de janeiro-rj':  [{ md: '01-20', label: 'São Sebastião' }, { md: '03-01', label: 'Aniversário do Rio' }],
+  'natal-rn':           [{ md: '12-25', label: 'Aniversário de Natal' }],
+  'porto alegre-rs':    [{ md: '02-02', label: 'Nossa Senhora dos Navegantes' }],
+  'porto velho-ro':     [{ md: '10-02', label: 'Aniversário de Porto Velho' }],
+  'boa vista-rr':       [{ md: '06-09', label: 'Aniversário de Boa Vista' }],
+  'florianopolis-sc':   [{ md: '03-23', label: 'Aniversário de Florianópolis' }],
+  'aracaju-se':         [{ md: '03-17', label: 'Aniversário de Aracaju' }],
+  'sao paulo-sp':       [{ md: '01-25', label: 'Aniversário de São Paulo' }],
+  'palmas-to':          [{ md: '05-20', label: 'Aniversário de Palmas' }],
+  // Mining towns — Carajás region
+  'parauapebas-pa':     [{ md: '05-10', label: 'Aniversário de Parauapebas' }],
+  'canaa dos carajas-pa': [{ md: '12-27', label: 'Aniversário de Canaã dos Carajás' }],
+  'maraba-pa':          [{ md: '04-05', label: 'Aniversário de Marabá' }],
+};
+
+// Optional periods — not official holidays but commonly observed
+function _optionalPeriods(year) {
+  const easter = _easter(year);
+  return [
+    // Carnival Wednesday (half-day / ponto facultativo)
+    { date: _fmt(_offset(easter, -46)), label: 'Quarta de Cinzas (ponto facultativo)' },
+    // Day before Carnival
+    { date: _fmt(_offset(easter, -49)), label: 'Pré-Carnaval (ponto facultativo)' },
+    // Corpus Christi bridge (day after, ponto facultativo)
+    { date: _fmt(_offset(easter, 61)), label: 'Pós-Corpus Christi (ponto facultativo)' },
+    // Public servant day
+    { date: `${year}-10-28`, label: 'Dia do Servidor Público (ponto facultativo)' },
+  ];
+}
+
+// Main function
+// options:
+//   uf: 'PA', 'SP', etc. — include state holidays
+//   municipality: 'parauapebas-PA', 'sao paulo-SP', etc. — include municipal holidays
+//   carnival: true (default) — include carnival Mon+Tue as holidays
+//   corpusChristi: true (default) — include Corpus Christi
+//   optional: false (default) — include ponto facultativo periods
+function brazilHolidays(year, options = {}) {
+  const {
+    uf = null,
+    municipality = null,
+    carnival = true,
+    corpusChristi = true,
+    optional = false,
+  } = options;
+
+  let holidays = federalHolidays(year);
+
+  // Filter carnival if disabled
+  if (!carnival) {
+    holidays = holidays.filter(h => !h.label.startsWith('Carnaval'));
+  }
+
+  // Filter Corpus Christi if disabled
+  if (!corpusChristi) {
+    holidays = holidays.filter(h => h.label !== 'Corpus Christi');
+  }
+
+  // State holidays
+  const effectiveUf = uf || (municipality ? municipality.split('-').pop().toUpperCase() : null);
+  if (effectiveUf && STATE_HOLIDAYS[effectiveUf]) {
+    for (const h of STATE_HOLIDAYS[effectiveUf]) {
+      holidays.push({ date: `${year}-${h.md}`, label: h.label });
+    }
+  }
+
+  // Municipal holidays
+  if (municipality) {
+    const key = municipality.toLowerCase();
+    if (MUNICIPAL_HOLIDAYS[key]) {
+      for (const h of MUNICIPAL_HOLIDAYS[key]) {
+        holidays.push({ date: `${year}-${h.md}`, label: h.label });
+      }
+    }
+  }
+
+  // Optional periods
+  if (optional) {
+    holidays.push(..._optionalPeriods(year));
+  }
+
+  // Sort by date
+  holidays.sort((a, b) => a.date.localeCompare(b.date));
+
+  return holidays;
+}
+
+// Generate holidays for a range of years
+function brazilCalendar(startYear, endYear, options = {}) {
+  const holidays = [];
+  for (let y = startYear; y <= endYear; y++) {
+    holidays.push(...brazilHolidays(y, options));
+  }
+  return { holidays };
+}
+
+// List available municipalities
+function brazilMunicipalities() {
+  return Object.keys(MUNICIPAL_HOLIDAYS).sort();
+}
+  return { isWorkingDay, addWorkingDays, workingDays, nextWorkingDay, getBlockedDays, brazilHolidays, brazilCalendar, brazilMunicipalities, federalHolidays };
+})();
+
+/* ==== src/engine/calendar.js ==== */
+const { zonesOf, offsetOf, instantOf } = (() => {
+// Working days and rosters over @gcu/plan's calendar engine (vendored), and time zones through Intl.
+// The calendar is a slot and is always shown: Brazil's federal holidays, or weekdays only.
+
+const CALS = ['brazil', 'weekdays'], CAL_LABEL = { brazil: 'Brazil, federal holidays', weekdays: 'weekdays only' };
+const calendarOf = (kind, y0, y1) => kind === 'weekdays' ? { weekends: [0, 6], holidays: [] } : { weekends: [0, 6], ...brazilCalendar(y0, y1) };
+const PLAN_SRC = { t: 'src', text: '@gcu/plan · vendored · working-day calendar and Brazil\'s federal holidays' };
+const calSlot = a => ({ v: CAL_LABEL[a.cal || 'brazil'], key: 'cal', alts: CALS, cur: a.cal || 'brazil' });
+const holidaysBetween = (cal, a, b) => cal.holidays.filter(h => { const d = new Date(h.date + 'T00:00'); return d >= a && d <= b && ![0, 6].includes(d.getDay()); });
+const hName = h => `${h.label} (${fmtDate(new Date(h.date + 'T00:00'))})`;
+const DATE = '(.+?)';
+
+/* ── working days ───────────────────────────────────────────── */
+tool({
+  name: 'workdays', rank: 85,
+  skill: { group: 'Compute', title: 'Working days and rosters', on: '@gcu/plan', about: 'Working days until a date or between two, N working days from a date, whether a day is a working day, and on/off rosters. The calendar is a slot: Brazil\'s federal holidays or weekdays only.', examples: ['working days until 20 dec', 'is 21 apr 2027 a working day', '15 working days from monday', '14 on 14 off from 6 oct, am i off at christmas'] },
+  read: (text, q) => {
+    let m;
+    if ((m = new RegExp(`^(?:how many )?(?:working|business) days (?:until|till|to|before|left until) ${DATE}$`).exec(q))) return { ask: 'until', to: m[1] };
+    if ((m = new RegExp(`^(?:how many )?(?:working|business) days (?:between|from) ${DATE} (?:and|to|until|till) ${DATE}$`).exec(q))) return { ask: 'between', from: m[1], to: m[2] };
+    if ((m = new RegExp(`^(?:is|was|will) ${DATE} (?:be )?a (?:working|business|work) ?day$`).exec(q))) return { ask: 'is', date: m[1] };
+    if ((m = new RegExp(`^(\\d+) (?:working|business) days? (?:from|after) ${DATE}$`).exec(q))) return { ask: 'add', n: +m[1], from: m[2] };
+    if ((m = new RegExp(`^(\\d+) (?:working|business) days? (?:before|back from) ${DATE}$`).exec(q))) return { ask: 'add', n: -m[1], from: m[2] };
+    if ((m = /^(?:what is |when is )?(?:the )?next (?:working|business) day(?: after (.+))?$/.exec(q))) return { ask: 'add', n: 1, from: m[1] || 'today' };
+    return null;
+  },
+  amend: [{ arg: 'cal', match: /^(?:in |with |using )?(?:the )?(brazil(?:ian)?|weekdays?(?: only)?|no holidays)(?: calendar| holidays)?$/, value: m => /^brazil/.test(m[1]) ? 'brazil' : 'weekdays' }],
+  topic: () => ['Working days', 1],
+  run: a => {
+    const dateOf = s => s === 'today' ? today() : (findDate(s) || {}).d;
+    const refuse = (s) => ({ read: ['working days', { v: s }], body: [{ t: 'note', kind: 'err', text: `I cannot read "${s}" as a date. Try "20 dec", "2027-04-21" or "next monday".` }], trace: ['date: no reading'] });
+    const span = (...ds) => { const ys = ds.map(d => d.getFullYear()); return calendarOf(a.cal || 'brazil', Math.min(...ys) - 1, Math.max(...ys) + 1); };
+    if (a.ask === 'is') {
+      const d = dateOf(a.date); if (!d) return refuse(a.date);
+      const cal = span(d), ok = isWorkingDay(d, cal), hol = cal.holidays.find(h => h.date === iso(d)), why = ok ? 'a weekday and not a holiday' : hol ? `${hol.label}` : 'a weekend';
+      return { read: ['is', { v: fmtDate(d) }, 'a working day in', calSlot(a)], value: ok, body: [{ t: 'big', v: ok ? 'Yes' : 'No', unit: why }, PLAN_SRC], trace: [`plan.isWorkingDay("${iso(d)}", ${a.cal || 'brazil'}) → ${ok}`, hol ? `holiday: ${hol.label}` : `weekday ${d.getDay()}`], py: `plan.isWorkingDay("${iso(d)}", cal)` };
+    }
+    if (a.ask === 'add') {
+      const from = dateOf(a.from); if (!from) return refuse(a.from);
+      const cal = span(from, new Date(from.getFullYear(), from.getMonth(), from.getDate() + Math.abs(a.n) * 2 * Math.sign(a.n || 1))), d = addWorkingDays(from, a.n, cal);
+      const lo = a.n >= 0 ? from : d, hi = a.n >= 0 ? d : from, hols = holidaysBetween(cal, lo, hi), cal0 = Math.round((d - from) / 864e5);
+      return { read: [{ v: `${Math.abs(a.n)} working day${Math.abs(a.n) === 1 ? '' : 's'}` }, a.n >= 0 ? 'from' : 'before', { v: fmtDate(from) }, 'in', calSlot(a)], value: iso(d), body: [{ t: 'big', v: fmtDate(d), unit: '' }, { t: 'kv', rows: [['calendar days', String(Math.abs(cal0))], ['holidays skipped', hols.length ? hols.map(hName).join('; ') : 'none in the span'], ['weekends', 'Saturday and Sunday']] }, PLAN_SRC], trace: [`plan.addWorkingDays("${iso(from)}", ${a.n}, ${a.cal || 'brazil'}) → ${iso(d)}`], py: `plan.addWorkingDays("${iso(from)}", ${a.n}, cal)` };
+    }
+    const to = dateOf(a.to); if (!to) return refuse(a.to);
+    let from = a.ask === 'until' ? today() : dateOf(a.from); if (!from) return refuse(a.from);
+    if (from > to && a.ask === 'between') { const b = (findDate(a.from, { back: true }) || {}).d; if (b && b <= to) from = b; }
+    if (to < from) return { read: ['working days from', { v: fmtDate(from) }, 'to', { v: fmtDate(to) }], body: [{ t: 'note', kind: 'err', text: `${fmtDate(to)} is before ${fmtDate(from)}.` }], trace: ['end before start'] };
+    const cal = span(from, to); let n = 0; for (const d = new Date(from.getFullYear(), from.getMonth(), from.getDate() + 1); d <= to; d.setDate(d.getDate() + 1)) if (isWorkingDay(d, cal)) n++;
+    const hols = holidaysBetween(cal, new Date(from.getTime() + 864e5), to), total = Math.round((to - from) / 864e5);
+    return { read: ['working days from', { v: a.ask === 'until' ? 'today' : fmtDate(from) }, 'to', { v: fmtDate(to) }, 'in', calSlot(a)], value: n, body: [{ t: 'big', v: String(n), unit: `working day${n === 1 ? '' : 's'}` }, { t: 'kv', rows: [['calendar days', `${total}, counting ${fmtDate(to)} and not ${fmtDate(from)}`], ['holidays in the span', hols.length ? hols.map(hName).join('; ') : 'none on a weekday'], ['weekends', 'Saturday and Sunday']] }, PLAN_SRC], trace: [`days after ${iso(from)} up to ${iso(to)}`, `plan.isWorkingDay over ${total} days → ${n}`, `calendar: ${CAL_LABEL[a.cal || 'brazil']}`], py: `plan.workingDays("${iso(from)}", "${iso(to)}", cal)` };
+  }
+});
+
+/* ── rosters: X on, Y off, from a start date ────────────────── */
+const lastRoster = () => { for (let i = S.cards.length - 1; i >= 0; i--) if (S.cards[i].tool === 'roster' && S.cards[i].args.on) return S.cards[i].args; return null; };
+tool({
+  name: 'roster', rank: 86,
+  read: (text, q) => {
+    let m = /^(\d+) on,? (\d+) off(?:,? (?:starting|from|since) (.+?))?(?:[,;]? (?:am i|will i be|are we) (off|on|working|at work)(?: (?:on|at) (.+))?)?$/.exec(q);
+    if (m) return { on: +m[1], off: +m[2], start: m[3] || 'today', ...(m[4] ? { date: m[5] || 'today' } : {}) };
+    m = /^(?:am i|will i be|are we) (?:off|on|working|at work)(?: (?:on|at) (.+))?$/.exec(q); if (m) { const r = lastRoster(); return r ? { ...r, date: m[1] || 'today' } : { noRoster: true }; }
+    m = /^(?:when is (?:the |my )?)?next (?:swing|change|changeover|days? off|days? on)$/.exec(q); if (m) { const r = lastRoster(); return r ? { ...r, date: 'today', next: true } : { noRoster: true }; }
+    return null;
+  },
+  topic: () => ['Roster', 1],
+  run: a => {
+    if (a.noRoster) return { read: ['roster'], body: [{ t: 'note', kind: 'err', text: 'No roster in this session. Say it first: "14 on 14 off from 6 oct".' }], trace: ['no roster card to read from'] };
+    const start = a.start === 'today' ? today() : (findDate(a.start, { back: true }) || {}).d, date = a.date == null ? null : a.date === 'today' ? today() : (findDate(a.date) || {}).d;
+    if (!start || (a.date != null && !date)) return { read: ['roster'], body: [{ t: 'note', kind: 'err', text: `I cannot read "${!start ? a.start : a.date}" as a date.` }], trace: ['date: no reading'] };
+    const cycle = a.on + a.off, at = d => { const k = Math.round((day0(d) - start) / 864e5), i = ((k % cycle) + cycle) % cycle; return { k, i, on: i < a.on, swing: Math.floor(k / cycle) }; };
+    const read = [{ v: `${a.on} on ${a.off} off` }, 'from', { v: fmtDate(start) }];
+    const rows = [], asked = date || today(), s = at(asked), swingStart = new Date(start.getFullYear(), start.getMonth(), start.getDate() + s.swing * cycle), onEnd = new Date(swingStart.getFullYear(), swingStart.getMonth(), swingStart.getDate() + a.on - 1), offEnd = new Date(swingStart.getFullYear(), swingStart.getMonth(), swingStart.getDate() + cycle - 1), next = new Date(swingStart.getFullYear(), swingStart.getMonth(), swingStart.getDate() + (s.on ? a.on : cycle));
+    rows.push(['this swing', `on ${fmtDate(swingStart)} to ${fmtDate(onEnd)}, off ${fmtDate(new Date(onEnd.getTime() + 864e5))} to ${fmtDate(offEnd)}`], ['next change', `${fmtDate(next)}: ${s.on ? 'off' : 'back on'}`]);
+    if (s.k < 0) rows.push(['note', 'that date is before the roster started; the pattern is extended backwards']);
+    const big = date ? { t: 'big', v: s.on ? 'On' : 'Off', unit: `${fmtDate(asked)}, day ${s.i + 1} of the ${s.on ? 'on' : 'off'} block` } : { t: 'big', v: fmtDate(next), unit: s.on ? 'first day off' : 'first day back on' };
+    if (date) read.push(':', { v: fmtDate(asked) }); else read.push(':', 'next change');
+    return { read, value: s.on, body: [big, { t: 'kv', rows }], trace: [`days since start: ${s.k}`, `${s.k} mod ${cycle} = ${s.i} → ${s.on ? 'on' : 'off'}`], py: `((date("${iso(asked)}") - date("${iso(start)}")).days % ${cycle}) < ${a.on}` };
+  }
+});
+
+/* ── time zones through Intl ────────────────────────────────── */
+const ZONES = typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : [];
+const cityOf = z => z.split('/').pop().replace(/_/g, ' ').toLowerCase();
+const ALIAS = { utc: 'UTC', gmt: 'UTC', z: 'UTC', zulu: 'UTC', 'belo horizonte': 'America/Sao_Paulo', brasilia: 'America/Sao_Paulo', 'brasília': 'America/Sao_Paulo', rio: 'America/Sao_Paulo', 'rio de janeiro': 'America/Sao_Paulo', 'sao paulo': 'America/Sao_Paulo', 'são paulo': 'America/Sao_Paulo', brazil: 'America/Sao_Paulo', brasil: 'America/Sao_Paulo', japan: 'Asia/Tokyo', china: 'Asia/Shanghai', beijing: 'Asia/Shanghai', india: 'Asia/Kolkata', mumbai: 'Asia/Kolkata', delhi: 'Asia/Kolkata', 'new delhi': 'Asia/Kolkata', uk: 'Europe/London', britain: 'Europe/London', england: 'Europe/London', france: 'Europe/Paris', germany: 'Europe/Berlin', spain: 'Europe/Madrid', portugal: 'Europe/Lisbon', italy: 'Europe/Rome', netherlands: 'Europe/Amsterdam', chile: 'America/Santiago', peru: 'America/Lima', colombia: 'America/Bogota', argentina: 'America/Argentina/Buenos_Aires', 'buenos aires': 'America/Argentina/Buenos_Aires', 'south africa': 'Africa/Johannesburg', 'la': 'America/Los_Angeles', nyc: 'America/New_York', 'new york city': 'America/New_York', sf: 'America/Los_Angeles', 'san francisco': 'America/Los_Angeles', seattle: 'America/Los_Angeles', 'hong kong': 'Asia/Hong_Kong', singapore: 'Asia/Singapore', 'kuala lumpur': 'Asia/Kuala_Lumpur', dubai: 'Asia/Dubai', 'tel aviv': 'Asia/Jerusalem', moscow: 'Europe/Moscow', brisbane: 'Australia/Brisbane', melbourne: 'Australia/Melbourne', sydney: 'Australia/Sydney', perth: 'Australia/Perth', vancouver: 'America/Vancouver', toronto: 'America/Toronto', 'mexico city': 'America/Mexico_City', mexico: 'America/Mexico_City', 'cape town': 'Africa/Johannesburg', johannesburg: 'Africa/Johannesburg', lagos: 'Africa/Lagos', nairobi: 'Africa/Nairobi', cairo: 'Africa/Cairo', 'salt lake city': 'America/Denver', chicago: 'America/Chicago', denver: 'America/Denver', phoenix: 'America/Phoenix', honolulu: 'Pacific/Honolulu', anchorage: 'America/Anchorage', bangalore: 'Asia/Kolkata', bengaluru: 'Asia/Kolkata', seoul: 'Asia/Seoul', tokyo: 'Asia/Tokyo', manila: 'Asia/Manila', jakarta: 'Asia/Jakarta', bangkok: 'Asia/Bangkok', karachi: 'Asia/Karachi', tehran: 'Asia/Tehran', istanbul: 'Europe/Istanbul', athens: 'Europe/Athens', helsinki: 'Europe/Helsinki', stockholm: 'Europe/Stockholm', oslo: 'Europe/Oslo', dublin: 'Europe/Dublin', zurich: 'Europe/Zurich', vienna: 'Europe/Vienna', warsaw: 'Europe/Warsaw', lima: 'America/Lima', bogota: 'America/Bogota', santiago: 'America/Santiago', caracas: 'America/Caracas', havana: 'America/Havana', auckland: 'Pacific/Auckland', wellington: 'Pacific/Auckland', 'new zealand': 'Pacific/Auckland' };
+const HERE = ['here', 'my time', 'local', 'local time', 'me', 'my zone', 'device time'];
+// a place name → the zones it may mean: the alias table, then every IANA zone with that city part
+function zonesOf(name) {
+  const n = name.trim().toLowerCase().replace(/\s+/g, ' ').replace(/^(?:in|to|at)\s+/, '');
+  if (HERE.includes(n)) return [clock.zone()];
+  if (ALIAS[n]) return [ALIAS[n]];
+  const direct = ZONES.find(z => z.toLowerCase() === n || z.toLowerCase() === n.replace(/ /g, '_')); if (direct) return [direct];
+  const m = /^(?:utc|gmt)\s?([+-]\d{1,2})(?::?(\d{2}))?$/.exec(n); if (m) return [`UTC${m[1][0]}${m[1].slice(1).padStart(2, '0')}:${m[2] || '00'}`];
+  const hits = ZONES.filter(z => cityOf(z) === n && !/^Etc\//.test(z));
+  return hits;
+}
+const fixedOffset = zone => { const m = /^UTC([+-]\d\d):(\d\d)$/.exec(zone); return m ? (m[1][0] === '-' ? -1 : 1) * (+m[1].slice(1) * 60 + +m[2]) * 6e4 : null; };
+const parts = (zone, t) => { const o = {}, fo = fixedOffset(zone); if (fo != null) { zone = 'UTC'; t += fo; } for (const p of new Intl.DateTimeFormat('en-GB', { timeZone: zone, hourCycle: 'h23', weekday: 'short', year: 'numeric', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }).formatToParts(new Date(t))) o[p.type] = p.value; return o; };
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+function offsetOf(zone, t) {
+  const f = fixedOffset(zone); if (f != null) return f;
+  const p = parts(zone, t), asUtc = Date.UTC(+p.year, MONTHS.indexOf(p.month), +p.day, +p.hour % 24, +p.minute, +p.second);
+  return Math.round((asUtc - Math.floor(t / 1000) * 1000) / 6e4) * 6e4;
+}
+// the instant at which a zone's wall clock reads y-m-d h:mi (two passes for the daylight step)
+function instantOf(zone, y, mo, d, h, mi) {
+  const wall = Date.UTC(y, mo, d, h, mi); let t = wall - offsetOf(zone, wall); t = wall - offsetOf(zone, t); return t;
+}
+const fmtOffset = ms => { const s = ms < 0 ? '−' : '+', m = Math.abs(ms) / 6e4; return `UTC${s}${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`; };
+const wall = (zone, t) => { const p = parts(zone, t); return { text: `${p.hour}:${p.minute}`, date: `${p.weekday} ${+p.day} ${p.month} ${p.year}` }; };
+const zoneName = z => /^UTC/.test(z) ? z : z.replace(/_/g, ' ');
+const dstNote = (zone, t) => { const o = offsetOf(zone, t); if (offsetOf(zone, t - 864e5) !== o) return `${zoneName(zone)} changed its clocks within the last day.`; if (offsetOf(zone, t + 864e5) !== o) return `${zoneName(zone)} changes its clocks within the next day.`; return null; };
+const PLACE = '([a-z][a-z .\'\\-]*?(?:\\s?[+-]\\d{1,2}(?::?\\d{2})?)?)';
+const zoneSlot = (key, name, zones, cur) => zones.length > 1 ? { v: zoneName(cur), key, alts: zones, cur } : { v: zoneName(cur) };
+const refuseZone = (read, name, zones) => ({ read, body: [{ t: 'note', kind: 'err', text: zones.length ? `"${name}" could be ${zones.map(zoneName).join(' or ')}.` : `I do not know a time zone called "${name}". Try a city from the IANA list, like "sao paulo" or "perth", or an offset like "utc+8".` }], trace: ['zone: no match'] });
+
+tool({
+  name: 'zone', rank: 87,
+  skill: { group: 'Compute', title: 'Time zones', on: 'Intl', about: 'A time in one place as it reads in another, with the offsets used and a note when the clocks change nearby. Cities by their IANA names, plus common aliases.', examples: ['9am sao paulo in perth', 'what time is it in vancouver', '14:30 utc to my time', 'overlap of 9 to 17 in belo horizonte and perth'] },
+  read: (text, q) => {
+    let m;
+    if ((m = /^(?:what time is it|what is the time|current time|time now|now)(?: now)? in (.+)$/.exec(q))) return { to: m[1] };
+    if ((m = new RegExp(`^(?:what is |what's )?(\\d{1,2}(?::\\d{2})? ?(?:am|pm)?|noon|midnight)(?: (?:on|of) (.+?))?(?: (?:in|at|from))? ${PLACE} (?:in|to|at|for|as) ${PLACE}$`).exec(q))) return { time: m[1], ...(m[2] ? { date: m[2] } : {}), from: m[3], to: m[4] };
+    if ((m = new RegExp(`^(?:what is |what's )?${PLACE} (\\d{1,2}(?::\\d{2})? ?(?:am|pm)?|noon|midnight)(?: (?:on|of) (.+?))? (?:in|to|at|for|as) ${PLACE}$`).exec(q))) return { time: m[2], ...(m[3] ? { date: m[3] } : {}), from: m[1], to: m[4] };
+    return null;
+  },
+  amend: [{ arg: 'date', match: /^(?:on |for )?(tomorrow|today|next \w+|\d{1,2} \w{3,9}(?: \d{4})?|\d{4}-\d{2}-\d{2})$/ }],
+  topic: () => ['Time zones', 1],
+  run: a => {
+    const toZ = zonesOf(a.to), to = a.toZone || toZ[0], read = [];
+    if (!a.time) {
+      if (toZ.length !== 1 && !a.toZone) return refuseZone(['time now in', { v: a.to }], a.to, toZ);
+      const t = clock.now().getTime(), w = wall(to, t), note = dstNote(to, t);
+      return { read: ['time now in', zoneSlot('toZone', a.to, toZ, to)], value: w.text, body: [{ t: 'big', v: w.text, unit: w.date }, { t: 'kv', rows: [['offset', fmtOffset(offsetOf(to, t))], ['here', `${wall(clock.zone(), t).text} (${zoneName(clock.zone())}, ${fmtOffset(offsetOf(clock.zone(), t))})`]] }, ...(note ? [{ t: 'note', text: note }] : [])], trace: [`Intl.DateTimeFormat(timeZone: "${to}")`, `now = ${new Date(t).toISOString()}`], py: `datetime.now(ZoneInfo("${to}"))` };
+    }
+    const fromZ = zonesOf(a.from), from = a.fromZone || fromZ[0];
+    const tm = a.time === 'noon' ? { h: 12, mi: 0 } : a.time === 'midnight' ? { h: 0, mi: 0 } : findTime('at ' + a.time) || findTime(a.time);
+    if (!tm) return { read: ['time', { v: a.time }], body: [{ t: 'note', kind: 'err', text: `I cannot read "${a.time}" as a time of day.` }], trace: ['time: no reading'] };
+    if (fromZ.length !== 1 && !a.fromZone) return refuseZone([{ v: a.time }, 'in', { v: a.from }], a.from, fromZ);
+    if (toZ.length !== 1 && !a.toZone) return refuseZone([{ v: a.time }, 'in', { v: a.from }, 'to', { v: a.to }], a.to, toZ);
+    const day = a.date ? (findDate(a.date) || {}).d : today(); if (!day) return { read: [{ v: a.time }, 'on', { v: a.date }], body: [{ t: 'note', kind: 'err', text: `I cannot read "${a.date}" as a date.` }], trace: ['date: no reading'] };
+    const t = instantOf(from, day.getFullYear(), day.getMonth(), day.getDate(), tm.h, tm.mi), wf = wall(from, t), wt = wall(to, t);
+    const dayShift = Math.round((Date.UTC(...wt.date.split(' ').slice(1).reverse().map((x, i) => i === 1 ? MONTHS.indexOf(x) : +x)) - Date.UTC(day.getFullYear(), day.getMonth(), day.getDate())) / 864e5);
+    const notes = [dstNote(from, t), dstNote(to, t)].filter(Boolean);
+    read.push({ v: wf.text }, zoneSlot('fromZone', a.from, fromZ, from), 'to', zoneSlot('toZone', a.to, toZ, to));
+    return { read, value: wt.text, body: [{ t: 'big', v: wt.text, unit: `${wt.date}${dayShift ? ` (${dayShift > 0 ? 'the next day' : 'the day before'})` : ' (the same day)'}` }, { t: 'kv', rows: [[zoneName(from), `${wf.text} ${fmtOffset(offsetOf(from, t))}, ${wf.date}`], [zoneName(to), `${wt.text} ${fmtOffset(offsetOf(to, t))}`], ['difference', `${fmtOffset(offsetOf(to, t) - offsetOf(from, t)).replace('UTC', '')} hours`]] }, ...(notes.length ? [{ t: 'note', text: notes.join(' ') }] : [])], trace: [`wall ${iso(day)} ${wf.text} in ${from} → ${new Date(t).toISOString()}`, `offsets: ${from} ${fmtOffset(offsetOf(from, t))}, ${to} ${fmtOffset(offsetOf(to, t))}`], py: `datetime(${day.getFullYear()}, ${day.getMonth() + 1}, ${day.getDate()}, ${tm.h}, ${tm.mi}, tzinfo=ZoneInfo("${from}")).astimezone(ZoneInfo("${to}"))` };
+  }
+});
+tool({
+  name: 'overlap', rank: 88,
+  read: (text, q) => { const m = new RegExp(`^(?:working )?(?:overlap|common hours|shared hours) (?:of|for|between) (\\d{1,2}(?::\\d{2})?) ?(?:to|-|–) ?(\\d{1,2}(?::\\d{2})?) (?:in|between|for) (.+)$`).exec(q); if (!m) return null; const places = m[3].split(/,\s*|\s+and\s+/).filter(Boolean); return places.length >= 2 ? { from: m[1], to: m[2], places } : null; },
+  topic: () => ['Time zones', 1],
+  run: a => {
+    const zs = a.places.map(p => ({ name: p, zones: zonesOf(p) })), bad = zs.find(z => z.zones.length !== 1);
+    const read = ['overlap of', { v: `${a.from} to ${a.to}` }, 'in', { v: a.places.join(', ') }];
+    if (bad) return refuseZone(read, bad.name, bad.zones);
+    const t0 = findTime('at ' + a.from), t1 = findTime('at ' + a.to); if (!t0 || !t1) return { read, body: [{ t: 'note', kind: 'err', text: 'I cannot read the hours.' }], trace: ['time: no reading'] };
+    const day = today(), windows = zs.map(z => { const s = instantOf(z.zones[0], day.getFullYear(), day.getMonth(), day.getDate(), t0.h, t0.mi), e = instantOf(z.zones[0], day.getFullYear(), day.getMonth(), day.getDate(), t1.h, t1.mi); return { zone: z.zones[0], s, e: e > s ? e : e + 864e5 }; });
+    // the day boundary differs by zone, so each window is also tried a day earlier and later
+    let best = null;
+    for (const shift of [-864e5, 0, 864e5]) { const s = Math.max(windows[0].s, ...windows.slice(1).map(w => w.s + shift)), e = Math.min(windows[0].e, ...windows.slice(1).map(w => w.e + shift)); if (e > s && (!best || e - s > best.e - best.s)) best = { s, e }; }
+    const rows = windows.map(w => [zoneName(w.zone), best ? `${wall(w.zone, best.s).text} to ${wall(w.zone, best.e).text} (${fmtOffset(offsetOf(w.zone, best.s))})` : `${a.from} to ${a.to} local (${fmtOffset(offsetOf(w.zone, w.s))})`]);
+    const hours = best ? (best.e - best.s) / 36e5 : 0;
+    return { read, value: hours, body: [{ t: 'big', v: best ? `${hours % 1 ? hours.toFixed(1) : hours} h` : 'None', unit: best ? `in common each day, ${a.from} to ${a.to} local in each place` : `no hour is ${a.from} to ${a.to} in all of them` }, { t: 'kv', rows }, { t: 'sub', text: `Computed for ${fmtDate(day)}; it moves when any of these places changes its clocks.` }], trace: windows.map(w => `${w.zone}: ${new Date(w.s).toISOString()} to ${new Date(w.e).toISOString()}`).concat(best ? [`intersection: ${new Date(best.s).toISOString()} to ${new Date(best.e).toISOString()}`] : ['empty intersection']), py: `# intersect the UTC windows of ${zs.map(z => z.zones[0]).join(', ')}` };
+  }
+});
+  return { zonesOf, offsetOf, instantOf };
 })();
 
 /* ==== src/engine/notes.js ==== */

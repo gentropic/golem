@@ -16,6 +16,7 @@ Open `dist/golem.html`, then:
 - Type `why` after any card, or `export as script`.
 - Open the menu (top left) for sessions and history search.
 - Ask `how old is the permian`, `what period is 250 ma`, `stages of the triassic`: the ICS chart, 171 units, CC BY 4.0 via Macrostrat.
+- Try `is 21 apr 2027 a working day`, `working days until 20 dec`, `14 on 14 off from 6 oct, am i off at christmas`, `9am sao paulo in perth`, `when is easter 2027`.
 - Try `sha256: abc`, `base64 decode: SGVsbG8=`, `the table as json` (it asks to open one first).
 - Try `explain cron: 0 9 * * 1-5`, `what is 1700000000`, `chmod 754`, `explain regex: ^\d{3}-\d{2}$`.
 - Try `mass of 1 m of nq core at 2.7`, `200 mesh in microns`, `rqd of 12, 8, 25, 4, 31 and 9 cm in a 100 cm run`.
@@ -52,6 +53,7 @@ src/engine/                  no DOM, no storage: everything that reads and compu
   sample.js timescale.js     core and sample arithmetic; the ICS timescale (data/timescale.js)
   explain.js                 explainers: cron, epoch time, chmod, URL, regex, each with its own parser
   convert.js                 SHA-256, base64/hex/URL encoding, the open table as CSV, TSV or JSON
+  calendar.js                working days and rosters over the vendored plan calendar; time zones through Intl
   knowledge.js device.js     packs sample, device hand-offs
   notes.js skills.js         notes and taught words; the skills and packs catalog
   reading.js                 the reading ladder: context, grammar (clause, then the rules), taught; none, why, export
@@ -59,7 +61,7 @@ src/engine/                  no DOM, no storage: everything that reads and compu
   sessions.js                sessions, replay, auto-naming, serialize and hydrate
   engine.js                  submit, rerun, slot flips, answers, undo
   index.js                   the surface Node tests import
-src/vendor/                  copies, never edited here: @gcu/dispatch (the parser), @gcu/bearing, @gcu/sadpan, @gcu/recon, @gcu/sift, @gcu/wmm, @gcu/units (tables only), the lead-acid shim
+src/vendor/                  copies, never edited here: @gcu/dispatch (the parser), @gcu/bearing, @gcu/sadpan, @gcu/recon, @gcu/sift, @gcu/wmm, @gcu/units (tables only), @gcu/plan (calendar and holidays only), the lead-acid shim
 src/shell/                   the browser: markup, rendering, wiring, storage
   index.html                 markup, Switchboard tokens, styles, bench notes
   fonts/                     Barlow and Space Mono (OFL), embedded by the build
@@ -72,6 +74,7 @@ test/timescale.test.mjs      the timescale pack: the chart's consistency and the
 test/sample.test.mjs         core and sample arithmetic checks
 test/explain.test.mjs        the explainers: the spec's checks and the parsers' edges
 test/convert.test.mjs        hashes against known digests, encodings both ways, the table written out
+test/calendar.test.mjs       working days, rosters and time zones on a pinned clock
 test/oracle.test.mjs         golem's arithmetic against the GCU packages it does not vendor
 test/smoke.mjs               browser smoke test on the built file
 dist/golem.html              the built mock (committed, so it opens without a build)

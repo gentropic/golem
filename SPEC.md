@@ -164,6 +164,8 @@ Status: **mock** = works in `src/` today; **planned** = named, not built.
 | Compute | Unit conversion with dimension checks | mock (own table, checked against `@gcu/units`) | `@gcu/units`, `@gcu/dimensions` |
 | Compute | Arithmetic, trig in degrees | mock (own parser) | `@gcu/expr` if it fits, else keep the parser |
 | Compute | Dates: day counts, weekdays | mock | built in |
+| Compute | Working days and rosters: counts, N working days from a date, is-it-a-working-day, on/off rosters; the calendar is a slot (Brazil federal, weekdays only) | `@gcu/plan` calendar and holidays vendored (8 Oct 2026); municipal calendars and the plan what-ifs are not | `@gcu/plan` |
+| Compute | Time zones: a time in one place as it reads in another, now in a place, shared hours across places; named days (Easter, Carnival, Christmas) | mock, Intl only (8 Oct 2026) | built in |
 | Compute | Hashes and encodings: SHA-256 of a text or an opened file; base64, hex and URL encoding both ways | mock (own SHA-256, 8 Oct 2026) | Web Crypto is asynchronous, so the digest is computed in the tool |
 | Table | The open table as CSV, TSV or JSON, with copy and save | mock (8 Oct 2026); xlsx, dm, parquet and yaml readers are the second pass of conversions | `@gcu/sheet`, `@gcu/dm`, `@gcu/parquet`, `@gcu/yaml` |
 | Compute | Explainers: cron schedules, epoch times, chmod modes, URLs, ECMAScript regular expressions | mock (own parsers, 8 Oct 2026); JWT waits for sensitive arguments, PCRE dialect not read | built in |

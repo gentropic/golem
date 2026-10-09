@@ -62,7 +62,7 @@ export function runTool(name, args) {
 }
 
 // The clock, so tests can pin "today".
-export const clock = { now: () => new Date() };
+export const clock = { now: () => new Date(), zone: () => Intl.DateTimeFormat().resolvedOptions().timeZone };
 
 export const fmt = (x, sig = 6) => {
   if (!isFinite(x)) return String(x);
