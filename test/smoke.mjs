@@ -90,6 +90,13 @@ const grouped = await page.evaluate(() => [...document.querySelectorAll('#stream
 const queryOk = /BRX/.test(grouped) && /holes\.csv/.test(grouped);
 console.log(`${queryOk ? 'ok  ' : 'FAIL'} a grouped mean on the opened file`);
 if (!fileOk || !queryOk) failed++;
+// the dm fixture after the CSV questions, since opening it replaces the open table
+await page.setInputFiles('#file', join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'model.dm'));
+await page.waitForTimeout(300);
+const dmText = await page.evaluate(() => [...document.querySelectorAll('#stream .card')].pop().textContent);
+const dmOk = /700/.test(dmText) && /@gcu\/dm/.test(dmText);
+console.log(`${dmOk ? 'ok  ' : 'FAIL'} a Datamine .dm opens through the picker`);
+if (!dmOk) failed++;
 errors.forEach(e => console.log('FAIL ' + e));
 await browser.close();
 if (failed || !nameOk || kept !== 22 || overflow > 0 || errors.length) { console.log('\nsmoke test failed'); process.exit(1); }
