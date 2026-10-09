@@ -11,6 +11,7 @@ export { zonesOf, offsetOf, instantOf } from './calendar.js';
 export { unitWord } from './estimate.js';
 export { parseFormula, molarMass } from './chem.js';
 export { payloadOf, sentences, syllables, textrank, myers } from './text.js';
+export { numberAsk, listAsk, listOf, firstNeed } from './forms.js';
 
 // the words of a result, in reading order: what a person would see on the card
 export function textOf(c) {

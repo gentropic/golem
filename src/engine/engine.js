@@ -18,6 +18,8 @@ import './calendar.js';
 import './estimate.js';
 import './chem.js';
 import './text.js';
+import './forms.js';
+import './econ.js';
 import './notes.js';
 import { norm, grammar, context, taught } from './reading.js';
 import { current, newSession, renameSession, touch } from './sessions.js';
@@ -52,8 +54,9 @@ export function submit(raw) {
   if (/^(sessions|history|menu)$/.test(q)) return { kind: 'drawer' };
   if ((m = /^(?:(?:name|call|rename) this(?: session)?|rename(?: the)? session)(?: to| as)? (.+)$/.exec(q))) { const name = text.slice(-m[1].length); renameSession(current().id, name); return { kind: 'rename', name }; }
   if (last && last.res.ask) {
-    const os = last.res.ask.options, o = os.find(x => x.label.toLowerCase() === q || String(x.value) === q) || os.find(x => x.label.toLowerCase().startsWith(q) || q.includes(x.label.toLowerCase())) || (os.length === 1 && /^(yes|ok|okay|sure|do it|go)$/.test(q) ? os[0] : null);
+    const os = last.res.ask.options, o = os.find(x => x.label.toLowerCase() === q || String(x.value) === q) || os.find(x => x.label.length >= 3 && (x.label.toLowerCase().startsWith(q) || q.includes(x.label.toLowerCase()))) || (os.length === 1 && /^(yes|ok|okay|sure|do it|go)$/.test(q) ? os[0] : null);
     if (o) { last.res.ask.set(last.args, o.value); rerun(last); return { kind: 'answered', card: last, label: o.label }; }
+    if (last.res.ask.parse) { const v = last.res.ask.parse(text); if (v != null) { last.res.ask.set(last.args, v); rerun(last); return { kind: 'answered', card: last, label: Array.isArray(v) ? v.join(', ') : String(v) }; } }
   }
   if (/^undo( that)?$/.test(q)) { const c = undo(); return c ? { kind: 'undo', card: c } : { kind: 'nothing', msg: 'Nothing to undo.' }; }
   if (/^(again|repeat|rerun|do it again)$/.test(q)) return last ? submit(last.raw) : { kind: 'nothing', msg: 'Nothing to repeat.' };

@@ -71,7 +71,7 @@ export function cardEl(c) {
   const el = document.createElement('article');
   el.className = 'card'; el.dataset.id = c.id;
   const r = c.res, read = r.read.map(x => typeof x === 'string' ? escHtml(x) : x.alts ? `<button class="slot" type="button" data-act="slot" data-key="${x.key}" title="Tap to change this reading">${escHtml(x.v)}</button>` : `<span class="slot">${escHtml(x.v)}</span>`).join(' ');
-  const ask = r.ask ? `<div class="note">${escHtml(r.ask.prompt)}</div><div class="opts">${r.ask.options.map((o, i) => `<button class="btn" type="button" data-act="answer" data-i="${i}">${escHtml(o.label)}</button>`).join('')}</div>` : '';
+  const ask = r.ask ? `<div class="note">${escHtml(r.ask.prompt)}</div>${r.ask.options.length ? `<div class="opts">${r.ask.options.map((o, i) => `<button class="btn" type="button" data-act="answer" data-i="${i}">${escHtml(o.label)}</button>`).join('')}${r.ask.parse ? '<span class="sub">or type it</span>' : ''}</div>` : ''}` : '';
   el.innerHTML = `<div class="chead"><span>#${pad(c.id)}</span><span class="rung ${c.rung}">${RUNG[c.rung]}</span>${c.amends ? `<span>from #${pad(c.amends)}</span>` : ''}<span class="ms">${c.ms < 10 ? c.ms.toFixed(1) : Math.round(c.ms)} ms</span></div>
     <div class="q">${escHtml(c.raw)}</div>${read ? `<div class="read"><span class="lbl">read as</span> ${read}</div>` : ''}
     <div class="ans">${r.body.map(blockHtml).join('')}${ask}</div>
