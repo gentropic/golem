@@ -28,6 +28,7 @@ export function findDate(s, opt = {}) {
   if ((m = /\bnew year'?s? eve(?: (\d{4}))?\b/.exec(s))) return { d: md(31, 11, m[1]), m };
   if ((m = new RegExp('\\b(' + Object.keys(MOVABLE).sort((x, y) => y.length - x.length).join('|') + ')(?: (\\d{4}))?\\b').exec(s))) { let y = m[2] ? +m[2] : now.getFullYear(), e = easter(y), dt = new Date(e.getFullYear(), e.getMonth(), e.getDate() + MOVABLE[m[1]]); if (!m[2] && !back && dt < now) { e = easter(y + 1); dt = new Date(e.getFullYear(), e.getMonth(), e.getDate() + MOVABLE[m[1]]); } return { d: dt, m }; }
   if ((m = /\btomorrow\b/.exec(s))) return { d: add(1), m };
+  if ((m = /\byesterday\b/.exec(s))) return { d: add(-1), m };
   if ((m = /\bin (\d+) (day|week)s?\b/.exec(s))) return { d: add(m[1] * (m[2] === 'week' ? 7 : 1)), m };
   if ((m = new RegExp('\\b(?:on )?(next )?' + DOWRE + '\\b').exec(s))) {
     let n = (DOW.indexOf(m[2].slice(0, 3)) - now.getDay() + 7) % 7 || (back ? 0 : 7);

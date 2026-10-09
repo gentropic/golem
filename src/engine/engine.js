@@ -1,6 +1,6 @@
 // The entry point: submit(raw) reads a request and returns what happened. Cards are recomputed in
 // place by rerun(); answers and slot flips go through it, so args stay the only state that matters.
-import { S, T, runTool } from './core.js';
+import { S, T, runTool, toolByName } from './core.js';
 import './units.js';
 import './calc.js';
 import './dates.js';
@@ -20,6 +20,7 @@ import './chem.js';
 import './text.js';
 import './forms.js';
 import './econ.js';
+import './log.js';
 import './notes.js';
 import { norm, grammar, context, taught } from './reading.js';
 import { current, newSession, renameSession, touch } from './sessions.js';
@@ -41,7 +42,12 @@ export function answer(c, i) {
   const o = c.res.ask && c.res.ask.options[i]; if (!o) return null;
   c.res.ask.set(c.args, o.value); rerun(c); return o;
 }
-export function undo() { const c = S.cards.pop(); if (!c) return null; touch(); return c; }
+export function undo() {
+  const c = S.cards.pop(); if (!c) return null;
+  const d = toolByName(c.tool); if (d && d.undo) d.undo(c.args);
+  if (c.amends) { const prev = S.cards.find(x => x.id === c.amends); if (prev) rerun(prev); }   // an amendment undone: the card it amended stands again
+  touch(); return c;
+}
 
 // Outcomes: { kind: 'empty' | 'new-session' | 'drawer' | 'rename', name | 'answered', card, label
 //             | 'undo', card | 'nothing', msg | 'card', card }
