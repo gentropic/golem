@@ -2,7 +2,10 @@
 // the caller hands it adder's API, so the same function runs in the page's worker (where the build
 // concatenates adder's modules ahead of it) and in-process in the Node tests.
 //   pyRun({ run, pyRepr, adderParse }, { code, trace, steps, ms }) → Promise<result>
-// result: { stdout, stderr, value, error: { type, message, line } | null, steps, ms, trace, traceCut }
+// result: { stdout, stderr, value, error: { type, message, line } | null, steps, ms, trace, traceCut, engine, engineWhy }
+// A run compiles through AIR when it can (engine 'auto': adder's own choice, tree-walking a trace or anything the
+// compiler refuses). Compiled code may raise without a line number; replay is deterministic and the worker is
+// fresh, so such a run is simply run again tree-walking, whose answer (with the line) is the one kept.
 
 const SHOW = 80, TRACE_MAX = 200, FIG_MAX = 4000000;
 const clip = s => s.length > SHOW ? s.slice(0, SHOW - 1) + '…' : s;
@@ -36,18 +39,23 @@ export async function pyRun(api, req) {
     if (prevLine != null) trace.push([prevLine, diff(prevSnap, now).join(', ')]);
     prevLine = ev.line; prevSnap = now;
   } : undefined;
-  let scope = null, error = null;
-  try {
-    scope = await api.run(prep.code, { host: false, remote: false, stdout: s => out.push(String(s)), stderr: s => err.push(String(s)), budget: { steps, ms, onStep } });
-  } catch (e) {
-    error = { type: e.pyType || (e instanceof SyntaxError ? 'SyntaxError' : e.name || 'Error'), message: String(e.pyMessage || e.message || e).replace(/\s*\(line \d+\)$/, ''), line: e.adderLine || null };
-    const m = !error.line && /line (\d+)/.exec(String(e.message)); if (m) error.line = +m[1];
-  }
+  let scope = null, error = null, engine = null, engineWhy = null;
+  const attempt = async (eng) => {
+    out.length = 0; err.length = 0; scope = null; error = null; if (api.resetFigures) api.resetFigures();
+    try {
+      scope = await api.run(prep.code, { host: false, remote: false, engine: eng, onEngine: (e, why) => { engine = e; engineWhy = why; }, stdout: s => out.push(String(s)), stderr: s => err.push(String(s)), budget: { steps, ms, onStep } });
+    } catch (e) {
+      error = { type: e.pyType || (e instanceof SyntaxError ? 'SyntaxError' : e.name || 'Error'), message: String(e.pyMessage || e.message || e).replace(/\s*\(line \d+\)$/, ''), line: e.adderLine || null };
+      const m = !error.line && /line (\d+)/.exec(String(e.message)); if (m) error.line = +m[1];
+    }
+  };
+  await attempt(req.engine || 'auto');
+  if (error && !error.line && engine === 'air' && error.type !== 'BudgetExceeded') { await attempt('tree'); if (engine === 'tree') engineWhy = 'rerun for the error line'; }
   if (req.trace && prevLine != null && trace.length < TRACE_MAX && scope) { const last = new Map(Object.entries(scope).filter(([k, v]) => k !== '__golem_last__' && typeof v !== 'function').map(([k, v]) => [k, repr(v)])); trace.push([prevLine, diff(prevSnap, last).join(', ')]); }
   const lastV = scope && prep.last ? scope.__golem_last__ : null, isFigure = v => v && typeof v === 'object' && typeof v.toDrawList === 'function';
   const value = lastV !== undefined && lastV !== null && !isFigure(lastV) ? repr(lastV) : null;   // a figure shows as a figure, not as its repr
   // figures the code showed (plot's draw lists, plain JSON), up to FIG_MAX characters in all
   let figures = [], figuresCut = 0;
   if (api.figures) { try { let size = 0; for (const f of api.figures()) { const n = JSON.stringify(f).length; if (size + n > FIG_MAX) { figuresCut++; continue; } size += n; figures.push(f); } } catch (e) { err.push(`figures: ${e.message}\n`); } }
-  return { stdout: out.join(''), stderr: err.join(''), value, error, steps: req.trace ? count : null, ms: Date.now() - t0, trace: req.trace ? trace : null, traceCut, figures, figuresCut, budget: { steps, ms } };
+  return { stdout: out.join(''), stderr: err.join(''), value, error, steps: req.trace ? count : null, ms: Date.now() - t0, trace: req.trace ? trace : null, traceCut, figures, figuresCut, budget: { steps, ms }, engine, engineWhy };
 }

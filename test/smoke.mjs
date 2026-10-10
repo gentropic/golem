@@ -105,8 +105,9 @@ if (!dmOk) failed++;
 // Python in a fresh worker built from the page itself: the card starts as running and is replaced when adder answers
 await page.fill('#q', 'run this: x = sum(range(10))\nprint("total", x)\nx * 2'); await page.press('#q', 'Enter');
 const pyText = await page.waitForFunction(() => { const c = [...document.querySelectorAll('#stream .card')].pop(); return c && /total 45/.test(c.textContent) && /90/.test(c.textContent) ? c.textContent : null; }, null, { timeout: 8000 }).then(h => h.jsonValue(), () => null);
-const pyOk = !!pyText;
-console.log(`${pyOk ? 'ok  ' : 'FAIL'} Python runs in a worker${pyOk ? '' : ': ' + (await page.evaluate(() => [...document.querySelectorAll('#stream .card')].pop().textContent)).slice(0, 200)}`);
+// compiled by AIR in the real worker (new Function is allowed there, principle 9), not a quiet fallback
+const pyOk = !!pyText && /compiled by AIR/.test(pyText);
+console.log(`${pyOk ? 'ok  ' : 'FAIL'} Python runs in a worker, compiled by AIR${pyOk ? '' : ': ' + (await page.evaluate(() => [...document.querySelectorAll('#stream .card')].pop().textContent)).slice(0, 300)}`);
 if (!pyOk) failed++;
 // a matplotlib figure: plot draws in the worker, the draw list crosses as JSON, the shell replays it on a canvas
 await page.fill('#q', 'run this: import matplotlib.pyplot as plt\nplt.plot([1, 2, 3], [1, 4, 9])\nplt.title("squares")\nplt.show()'); await page.press('#q', 'Enter');

@@ -1,6 +1,5 @@
-// ⚠ VENDORED — DO NOT EDIT. @gcu/adder (the single-file build, with run and the sandbox options), copied from ../auditable/ext/adder/index.js at auditable 774234c3 (9 Oct 2026, MIT).
+// ⚠ VENDORED — DO NOT EDIT. @gcu/adder (the single-file build: run with the sandbox options, and engine 'auto' compiling through AIR), copied from ../auditable/ext/adder/index.js at auditable 5fa5f72e (10 Oct 2026, MIT).
 // Loaded only inside the Python worker. Re-vendor by copying that file here.
-
 // ⚠ GENERATED FILE — DO NOT EDIT. Source: ext/adder/src/  Build: node ext/adder/build.js
 // @gcu/adder — Pure JS Python interpreter for Auditable
 // Python cells, adder/mpy tagged template, tree-walking evaluator.
@@ -1952,6 +1951,7 @@ function _typedRepr(v) {
 
 function pyRepr(v) {
   if (v === null || v === undefined) return 'None';
+  if (v instanceof AdderError) return `${v.pyType}(${pyRepr(String(v.pyMessage))})`;
   if (v === true) return 'True';
   if (v === false) return 'False';
   if (typeof v === 'string') return `'${v.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
@@ -1979,6 +1979,7 @@ function pyRepr(v) {
 
 function pyStr(v) {
   if (v === null || v === undefined) return 'None';
+  if (v instanceof AdderError) return String(v.pyMessage);
   if (v === true) return 'True';
   if (v === false) return 'False';
   if (typeof v === 'string') return v;
@@ -1986,6 +1987,45 @@ function pyStr(v) {
   if (typeof v === 'function' && v._pyClass) return `<class '${v._pyName || v.name}'>`;
   if (typeof v === 'object' && typeof v.__str__ === 'function') return v.__str__();
   return pyRepr(v);
+}
+
+// pyStr / pyRepr for values whose user dunders may be async (tree-walked methods are):
+// a plain string when nothing on the way returned a Promise, else a Promise of the string.
+// print, str(), repr() and the tree-walker's f-strings use these; compiled (AIR) methods
+// are sync, so they get plain strings and print stays synchronous.
+const _isThenable = (x) => x != null && typeof x.then === 'function';
+function _joinMaybe(parts, open, sep, close) {
+  return parts.some(_isThenable)
+    ? Promise.all(parts).then((ps) => open + ps.join(sep) + close)
+    : open + parts.join(sep) + close;
+}
+function _hasUserDunder(v, name) {
+  return v !== null && typeof v === 'object' && typeof v[name] === 'function'
+    && !(v instanceof Complex) && !ArrayBuffer.isView(v);
+}
+function pyReprMaybe(v) {
+  if (Array.isArray(v)) return _joinMaybe(v.map(pyReprMaybe), '[', ', ', ']');
+  if (v instanceof Map) {
+    if (v.size === 0) return '{}';
+    const parts = [...v.entries()].map(([k, val]) => {
+      const a = pyReprMaybe(k), b = pyReprMaybe(val);
+      return _isThenable(a) || _isThenable(b) ? Promise.all([a, b]).then(([x, y]) => `${x}: ${y}`) : `${a}: ${b}`;
+    });
+    return _joinMaybe(parts, '{', ', ', '}');
+  }
+  if (_hasUserDunder(v, '__repr__')) {
+    const r = v.__repr__();
+    return _isThenable(r) ? r.then(String) : String(r);
+  }
+  return pyRepr(v);
+}
+function pyStrMaybe(v) {
+  if (typeof v === 'string') return v;
+  if (_hasUserDunder(v, '__str__')) {
+    const r = v.__str__();
+    return _isThenable(r) ? r.then(String) : String(r);
+  }
+  return pyReprMaybe(v);
 }
 
 // ── iteration helper ──
@@ -3336,7 +3376,9 @@ function adderBuiltins(printFn) {
         if (kw.sep !== undefined) sep = kw.sep;
         if (kw.end !== undefined) end = kw.end;
       }
-      printFn(args.map(pyStr).join(sep) + end);
+      const parts = args.map(pyStrMaybe);
+      if (parts.some(_isThenable)) return Promise.all(parts).then((ps) => { printFn(ps.join(sep) + end); return null; });
+      printFn(parts.join(sep) + end);
       return null;
     },
     len: (obj) => {
@@ -3353,7 +3395,7 @@ function adderBuiltins(printFn) {
     range: (a, b, c) => new AdderRange(a, b, c),
     int: (x, base) => { if (x === undefined) return 0; if (base !== undefined) { const n = parseInt(String(x), base); if (isNaN(n)) throw new AdderError('ValueError', `invalid literal for int() with base ${base}: ${pyRepr(String(x))}`); return n; } if (typeof x === 'string') { const n = parseInt(x); if (isNaN(n)) throw new AdderError('ValueError', `invalid literal for int() with base 10: ${pyRepr(x)}`); return n; } return Math.trunc(Number(x)); },
     float: (x) => { if (x === undefined) return 0.0; if (typeof x === 'string') { const s = x.trim().toLowerCase(); if (s === 'inf' || s === '+inf' || s === 'infinity') return Infinity; if (s === '-inf' || s === '-infinity') return -Infinity; if (s === 'nan') return NaN; if (s === '') throw new AdderError('ValueError', `could not convert string to float: ${pyRepr(x)}`); const n = Number(x); if (isNaN(n)) throw new AdderError('ValueError', `could not convert string to float: ${pyRepr(x)}`); return n; } return Number(x); },
-    str: (x) => x === undefined ? '' : pyStr(x),
+    str: (x) => x === undefined ? '' : pyStrMaybe(x),
     bool: (x) => x === undefined ? false : pyBool(x),
     list: Object.assign(
       async (x) => x === undefined ? [] : await pyCollect(x),
@@ -3460,7 +3502,7 @@ function adderBuiltins(printFn) {
     hex: (n) => { const v = Math.trunc(n); return v < 0 ? '-0x' + (-v).toString(16) : '0x' + v.toString(16); },
     oct: (n) => { const v = Math.trunc(n); return v < 0 ? '-0o' + (-v).toString(8) : '0o' + v.toString(8); },
     bin: (n) => { const v = Math.trunc(n); return v < 0 ? '-0b' + (-v).toString(2) : '0b' + v.toString(2); },
-    repr: pyRepr,
+    repr: pyReprMaybe,
     format: (value, spec) => pyFormatValue(value, spec || ''),
     pow: (x, y, mod) => mod !== undefined ? _modPow(x, y, mod) : Math.pow(x, y),
     divmod: (a, b) => [Math.floor(a / b), ((a % b) + b) % b],
@@ -3662,6 +3704,18 @@ function _tick(node, scope) {
   if (b.count > b.limit) { b.spent = `${b.limit} statements`; throw new AdderError('BudgetExceeded', b.spent, node.line); }
   if (b.deadline !== Infinity && (b.count & 255) === 0 && _now() > b.deadline) { b.spent = `${b.ms} ms`; throw new AdderError('BudgetExceeded', b.spent, node.line); }
   if (b.onStep) { _view.scope = scope; b.onStep({ line: node.line, kind: node.type, scope: _view }); }
+}
+
+// The same budget for AIR-compiled code: the lowerer (ticks: true) emits _py.tick(line)
+// before every statement, so `steps` counts statements exactly as the tree-walker does.
+// No onStep here: compiled code has no interpreter frame to show (trace runs tree-walking).
+function _tickLine(line) {
+  const b = _budget;
+  if (b === null) return;
+  if (b.spent) throw new AdderError('BudgetExceeded', b.spent, line);
+  b.count++;
+  if (b.count > b.limit) { b.spent = `${b.limit} statements`; throw new AdderError('BudgetExceeded', b.spent, line); }
+  if (b.deadline !== Infinity && (b.count & 255) === 0 && _now() > b.deadline) { b.spent = `${b.ms} ms`; throw new AdderError('BudgetExceeded', b.spent, line); }
 }
 
 // ── module registry (sandbox) ──
@@ -3890,10 +3944,12 @@ async function adderEval(node, scope) {
       return result;
     }
     case 'FormattedValue': {
+      // tree-walked methods are async, so a user __str__ / __repr__ gives a Promise:
+      // the *Maybe formatters await it (and stay plain strings for everything else)
       let val = await adderEval(node.value, scope);
-      if (node.conversion === 'r') val = pyRepr(val);
-      else if (node.conversion === 's') val = pyStr(val);
-      return node.formatSpec ? pyFormatValue(val, node.formatSpec) : pyStr(val);
+      if (node.conversion === 'r') val = await pyReprMaybe(val);
+      else if (node.conversion === 's') val = await pyStrMaybe(val);
+      return node.formatSpec ? pyFormatValue(val, node.formatSpec) : await pyStrMaybe(val);
     }
 
     // ── await ──
@@ -5126,7 +5182,8 @@ async function* _genExprIter(node, scope, genIdx) {
 }
 
 async function _evalComp(node, scope, kind) {
-  const result = kind === 'list' ? [] : kind === 'set' ? new Set() : {};
+  // a dict comprehension builds a dict (a Map, like a dict literal), not a JS object
+  const result = kind === 'list' ? [] : kind === 'set' ? new Set() : new Map();
   const compScope = new AdderScope(scope);
   await _evalCompIter(node, compScope, result, kind, 0);
   return result;
@@ -5153,7 +5210,7 @@ async function _evalCompIter(node, scope, result, kind, genIdx) {
       } else {
         const k = await adderEval(node.key, scope);
         const v = await adderEval(node.value, scope);
-        result[k] = v;
+        result.set(k, v);
       }
     }
   }
@@ -6333,6 +6390,8 @@ const _py = {
   importFromPath: _importFromPath,
   // class
   createClass: _createClass,
+  // the run budget (emitted only when lowering with ticks: true)
+  tick: _tickLine,
 };
 
 // -- runner.js --
@@ -6340,6 +6399,8 @@ const _py = {
 // @gcu/adder — high-level runtime API (tree-walker path).
 // Companion: @gcu/adder/air exports the same API backed by AIR transpilation
 // (15-300x faster), at the cost of requiring @gcu/air as a peer dep.
+
+
 
 
 
@@ -6435,6 +6496,78 @@ async function _withSandbox(opts, fn) {
   finally { _setRunOptions(prevOpts); _setBudget(prevBudget); }
 }
 
+// ── the AIR engine (opts.engine) ──
+// The same run() can compile adder to JavaScript through @gcu/air instead of walking the
+// tree: 10-600x faster on loops, same scope out, same sandbox (host / remote / budget —
+// the budget through _py.tick before every statement). The host attaches AIR once:
+//   attachAir(await import('@gcu/air'))   // or the @gcu/air bundle's namespace
+// engine: 'tree' (default) | 'air' (compile or throw) | 'auto' (compile when it can, else
+// tree-walk: no AIR attached, budget.onStep (a trace needs interpreter frames), a construct
+// the lowerer refuses, or a free name the bindings don't supply — the tree-walker raises the
+// proper NameError for that one, where compiled code would see undefined).
+
+const _AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+
+// JS intrinsics AIR's imports may list but which resolve via the ambient global scope
+const _JS_INTRINSICS = new Set([
+  'Math', 'console', 'JSON', 'Object', 'Array', 'String', 'Number', 'Boolean',
+  'Date', 'RegExp', 'Error', 'TypeError', 'ValueError', 'RangeError',
+  'Map', 'Set', 'WeakMap', 'WeakSet', 'Promise', 'Symbol',
+  'parseInt', 'parseFloat', 'isNaN', 'isFinite', 'NaN', 'Infinity',
+  'Int8Array', 'Uint8Array', 'Int16Array', 'Uint16Array',
+  'Int32Array', 'Uint32Array', 'Float32Array', 'Float64Array',
+  'ArrayBuffer', 'DataView', 'globalThis',
+]);
+
+let _airLib = null;
+function attachAir(air) {
+  const a = air && air.default && !air.runPasses ? air.default : air;
+  if (!a || typeof a.runPasses !== 'function' || typeof a.emitJS !== 'function' || typeof a.needsAsync !== 'function') {
+    throw new TypeError('attachAir: expected @gcu/air (runPasses, emitJS, needsAsync)');
+  }
+  // adder's _py fast paths live in AIR's specialization registry: give them to this copy
+  if (typeof a.registerSpecializations === 'function') a.registerSpecializations('_py', PY_SPECIALIZATIONS);
+  _airLib = a;
+  return a;
+}
+function airAttached() { return _airLib !== null; }
+
+// AIR-compile a parsed module. Throws on anything it cannot lower or emit.
+function _airCompile(ast, src, ticks) {
+  if (!_airLib) throw new AdderRuntimeError("engine 'air' needs @gcu/air: call attachAir(air) first");
+  const mod = lowerAdder(ast, src, { ticks });
+  _airLib.runPasses(mod);
+  const imports = [...(mod.imports || [])].filter((n) => !_JS_INTRINSICS.has(n));
+  const scopeKeys = ['_py', ...imports];
+  const body = _airLib.emitJS(mod, scopeKeys, []);
+  const Ctor = _airLib.needsAsync(mod) ? _AsyncFunction : Function;
+  return { air: mod, imports, fn: new Ctor(...scopeKeys, body) };
+}
+
+async function _airCall(compiled, opts, bindings) {
+  const args = [_py, ...compiled.imports.map((name) => bindings[name])];
+  const scope = await _withSandbox(opts, () => _withVfs(opts, () => compiled.fn(...args)));
+  const out = {};
+  if (scope && typeof scope === 'object') for (const k of Object.keys(scope)) if (k !== '__lastExpr__') out[k] = scope[k];
+  return out;
+}
+
+// which engine runs this call, and why not AIR when it doesn't
+function _pickEngine(opts) {
+  const e = opts.engine || 'tree';
+  if (e !== 'tree' && e !== 'air' && e !== 'auto') throw new TypeError(`run: engine must be 'tree', 'air' or 'auto', not ${JSON.stringify(e)}`);
+  if (e === 'tree') return { engine: 'tree', why: 'asked' };
+  if (opts.budget && typeof opts.budget.onStep === 'function') {
+    if (e === 'air') throw new AdderRuntimeError("engine 'air' cannot honour budget.onStep (compiled code has no interpreter frames): use engine 'tree' to trace");
+    return { engine: 'tree', why: 'trace' };
+  }
+  if (!_airLib) {
+    if (e === 'air') throw new AdderRuntimeError("engine 'air' needs @gcu/air: call attachAir(air) first");
+    return { engine: 'tree', why: 'no AIR attached' };
+  }
+  return { engine: e, why: null };
+}
+
 // Extract a plain object from an AdderScope, skipping names we injected as bindings.
 // scope.vars is a Map; iterate to preserve insertion order and skip injected names.
 function _scopeToObject(scope, bindings) {
@@ -6465,12 +6598,32 @@ function _scopeToObject(scope, bindings) {
  * @param {boolean} [opts.remote=true] - false turns off every import path that would call fetch()
  * @param {{steps?: number, ms?: number, onStep?: (ev: {line: number, kind: string, scope: object}) => void}} [opts.budget]
  *   - stop with AdderError('BudgetExceeded') after `steps` statements or `ms` wall-clock; onStep sees every statement
+ * @param {'tree'|'air'|'auto'} [opts.engine='tree'] - tree-walk, AIR-compile (attachAir first), or AIR when it can
+ * @param {(engine: 'tree'|'air', why: string|null) => void} [opts.onEngine] - told which engine ran, and why not AIR
  * @returns {Promise<Record<string, any>>} the module scope
  */
 async function run(code, opts = {}) {
-  const ast = adderParse(_dedent(code));
-  const scope = new AdderScope();
+  const src = _dedent(code);
+  const ast = adderParse(src);
   const bindings = _makeBindings(opts);
+  let pick = _pickEngine(opts);
+  if (pick.engine !== 'tree') {
+    let compiled = null;
+    try { compiled = _airCompile(ast, src, !!opts.budget); } catch (e) {
+      if (pick.engine === 'air') throw e;
+      pick = { engine: 'tree', why: `not compiled: ${String(e && e.message || e).split('\n')[0]}` };
+    }
+    if (compiled) {
+      const missing = compiled.imports.filter((n) => !(n in bindings));
+      if (missing.length && pick.engine === 'auto') pick = { engine: 'tree', why: `free name ${missing[0]}` };
+      else {
+        if (opts.onEngine) opts.onEngine('air', null);
+        return await _airCall(compiled, opts, bindings);
+      }
+    }
+  }
+  if (opts.onEngine) opts.onEngine('tree', pick.why);
+  const scope = new AdderScope();
   for (const [k, v] of Object.entries(bindings)) scope.set(k, v);
   return await _withSandbox(opts, () => _withVfs(opts, async () => {
     await adderEval(ast, scope);
@@ -6539,6 +6692,9 @@ function isIncomplete(code) {
     return /got '' \[|''\s*\(line|\bEOF\b|[Uu]nexpected end/.test(msg);
   }
 }
+
+
+// the bindings run() builds, for @gcu/adder/air's compile().run
 
 // -- highlight.js --
 
@@ -7170,11 +7326,14 @@ function emitAwaitedCall_ad(ctx, fnId, argIds, loc, type, opts) {
 
 // ── Main entry ──
 
-function lowerAdder(ast, source) {
+// opts.ticks: emit _py.tick(line) before every statement, for a run budget
+// (statement count + wall clock) that holds in compiled code too.
+function lowerAdder(ast, source, opts) {
   // SSA id counter lives on the AdderLowerCtx instance now (via
   // BaseLowerCtx's _idGen); no module-level reset.
   const ctx = new AdderLowerCtx();
   ctx.source = source || null;
+  ctx.ticks = !!(opts && opts.ticks);
 
   if (ast.type !== 'Module') throw new AirLowerError('Expected Module node');
 
@@ -7260,6 +7419,10 @@ function lowerAdder(ast, source) {
 function lowerStmt_ad(ctx, node) {
   if (!node) return null;
   const l = ctx.loc(node);
+  if (ctx.ticks && node.line != null) {
+    const ln = ctx.emit('const', [node.line], DYNAMIC, l);
+    emitPyCall(ctx, 'tick', [ln], l, VOID);
+  }
 
   switch (node.type) {
     case 'Pass': return null;
@@ -8428,6 +8591,9 @@ function _buildParamBinding(ctx, node, l) {
     }));
     // Prologue: strip trailing _kw bag if present (caller may pass kwargs)
     const prologueOps = [];
+    // the params are locals of the body, as the general path below records them: without
+    // this a parameter read in the body was reported as a free (imported) name
+    for (const p of params) ctx.symbols.set(p.name, null);
     return { params, prologueOps, isSimple: true };
   }
 
@@ -9242,9 +9408,10 @@ const adder = {
   // the sandbox registrar (spec_inbox/lang/adder-sandbox-spec.md §2.4): make a module
   // importable without window._auditableExtensions — the same call a worker host makes
   registerModule, unregisterModule,
-  // the library API (tree-walker) with the sandbox options — host / remote / budget —
-  // so a single-file host vendors this bundle as is (golem's worker does)
-  run, evalExpr, compile, isIncomplete, AdderRuntimeError,
+  // the library API with the sandbox options — host / remote / budget — so a single-file
+  // host vendors this bundle as is (golem's worker does). attachAir(air) + run(code,
+  // { engine: 'auto' }) compiles through @gcu/air and falls back to the tree-walker.
+  run, evalExpr, compile, isIncomplete, AdderRuntimeError, attachAir, airAttached,
 };
 
 export { adder };

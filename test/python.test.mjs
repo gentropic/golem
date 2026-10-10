@@ -29,6 +29,19 @@ test('a run shows output and the last value; the card is recomputed when the job
   assert.equal(multi.res.body.find(b => b.t === 'pre').text, 'A\nB\n', 'the payload may follow the first line');
 });
 
+test('a run is compiled by AIR; a trace, and an error without a line, are tree-walked', async () => {
+  g.reset();
+  const c = await ran('run this: s = 0\nfor i in range(100000):\n    s += i\ns');
+  assert.equal(c.res.value, '4999950000');
+  assert.ok(g.textOf(c).includes('compiled by AIR'), g.textOf(c));
+  const t = await ran('trace this: a = 1\nb = a * 2');
+  assert.ok(g.textOf(t).includes('tree-walking (trace)'), g.textOf(t));
+  const loop = await ran('run this: n = 0\nwhile True:\n    n += 1');
+  assert.ok(g.textOf(loop).includes('BudgetExceeded') && g.textOf(loop).includes('compiled by AIR'), 'the budget holds in compiled code: ' + g.textOf(loop));
+  const undef = await ran('run this: print(nope)');
+  assert.ok(g.textOf(undef).includes('NameError') && g.textOf(undef).includes('free name nope'), g.textOf(undef));
+});
+
 test('errors carry their type and line; the budget stops a loop; js and remote imports are refused', async () => {
   g.reset();
   const e = await ran('run this: a = 1\nb = a / 0');
@@ -63,7 +76,8 @@ test('numpy, scipy, pandas, sklearn and matplotlib: rewritten to the GCU names, 
   assert.ok(fb.ops.some(o => o[0] === 'fillText' && o[1] === 'squares') && fb.label.includes('squares'), fb.label);
   assert.equal(JSON.stringify(JSON.parse(JSON.stringify(fb))), JSON.stringify(fb), 'the block is plain JSON');
   assert.ok(!fig.res.body.some(b => b.kind === 'ok'), 'a figure counts as output');
-  assert.ok(g.textOf(await ran('run this: from sklearn.tree import DecisionTreeClassifier\nt = DecisionTreeClassifier().fit([[0.0], [1.0], [2.0], [3.0]], [0, 0, 1, 1])\nt.compile()')).includes('not available in golem'), 'compile() builds code at run time and is refused');
+  const tc = await ran('run this: from sklearn.tree import DecisionTreeClassifier\nt = DecisionTreeClassifier().fit([[0.0], [1.0], [2.0], [3.0]], [0, 0, 1, 1])\nlist(t.compile().predict([[0.5], [2.5]]))');
+  assert.equal(tc.res.value, '[0, 1]', 'compile() builds the tree\'s predict at run time, allowed in the worker (principle 9): ' + g.textOf(tc));
   const pr = (await ran('run this: from sklearn.linear_model import LinearRegression\nprint(LinearRegression().fit([[1.0], [2.0]], [3.0, 5.0]).coef_, float("inf"))')).res.body.find(b => b.t === 'pre').text;
   assert.ok(/^\[\d/.test(pr) && pr.endsWith(' inf\n') && !pr.includes('{'), 'print shows typed arrays as lists and inf as Python does: ' + pr);
   const ln = await ran('run this: import line as np\nm = np.array([[3.0, 1.0], [1.0, 2.0]])\nnp.linalg.solve(m, np.array([9.0, 8.0])).tolist()');
