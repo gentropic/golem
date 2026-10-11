@@ -18,6 +18,7 @@ Open `dist/golem.html`, then:
 - Ask `how old is the permian`, `what period is 250 ma`, `stages of the triassic`: the ICS chart, 171 units, CC BY 4.0 via Macrostrat.
 - With a table open, try `true thickness of every intercept with hole 270/60, bedding 045/30` or `apparent dip of each plane on a section at 090`.
 - Open an `.xlsx`, a Parquet file or a Datamine `.dm` with the paperclip: it is converted once, kept, and every table question works on it. `the table as parquet` writes it back out.
+- After a session you want again, `save this as a recipe called cu check`, say which subjects change, then `run cu check for au` (a new session) or `run cu check on every table`.
 - Open Markdown, text or HTML notes with the paperclip, then `find resurvey in my documents` or `where did i write about core loss`: passages come back as written, with where they are.
 - Open a `.dxf` and it becomes GeoJSON or WKT; paste `json to yaml: {…}` or `wkt to geojson: POINT (30 10)` for the rest.
 - Try `home is -19.92, -43.94`, `distance from home to -6.07,-50.16`, `-19.92, -43.94 in utm`, `sunrise tomorrow in home`, `moon phase on 25 dec`.
@@ -71,6 +72,7 @@ src/engine/                  no DOM, no storage: everything that reads and compu
   python.js                  Python by adder: a pending card, a job, the result kept and the card recomputed
   apply.js                   a skill on every row of the table, columns bound by name, constants for the rest
   formats.js                 xlsx, .dm and Parquet converted to text per table at open time (sheet, dm, parquet vendored)
+  recipes.js                 recipes: steps as card specs, subjects, bindings, a run stopped where a step no longer reads, batch
   docs.js                    documents kept on the device, passages by heading and paragraph, librarian search (vendored)
   interchange.js             YAML ↔ JSON (strict subset), WKT ↔ GeoJSON, DXF → GeoJSON or WKT (yaml, wkt, dxf vendored)
   places.js sky.js           saved places, Vincenty distance, Krüger UTM; NOAA sun times, mean-cycle moon phase
@@ -105,6 +107,7 @@ test/log.test.mjs            the log: rows, corrections, undo, replay, questions
 test/python.test.mjs         the page's own worker text in a fresh context per run: output, errors, budget, sandbox, scipy and pandas, trace, replay
 test/apply.test.mjs          thickness and apparent dip over every row, against the single-value tools
 test/formats.test.mjs        xlsx (written by the vendored sheet) and the .dm fixture through openBinary, replay, the sheet slot
+test/recipes.test.mjs        save and the subjects asked, run into a new session, the stop rule, a new table bound, batch
 test/docs.test.mjs           passages from Markdown and HTML, search with marks, near spellings, the passage card, replay
 test/interchange.test.mjs    YAML and JSON both ways, the strict-subset refusal, WKT and GeoJSON, the DXF fixture, Parquet out and back in
 test/places.test.mjs         Vincenty against the Geoscience Australia test line, UTM round trips and the meridian arc, sun and moon

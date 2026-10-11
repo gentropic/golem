@@ -207,6 +207,7 @@ Status: **mock** = works in `src/` today; **planned** = named, not built.
 | Session | Teach a word | mock | device lexicon |
 | Session | Notes: remember and recall | mock | glass later; a table now |
 | Session | Sessions, history, auto names | mock | section 8 |
+| Session | Recipes | mock (11 Oct 2026): a session's steps saved as card specs with the subjects that change (the table, columns), run again into a session of its own with every step re-read and the run stopped at the first step that does not read; batch over every kept table, one row each; recipes are device state | section 8 |
 | Session | Export the plan as a script | mock (illustrative API names) | `@gcu/adder` |
 
 Package names in the right-hand column were checked against `gentropic/auditable` `ext/*/package.json` at commit `09c4904`. Two things the design leans on were **not** found under `ext/` at that commit and need locating before they are relied on: the dispatch meta-intent package (`dispatch-meta`) and swatch. The clause grammar was folded into `ext/dispatch/src/grammar/` on 8 Oct 2026 (see `ext/dispatch/SPEC.md`, "The grammar rung").

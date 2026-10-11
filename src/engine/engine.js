@@ -27,6 +27,7 @@ import './apply.js';
 import './python.js';
 import { DOCUMENT } from './interchange.js';
 import { DOCTEXT } from './docs.js';
+import { recipeAt, bindingsOf, runSteps } from './recipes.js';
 import { tableFromText } from './table.js';
 import { convertBinary } from './formats.js';
 import './notes.js';
@@ -68,14 +69,32 @@ export function submit(raw) {
   if (/^(sessions|history|menu)$/.test(q)) return { kind: 'drawer' };
   if ((m = /^(?:(?:name|call|rename) this(?: session)?|rename(?: the)? session)(?: to| as)? (.+)$/.exec(q))) { const name = text.slice(-m[1].length); renameSession(current().id, name); return { kind: 'rename', name }; }
   if (last && last.res.ask) {
-    const os = last.res.ask.options, o = os.find(x => x.label.toLowerCase() === q || String(x.value) === q) || os.find(x => x.label.length >= 3 && (x.label.toLowerCase().startsWith(q) || q.includes(x.label.toLowerCase()))) || (os.length === 1 && /^(yes|ok|okay|sure|do it|go)$/.test(q) ? os[0] : null);
+    // a typed list ("a, b") is an answer of several, before any one option is matched loosely inside it
+    const many = last.res.ask.parse && /,|\band\b/.test(q) ? last.res.ask.parse(text) : null;
+    if (Array.isArray(many) && many.length > 1) { last.res.ask.set(last.args, many); rerun(last); return { kind: 'answered', card: last, label: many.join(', ') }; }
+    const os = last.res.ask.options, o = os.find(x => x.label.toLowerCase() === q) || os.find(x => x.label.length >= 3 && (x.label.toLowerCase().startsWith(q) || q.includes(x.label.toLowerCase()))) || (os.length === 1 && /^(yes|ok|okay|sure|do it|go)$/.test(q) ? os[0] : null);
     if (o) { last.res.ask.set(last.args, o.value); rerun(last); return { kind: 'answered', card: last, label: o.label }; }
     if (last.res.ask.parse) { const v = last.res.ask.parse(text); if (v != null) { last.res.ask.set(last.args, v); rerun(last); return { kind: 'answered', card: last, label: Array.isArray(v) ? v.join(', ') : String(v) }; } }
   }
   if (/^undo( that)?$/.test(q)) { const c = undo(); return c ? { kind: 'undo', card: c } : { kind: 'nothing', msg: 'Nothing to undo.' }; }
   if (/^(again|repeat|rerun|do it again)$/.test(q)) return last ? submit(last.raw) : { kind: 'nothing', msg: 'Nothing to repeat.' };
+  // a saved recipe by name: replayed with the new subjects into a session of its own (a batch is a card)
+  if ((m = /^run\s+(.+)$/i.exec(text))) {
+    const ba = toolByName('recipeBatch').read(text); if (ba) return { kind: 'card', card: addCard(raw, { tool: 'recipeBatch', args: ba, rung: 'grammar', res: T.recipeBatch(ba) }, performance.now() - t0) };
+    const at = recipeAt(m[1]); if (at) return runRecipe(at[0], at[1]);
+  }
   const r = context(q, last) || grammar(text, q, 'grammar', raw) || taught(text, q, raw) || { tool: 'none', args: { q }, rung: 'none', res: T.none({ q }) };
   return { kind: 'card', card: addCard(raw, r, performance.now() - t0) };
+}
+
+// run a recipe: a new session named after it and its bindings, one card per step, stopping at the first
+// step that does not read, with a card that says which and why
+function runRecipe(recipe, rest) {
+  const b = bindingsOf(recipe, rest); if (b.err) return { kind: 'nothing', msg: b.err };
+  const s = newSession(); renameSession(s.id, `${recipe.name}: ${b.bindings.length ? b.bindings.map(x => x.to).join(', ') : 'as saved'}`);
+  const out = runSteps(recipe, b.bindings, (spec, res) => { if (res) addCard(spec.raw, { tool: spec.tool, args: spec.args, rung: 'grammar', res }, 0); });
+  if (out.stop) { const args = { name: recipe.name, n: out.stop.n, of: recipe.steps.length, raw: out.stop.raw, why: out.stop.why }; addCard(`recipe ${recipe.name}: stopped`, { tool: 'recipeStop', args, rung: 'grammar', res: T.recipeStop(args) }, 0); }
+  return { kind: 'recipe', session: s, msg: out.stop ? `${recipe.name} stopped at step ${out.stop.n} of ${recipe.steps.length}.` : `Ran ${recipe.name}: ${out.ran} steps, in a session of its own.` };
 }
 
 // a 32-bit FNV-1a of the text: the key of a file in the device store, and what a card remembers of it

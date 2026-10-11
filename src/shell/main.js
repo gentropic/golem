@@ -43,6 +43,7 @@ function run(raw) {
 function show(o) {
   switch (o.kind) {
     case 'new-session': renderStream(); status('New session.'); break;
+    case 'recipe': renderStream(); status(o.msg); break;
     case 'drawer': openDrawer(); break;
     case 'rename': status(`Session named “${o.name}”.`); break;
     case 'answered': replaceCard(o.card); status(`Answered #${pad(o.card.id)}: ${o.label}`); break;

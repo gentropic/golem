@@ -140,6 +140,13 @@ await page.fill('#q', 'run this: import numpy as np\nnp.round(np.array([1.0, 0.3
 const npText = await page.waitForFunction(() => { const c = [...document.querySelectorAll('#stream .card')].pop(); return c && /array\(\[1\.\s+, 0\.33, 0\.67\]\)/.test(c.textContent) ? c.textContent : null; }, null, { timeout: 8000 }).then(h => h.jsonValue(), () => null);
 console.log(`${npText ? 'ok  ' : 'FAIL'} numpy in a real worker${npText ? '' : ': ' + (await page.evaluate(() => [...document.querySelectorAll('#stream .card')].pop().textContent)).slice(0, 240)}`);
 if (!npText) failed++;
+// a recipe, last, since running one opens a session of its own: save in a fresh session, answer by typing, run for au
+await page.fill('#q', 'new session'); await page.press('#q', 'Enter');
+for (const q of ['open assays.csv', 'histogram of cu', 'save this as a recipe called cu look', 'cu', 'run cu look for au']) { await page.fill('#q', q); await page.press('#q', 'Enter'); await page.waitForTimeout(150); }
+const rec = await page.evaluate(() => ({ cards: [...document.querySelectorAll('#stream .card')].map(c => c.textContent), status: (document.getElementById('status') || {}).textContent || '' }));
+const recOk = rec.cards.length === 2 && /histogram of au/i.test(rec.cards[1]);
+console.log(`${recOk ? 'ok  ' : 'FAIL'} a recipe saved and run for au opens a session of its own${recOk ? '' : ': ' + rec.cards.length + ' cards, ' + rec.cards.map(t => t.slice(0, 60)).join(' | ')}`);
+if (!recOk) failed++;
 errors.forEach(e => console.log('FAIL ' + e));
 await browser.close();
 if (failed || !nameOk || kept !== 22 || overflow > 0 || errors.length) { console.log('\nsmoke test failed'); process.exit(1); }
