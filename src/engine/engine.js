@@ -25,6 +25,7 @@ import './places.js';
 import './sky.js';
 import './apply.js';
 import './python.js';
+import { DOCUMENT } from './interchange.js';
 import { convertBinary } from './formats.js';
 import './notes.js';
 import { norm, grammar, context, taught } from './reading.js';
@@ -82,6 +83,8 @@ export function openFile(name, text) {
   if (!current()) newSession();
   const t0 = performance.now(), hash = hashOf(text);
   S.files[hash] = { name, hash, text, size: text.length };
+  // a drawing, a YAML or a geometry file is converted, not opened as a table
+  if (DOCUMENT.test(name)) { const args = { file: { name, hash } }, res = T.convertFile(args); return { kind: 'card', card: addCard(`open ${name}`, { tool: 'convertFile', args, rung: 'grammar', res }, performance.now() - t0) }; }
   const args = { file: { name, hash } }, res = T.open(args);
   return { kind: 'card', card: addCard(`open ${name}`, { tool: 'open', args, rung: 'grammar', res }, performance.now() - t0) };
 }

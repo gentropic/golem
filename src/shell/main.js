@@ -134,7 +134,7 @@ $('stream').addEventListener('click', e => {
   else if (act === 'answer') { answer(c, +b.dataset.i); replaceCard(c); }
   else if (act === 'handoff') { const n = document.createElement('div'); n.className = 'note ok'; n.textContent = b.dataset.msg; b.replaceWith(n); }
   else if (act === 'save' && c.res.file) {
-    const f = c.res.file, url = URL.createObjectURL(new Blob([f.text], { type: f.mime })), a = document.createElement('a');
+    const f = c.res.file, url = URL.createObjectURL(new Blob([f.bytes || f.text], { type: f.mime })), a = document.createElement('a');
     a.href = url; a.download = f.name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000); status(`Saved ${f.name}.`);
   }
   else if (act === 'copy') {

@@ -71,26 +71,30 @@ self.onmessage = async e => { self.postMessage(await pyRun({ run, pyRepr, adderP
 }
 
 export function bundle(entry) {
-  const order = [], state = new Map();
+  const order = [], state = new Map(), varOf = new Map();
   const visit = rel => {
     const abs = join(src, rel);
     if (state.get(abs) === 'done') return;
     if (state.get(abs) === 'visiting') throw new Error(`build: import cycle through src/${rel}`);
     state.set(abs, 'visiting');
-    const code = readFileSync(abs, 'utf8');
+    // a minified bundle ends its last line with its export block; that block goes on a line of its own
+    const code = readFileSync(abs, 'utf8').replace(/([;}])export\s*\{([^}]*)\};?\s*$/, '$1\nexport {$2};\n'), imports = [];
     for (const line of code.split('\n')) {
       if (!/^\s*import\b/.test(line)) continue;
       if ((line.match(/\bimport\b/g) || []).length > 1) throw new Error(`build: src/${rel}: one import per line`);
-      if (/^\s*import\s*\*/.test(line) || /\bas\b/.test(line.replace(/'[^']*'/g, ''))) throw new Error(`build: src/${rel}: named imports only, no "* as" and no "as" aliases: ${line.trim()}`);
-      const m = /from\s+['"](\.[^'"]+)['"]|^\s*import\s+['"](\.[^'"]+)['"]/.exec(line);
+      if (/^\s*import\s*\*/.test(line) || /^\s*import\s+[\w$]/.test(line)) throw new Error(`build: src/${rel}: named imports only, no "* as" and no default imports: ${line.trim()}`);
+      const m = /^\s*import\s*\{([^}]*)\}\s*from\s+['"](\.[^'"]+)['"]|^\s*import\s+['"](\.[^'"]+)['"]/.exec(line);
       if (!m) throw new Error(`build: src/${rel}: cannot read import: ${line.trim()}`);
-      visit(posix(relative(src, resolve(dirname(abs), m[1] || m[2]))));
+      const dep = posix(relative(src, resolve(dirname(abs), m[2] || m[3])));
+      visit(dep);
+      if (m[1]) imports.push({ dep, names: m[1].split(',').map(x => x.trim()).filter(Boolean).map(e => { const n = /^([\w$]+)(?:\s+as\s+([\w$]+))?$/.exec(e); if (!n) throw new Error(`build: src/${rel}: cannot read import entry "${e}"`); return [n[1], n[2] || n[1]]; }) });
     }
-    order.push({ rel, code }); state.set(abs, 'done');
+    order.push({ rel, code, imports }); state.set(abs, 'done');
   };
   visit(entry);
-  const owner = new Map();
-  const parts = order.map(({ rel, code }) => {
+  // each module is a function whose exports come back as an object; a module reads what it imports from
+  // the objects of the modules it names, so two modules may export the same name
+  const parts = order.map(({ rel, code, imports }, i) => {
     if (/^\s*export\s+default\b/m.test(code)) throw new Error(`build: src/${rel}: no default exports`);
     if (/^\s*export\s*(\*|\{[^}]*\}\s*from\b)/m.test(code)) throw new Error(`build: src/${rel}: no re-exports`);
     if (/^\s*export\s+let\b/m.test(code)) throw new Error(`build: src/${rel}: no "export let" (a reassigned export cannot cross the wrapper; export a function that reads it)`);
@@ -107,10 +111,19 @@ export function bundle(entry) {
       }
       return '';
     }).replace(/^export\s+/gm, '');
-    for (const [, name] of exports) { if (owner.has(name)) throw new Error(`build: "${name}" is exported by both src/${owner.get(name)} and src/${rel}`); owner.set(name, rel); }
-    const ret = exports.length ? `\n  return { ${exports.map(([n, a]) => n === a ? n : `${a}: ${n}`).join(', ')} };` : '';
-    const head = exports.length ? `const { ${exports.map(([, a]) => a).join(', ')} } = ` : '';
-    return `/* ==== src/${rel} ==== */\n${head}(() => {\n${stripped.trim()}${ret}\n})();\n`;
+    const seen = new Set(); for (const [, a] of exports) { if (seen.has(a)) throw new Error(`build: src/${rel} exports "${a}" twice`); seen.add(a); }
+    for (const { dep, names } of imports) for (const [n] of names) if (!order.find(o => o.rel === dep).exports.some(([, a]) => a === n)) throw new Error(`build: src/${rel} imports "${n}", which src/${dep} does not export`);
+    order[i].exports = exports;
+    const v = `__m${i}`; varOf.set(rel, v);
+    const head = imports.map(({ dep, names }) => `const { ${names.map(([n, a]) => n === a ? n : `${n}: ${a}`).join(', ')} } = ${varOf.get(dep)};
+`).join('');
+    const ret = `
+  return { ${exports.map(([n, a]) => n === a ? n : `${a}: ${n}`).join(', ')} };`;
+    return `/* ==== src/${rel} ==== */
+const ${v} = (() => {
+${head}${stripped.trim()}${ret}
+})();
+`;
   });
   return parts.join('\n');
 }

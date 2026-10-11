@@ -17,7 +17,8 @@ Open `dist/golem.html`, then:
 - Open the menu (top left) for sessions and history search.
 - Ask `how old is the permian`, `what period is 250 ma`, `stages of the triassic`: the ICS chart, 171 units, CC BY 4.0 via Macrostrat.
 - With a table open, try `true thickness of every intercept with hole 270/60, bedding 045/30` or `apparent dip of each plane on a section at 090`.
-- Open an `.xlsx` or a Datamine `.dm` with the paperclip: it is converted once, kept, and every table question works on it.
+- Open an `.xlsx`, a Parquet file or a Datamine `.dm` with the paperclip: it is converted once, kept, and every table question works on it. `the table as parquet` writes it back out.
+- Open a `.dxf` and it becomes GeoJSON or WKT; paste `json to yaml: {…}` or `wkt to geojson: POINT (30 10)` for the rest.
 - Try `home is -19.92, -43.94`, `distance from home to -6.07,-50.16`, `-19.92, -43.94 in utm`, `sunrise tomorrow in home`, `moon phase on 25 dec`.
 - Try `log 5 km run yesterday`, `how many km did i run this month`, `mean weight by week`, `open the log` then `count by activity`.
 - Try `help me decide between perth, vancouver and santiago` (it asks for criteria, weights and scores), `cutoff grade for copper at 9000 usd/t, 88% recovery, processing 14 usd/t, g&a 3 usd/t`, `cueq of 0.8% cu and 0.3 g/t au at 9000 usd/t and 2300 usd/oz`.
@@ -45,7 +46,7 @@ npm run test:engine  # the engine alone, in Node: the 27 queries, replay, slots,
 npm test             # build, engine tests, then drive the page through the same 27 queries
 ```
 
-The build is concatenation: `src/shell/index.html` with the two typefaces embedded, then the shell, engine and vendored modules in import order inside one `<script>`. Each module's text goes in verbatim inside a function, so its private names stay private, and its exports become plain declarations the later modules see. No bundler, no transforms of the code. The build refuses import cycles, an export declared twice, and the module syntax the wrapping cannot carry. It also writes `dist/golem.json`, the parser ontology the engine derives from its tool declarations. The built page makes no network request; the one external link is the library reader, opened on tap.
+The build is concatenation: `src/shell/index.html` with the two typefaces embedded, then the shell, engine and vendored modules in import order inside one `<script>`. Each module's text goes in verbatim inside a function, so its private names stay private; the function returns its exports as an object, and a module that imports names reads them from that object (with `as` aliases if it wants them), so two modules may export the same name. No bundler, no transforms of the code. The build refuses import cycles, an import the other module does not export, and the module syntax the wrapping cannot carry. It also writes `dist/golem.json`, the parser ontology the engine derives from its tool declarations. The built page makes no network request; the one external link is the library reader, opened on tap.
 
 If Playwright has no browser installed, run `npx playwright install chromium` or point `CHROMIUM_PATH` at one.
 
@@ -68,7 +69,8 @@ src/engine/                  no DOM, no storage: everything that reads and compu
   text.js                    payloads after a colon or the first line: word count and readability, TextRank sentences, Myers diff
   python.js                  Python by adder: a pending card, a job, the result kept and the card recomputed
   apply.js                   a skill on every row of the table, columns bound by name, constants for the rest
-  formats.js                 xlsx and .dm converted to text per table at open time (sheet, dm vendored)
+  formats.js                 xlsx, .dm and Parquet converted to text per table at open time (sheet, dm, parquet vendored)
+  interchange.js             YAML ↔ JSON (strict subset), WKT ↔ GeoJSON, DXF → GeoJSON or WKT (yaml, wkt, dxf vendored)
   places.js sky.js           saved places, Vincenty distance, Krüger UTM; NOAA sun times, mean-cycle moon phase
   log.js                     the log: a device table written from cards, asked in plain words, opened as the table
   forms.js econ.js           the form card (questions asked in turn, answers as slots) and the decision matrix; Gy, cutoff, NSR, equivalents
@@ -101,6 +103,7 @@ test/log.test.mjs            the log: rows, corrections, undo, replay, questions
 test/python.test.mjs         the page's own worker text in a fresh context per run: output, errors, budget, sandbox, scipy and pandas, trace, replay
 test/apply.test.mjs          thickness and apparent dip over every row, against the single-value tools
 test/formats.test.mjs        xlsx (written by the vendored sheet) and the .dm fixture through openBinary, replay, the sheet slot
+test/interchange.test.mjs    YAML and JSON both ways, the strict-subset refusal, WKT and GeoJSON, the DXF fixture, Parquet out and back in
 test/places.test.mjs         Vincenty against the Geoscience Australia test line, UTM round trips and the meridian arc, sun and moon
 test/oracle.test.mjs         golem's arithmetic against the GCU packages it does not vendor
 test/smoke.mjs               browser smoke test on the built file

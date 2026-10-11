@@ -13,6 +13,7 @@ export const STEPS = [
   ['2.7 g/cm3 in lb/ft3', 'grammar', '168.555'],
   ['5 km in kg', 'grammar', 'No conversion exists'],
   ['25 c in f', 'grammar', '77'],
+  ['wkt to geojson: POINT (30 10)', 'grammar', '"Point"'],
   ['14 * cos(22) + 3^2', 'grammar', '21.98057396'],
   ['what day is 15 nov 2027', 'grammar', 'Monday'],
   ['population density of mongolia in people per square mile', 'grammar', '5.46'],
@@ -116,9 +117,9 @@ test('the clock can be pinned, and dates follow it', () => {
 
 test('declarations drive the catalog, the names and the amendments', () => {
   const rows = g.skills();
-  assert.equal(rows.length, 46);
+  assert.equal(rows.length, 47);
   assert.deepEqual([...new Set(rows.map(r => r.group))], ['Compute', 'Field', 'Table', 'Knowledge', 'Device', 'Session']);
-  assert.equal(rows.filter(r => r.live).length, 38);
+  assert.equal(rows.filter(r => r.live).length, 39);
   for (const name of Object.keys(g.T)) assert.ok(g.toolByName(name), `a declaration for ${name}`);
   assert.deepEqual(g.tagOf({ tool: 'hist', args: { col: 'au' } }), ['Au histogram', 3]);
   assert.ok(g.toolByName('convert').amend.length === 1 && g.toolByName('fact').amend.length === 2);

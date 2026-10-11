@@ -1,7 +1,8 @@
 // The open table: a real delimited file typed by @gcu/recon, or the synthetic sample; a histogram; and
 // table questions in controlled English answered through @gcu/sadpan and @gcu/sift (all vendored).
 // Sample data stays labelled as sample data; a file is named on every card that reads it.
-import { S, tool, frame, condition, fmt } from './core.js';
+import { S, T, tool, frame, condition, fmt } from './core.js';
+import { DOCUMENT } from './interchange.js';
 import { series } from '../vendor/sadpan.js';
 import { sniff, detectAnalyte, NULL_SENTINELS } from '../vendor/recon.js';
 import { parsePredicate, evaluatePredicate, predicateToString } from '../vendor/sift.js';
@@ -71,7 +72,7 @@ export function colOf(word, table = S.table) {
 }
 const colNames = t => t.cols.map(c => c.name).join(', ');
 const shown = w => { const c = colOf(w, S.table || { cols: SAMPLE_COLS }); return c ? (c.analyte || c.name) : w; };
-const srcLine = t => t.source === 'sample' ? 'assays.csv · synthetic sample generated for this mock' : t.source === 'device' ? `the ${t.name} · ${t.rows.length} rows · a table on this device` : `${t.name}${t.sheet && t.from === 'xlsx' ? ' · sheet ' + t.sheet : ''} · ${t.rows.length} rows · ${t.from === 'xlsx' ? 'read by @gcu/sheet, ' : t.from === 'dm' ? 'read by @gcu/dm, ' : ''}typed by @gcu/recon`;
+const srcLine = t => t.source === 'sample' ? 'assays.csv · synthetic sample generated for this mock' : t.source === 'device' ? `the ${t.name} · ${t.rows.length} rows · a table on this device` : `${t.name}${t.sheet && t.from === 'xlsx' ? ' · sheet ' + t.sheet : ''} · ${t.rows.length} rows · ${t.from === 'xlsx' ? 'read by @gcu/sheet, ' : t.from === 'dm' ? 'read by @gcu/dm, ' : t.from === 'parquet' ? 'read by @gcu/parquet, ' : ''}typed by @gcu/recon`;
 
 /* ── statistics, weighted or not ───────────────────────────── */
 export function stats(v) {
@@ -96,7 +97,7 @@ condition('table', {
 });
 tool({
   name: 'open', rank: 50,
-  skill: { group: 'Table', title: 'Open and validate', on: '@gcu/recon · sheet · dm', about: 'A CSV, TSV, xlsx or Datamine .dm from your files, typed by recon: numbers, categories, units, analytes, hole and interval columns. A workbook with several sheets asks which.', examples: ['open assays.csv'] },
+  skill: { group: 'Table', title: 'Open and validate', on: '@gcu/recon · sheet · dm · parquet', about: 'A CSV, TSV, xlsx, Parquet or Datamine .dm from your files, typed by recon: numbers, categories, units, analytes, hole and interval columns. A workbook with several sheets asks which.', examples: ['open assays.csv'] },
   read: (text, q) => { let m; if (/^open (?:the sample|sample|assays|assays\.csv)$/.test(q)) return {}; if ((m = /^open (?:the |my )?(log)$/.exec(q))) return { device: m[1] }; if ((m = /^open (.+)$/.exec(q))) { const f = Object.values(S.files).find(f => f.name.toLowerCase() === m[1]); return f ? { file: { name: f.name, hash: f.hash } } : null; } return null; },
   topic: () => null,
   run: a => {
@@ -105,6 +106,8 @@ tool({
       const d = S.tables[a.device]; if (!d || !d.rows.length) return { read: ['open table', { v: a.device }], body: [{ t: 'note', kind: 'err', text: `The ${a.device} is empty. Say "log 5 km run" first.` }], trace: ['device table: empty'] };
       t = { name: a.device, source: 'device', hash: a.device, rows: d.rows.map(r => ({ ...r })), cols: d.cols.map(c => ({ ...c })), roles: {} };
     } else if (a.file) {
+      // a drawing, a YAML or a geometry file is not a table: it opens as its conversion
+      if (DOCUMENT.test(a.file.name)) return T.convertFile({ file: a.file });
       const f = S.files[a.file.hash];
       if (!f) return { read: ['open table', { v: a.file.name }], body: [{ t: 'note', kind: 'err', text: `${a.file.name} is not kept on this device. Open it again from your files.` }], trace: ['file: not in the device store'] };
       if (a.sheet) a.file = { ...a.file, sheet: a.sheet };
@@ -123,7 +126,7 @@ tool({
     const trace = [...(t.convTrace || []), t.source === 'sample' ? 'generate the sample table' : t.source === 'device' ? `device table ${t.name}: ${t.rows.length} rows` : `recon.sniff(${t.name}) → delimiter "${t.delimiter}", ${t.cols.length} columns typed`, `roles: ${Object.entries(t.roles).map(([k, v]) => `${k} = ${v}`).join(', ') || 'none found'}`, `tare: ${nulls} blank or sentinel cells, ${bdl.map(([c, n]) => `${n} negative ${c}`).join(', ') || 'no negative codes'}`];
     return {
       read: ['open table', { v: t.name }, ...(t.sheet && t.from === 'xlsx' ? [{ v: `sheet ${t.sheet}`, key: 'sheet', alts: Object.keys((S.files[t.hash] || {}).tables || {}).length > 1 ? Object.keys(S.files[t.hash].tables) : [t.sheet], cur: t.sheet }] : [])],
-      body: [{ t: 'kv', rows }, ...(t.from ? [{ t: 'note', text: `Converted from ${t.from === 'xlsx' ? 'xlsx by @gcu/sheet' : 'Datamine .dm by @gcu/dm'} when the file was opened${t.lost && t.lost.length ? '; ' + t.lost.join('; ') : ''}.` }] : []), ...(bdl.length ? [{ t: 'note', text: `${bdl.map(([c, n]) => `${n} ${c} values are negative`).join('; ')}. That looks like a below-detection code. Statistics leave them out until you choose a policy on a card.` }] : []), { t: 'src', text: srcLine(t) }],
+      body: [{ t: 'kv', rows }, ...(t.from ? [{ t: 'note', text: `Converted from ${t.from === 'xlsx' ? 'xlsx by @gcu/sheet' : t.from === 'parquet' ? 'Parquet by @gcu/parquet' : 'Datamine .dm by @gcu/dm'} when the file was opened${t.lost && t.lost.length ? '; ' + t.lost.join('; ') : ''}.` }] : []), ...(bdl.length ? [{ t: 'note', text: `${bdl.map(([c, n]) => `${n} ${c} values are negative`).join('; ')}. That looks like a below-detection code. Statistics leave them out until you choose a policy on a card.` }] : []), { t: 'src', text: srcLine(t) }],
       trace, py: t.source === 'device' ? `dh = device.table("${t.name}")` : `dh = read_csv("${t.name}")`
     };
   }

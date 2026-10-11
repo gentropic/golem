@@ -102,6 +102,13 @@ const dmText = await page.evaluate(() => [...document.querySelectorAll('#stream 
 const dmOk = /700/.test(dmText) && /@gcu\/dm/.test(dmText);
 console.log(`${dmOk ? 'ok  ' : 'FAIL'} a Datamine .dm opens through the picker`);
 if (!dmOk) failed++;
+// a DXF through the picker opens as its conversion, not as a table
+await page.setInputFiles('#file', join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'pit.dxf'));
+await page.waitForTimeout(300);
+const dxfText = await page.evaluate(() => [...document.querySelectorAll('#stream .card')].pop().textContent);
+const dxfOk = /FeatureCollection/.test(dxfText) && /@gcu\/dxf/.test(dxfText);
+console.log(`${dxfOk ? 'ok  ' : 'FAIL'} a DXF opens through the picker as GeoJSON`);
+if (!dxfOk) failed++;
 // Python in a fresh worker built from the page itself: the card starts as running and is replaced when adder answers
 await page.fill('#q', 'run this: x = sum(range(10))\nprint("total", x)\nx * 2'); await page.press('#q', 'Enter');
 const pyText = await page.waitForFunction(() => { const c = [...document.querySelectorAll('#stream .card')].pop(); return c && /total 45/.test(c.textContent) && /90/.test(c.textContent) ? c.textContent : null; }, null, { timeout: 8000 }).then(h => h.jsonValue(), () => null);
