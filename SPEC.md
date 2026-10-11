@@ -199,7 +199,7 @@ Status: **mock** = works in `src/` today; **planned** = named, not built.
 | Knowledge | Term definitions with reader hand-off | mock (locator only) | `@gcu/librarian`, `@gcu/reader-core` |
 | Knowledge | Geologic timescale: bounds, ranks, parents, neighbours, subdivisions, the unit at an age | built in (8 Oct 2026) from the ICS chart via Macrostrat, CC BY 4.0, 171 units | the first real records pack; the `golem` facet is this file |
 | Knowledge | Style check from a rule pack | mock | elements-of-style pack |
-| Knowledge | Search over the user's documents | planned | `@gcu/librarian`, `@gcu/vfs` |
+| Knowledge | Search over the user's documents | mock (11 Oct 2026): Markdown, text and HTML from the picker kept on the device, cut into passages by heading and paragraph, indexed by librarian (rebuilt from the kept files, never stored), passages returned verbatim with the matched words marked; no folder indexing (needs the `tree` plugin's grant), no PDF, no documentation packs yet | `@gcu/librarian`, `@gcu/vfs` |
 | Device | Calendar event | mock (simulated hand-off) | lead-acid intent route |
 | Device | Timer, alarm | mock (simulated hand-off) | lead-acid intent route |
 | Device | Map, dial, share | planned | lead-acid intent route; `share` exists today |

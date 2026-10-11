@@ -26,6 +26,8 @@ import './sky.js';
 import './apply.js';
 import './python.js';
 import { DOCUMENT } from './interchange.js';
+import { DOCTEXT } from './docs.js';
+import { tableFromText } from './table.js';
 import { convertBinary } from './formats.js';
 import './notes.js';
 import { norm, grammar, context, taught } from './reading.js';
@@ -78,11 +80,24 @@ export function submit(raw) {
 
 // a 32-bit FNV-1a of the text: the key of a file in the device store, and what a card remembers of it
 export function hashOf(text) { let h = 0x811c9dc5; for (let i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 0x01000193); } return (h >>> 0).toString(16).padStart(8, '0'); }
+// a .txt is a table when recon finds columns; split on spaces, only when every line has the same number of fields
+function tabular(name, text, hash) {
+  const t = tableFromText(name, text, hash); if (!t || t.cols.length < 2) return false;
+  if (t.delimiter !== ' ') return true;
+  const counts = new Set(text.split(/\r?\n/).filter(l => l.trim()).map(l => l.trim().split(/\s+/).length));
+  return counts.size === 1;
+}
 // a file the person picked: kept on the device by hash, opened as a card
 export function openFile(name, text) {
   if (!current()) newSession();
   const t0 = performance.now(), hash = hashOf(text);
   S.files[hash] = { name, hash, text, size: text.length };
+  // Markdown, HTML or prose is kept as a document to search; a .txt that holds a table opens as one
+  if (DOCTEXT.test(name) && !(/\.txt$/i.test(name) && tabular(name, text, hash))) {
+    S.files[hash].kind = 'doc';
+    const args = { file: { name, hash } }, res = T.docOpen(args);
+    return { kind: 'card', card: addCard(`open ${name}`, { tool: 'docOpen', args, rung: 'grammar', res }, performance.now() - t0) };
+  }
   // a drawing, a YAML or a geometry file is converted, not opened as a table
   if (DOCUMENT.test(name)) { const args = { file: { name, hash } }, res = T.convertFile(args); return { kind: 'card', card: addCard(`open ${name}`, { tool: 'convertFile', args, rung: 'grammar', res }, performance.now() - t0) }; }
   const args = { file: { name, hash } }, res = T.open(args);

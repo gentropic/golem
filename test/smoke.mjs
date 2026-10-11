@@ -109,6 +109,15 @@ const dxfText = await page.evaluate(() => [...document.querySelectorAll('#stream
 const dxfOk = /FeatureCollection/.test(dxfText) && /@gcu\/dxf/.test(dxfText);
 console.log(`${dxfOk ? 'ok  ' : 'FAIL'} a DXF opens through the picker as GeoJSON`);
 if (!dxfOk) failed++;
+// a Markdown file is kept as a document and searched; the matched word is marked in the passage
+await page.setInputFiles('#file', join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'notes.md'));
+await page.waitForTimeout(300);
+await page.fill('#q', 'find resurvey in my documents'); await page.press('#q', 'Enter');
+await page.waitForTimeout(300);
+const docMark = await page.evaluate(() => { const c = [...document.querySelectorAll('#stream .card')].pop(); const m = c.querySelector('mark'); return m ? m.textContent + ' | ' + c.textContent : c.textContent; });
+const docOk = docMark.startsWith('resurvey | ') && /notes\.md · Field notes › Collar check · line 7/.test(docMark);
+console.log(`${docOk ? 'ok  ' : 'FAIL'} a Markdown file is searched, the match marked${docOk ? '' : ': ' + docMark.slice(0, 200)}`);
+if (!docOk) failed++;
 // Python in a fresh worker built from the page itself: the card starts as running and is replaced when adder answers
 await page.fill('#q', 'run this: x = sum(range(10))\nprint("total", x)\nx * 2'); await page.press('#q', 'Enter');
 const pyText = await page.waitForFunction(() => { const c = [...document.querySelectorAll('#stream .card')].pop(); return c && /total 45/.test(c.textContent) && /90/.test(c.textContent) ? c.textContent : null; }, null, { timeout: 8000 }).then(h => h.jsonValue(), () => null);

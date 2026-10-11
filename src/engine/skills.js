@@ -9,7 +9,6 @@ tool({ name: 'munsell', planned: true, skill: { group: 'Field', title: 'Munsell 
 tool({ name: 'kinematic', planned: true, skill: { group: 'Field', title: 'Kinematic check', on: 'daylight', about: 'Planar, wedge and toppling tests against a slope face.', examples: [] } });
 tool({ name: 'transform', planned: true, skill: { group: 'Table', title: 'Transform by example', on: 'new package', about: 'Show two examples (BH-001A → 1) and it derives the rule for the column.', examples: [] } });
 tool({ name: 'report', planned: true, skill: { group: 'Table', title: 'Report paragraph', on: 'templates', about: 'A method paragraph written from the plan parameters.', examples: [] } });
-tool({ name: 'documents', planned: true, skill: { group: 'Knowledge', title: 'Your documents', on: 'librarian · glass', about: 'Retrieval over files you add. Returns the passage and its location.', examples: [] } });
 tool({ name: 'mapdial', planned: true, skill: { group: 'Device', title: 'Map, dial, share', on: 'lead-acid intent', about: 'Show a place, start a call, share the last result.', examples: [] } });
 
 // Row: [id, name, size · licence, status (live | samp | plan), description]
