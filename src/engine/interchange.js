@@ -1,8 +1,7 @@
 // Formats that are not tables: YAML and JSON both ways (within the strict subset @gcu/yaml reads), WKT and
 // GeoJSON both ways (@gcu/wkt), and DXF to GeoJSON or WKT one way (@gcu/dxf). Pasted after a colon, or a
 // file from the picker kept on the device. What does not carry over is said on the card.
-import { S, tool, fmt } from './core.js';
-import { payloadOf } from './text.js';
+import { S, tool, frame, fmt } from './core.js';
 import { parse as parseYaml, emit, scalar, mapNode, seqNode, mapEntry } from '../vendor/yaml.js';
 import { parse as parseWkt, stringify as toWkt } from '../vendor/wkt.js';
 import { read as readDxf, explode, arcFromBulge } from '../vendor/dxf.js';
@@ -136,15 +135,8 @@ const PY = (from, to) => from === 'yaml' ? 'json.dumps(yaml.safe_load(text), ind
 const KIND = { json: 'json', yaml: 'yaml', yml: 'yaml', wkt: 'wkt', geojson: 'geojson' };
 const sniff = body => /^\s*[[{]/.test(body) ? (/"type"\s*:\s*"(Feature|FeatureCollection|Point|LineString|Polygon|Multi\w+|GeometryCollection)"/.test(body) ? 'geojson' : 'json') : /^\s*(?:SRID=\d+;\s*)?(POINT|LINESTRING|POLYGON|MULTIPOINT|MULTILINESTRING|MULTIPOLYGON|GEOMETRYCOLLECTION)\b/i.test(body) ? 'wkt' : 'yaml';
 tool({
-  name: 'convertText', rank: 44,
-  skill: { group: 'Compute', title: 'YAML, JSON, WKT and GeoJSON', on: '@gcu/yaml · wkt · dxf', about: 'JSON to YAML and back (the strict YAML subset, where every string is quoted), WKT to GeoJSON and back, and DXF drawings to GeoJSON or WKT from your files. What does not carry over is said.', examples: ['json to yaml: {"hole": "DH-12", "depth": 240.5}', 'wkt to geojson: POINT (30 10)', 'as wkt: {"type": "LineString", "coordinates": [[0, 0], [10, 5]]}'] },
-  read: (text, q, raw) => {
-    const p = payloadOf(raw || text); if (!p || !p.body) return null;
-    const m = /^(?:convert\s+)?(?:(?:this|the)\s+)?(?:(json|ya?ml|wkt|geojson)\s+)?(?:to|as|into|in)\s+(json|ya?ml|wkt|geojson)$/i.exec(p.head.trim());
-    if (!m) return null;
-    const body = p.body.replace(/\r\n/g, '\n');
-    return { from: m[1] ? KIND[m[1].toLowerCase()] : sniff(body), to: KIND[m[2].toLowerCase()], text: body };
-  },
+  name: 'convertText',
+  skill: { group: 'Compute', title: 'YAML, JSON, WKT and GeoJSON', on: '@gcu/yaml · wkt · dxf', about: 'JSON to YAML and back (the strict YAML subset, where every string is quoted), WKT to GeoJSON and back, and DXF drawings to GeoJSON or WKT from your files. What does not carry over is said.', examples: ['json to yaml: {"hole": "DH-12", "depth": 240.5}', 'wkt to geojson: POINT (30 10)', 'convert to wkt: {"type": "LineString", "coordinates": [[0, 0], [10, 5]]}'] },
   amend: [{ arg: 'to', match: /^(?:as |to |in )?(json|yaml|wkt|geojson)(?: instead)?$/ }],
   topic: a => [`${LABEL[a.from]} to ${LABEL[a.to]}`, 1],
   run: a => {
@@ -159,12 +151,7 @@ tool({
 /* ── a file the device keeps ────────────────────────────────── */
 const fileNamed = name => Object.values(S.files).find(f => f.name.toLowerCase() === name.toLowerCase());
 tool({
-  name: 'convertFile', rank: 43,
-  read: (text, q) => {
-    const m = /^(?:convert |export |save )?(\S+\.(?:dxf|ya?ml|wkt|geojson))(?: (?:to|as|into) (json|ya?ml|wkt|geojson))?$/i.exec(text.trim());
-    const f = m && fileNamed(m[1]); if (!f) return null;
-    return { file: { name: f.name, hash: f.hash }, ...(m[2] ? { to: KIND[m[2].toLowerCase()] } : {}) };
-  },
+  name: 'convertFile',
   amend: [{ arg: 'to', match: /^(?:as |to |in )?(json|yaml|wkt|geojson)(?: instead)?$/ }],
   topic: a => [a.file.name, 2],
   run: a => {
@@ -173,5 +160,18 @@ tool({
     if (!f) return { read, body: [{ t: 'note', kind: 'err', text: `${a.file.name} is not kept on this device. Open it again from your files.` }], trace: ['file: not in the device store'] };
     if (!targets.includes(to)) return { read, body: [{ t: 'note', kind: 'err', text: `${LABEL[from] || from} does not become ${LABEL[to] || to} here. It can become ${targets.map(t => LABEL[t]).join(' or ')}.` }], trace: [`${from} → ${to}: no such pair`] };
     return card(read, from, to, f.text, a.file.name.replace(/\.\w+$/, ''), PY(from, to).replace('text', `open("${a.file.name}").read()`));
+  }
+});
+/* ── what reads them: "json to yaml: …", "convert to wkt: …", "pit.dxf to wkt" ── */
+const payload = c => { const t = c.roles.text && c.roles.text[0]; return t && t.type === 'text' ? t.value.replace(/\r\n/g, '\n') : null; };
+frame({
+  name: 'reformat', label: 'Convert', words: ['convert', 'turn', 'change'], elidable: true,
+  theme: ['format', 'file'], required: [], roles: { to: { preps: ['to', 'as', 'into', 'in'], types: ['format'] }, text: { preps: [':'], types: ['text'] } },
+  words_pt: ['converte', 'converta', 'converter', 'transforma', 'transforme'], label_pt: 'Converter',
+  bind: c => {
+    const th = c.theme[0], to = c.roles.to && KIND[c.roles.to[0].value], body = payload(c);
+    if (body) { const from = th && th.type === 'format' ? KIND[th.value] : sniff(body); return from && to ? { tool: 'convertText', args: { from, to, text: body } } : null; }
+    const f = th && th.type === 'file' && th.value && fileNamed(th.value); if (!f || !DOCUMENT.test(f.name)) return null;
+    return { tool: 'convertFile', args: { file: { name: f.name, hash: f.hash }, ...(to ? { to } : {}) } };
   }
 });

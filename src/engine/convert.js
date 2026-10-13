@@ -1,6 +1,6 @@
 // Conversions that need no file format reader: hashes, text encodings both ways, and the open table
 // as CSV, TSV or JSON with a save action. Format readers (xlsx, dm, parquet) are the second pass.
-import { S, tool, fmt } from './core.js';
+import { S, tool, frame, noun, fmt } from './core.js';
 import { writeParquet } from '../vendor/parquet.js';
 
 /* ── SHA-256, synchronous, so a card recomputes without a promise ── */
@@ -36,14 +36,8 @@ const thisFile = () => (S.table && S.table.source === 'file' && S.files[S.table.
 
 /* ── hash ───────────────────────────────────────────────────── */
 tool({
-  name: 'hash', rank: 46,
+  name: 'hash',
   skill: { group: 'Compute', title: 'Hashes and encodings', on: 'own SHA-256, TextEncoder', about: 'SHA-256 of a text or an opened file; text to and from base64, hex and URL encoding. Bytes that are not UTF-8 are shown as hex, not guessed.', examples: ['sha256: abc', 'sha256 of this file', 'base64 decode: SGVsbG8=', 'hex encode: golem', 'url decode: a%20b%26c'] },
-  read: text => {
-    let m = /^(?:sha-?256|hash)(?:\s+of)?(?:\s+(?:this|the)\s+file|\s+file)\s*$/i.exec(text); if (m) return { file: 'this' };
-    m = /^(?:sha-?256|hash)\s+of\s+(\S+\.\w{1,6})$/i.exec(text); if (m && fileNamed(m[1])) return { file: m[1] };
-    m = /^(?:sha-?256|hash)(?:\s+of)?\s*[:]\s*(.*)$/i.exec(text) || /^(?:sha-?256|hash)\s+of\s+(.+)$/i.exec(text); if (m) return { text: m[1] };
-    return null;
-  },
   topic: () => ['SHA-256', 1],
   run: a => {
     let bytes, read;
@@ -60,14 +54,7 @@ tool({
 /* ── text encodings ─────────────────────────────────────────── */
 const ENC = { base64: 'base64', b64: 'base64', hex: 'hex', hexadecimal: 'hex', url: 'url', uri: 'url', percent: 'url', urlencode: 'url', urlencoded: 'url' };
 tool({
-  name: 'encode', rank: 47,
-  read: text => {
-    let m = /^(?:(encode|decode)\s+(?:this\s+|as\s+|from\s+|to\s+)?)?(base64|b64|hex|hexadecimal|url|uri|percent|urlencoded?)(?:[\s-]*(encode|decode|encoded|decoded))?\s*[:]\s*(.*)$/i.exec(text);
-    if (!m) m = /^(?:(encode|decode)\s+(?:this\s+)?(?:as\s+|from\s+|to\s+|in\s+)?)(base64|b64|hex|hexadecimal|url|uri|percent|urlencoded?)\s+(.+)$/i.exec(text) && (x => [x[0], x[1], x[2], null, x[3]])(/^(?:(encode|decode)\s+(?:this\s+)?(?:as\s+|from\s+|to\s+|in\s+)?)(base64|b64|hex|hexadecimal|url|uri|percent|urlencoded?)\s+(.+)$/i.exec(text));
-    if (!m) return null;
-    const op = ((m[1] || m[3] || 'encode').toLowerCase().replace(/d$/, '')).replace(/^encode$|^decode$/, x => x);
-    return { enc: ENC[m[2].toLowerCase()], op: /^dec/.test(op) ? 'decode' : 'encode', text: m[4] };
-  },
+  name: 'encode',
   amend: [{ arg: 'op', match: /^(encode|decode)(?: it| instead)?$/ }],
   topic: a => [`${a.enc} ${a.op}`, 1],
   run: a => {
@@ -121,9 +108,8 @@ function parquetOut(t) {
   };
 }
 tool({
-  name: 'tableExport', rank: 48, pre: ['table'],
+  name: 'tableExport', pre: ['table'],
   skill: { group: 'Table', title: 'Table as CSV, TSV, JSON or Parquet', on: 'built in · @gcu/parquet', about: 'The open table written out, with what the format cannot hold stated. Copy or save it; Parquet is saved, not copied.', examples: ['the table as json', 'export the table as tsv', 'the table as parquet'] },
-  read: (text, q) => { const m = /^(?:export |save |convert |write |give me )?(?:the |this )?(?:table|file|data|rows)(?: as| to| in)? (csv|tsv|json|parquet|comma separated|tab separated)(?: file| format)?$/.exec(q); return m ? { fmt: FMT[m[1]] } : null; },
   amend: [{ arg: 'fmt', match: /^(?:as |to |in )?(csv|tsv|json|parquet)(?: instead)?$/ }],
   topic: a => [`Table as ${a.fmt === 'parquet' ? 'Parquet' : a.fmt.toUpperCase()}`, 1],
   run: a => {
@@ -142,4 +128,27 @@ tool({
       trace: [`${t.rows.length} rows × ${t.cols.length} columns → ${a.fmt}`, `${lines.length - (a.fmt === 'json' ? 0 : 1)} lines, ${utf8(text).length} bytes`], py: a.fmt === 'json' ? `dh.to_json("${name}", orient="records")` : `dh.to_csv("${name}", sep=${a.fmt === 'tsv' ? '"\\t"' : '","'}, index=False)`
     };
   }
+});
+/* ── what reads them ─────────────────────────────────────────── */
+const payload = c => { const t = c.roles.text && c.roles.text[0]; return t && t.type === 'text' ? t.value.replace(/\r\n/g, '\n') : null; };
+noun({ type: 'encoding', words: { base64: ['base64', 'b64'], hex: ['hex', 'hexadecimal'], url: ['url', 'uri', 'percent', 'urlencoded', 'url-encoded'] }, generic: ['encoding'],
+  words_pt: { base64: ['base64', 'b64'], hex: ['hex', 'hexadecimal'], url: ['url', 'uri', 'percent'] }, generic_pt: ['codificação', 'codificacao'] });
+// "sha256: abc", "sha256 of this file", "hash of holes.csv"
+frame({
+  name: 'hash', label: 'SHA-256', words: ['sha256', 'sha-256', 'hash', 'checksum'], theme: [], required: [],
+  roles: { text: { preps: [':'], types: ['text'] }, of: { preps: ['of', 'for'], types: ['file', 'text'] } },
+  words_pt: ['sha256', 'hash', 'checksum'], label_pt: 'SHA-256',
+  bind: c => {
+    if (payload(c) != null) return { tool: 'hash', args: { text: payload(c) } };
+    const of = c.roles.of && c.roles.of[0]; if (!of) return null;
+    if (of.type === 'text') return { tool: 'hash', args: { text: of.value } };
+    return { tool: 'hash', args: { file: of.value ? fileNamed(of.value).name : 'this' } };
+  }
+});
+// "base64 decode: …", "decode base64: …", "hex encode: golem", "decode from url: …"
+for (const op of ['encode', 'decode']) frame({
+  name: op, label: op === 'encode' ? 'Encode' : 'Decode', words: op === 'encode' ? ['encode', 'encoding'] : ['decode', 'decoding'], elidable: op === 'encode',   // "base64: golem" encodes
+  subject: ['encoding'], theme: ['encoding'], required: ['text'], roles: { as: { preps: ['as', 'to', 'in', 'into', 'from'], types: ['encoding'] }, text: { preps: [':', ''], types: ['text'] } },   // '' = the text may follow bare: "decode hex 676f"
+  words_pt: op === 'encode' ? ['codifica', 'codifique', 'codificar'] : ['decodifica', 'decodifique', 'decodificar'], label_pt: op === 'encode' ? 'Codificar' : 'Decodificar',
+  bind: c => { const e = (c.roles.subject || c.theme || [])[0] || (c.roles.as || [])[0]; return e && payload(c) != null ? { tool: 'encode', args: { enc: e.value, op, text: payload(c) } } : null; }
 });

@@ -2,8 +2,7 @@
 // "running" card carrying a job, the runner (a Web Worker in the page, adder in-process in the tests)
 // answers later, and the card is recomputed from the kept result. Replay reruns the code, which is
 // deterministic: a fresh interpreter each time, no network, no clock, a seeded random.
-import { tool, result, fmt } from './core.js';
-import { payloadOf } from './text.js';
+import { tool, frame, result, fmt } from './core.js';
 import { importNotebook } from '../vendor/ipynb.js';
 
 const BUDGET = { steps: 2000000, ms: 5000 };
@@ -22,9 +21,8 @@ export function rewriteForGcu(code) {
 const HEAD = /^(?:run|run this|run it|python|py|execute|exec|eval(?:uate)?(?: this)?|what does this print|trace|trace this|step through(?: this)?)$/i;
 
 tool({
-  name: 'python', rank: 41,
+  name: 'python',
   skill: { group: 'Compute', title: 'Run and trace Python', on: '@gcu/adder', about: 'Python run on the device by adder, compiled to JavaScript through AIR (tree-walked when tracing, or when the compiler declines a construct): output, the last value, the error with its line. "trace it" adds a table of lines and the variables they changed. No network, no page access, a statement budget; numpy, pandas, scipy, sklearn and matplotlib imports are rewritten to the GCU names (natra, sadpan, scitra, learn, plt) and shown; figures come back as drawings on the card.', examples: ['run this: print(sum(range(10)))', 'run this: import plt; plt.plot([1, 2, 3], [1, 4, 9]); plt.show()', 'trace this: a = 1; b = a * 2; a = a + b'] },
-  read: (text, q, raw) => { const p = payloadOf(raw || text); if (!p || !p.body || !HEAD.test(p.head)) return null; return { code: p.body.replace(/\r\n/g, '\n'), trace: /^(?:trace|step)/i.test(p.head) }; },
   amend: [{ arg: 'trace', match: /^(?:trace it|trace|step through it|show the steps)$/, value: () => true }, { arg: 'trace', match: /^(?:no trace|just run it)$/, value: () => false }],
   topic: () => ['Python', 1],
   run: a => {
@@ -54,4 +52,14 @@ tool({
     body.push(...subs, { ...src, text: `@gcu/adder, ${how} · ${limits} · ran in ${fmt(r.ms)} ms` });
     return { read, value: r.value, copy: r.stdout || r.value || '', body, trace: [`adder.run(${lines} lines${a.trace ? ', trace' : ''}) in a fresh interpreter`, `engine: ${r.engine || 'adder'}${r.engineWhy ? ` (${r.engineWhy})` : ''}`, r.error ? `raised ${r.error.type}` : 'finished', `${fmt(r.ms)} ms`], py: a.code };
   }
+});
+/* ── what reads it: "run this:" or "trace this:", then the code after the colon or on the next lines ── */
+const payload = c => { const t = c.roles.text && c.roles.text[0]; return t && t.type === 'text' ? t.value.replace(/\r\n/g, '\n') : null; };
+for (const [name, words, words_pt, trace] of [
+  ['python', ['run', 'python', 'py', 'execute', 'exec', 'eval', 'evaluate', 'what does this print'], ['roda', 'rode', 'rodar', 'executa', 'execute', 'executar', 'avalia', 'avalie'], false],
+  ['pytrace', ['trace', 'step through'], ['rastreia', 'rastreie', 'passo a passo'], true]
+]) frame({
+  name, label: trace ? 'Trace' : 'Run', words, theme: [], required: ['text'], roles: { text: { preps: [':'], types: ['text'] } },
+  words_pt, label_pt: trace ? 'Rastrear' : 'Rodar',
+  bind: c => payload(c) ? { tool: 'python', args: { code: payload(c), trace } } : null
 });

@@ -1,10 +1,10 @@
 // Notes and taught words. Both belong to the device and are shared by every session.
-import { S, tool } from './core.js';
+import { S, tool, frame } from './core.js';
+const textOf = c => c.theme[0] && c.theme[0].type === 'text' ? c.theme[0].value : null;
 
 tool({
-  name: 'remember', rank: 40,
+  name: 'remember',
   skill: { group: 'Session', title: 'Notes', on: 'glass', about: 'Remembers only what you ask it to.', examples: ['remember that hole 12 collar was resurveyed in march', 'what do you know about hole 12'] },
-  read: (text, q) => /^remember /.test(q) ? { text: text.replace(/^remember (that )?/i, '') } : null,
   topic: () => ['Notes', 1],
   run: a => {
     if (!a.done) { S.facts.push(a.text); a.done = true; }
@@ -12,8 +12,7 @@ tool({
   }
 });
 tool({
-  name: 'recall', rank: 41,
-  read: (text, q) => { const m = /^what do you (?:know|remember) about (.+)$/.exec(q); return m ? { about: m[1] } : null; },
+  name: 'recall',
   topic: () => ['Notes', 1],
   run: a => {
     const w = a.about.split(/\s+/).filter(Boolean), hit = S.facts.filter(f => w.every(x => f.toLowerCase().includes(x)));
@@ -21,11 +20,27 @@ tool({
   }
 });
 tool({
-  name: 'teach', rank: 10,
+  name: 'teach',
   skill: { group: 'Session', title: 'Teach a word', on: 'lexicon', about: 'Stays on the device.', examples: ['pop means population'] },
-  read: (text, q) => { const m = /^(.+?) means (.+)$/.exec(q); return m ? { word: m[1], means: m[2] } : null; },
   run: a => {
     S.aliases[a.word] = a.means;
     return { read: ['learn that', { v: a.word }, 'means', { v: a.means }], body: [{ t: 'note', kind: 'ok', text: `Learned. From now on “${a.word}” reads as “${a.means}” on this device.` }], trace: ['lexicon.add(word → meaning)', 'retrain: instant, the lexicon is a table'] };
   }
+});
+
+// "remember (that) …", "what do you know about …", "pop means population": the words are free text
+frame({
+  name: 'remember', label: 'Remember', words: ['remember', 'note', 'note down', 'make a note', 'keep in mind'], lead: ['that'], theme: ['text'], required: ['theme'], roles: {},
+  words_pt: ['lembra', 'lembre', 'anota', 'anote', 'guarda', 'guarde'], lead_pt: ['que'], label_pt: 'Lembrar',
+  bind: c => textOf(c) ? { tool: 'remember', args: { text: textOf(c) } } : null
+});
+frame({
+  name: 'recall', label: 'Recall', words: ['what do you know about', 'what do you remember about', 'what did i note about', 'recall', 'notes about'], theme: ['text'], required: ['theme'], roles: {},
+  words_pt: ['o que você sabe sobre', 'o que voce sabe sobre', 'o que eu anotei sobre'], label_pt: 'Recordar',
+  bind: c => textOf(c) ? { tool: 'recall', args: { about: textOf(c).toLowerCase() } } : null
+});
+frame({
+  name: 'teach', label: 'Teach', words: ['means', 'stands for', 'is short for', 'is another word for'], subject: ['text'], theme: ['text'], required: ['theme', 'subject'], roles: {},
+  words_pt: ['significa', 'quer dizer', 'é abreviação de'], label_pt: 'Ensinar',
+  bind: c => { const w = c.roles.subject && c.roles.subject[0]; return w && textOf(c) ? { tool: 'teach', args: { word: w.value.toLowerCase(), means: textOf(c).toLowerCase() } } : null; }
 });

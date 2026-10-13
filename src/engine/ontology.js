@@ -1,7 +1,7 @@
 // The clause ontology, assembled from what golem knows: units from the conversion table, nouns from the
 // sample packs, verb frames from the declarations. Inert data; the build writes it to dist/golem.json.
 // Portuguese synonyms are listed here by hand until packs carry them in their golem facet.
-import { FRAMES, S } from './core.js';
+import { FRAMES, LEXICON, S } from './core.js';
 import { UNIT_TABLE, COMPOUNDS, DIM, parseUnit, dimName } from './units.js';
 import { ELEMENT } from './table.js';
 import { FB, ODS, ODSA } from './knowledge.js';
@@ -35,16 +35,23 @@ export function ontology() {
       { type: 'filter', words: { landlocked: ['landlocked'] }, words_pt: { landlocked: ['sem litoral', 'sem costa'] } },
       { type: 'scale', words: { log: ['log', 'logarithmic', 'log scale'], linear: ['linear', 'linear scale'] }, words_pt: { log: ['log', 'logarítmica', 'logaritmica', 'escala log'], linear: ['linear', 'escala linear'] } },
       { type: 'term', words: terms, generic: ['term', 'word'], words_pt: { ...terms, 'hash table': ['hash table', 'tabela hash'], 'b-tree': ['b-tree', 'btree', 'árvore b', 'arvore b'] }, generic_pt: ['termo', 'palavra'] },
-      { type: 'table', words: { 'assays.csv': ['assays.csv', 'assays', 'sample table'] }, generic: ['table', 'file', 'csv'], words_pt: { 'assays.csv': ['assays.csv', 'assays', 'tabela de amostra'] }, generic_pt: ['tabela', 'arquivo'] },
-      { type: 'format', words: { script: ['script', 'python', 'adder'], notebook: ['notebook'], csv: ['csv'], tsv: ['tsv'], json: ['json'] }, words_pt: { script: ['script', 'python', 'adder'], notebook: ['notebook', 'caderno'], csv: ['csv'], tsv: ['tsv'], json: ['json'] } },
+      { type: 'table', words: { 'assays.csv': ['assays.csv', 'assays', 'sample table'] }, generic: ['table', 'csv', 'rows', 'data'], words_pt: { 'assays.csv': ['assays.csv', 'assays', 'tabela de amostra'] }, generic_pt: ['tabela', 'arquivo'] },
+      { type: 'format', words: { script: ['script', 'python', 'adder'], notebook: ['notebook'], csv: ['csv', 'comma separated'], tsv: ['tsv', 'tab separated'], json: ['json'], parquet: ['parquet'], yaml: ['yaml', 'yml'], wkt: ['wkt'], geojson: ['geojson'] },
+        words_pt: { script: ['script', 'python', 'adder'], notebook: ['notebook', 'caderno'], csv: ['csv'], tsv: ['tsv'], json: ['json'], parquet: ['parquet'], yaml: ['yaml', 'yml'], wkt: ['wkt'], geojson: ['geojson'] } },
+      // the files kept on this device, by name; "this file" is the generic
+      { type: 'file', words: Object.fromEntries(Object.values(S.files).map(f => [f.name, [f.name.toLowerCase()]])), generic: ['file', 'this file'],
+        words_pt: Object.fromEntries(Object.values(S.files).map(f => [f.name, [f.name.toLowerCase()]])), generic_pt: ['arquivo', 'este arquivo'] },
       { type: 'timer', words: { timer: ['timer', 'countdown'] }, words_pt: { timer: ['timer', 'cronômetro', 'cronometro', 'temporizador', 'contagem'] } },
       // every unit of the chart, by name; the generic words let "what period is …" fail cleanly to the regex reader
       { type: 'chron', words: Object.fromEntries(TIMESCALE.map(u => [u.n, [u.n.toLowerCase()]])), generic: ['period', 'epoch', 'era', 'eon', 'stage', 'series', 'system'],
-        words_pt: Object.fromEntries(TIMESCALE.map(u => [u.n, [u.n.toLowerCase()]])), generic_pt: ['período', 'periodo', 'época', 'epoca', 'era', 'éon', 'eon', 'andar', 'idade'] }
+        words_pt: Object.fromEntries(TIMESCALE.map(u => [u.n, [u.n.toLowerCase()]])), generic_pt: ['período', 'periodo', 'época', 'epoca', 'era', 'éon', 'eon', 'andar', 'idade'] },
+      ...LEXICON.nouns.map(n => typeof n === 'function' ? n() : n).filter(Boolean)
     ],
+    shapes: LEXICON.shapes,
+    fillers: ['golem', 'ok', 'okay'],
     units,
     compounds: [{ mod: 'filter', heads: ['country'], attr: 'filter', echo: true }, { mod: 'scale', heads: ['plot'], attr: 'scale', echo: true }],
-    postmods: [],
+    postmods: LEXICON.postmods,
     qmods: [{ head: 'timer', attr: 'duration', dims: ['time'] }],   // "a 30 minute timer"
     verbs: FRAMES.map(({ bind, ...f }) => f),
     inherit: [],

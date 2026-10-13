@@ -34,6 +34,15 @@ export const toolByName = name => TOOLS.find(d => d.name === name);
 //   bind(cmd) → { tool, args } | null     a parsed command (verb, theme, roles) into a tool and its args
 export const FRAMES = [];
 export function frame(f) { FRAMES.push(f); return f; }
+// The words a file contributes beside its frames, gathered into the ontology by ontology():
+//   noun({ type, words, generic, words_pt, generic_pt })   a type of thing; a function returning one is
+//                                                           called each time (a noun that follows the open table)
+//   shape({ type, re })                                     a token shape that is a thing of that type (270/60)
+//   postmod({ prep, heads, attr, quantity })                a modifier after a noun ("cu above 0.5")
+export const LEXICON = { nouns: [], shapes: [], postmods: [] };
+export const noun = n => { LEXICON.nouns.push(n); return n; };
+export const shape = s => { LEXICON.shapes.push(s); return s; };
+export const postmod = p => { LEXICON.postmods.push(p); return p; };
 
 // Conditions a tool may declare in `pre`. Each knows whether it holds now and how it can be established:
 // a list of steps { label, tool, args }. When a tool's condition is unmet, runTool() asks which step to

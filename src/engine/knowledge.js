@@ -80,9 +80,8 @@ const LINT = [
 ];
 const RULE = { 11: 'Use the active voice.', 12: 'Put statements in positive form.', 13: 'Omit needless words.' };
 tool({
-  name: 'lint', rank: 80,
+  name: 'lint',
   skill: { group: 'Knowledge', title: 'Style check', on: 'elements-of-style pack', about: 'Rules compiled into a checker that cites the rule.', examples: ['check: owing to the fact that the samples were lost by the lab, there is no doubt but that the assay was not important'] },
-  read: text => { const m = /^(?:check|lint|review)(?: this| the)?(?: text| sentence| paragraph)?[:,]? (.+)$/i.exec(text); return m ? { text: m[1] } : null; },
   topic: () => ['Style check', 2],
   run: a => {
     const hits = [];
@@ -128,4 +127,10 @@ frame({
     if (by && by !== 'area' && by !== 'population') return null;
     return { tool: 'factList', args: { by: by || 'area' } };
   }
+});
+// "check: …", "review this: …"
+frame({
+  name: 'lint', label: 'Check', words: ['check', 'lint', 'review', 'proofread', 'style check'], theme: [], required: ['text'], roles: { text: { preps: [':'], types: ['text'] } },
+  words_pt: ['revisa', 'revise', 'confere', 'confira'], label_pt: 'Revisar',
+  bind: c => { const t = c.roles.text && c.roles.text[0]; return t && t.type === 'text' ? { tool: 'lint', args: { text: t.value } } : null; }
 });

@@ -1,7 +1,7 @@
 // Text tools over a pasted payload: counts and readability, extracted key sentences, and a diff.
 // The payload is what follows the first colon, or every line after the first of a multi-line input;
 // it is never read as a command. Nothing here rewrites text.
-import { tool, fmt } from './core.js';
+import { tool, frame, fmt } from './core.js';
 
 // head: the command; body: the payload, from the raw input so lines and case survive
 export function payloadOf(raw) {
@@ -29,9 +29,8 @@ export function syllables(w) {
 const quote = s => `“${s.length > 160 ? s.slice(0, 157) + '…' : s}”`;
 
 tool({
-  name: 'wordcount', rank: 42,
+  name: 'wordcount',
   skill: { group: 'Compute', title: 'Text tools', on: 'own algorithms', about: 'Word count and readability (Flesch, English only, labelled estimates), the key sentences of a text in their original order (TextRank, nothing rewritten), and a diff of two blocks by line, word or character (Myers). The text follows a colon or the first line.', examples: ['word count: the quick brown fox jumps over the lazy dog. it was not amused.', 'summarise this: …', 'diff these: a\\n---\\nb'] },
-  read: (text, q, raw) => { const p = payloadOf(raw || text); if (!p || !p.body) return null; return /^(?:word ?count|count (?:the )?words|counts|text stats|stats|how readable is (?:this|it)|readability|reading level)(?: of this| of it| of)?$/i.test(p.head) ? { text: p.body, lang: 'en' } : null; },
   amend: [{ arg: 'lang', match: /^(?:in |it is |it's |this is )?(english|portuguese|spanish|french|german|other)$/, value: m => ({ english: 'en', portuguese: 'pt', spanish: 'es', french: 'fr', german: 'de', other: 'other' })[m[1]] }],
   topic: () => ['Text', .5],
   run: a => {
@@ -62,8 +61,7 @@ export function textrank(ss) {
   return R;
 }
 tool({
-  name: 'extract', rank: 43,
-  read: (text, q, raw) => { const p = payloadOf(raw || text); if (!p || !p.body) return null; const m = /^(?:summari[sz]e|summary of|key sentences(?: of)?|extract(?: the)?(?: key)?(?: sentences)?(?: of| from)?|main points(?: of)?|gist of)(?: this| it| the text)?$/i.exec(p.head); return m ? { text: p.body, n: 3 } : null; },
+  name: 'extract',
   amend: [{ arg: 'n', match: /^(\d+) sentences?$/, value: m => +m[1] }, { arg: 'n', match: /^shorter$/, value: (m, a) => Math.max(1, a.n - 1) }, { arg: 'n', match: /^longer$/, value: (m, a) => a.n + 1 }],
   topic: () => ['Key sentences', 1],
   run: a => {
@@ -98,8 +96,7 @@ export function myers(a, b) {
 const UNITS = ['line', 'word', 'character'];
 const split = (s, unit) => unit === 'line' ? s.split(/\r?\n/) : unit === 'word' ? s.split(/(\s+)/).filter(x => x !== '') : [...s];
 tool({
-  name: 'diff', rank: 44,
-  read: (text, q, raw) => { const p = payloadOf(raw || text); if (!p || !p.body) return null; const m = /^(?:diff|compare|difference(?: between)?|what changed(?: between)?)(?: these| this| the two| two)?(?: blocks| texts| versions)?$/i.exec(p.head); if (!m) return null; const parts = p.body.split(/\n\s*-{3,}\s*\n/); return parts.length === 2 ? { a: parts[0].trim(), b: parts[1].trim(), unit: /\n/.test(parts[0].trim()) || /\n/.test(parts[1].trim()) ? 'line' : 'word' } : { noSep: true }; },
+  name: 'diff',
   amend: [{ arg: 'unit', match: /^(?:by |per )?(lines?|words?|characters?|chars?|letters?)$/, value: m => /^l/.test(m[1]) ? 'line' : /^w/.test(m[1]) ? 'word' : 'character' }],
   topic: () => ['Diff', 1],
   run: a => {
@@ -110,5 +107,27 @@ tool({
     const read = ['diff by', { v: a.unit, key: 'unit', alts: UNITS, cur: a.unit }];
     const view = a.unit === 'line' ? ops.map(([t, s]) => `${t === '=' ? ' ' : t} ${s}`).join('\n') : ops.map(([t, s]) => t === '=' ? s : t === '-' ? `[-${s}-]` : `{+${s}+}`).join(a.unit === 'word' ? '' : '');
     return { read, value: added + removed, copy: view, body: [{ t: 'big', v: added + removed ? `${added} added, ${removed} removed` : 'Identical', unit: `${a.unit}s; ${same} unchanged` }, { t: 'pre', text: view }, { t: 'sub', text: a.unit === 'line' ? 'Lines marked − are only in the first block, + only in the second.' : 'Removed pieces are in [-…-], added ones in {+…+}.' }, { t: 'actions', items: [{ act: 'copy', label: 'Copy diff' }] }], trace: [`split by ${a.unit}: ${A.length} and ${B.length}`, `Myers O(ND) → ${ops.length} operations, D = ${added + removed}`], py: `difflib.unified_diff(a.splitlines(), b.splitlines())` };
+  }
+});
+/* ── what reads them: a head, then the text after a colon or a line break ── */
+const payload = c => { const t = c.roles.text && c.roles.text[0]; return t && t.type === 'text' ? t.value.replace(/\r\n/g, '\n') : null; };
+const TEXT_ROLE = { text: { preps: [':'], types: ['text'] } };
+frame({
+  name: 'wordcount', label: 'Count words', words: ['word count', 'count words', 'count the words', 'text stats', 'readability', 'reading level', 'how readable is'], theme: [], required: ['text'], roles: TEXT_ROLE,
+  words_pt: ['contar palavras', 'conta as palavras', 'contagem de palavras', 'legibilidade'], label_pt: 'Contar palavras',
+  bind: c => payload(c) ? { tool: 'wordcount', args: { text: payload(c), lang: 'en' } } : null
+});
+frame({
+  name: 'extract', label: 'Key sentences', words: ['summarise', 'summarize', 'summary', 'key sentences', 'extract', 'extract the key sentences', 'main points', 'gist'], theme: [], required: ['text'], roles: TEXT_ROLE,
+  words_pt: ['resume', 'resuma', 'resumir', 'resumo', 'pontos principais', 'frases principais'], label_pt: 'Frases principais',
+  bind: c => payload(c) ? { tool: 'extract', args: { text: payload(c), n: 3 } } : null
+});
+frame({
+  name: 'diff', label: 'Diff', words: ['diff', 'compare', 'difference', 'difference between', 'what changed between', 'what changed in'], theme: [], required: ['text'], roles: TEXT_ROLE,
+  words_pt: ['diferença', 'diferença entre', 'compara', 'compare', 'o que mudou entre'], label_pt: 'Diferença',
+  bind: c => {
+    const p = payload(c); if (!p) return null;
+    const parts = p.split(/\n\s*-{3,}\s*\n/);
+    return { tool: 'diff', args: parts.length === 2 ? { a: parts[0].trim(), b: parts[1].trim(), unit: /\n/.test(parts[0].trim()) || /\n/.test(parts[1].trim()) ? 'line' : 'word' } : { noSep: true } };
   }
 });

@@ -132,7 +132,7 @@ tool({
   }
 });
 frame({
-  name: 'open', label: 'Open', words: ['open', 'load'], theme: ['table'], required: ['theme'], roles: {},
+  name: 'open', label: 'Open', words: ['open', 'load'], theme: ['table', 'file'], required: ['theme'], roles: {},
   words_pt: ['abrir', 'abre', 'carregar', 'carrega'], label_pt: 'Abrir',
   bind: c => { const v = c.theme[0] && c.theme[0].value; const f = v && Object.values(S.files).find(f => f.name.toLowerCase() === String(v).toLowerCase()); return f ? { tool: 'open', args: { file: { name: f.name, hash: f.hash } } } : { tool: 'open', args: {} }; }
 });

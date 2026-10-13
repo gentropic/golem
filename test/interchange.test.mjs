@@ -36,7 +36,7 @@ test('WKT to GeoJSON and back; an SRID is said to be dropped; several lines make
   assert.ok(note(s).includes('SRID 31983'), note(s)); assert.ok(!('srid' in JSON.parse(s.res.value)));
   const many = card('wkt to geojson:\nPOINT (1 2)\nLINESTRING (0 0, 1 1)');
   assert.equal(JSON.parse(many.res.value).features.length, 2);
-  const w = card('as wkt: {"type": "Feature", "properties": {"id": 1}, "geometry": {"type": "LineString", "coordinates": [[0, 0], [10, 5]]}}');
+  const w = card('convert to wkt: {"type": "Feature", "properties": {"id": 1}, "geometry": {"type": "LineString", "coordinates": [[0, 0], [10, 5]]}}');
   assert.equal(w.args.from, 'geojson', 'sniffed'); assert.equal(w.res.value.trim(), 'LINESTRING (0 0, 10 5)');
   assert.ok(note(w).includes('properties'), 'what WKT cannot hold is said');
   const bad = card('wkt to yaml: POINT (1 2)');

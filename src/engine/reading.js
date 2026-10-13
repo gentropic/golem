@@ -10,13 +10,23 @@ export const norm = s => s.trim().replace(/\s+/g, ' ').replace(/[?.!]+$/, '');
 
 /* ── rung 2, first half: the clause parser over golem's ontology ── */
 let clause = null, clauseFor = null;
-export const clauseEngine = () => { const key = S.table ? S.table.hash : 'sample'; if (!clause || clauseFor !== key) { clause = createEngine(ontology(), ENGLISH); clauseFor = key; } return clause; };
+export const clauseEngine = () => { const key = (S.table ? S.table.hash : 'sample') + '|' + Object.keys(S.files).sort().join(','); if (!clause || clauseFor !== key) { clause = createEngine(ontology(), ENGLISH); clauseFor = key; } return clause; };
 const clauseSession = () => S.clause || (S.clause = makeSession([]));
 // The parser's verdict on a text, then the frame's bind(): a frame may answer { tool, args }, or
 // { clarify } when the reading is whole but a value is missing, which becomes a clarify verdict too.
 // Only the first command of a sequence is taken for now; "then" chains are a plan the planner does not build yet.
+// When the grammar finds several readings, each is bound: if exactly one names a tool that takes it, that is the
+// reading ("python" is a verb and a format; only the verb has a tool for "python\n<code>"), and the trace says so.
+const bindOf = cmd => { const f = FRAMES.find(x => x.name === cmd.verb), b = f && f.bind(cmd); return b && !b.clarify ? b : null; };
 function verdictOf(text, session) {
-  const r = clauseEngine().understand(text, session);
+  let r = clauseEngine().understand(text, session);
+  if (r.status === 'ambiguous' && r.alternatives) {
+    const takers = r.alternatives.map((cmds, k) => ({ cmds, echo: r.readings[k], b: bindOf(cmds[0]) })).filter(x => x.b);
+    if (takers.length !== 1) return { r };
+    const t = takers[0];
+    r = { status: 'ok', commands: t.cmds, echo: t.echo, diag: { ...r.diag, notes: [...r.diag.notes, `${r.readings.length} readings; only "${t.echo.replace(/\.$/, '')}" names a tool that takes it`] } };
+    return { r, b: t.b };
+  }
   if (r.status !== 'ok') return { r };
   const cmd = r.commands[0], f = FRAMES.find(x => x.name === cmd.verb), b = f && f.bind(cmd), echo = r.echo.replace(/\.$/, '');
   if (!b) return { r: { status: 'clarify', reasons: [`I read "${echo}" but no tool takes that`], partial: [echo], diag: r.diag } };
@@ -35,7 +45,7 @@ const describeVerdict = r => `clause: ${r.status}${r.reasons ? ' — ' + r.reaso
 /* ── rung 2, second half: the regex rules the declarations carry, by rank ── */
 const readers = () => TOOLS.filter(d => d.read).sort((a, b) => a.rank - b.rank);
 export function grammar(text, q, rung, raw) {
-  const c = clauseRead(text, rung); if (c.tool) return c;
+  const c = clauseRead(raw || text, rung); if (c.tool) return c;   // the parser reads what was typed: a payload keeps its line breaks
   for (const d of readers()) {
     const args = d.read(text, q, raw); if (!args) continue;
     const res = runTool(d.name, args); if (res) return { tool: d.name, args, rung, res };
@@ -61,7 +71,7 @@ export function taught(text, q, raw) {
   let q2 = ' ' + q + ' ', t2 = ' ' + text + ' ';
   Object.entries(S.aliases).forEach(([k, v]) => { const re = new RegExp('(?<=\\s)' + k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?=\\s)', 'gi'); q2 = q2.replace(re, v); t2 = t2.replace(re, v); });
   q2 = q2.trim(); if (q2 === q) return null;
-  const r = grammar(t2.trim(), q2, 'taught', raw);
+  const r = grammar(t2.trim(), q2, 'taught', null);
   if (r) r.res.trace.unshift(`lexicon: "${q}" → "${q2}"`);
   return r;
 }
@@ -101,9 +111,8 @@ tool({
 tool({ name: 'amend', skill: { group: 'Session', title: 'Amend, repeat, undo', on: 'dispatch-meta', about: 'Change the last card without retyping it.', examples: ['in feet', 'log scale', 'and chile', 'again', 'undo'] } });
 tool({ name: 'sessions', skill: { group: 'Session', title: 'Sessions and history', on: 'plan store', about: 'Sessions name themselves from the tools that ran. Search covers all of them.', examples: ['new session', 'name this session friday lab run', 'history'] } });
 tool({
-  name: 'export', rank: 20,
+  name: 'export',
   skill: { group: 'Session', title: 'Export the plan', on: 'adder', about: 'The session as a script. Every line is a tool call it made.', examples: ['export as script'] },
-  read: (text, q) => /^(export|save|give me)\b.*\b(script|notebook|python|adder)$/.test(q) ? {} : null,
   run: () => {
     const body = S.cards.filter(c => c.res.py).map(c => `# ${c.raw}\n${c.res.py}`).join('\n\n');
     const src = `# golem session, exported ${iso(new Date())}\n# every line is a tool call the session made\nfrom gcu import *\n\n${body || '# nothing to export yet'}`;
@@ -111,7 +120,8 @@ tool({
   }
 });
 frame({
-  name: 'export', label: 'Export', words: ['export', 'save'], theme: [], required: ['as'], roles: { as: { preps: ['as', 'to'], types: ['format'] } },
+  name: 'export', label: 'Export', words: ['export', 'save', 'write', 'give me'], elidable: true, theme: ['table'], required: ['as'], roles: { as: { preps: ['as', 'to', 'in'], types: ['format'] } },
   words_pt: ['exportar', 'exporta', 'salvar', 'salva'], label_pt: 'Exportar',
-  bind: c => { const as = c.roles.as && c.roles.as[0] && c.roles.as[0].value; return ['csv', 'tsv', 'json'].includes(as) ? { tool: 'tableExport', args: { fmt: as } } : { tool: 'export', args: {} }; }
+  // csv, tsv, json and parquet are the open table as a file; script and notebook are the session as code
+  bind: c => { const as = c.roles.as && c.roles.as[0] && c.roles.as[0].value; return ['csv', 'tsv', 'json', 'parquet'].includes(as) ? { tool: 'tableExport', args: { fmt: as } } : ['script', 'notebook'].includes(as) ? { tool: 'export', args: {} } : null; }
 });

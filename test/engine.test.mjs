@@ -128,20 +128,24 @@ test('declarations drive the catalog, the names and the amendments', () => {
 test('the ontology derives from the declarations and is plain JSON', () => {
   const o = g.ontology();
   assert.equal(JSON.stringify(JSON.parse(JSON.stringify(o))), JSON.stringify(o));
-  assert.deepEqual(o.verbs.map(v => v.name).sort(), ['convert', 'date', 'define', 'export', 'list', 'lookup', 'open', 'plot', 'timer']);
+  const names = o.verbs.map(v => v.name);
+  for (const v of ['convert', 'date', 'define', 'export', 'list', 'lookup', 'open', 'plot', 'timer', 'remember', 'recall', 'teach']) assert.ok(names.includes(v), `a frame for ${v}`);
   assert.ok(o.verbs.every(v => !('bind' in v)), 'bind functions stay in the engine');
   assert.ok(o.units.some(u => u.unit === 'oz per short ton'));
   assert.ok(o.nouns.find(n => n.type === 'country').words.Mongolia);
 });
 
-test('the clause parser reads the bare phrases and closed questions; the regex rules keep the rest', () => {
+// Every query is read by the clause parser. Arithmetic is the one exception by design: it goes to the
+// expression parser. MOVING lists what still reads by a regex rule while the tools move to frames.
+const ARITHMETIC = new Set(['14 * cos(22) + 3^2']);
+const MOVING = new Set(['true thickness of a 14 m intercept, hole 270/60, bedding 045/30', 'what day is 15 nov 2027']);
+test('the clause parser reads every query but arithmetic', () => {
   g.reset();
-  const byClause = new Set(['0.35 oz per short ton in g/t', '2.7 g/cm3 in lb/ft3', '5 km in kg', '25 c in f', 'population density of mongolia in people per square mile', 'landlocked countries by population', 'capital of brazil', 'what is a skiplist', 'histogram of au', 'export as script', 'pop of mongolia', 'histogram of cu']);
   for (const [q, rung] of STEPS) {
     const o = g.submit(q);
     if (rung === null || o.kind !== 'card' || o.card.rung === 'none' || o.card.rung === 'context') continue;
     const viaClause = o.card.res.trace.some(t => t.startsWith('clause: '));
-    assert.equal(viaClause, byClause.has(q), `"${q}" read by ${viaClause ? 'clause' : 'the regex rules'}: ${o.card.res.trace[0]}`);
+    assert.equal(viaClause, !ARITHMETIC.has(q) && !MOVING.has(q), `"${q}" read by ${viaClause ? 'clause' : 'a regex rule'}: ${o.card.res.trace[0]}`);
   }
   const asked = g.submit('what is the capital of brazil?').card;
   assert.equal(asked.tool, 'fact');

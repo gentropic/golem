@@ -359,8 +359,9 @@
       },
       "generic": [
         "table",
-        "file",
-        "csv"
+        "csv",
+        "rows",
+        "data"
       ],
       "words_pt": {
         "assays.csv": [
@@ -386,13 +387,28 @@
           "notebook"
         ],
         "csv": [
-          "csv"
+          "csv",
+          "comma separated"
         ],
         "tsv": [
-          "tsv"
+          "tsv",
+          "tab separated"
         ],
         "json": [
           "json"
+        ],
+        "parquet": [
+          "parquet"
+        ],
+        "yaml": [
+          "yaml",
+          "yml"
+        ],
+        "wkt": [
+          "wkt"
+        ],
+        "geojson": [
+          "geojson"
         ]
       },
       "words_pt": {
@@ -413,8 +429,34 @@
         ],
         "json": [
           "json"
+        ],
+        "parquet": [
+          "parquet"
+        ],
+        "yaml": [
+          "yaml",
+          "yml"
+        ],
+        "wkt": [
+          "wkt"
+        ],
+        "geojson": [
+          "geojson"
         ]
       }
+    },
+    {
+      "type": "file",
+      "words": {},
+      "generic": [
+        "file",
+        "this file"
+      ],
+      "words_pt": {},
+      "generic_pt": [
+        "arquivo",
+        "este arquivo"
+      ]
     },
     {
       "type": "timer",
@@ -1486,7 +1528,55 @@
         "andar",
         "idade"
       ]
+    },
+    {
+      "type": "encoding",
+      "words": {
+        "base64": [
+          "base64",
+          "b64"
+        ],
+        "hex": [
+          "hex",
+          "hexadecimal"
+        ],
+        "url": [
+          "url",
+          "uri",
+          "percent",
+          "urlencoded",
+          "url-encoded"
+        ]
+      },
+      "generic": [
+        "encoding"
+      ],
+      "words_pt": {
+        "base64": [
+          "base64",
+          "b64"
+        ],
+        "hex": [
+          "hex",
+          "hexadecimal"
+        ],
+        "url": [
+          "url",
+          "uri",
+          "percent"
+        ]
+      },
+      "generic_pt": [
+        "codificação",
+        "codificacao"
+      ]
     }
+  ],
+  "shapes": [],
+  "fillers": [
+    "golem",
+    "ok",
+    "okay"
   ],
   "units": [
     {
@@ -1975,6 +2065,73 @@
   ],
   "verbs": [
     {
+      "name": "python",
+      "label": "Run",
+      "words": [
+        "run",
+        "python",
+        "py",
+        "execute",
+        "exec",
+        "eval",
+        "evaluate",
+        "what does this print"
+      ],
+      "theme": [],
+      "required": [
+        "text"
+      ],
+      "roles": {
+        "text": {
+          "preps": [
+            ":"
+          ],
+          "types": [
+            "text"
+          ]
+        }
+      },
+      "words_pt": [
+        "roda",
+        "rode",
+        "rodar",
+        "executa",
+        "execute",
+        "executar",
+        "avalia",
+        "avalie"
+      ],
+      "label_pt": "Rodar"
+    },
+    {
+      "name": "pytrace",
+      "label": "Trace",
+      "words": [
+        "trace",
+        "step through"
+      ],
+      "theme": [],
+      "required": [
+        "text"
+      ],
+      "roles": {
+        "text": {
+          "preps": [
+            ":"
+          ],
+          "types": [
+            "text"
+          ]
+        }
+      },
+      "words_pt": [
+        "rastreia",
+        "rastreie",
+        "passo a passo"
+      ],
+      "label_pt": "Rastrear"
+    },
+    {
       "name": "convert",
       "label": "Convert",
       "words": [
@@ -2012,6 +2169,50 @@
       "label_pt": "Converter"
     },
     {
+      "name": "reformat",
+      "label": "Convert",
+      "words": [
+        "convert",
+        "turn",
+        "change"
+      ],
+      "elidable": true,
+      "theme": [
+        "format",
+        "file"
+      ],
+      "required": [],
+      "roles": {
+        "to": {
+          "preps": [
+            "to",
+            "as",
+            "into",
+            "in"
+          ],
+          "types": [
+            "format"
+          ]
+        },
+        "text": {
+          "preps": [
+            ":"
+          ],
+          "types": [
+            "text"
+          ]
+        }
+      },
+      "words_pt": [
+        "converte",
+        "converta",
+        "converter",
+        "transforma",
+        "transforme"
+      ],
+      "label_pt": "Converter"
+    },
+    {
       "name": "open",
       "label": "Open",
       "words": [
@@ -2019,7 +2220,8 @@
         "load"
       ],
       "theme": [
-        "table"
+        "table",
+        "file"
       ],
       "required": [
         "theme"
@@ -2186,6 +2388,38 @@
       "label_pt": "Listar"
     },
     {
+      "name": "lint",
+      "label": "Check",
+      "words": [
+        "check",
+        "lint",
+        "review",
+        "proofread",
+        "style check"
+      ],
+      "theme": [],
+      "required": [
+        "text"
+      ],
+      "roles": {
+        "text": {
+          "preps": [
+            ":"
+          ],
+          "types": [
+            "text"
+          ]
+        }
+      },
+      "words_pt": [
+        "revisa",
+        "revise",
+        "confere",
+        "confira"
+      ],
+      "label_pt": "Revisar"
+    },
+    {
       "name": "timer",
       "label": "Start",
       "words": [
@@ -2250,13 +2484,339 @@
       "label_pt": "Datar"
     },
     {
+      "name": "hash",
+      "label": "SHA-256",
+      "words": [
+        "sha256",
+        "sha-256",
+        "hash",
+        "checksum"
+      ],
+      "theme": [],
+      "required": [],
+      "roles": {
+        "text": {
+          "preps": [
+            ":"
+          ],
+          "types": [
+            "text"
+          ]
+        },
+        "of": {
+          "preps": [
+            "of",
+            "for"
+          ],
+          "types": [
+            "file",
+            "text"
+          ]
+        }
+      },
+      "words_pt": [
+        "sha256",
+        "hash",
+        "checksum"
+      ],
+      "label_pt": "SHA-256"
+    },
+    {
+      "name": "encode",
+      "label": "Encode",
+      "words": [
+        "encode",
+        "encoding"
+      ],
+      "elidable": true,
+      "subject": [
+        "encoding"
+      ],
+      "theme": [
+        "encoding"
+      ],
+      "required": [
+        "text"
+      ],
+      "roles": {
+        "as": {
+          "preps": [
+            "as",
+            "to",
+            "in",
+            "into",
+            "from"
+          ],
+          "types": [
+            "encoding"
+          ]
+        },
+        "text": {
+          "preps": [
+            ":",
+            ""
+          ],
+          "types": [
+            "text"
+          ]
+        }
+      },
+      "words_pt": [
+        "codifica",
+        "codifique",
+        "codificar"
+      ],
+      "label_pt": "Codificar"
+    },
+    {
+      "name": "decode",
+      "label": "Decode",
+      "words": [
+        "decode",
+        "decoding"
+      ],
+      "elidable": false,
+      "subject": [
+        "encoding"
+      ],
+      "theme": [
+        "encoding"
+      ],
+      "required": [
+        "text"
+      ],
+      "roles": {
+        "as": {
+          "preps": [
+            "as",
+            "to",
+            "in",
+            "into",
+            "from"
+          ],
+          "types": [
+            "encoding"
+          ]
+        },
+        "text": {
+          "preps": [
+            ":",
+            ""
+          ],
+          "types": [
+            "text"
+          ]
+        }
+      },
+      "words_pt": [
+        "decodifica",
+        "decodifique",
+        "decodificar"
+      ],
+      "label_pt": "Decodificar"
+    },
+    {
+      "name": "wordcount",
+      "label": "Count words",
+      "words": [
+        "word count",
+        "count words",
+        "count the words",
+        "text stats",
+        "readability",
+        "reading level",
+        "how readable is"
+      ],
+      "theme": [],
+      "required": [
+        "text"
+      ],
+      "roles": {
+        "text": {
+          "preps": [
+            ":"
+          ],
+          "types": [
+            "text"
+          ]
+        }
+      },
+      "words_pt": [
+        "contar palavras",
+        "conta as palavras",
+        "contagem de palavras",
+        "legibilidade"
+      ],
+      "label_pt": "Contar palavras"
+    },
+    {
+      "name": "extract",
+      "label": "Key sentences",
+      "words": [
+        "summarise",
+        "summarize",
+        "summary",
+        "key sentences",
+        "extract",
+        "extract the key sentences",
+        "main points",
+        "gist"
+      ],
+      "theme": [],
+      "required": [
+        "text"
+      ],
+      "roles": {
+        "text": {
+          "preps": [
+            ":"
+          ],
+          "types": [
+            "text"
+          ]
+        }
+      },
+      "words_pt": [
+        "resume",
+        "resuma",
+        "resumir",
+        "resumo",
+        "pontos principais",
+        "frases principais"
+      ],
+      "label_pt": "Frases principais"
+    },
+    {
+      "name": "diff",
+      "label": "Diff",
+      "words": [
+        "diff",
+        "compare",
+        "difference",
+        "difference between",
+        "what changed between",
+        "what changed in"
+      ],
+      "theme": [],
+      "required": [
+        "text"
+      ],
+      "roles": {
+        "text": {
+          "preps": [
+            ":"
+          ],
+          "types": [
+            "text"
+          ]
+        }
+      },
+      "words_pt": [
+        "diferença",
+        "diferença entre",
+        "compara",
+        "compare",
+        "o que mudou entre"
+      ],
+      "label_pt": "Diferença"
+    },
+    {
+      "name": "remember",
+      "label": "Remember",
+      "words": [
+        "remember",
+        "note",
+        "note down",
+        "make a note",
+        "keep in mind"
+      ],
+      "lead": [
+        "that"
+      ],
+      "theme": [
+        "text"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {},
+      "words_pt": [
+        "lembra",
+        "lembre",
+        "anota",
+        "anote",
+        "guarda",
+        "guarde"
+      ],
+      "lead_pt": [
+        "que"
+      ],
+      "label_pt": "Lembrar"
+    },
+    {
+      "name": "recall",
+      "label": "Recall",
+      "words": [
+        "what do you know about",
+        "what do you remember about",
+        "what did i note about",
+        "recall",
+        "notes about"
+      ],
+      "theme": [
+        "text"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {},
+      "words_pt": [
+        "o que você sabe sobre",
+        "o que voce sabe sobre",
+        "o que eu anotei sobre"
+      ],
+      "label_pt": "Recordar"
+    },
+    {
+      "name": "teach",
+      "label": "Teach",
+      "words": [
+        "means",
+        "stands for",
+        "is short for",
+        "is another word for"
+      ],
+      "subject": [
+        "text"
+      ],
+      "theme": [
+        "text"
+      ],
+      "required": [
+        "theme",
+        "subject"
+      ],
+      "roles": {},
+      "words_pt": [
+        "significa",
+        "quer dizer",
+        "é abreviação de"
+      ],
+      "label_pt": "Ensinar"
+    },
+    {
       "name": "export",
       "label": "Export",
       "words": [
         "export",
-        "save"
+        "save",
+        "write",
+        "give me"
       ],
-      "theme": [],
+      "elidable": true,
+      "theme": [
+        "table"
+      ],
       "required": [
         "as"
       ],
@@ -2264,7 +2824,8 @@
         "as": {
           "preps": [
             "as",
-            "to"
+            "to",
+            "in"
           ],
           "types": [
             "format"

@@ -381,6 +381,15 @@ const toolByName = name => TOOLS.find(d => d.name === name);
 //   bind(cmd) → { tool, args } | null     a parsed command (verb, theme, roles) into a tool and its args
 const FRAMES = [];
 function frame(f) { FRAMES.push(f); return f; }
+// The words a file contributes beside its frames, gathered into the ontology by ontology():
+//   noun({ type, words, generic, words_pt, generic_pt })   a type of thing; a function returning one is
+//                                                           called each time (a noun that follows the open table)
+//   shape({ type, re })                                     a token shape that is a thing of that type (270/60)
+//   postmod({ prep, heads, attr, quantity })                a modifier after a noun ("cu above 0.5")
+const LEXICON = { nouns: [], shapes: [], postmods: [] };
+const noun = n => { LEXICON.nouns.push(n); return n; };
+const shape = s => { LEXICON.shapes.push(s); return s; };
+const postmod = p => { LEXICON.postmods.push(p); return p; };
 
 // Conditions a tool may declare in `pre`. Each knows whether it holds now and how it can be established:
 // a list of steps { label, tool, args }. When a tool's condition is unmet, runTool() asks which step to
@@ -444,7 +453,7 @@ const p3 = x => String(Math.round(x) % 360).padStart(3, '0');
 const p2 = x => String(Math.round(x)).padStart(2, '0');
 // a quantity node from the parser as a number in a base unit, given the unit's factor
 const qty = (node, f) => node && node.type === 'quantity' ? node.n * f(node.unit) : null;
-  return { S, T, TOOLS, tool, toolByName, FRAMES, frame, CONDITIONS, condition, setRunner, onJobDone, result, clearResults, startJobs, settle, runTool, clock, fmt, iso, rad, deg, p3, p2, qty };
+  return { S, T, TOOLS, tool, toolByName, FRAMES, frame, LEXICON, noun, shape, postmod, CONDITIONS, condition, setRunner, onJobDone, result, clearResults, startJobs, settle, runTool, clock, fmt, iso, rad, deg, p3, p2, qty };
 })();
 
 /* ==== src/engine/units.js ==== */
@@ -4638,127 +4647,8 @@ tool({
   return {  };
 })();
 
-/* ==== src/engine/text.js ==== */
-const __m6 = (() => {
-const { tool, fmt } = __m0;
-// Text tools over a pasted payload: counts and readability, extracted key sentences, and a diff.
-// The payload is what follows the first colon, or every line after the first of a multi-line input;
-// it is never read as a command. Nothing here rewrites text.
-
-// head: the command; body: the payload, from the raw input so lines and case survive
-function payloadOf(raw) {
-  const s = raw.trim();
-  if (/\n/.test(s)) { const i = s.indexOf('\n'); const head = s.slice(0, i).trim(); if (!/:\s*\S/.test(head) || head.indexOf(':') === head.length - 1) return { head: head.replace(/:$/, '').trim(), body: s.slice(i + 1).trim() }; }
-  const i = s.indexOf(':'); if (i < 0) return null;
-  return { head: s.slice(0, i).trim(), body: s.slice(i + 1).trim() };
-}
-const WORD = /[\p{L}\p{N}][\p{L}\p{N}\p{M}'’\-]*/gu;
-const words = s => s.match(WORD) || [];
-function sentences(s) {
-  const out = []; let start = 0; const t = s.replace(/\s+/g, ' ').trim();
-  const re = /[.!?…]+["”’)\]]*(?=\s+[\p{Lu}\p{N}"“(\[]|\s*$)/gu; let m;
-  while ((m = re.exec(t))) { const piece = t.slice(start, m.index + m[0].length).trim(); if (piece) out.push(piece); start = m.index + m[0].length; }
-  const tail = t.slice(start).trim(); if (tail) out.push(tail);
-  return out;
-}
-// an English syllable estimate by rule: vowel groups, less a silent e, at least one
-function syllables(w) {
-  w = w.toLowerCase().replace(/[^a-z]/g, ''); if (!w) return 0; if (w.length <= 3) return 1;
-  let n = (w.replace(/e$/, '').replace(/(?:[^laeiouy]es|ed)$/, '').match(/[aeiouy]{1,2}/g) || []).length;
-  if (/[^aeiou]le$/.test(w)) n++;
-  return Math.max(1, n);
-}
-const quote = s => `“${s.length > 160 ? s.slice(0, 157) + '…' : s}”`;
-
-tool({
-  name: 'wordcount', rank: 42,
-  skill: { group: 'Compute', title: 'Text tools', on: 'own algorithms', about: 'Word count and readability (Flesch, English only, labelled estimates), the key sentences of a text in their original order (TextRank, nothing rewritten), and a diff of two blocks by line, word or character (Myers). The text follows a colon or the first line.', examples: ['word count: the quick brown fox jumps over the lazy dog. it was not amused.', 'summarise this: …', 'diff these: a\\n---\\nb'] },
-  read: (text, q, raw) => { const p = payloadOf(raw || text); if (!p || !p.body) return null; return /^(?:word ?count|count (?:the )?words|counts|text stats|stats|how readable is (?:this|it)|readability|reading level)(?: of this| of it| of)?$/i.test(p.head) ? { text: p.body, lang: 'en' } : null; },
-  amend: [{ arg: 'lang', match: /^(?:in |it is |it's |this is )?(english|portuguese|spanish|french|german|other)$/, value: m => ({ english: 'en', portuguese: 'pt', spanish: 'es', french: 'fr', german: 'de', other: 'other' })[m[1]] }],
-  topic: () => ['Text', .5],
-  run: a => {
-    const ws = words(a.text), ss = sentences(a.text), paras = a.text.split(/\n\s*\n/).filter(x => x.trim()).length, chars = a.text.length, nospace = a.text.replace(/\s/g, '').length;
-    const longest = ss.reduce((b, s) => words(s).length > words(b).length ? s : b, ss[0] || '');
-    const rows = [['characters', `${chars} (${nospace} without spaces)`], ['words', String(ws.length)], ['sentences', String(ss.length)], ['paragraphs', String(paras)], ['mean sentence', ss.length ? `${fmt(ws.length / ss.length, 3)} words` : '—'], ['longest sentence', ss.length ? `${words(longest).length} words: ${quote(longest)}` : '—']];
-    const body = [{ t: 'big', v: String(ws.length), unit: `word${ws.length === 1 ? '' : 's'}` }, { t: 'kv', rows }];
-    const read = ['count', { v: `${ws.length} words` }, { v: a.lang === 'en' ? 'English' : a.lang === 'pt' ? 'Portuguese' : a.lang, key: 'lang', alts: ['en', 'pt', 'other'], cur: a.lang }];
-    const trace = [`words: ${ws.length}, sentences: ${ss.length}, paragraphs: ${paras}`];
-    if (a.lang === 'en' && ws.length && ss.length) {
-      const syl = ws.reduce((n, w) => n + syllables(w), 0), wps = ws.length / ss.length, spw = syl / ws.length;
-      const fre = 206.835 - 1.015 * wps - 84.6 * spw, fk = 0.39 * wps + 11.8 * spw - 15.59;
-      body.push({ t: 'kv', rows: [['Flesch reading ease', `about ${Math.round(fre)} (estimate; 60 to 70 reads as plain English, under 30 as academic)`], ['Flesch–Kincaid grade', `about ${Math.round(fk)} (estimate; US school grade)`], ['syllables', `${syl}, estimated by rule (vowel groups), ${fmt(spw, 3)} per word`]] });
-      trace.push(`syllables by rule: ${syl}`, `FRE = 206.835 − 1.015 × ${fmt(wps, 4)} − 84.6 × ${fmt(spw, 4)} = ${fmt(fre, 4)}`, `FK = 0.39 × ${fmt(wps, 4)} + 11.8 × ${fmt(spw, 4)} − 15.59 = ${fmt(fk, 4)}`);
-    } else if (a.lang !== 'en') { body.push({ t: 'note', text: `No readability score: I have no checked formula for ${a.lang === 'pt' ? 'Portuguese (the Martins et al. 1996 adaptation is not transcribed yet)' : 'that language'}. The counts stand.` }); trace.push('readability: no formula for ' + a.lang); }
-    return { read, value: ws.length, body, trace, py: `text.stats(payload, lang="${a.lang}")` };
-  }
-});
-
-/* ── key sentences by TextRank, in their original order ─────── */
-const STOP = new Set('a an the and or but if then else of in on at to for from by with without as is are was were be been being it its this that these those there here he she they we you i me him her them us my your our their his not no yes do does did done have has had having will would shall should can could may might must also than too very so such which who whom whose what when where why how all any each few more most other some only own same into over under again further once'.split(' '));
-const content = s => new Set(words(s).map(w => w.toLowerCase()).filter(w => w.length > 2 && !STOP.has(w)));
-function textrank(ss) {
-  const n = ss.length, C = ss.map(content), W = Array.from({ length: n }, () => new Array(n).fill(0));
-  for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) { let shared = 0; for (const w of C[i]) if (C[j].has(w)) shared++; const den = Math.log(C[i].size + 1) + Math.log(C[j].size + 1); W[i][j] = W[j][i] = den > 0 ? shared / den : 0; }
-  let R = new Array(n).fill(1 / n); const out = W.map(row => row.reduce((x, y) => x + y, 0));
-  for (let it = 0; it < 40; it++) { const next = R.map((_, i) => 0.15 / n + 0.85 * W[i].reduce((acc, w, j) => acc + (w && out[j] ? w / out[j] * R[j] : 0), 0)); R = next; }
-  return R;
-}
-tool({
-  name: 'extract', rank: 43,
-  read: (text, q, raw) => { const p = payloadOf(raw || text); if (!p || !p.body) return null; const m = /^(?:summari[sz]e|summary of|key sentences(?: of)?|extract(?: the)?(?: key)?(?: sentences)?(?: of| from)?|main points(?: of)?|gist of)(?: this| it| the text)?$/i.exec(p.head); return m ? { text: p.body, n: 3 } : null; },
-  amend: [{ arg: 'n', match: /^(\d+) sentences?$/, value: m => +m[1] }, { arg: 'n', match: /^shorter$/, value: (m, a) => Math.max(1, a.n - 1) }, { arg: 'n', match: /^longer$/, value: (m, a) => a.n + 1 }],
-  topic: () => ['Key sentences', 1],
-  run: a => {
-    const ss = sentences(a.text), read = ['extract', { v: `${a.n} sentence${a.n === 1 ? '' : 's'}` }, 'of', { v: `${ss.length}` }];
-    if (ss.length < 6) return { read, body: [{ t: 'note', kind: 'err', text: `${ss.length} sentence${ss.length === 1 ? '' : 's'}: short enough to read as it is.` }], trace: ['fewer than six sentences'] };
-    const R = textrank(ss), n = Math.min(a.n, ss.length), top = R.map((r, i) => [r, i]).sort((x, y) => y[0] - x[0]).slice(0, n).map(x => x[1]).sort((x, y) => x - y);
-    return { read, value: top.map(i => ss[i]).join(' '), copy: top.map(i => ss[i]).join('\n'), body: [{ t: 'lbl', text: 'Extracted sentences' }, { t: 'list', items: top.map(i => `${quote(ss[i])} (sentence ${i + 1} of ${ss.length})`) }, { t: 'sub', text: 'Nothing was rewritten: these are the source\'s own sentences, in their original order, chosen by TextRank over shared content words.' }, { t: 'actions', items: [{ act: 'copy', label: 'Copy sentences' }] }], trace: [`split → ${ss.length} sentences`, `TextRank, 40 iterations, d = 0.85 → top ${n}: ${top.map(i => i + 1).join(', ')}`, `scores ${top.map(i => fmt(R[i], 3)).join(', ')}`], py: `text.extract(payload, n=${a.n})` };
-  }
-});
-
-/* ── diff of two blocks, Myers O(ND) ────────────────────────── */
-function myers(a, b) {
-  const N = a.length, M = b.length, MAX = N + M, off = MAX + 1, V = new Array(2 * MAX + 3).fill(0), trace = [];
-  V[off + 1] = 0;
-  outer: for (let d = 0; d <= MAX; d++) {
-    trace.push(V.slice());
-    for (let k = -d; k <= d; k += 2) {
-      let x = (k === -d || (k !== d && V[off + k - 1] < V[off + k + 1])) ? V[off + k + 1] : V[off + k - 1] + 1, y = x - k;
-      while (x < N && y < M && a[x] === b[y]) { x++; y++; }
-      V[off + k] = x;
-      if (x >= N && y >= M) break outer;
-    }
-  }
-  const ops = []; let x = N, y = M;
-  for (let d = trace.length - 1; d >= 0; d--) {
-    const v = trace[d], k = x - y, pk = (k === -d || (k !== d && v[off + k - 1] < v[off + k + 1])) ? k + 1 : k - 1, px = v[off + pk], py = px - pk;
-    while (x > px && y > py) { ops.push(['=', a[x - 1]]); x--; y--; }
-    if (d > 0) { if (x === px) { ops.push(['+', b[py]]); y--; } else { ops.push(['-', a[px]]); x--; } }
-  }
-  return ops.reverse();
-}
-const UNITS = ['line', 'word', 'character'];
-const split = (s, unit) => unit === 'line' ? s.split(/\r?\n/) : unit === 'word' ? s.split(/(\s+)/).filter(x => x !== '') : [...s];
-tool({
-  name: 'diff', rank: 44,
-  read: (text, q, raw) => { const p = payloadOf(raw || text); if (!p || !p.body) return null; const m = /^(?:diff|compare|difference(?: between)?|what changed(?: between)?)(?: these| this| the two| two)?(?: blocks| texts| versions)?$/i.exec(p.head); if (!m) return null; const parts = p.body.split(/\n\s*-{3,}\s*\n/); return parts.length === 2 ? { a: parts[0].trim(), b: parts[1].trim(), unit: /\n/.test(parts[0].trim()) || /\n/.test(parts[1].trim()) ? 'line' : 'word' } : { noSep: true }; },
-  amend: [{ arg: 'unit', match: /^(?:by |per )?(lines?|words?|characters?|chars?|letters?)$/, value: m => /^l/.test(m[1]) ? 'line' : /^w/.test(m[1]) ? 'word' : 'character' }],
-  topic: () => ['Diff', 1],
-  run: a => {
-    if (a.noSep) return { read: ['diff'], body: [{ t: 'note', kind: 'err', text: 'Put a line of three dashes (---) between the two blocks.' }], trace: ['no separator'] };
-    const A = split(a.a, a.unit), B = split(a.b, a.unit);
-    if (A.length + B.length > 6000) return { read: ['diff'], body: [{ t: 'note', kind: 'err', text: `${A.length + B.length} ${a.unit}s is more than I diff in the page; try by line, or split the text.` }], trace: ['too long'] };
-    const ops = myers(A, B), added = ops.filter(o => o[0] === '+').length, removed = ops.filter(o => o[0] === '-').length, same = ops.filter(o => o[0] === '=').length;
-    const read = ['diff by', { v: a.unit, key: 'unit', alts: UNITS, cur: a.unit }];
-    const view = a.unit === 'line' ? ops.map(([t, s]) => `${t === '=' ? ' ' : t} ${s}`).join('\n') : ops.map(([t, s]) => t === '=' ? s : t === '-' ? `[-${s}-]` : `{+${s}+}`).join(a.unit === 'word' ? '' : '');
-    return { read, value: added + removed, copy: view, body: [{ t: 'big', v: added + removed ? `${added} added, ${removed} removed` : 'Identical', unit: `${a.unit}s; ${same} unchanged` }, { t: 'pre', text: view }, { t: 'sub', text: a.unit === 'line' ? 'Lines marked − are only in the first block, + only in the second.' : 'Removed pieces are in [-…-], added ones in {+…+}.' }, { t: 'actions', items: [{ act: 'copy', label: 'Copy diff' }] }], trace: [`split by ${a.unit}: ${A.length} and ${B.length}`, `Myers O(ND) → ${ops.length} operations, D = ${added + removed}`], py: `difflib.unified_diff(a.splitlines(), b.splitlines())` };
-  }
-});
-  return { payloadOf, words, sentences, syllables, textrank, myers };
-})();
-
 /* ==== src/vendor/yaml.js ==== */
-const __m7 = (() => {
+const __m6 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/yaml, the strict YAML subset (parse to a typed tree, emit canonical text), copied from ../auditable/ext/yaml/index.js at auditable 5fa5f72e (MIT).
 // Re-vendor by copying that file here.
 
@@ -6386,7 +6276,7 @@ function format(text) {
 })();
 
 /* ==== src/vendor/wkt.js ==== */
-const __m8 = (() => {
+const __m7 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/wkt, Well-Known Text to and from GeoJSON geometry, copied from ../auditable/ext/wkt/index.js at auditable 5fa5f72e (MIT).
 // Re-vendor by copying that file here.
 
@@ -6513,7 +6403,7 @@ function stringify(geom, opts = {}) {
 })();
 
 /* ==== src/vendor/dxf.js ==== */
-const __m9 = (() => {
+const __m8 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/dxf, the DXF reader and writer (R2000 ASCII), copied from ../auditable/ext/dxf/index.js at auditable 5fa5f72e (MIT).
 // Re-vendor by copying that file here.
 
@@ -7721,12 +7611,11 @@ function extractScene(doc) {
 })();
 
 /* ==== src/engine/interchange.js ==== */
-const __m10 = (() => {
-const { S, tool, fmt } = __m0;
-const { payloadOf } = __m6;
-const { parse: parseYaml, emit, scalar, mapNode, seqNode, mapEntry } = __m7;
-const { parse: parseWkt, stringify: toWkt } = __m8;
-const { read: readDxf, explode, arcFromBulge } = __m9;
+const __m9 = (() => {
+const { S, tool, frame, fmt } = __m0;
+const { parse: parseYaml, emit, scalar, mapNode, seqNode, mapEntry } = __m6;
+const { parse: parseWkt, stringify: toWkt } = __m7;
+const { read: readDxf, explode, arcFromBulge } = __m8;
 // Formats that are not tables: YAML and JSON both ways (within the strict subset @gcu/yaml reads), WKT and
 // GeoJSON both ways (@gcu/wkt), and DXF to GeoJSON or WKT one way (@gcu/dxf). Pasted after a colon, or a
 // file from the picker kept on the device. What does not carry over is said on the card.
@@ -7860,15 +7749,8 @@ const PY = (from, to) => from === 'yaml' ? 'json.dumps(yaml.safe_load(text), ind
 const KIND = { json: 'json', yaml: 'yaml', yml: 'yaml', wkt: 'wkt', geojson: 'geojson' };
 const sniff = body => /^\s*[[{]/.test(body) ? (/"type"\s*:\s*"(Feature|FeatureCollection|Point|LineString|Polygon|Multi\w+|GeometryCollection)"/.test(body) ? 'geojson' : 'json') : /^\s*(?:SRID=\d+;\s*)?(POINT|LINESTRING|POLYGON|MULTIPOINT|MULTILINESTRING|MULTIPOLYGON|GEOMETRYCOLLECTION)\b/i.test(body) ? 'wkt' : 'yaml';
 tool({
-  name: 'convertText', rank: 44,
-  skill: { group: 'Compute', title: 'YAML, JSON, WKT and GeoJSON', on: '@gcu/yaml · wkt · dxf', about: 'JSON to YAML and back (the strict YAML subset, where every string is quoted), WKT to GeoJSON and back, and DXF drawings to GeoJSON or WKT from your files. What does not carry over is said.', examples: ['json to yaml: {"hole": "DH-12", "depth": 240.5}', 'wkt to geojson: POINT (30 10)', 'as wkt: {"type": "LineString", "coordinates": [[0, 0], [10, 5]]}'] },
-  read: (text, q, raw) => {
-    const p = payloadOf(raw || text); if (!p || !p.body) return null;
-    const m = /^(?:convert\s+)?(?:(?:this|the)\s+)?(?:(json|ya?ml|wkt|geojson)\s+)?(?:to|as|into|in)\s+(json|ya?ml|wkt|geojson)$/i.exec(p.head.trim());
-    if (!m) return null;
-    const body = p.body.replace(/\r\n/g, '\n');
-    return { from: m[1] ? KIND[m[1].toLowerCase()] : sniff(body), to: KIND[m[2].toLowerCase()], text: body };
-  },
+  name: 'convertText',
+  skill: { group: 'Compute', title: 'YAML, JSON, WKT and GeoJSON', on: '@gcu/yaml · wkt · dxf', about: 'JSON to YAML and back (the strict YAML subset, where every string is quoted), WKT to GeoJSON and back, and DXF drawings to GeoJSON or WKT from your files. What does not carry over is said.', examples: ['json to yaml: {"hole": "DH-12", "depth": 240.5}', 'wkt to geojson: POINT (30 10)', 'convert to wkt: {"type": "LineString", "coordinates": [[0, 0], [10, 5]]}'] },
   amend: [{ arg: 'to', match: /^(?:as |to |in )?(json|yaml|wkt|geojson)(?: instead)?$/ }],
   topic: a => [`${LABEL[a.from]} to ${LABEL[a.to]}`, 1],
   run: a => {
@@ -7883,12 +7765,7 @@ tool({
 /* ── a file the device keeps ────────────────────────────────── */
 const fileNamed = name => Object.values(S.files).find(f => f.name.toLowerCase() === name.toLowerCase());
 tool({
-  name: 'convertFile', rank: 43,
-  read: (text, q) => {
-    const m = /^(?:convert |export |save )?(\S+\.(?:dxf|ya?ml|wkt|geojson))(?: (?:to|as|into) (json|ya?ml|wkt|geojson))?$/i.exec(text.trim());
-    const f = m && fileNamed(m[1]); if (!f) return null;
-    return { file: { name: f.name, hash: f.hash }, ...(m[2] ? { to: KIND[m[2].toLowerCase()] } : {}) };
-  },
+  name: 'convertFile',
   amend: [{ arg: 'to', match: /^(?:as |to |in )?(json|yaml|wkt|geojson)(?: instead)?$/ }],
   topic: a => [a.file.name, 2],
   run: a => {
@@ -7899,11 +7776,24 @@ tool({
     return card(read, from, to, f.text, a.file.name.replace(/\.\w+$/, ''), PY(from, to).replace('text', `open("${a.file.name}").read()`));
   }
 });
+/* ── what reads them: "json to yaml: …", "convert to wkt: …", "pit.dxf to wkt" ── */
+const payload = c => { const t = c.roles.text && c.roles.text[0]; return t && t.type === 'text' ? t.value.replace(/\r\n/g, '\n') : null; };
+frame({
+  name: 'reformat', label: 'Convert', words: ['convert', 'turn', 'change'], elidable: true,
+  theme: ['format', 'file'], required: [], roles: { to: { preps: ['to', 'as', 'into', 'in'], types: ['format'] }, text: { preps: [':'], types: ['text'] } },
+  words_pt: ['converte', 'converta', 'converter', 'transforma', 'transforme'], label_pt: 'Converter',
+  bind: c => {
+    const th = c.theme[0], to = c.roles.to && KIND[c.roles.to[0].value], body = payload(c);
+    if (body) { const from = th && th.type === 'format' ? KIND[th.value] : sniff(body); return from && to ? { tool: 'convertText', args: { from, to, text: body } } : null; }
+    const f = th && th.type === 'file' && th.value && fileNamed(th.value); if (!f || !DOCUMENT.test(f.name)) return null;
+    return { tool: 'convertFile', args: { file: { name: f.name, hash: f.hash }, ...(to ? { to } : {}) } };
+  }
+});
   return { DOCUMENT };
 })();
 
 /* ==== src/vendor/sadpan.js ==== */
-const __m11 = (() => {
+const __m10 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sadpan, DataFrame-style tables and series, copied from
 // ../auditable/ext/sadpan/index.js (built from its src/ by @gcu/build). Re-vendor by copying that file here.
 // golem uses series() for summary statistics.
@@ -10032,7 +9922,7 @@ if (typeof window !== 'undefined') {
 })();
 
 /* ==== src/vendor/recon.js ==== */
-const __m12 = (() => {
+const __m11 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/recon, copied from ../auditable/ext/recon/index.js (built from its src/ by @gcu/build).
 // Re-vendor by copying that file here.
 
@@ -10543,7 +10433,7 @@ function assemble(ctx) {
 })();
 
 /* ==== src/vendor/sift.js ==== */
-const __m13 = (() => {
+const __m12 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sift, copied from ../auditable/ext/sift/index.js (built from its src/ by @gcu/build).
 // Re-vendor by copying that file here.
 
@@ -10810,12 +10700,12 @@ function _wrap(n) { return n && PARENS.has(n.op) ? '(' + _str(n) + ')' : _str(n)
 })();
 
 /* ==== src/engine/table.js ==== */
-const __m14 = (() => {
+const __m13 = (() => {
 const { S, T, tool, frame, condition, fmt } = __m0;
-const { DOCUMENT } = __m10;
-const { series } = __m11;
-const { sniff, detectAnalyte, NULL_SENTINELS } = __m12;
-const { parsePredicate, evaluatePredicate, predicateToString } = __m13;
+const { DOCUMENT } = __m9;
+const { series } = __m10;
+const { sniff, detectAnalyte, NULL_SENTINELS } = __m11;
+const { parsePredicate, evaluatePredicate, predicateToString } = __m12;
 // The open table: a real delimited file typed by @gcu/recon, or the synthetic sample; a histogram; and
 // table questions in controlled English answered through @gcu/sadpan and @gcu/sift (all vendored).
 // Sample data stays labelled as sample data; a file is named on every card that reads it.
@@ -10945,7 +10835,7 @@ tool({
   }
 });
 frame({
-  name: 'open', label: 'Open', words: ['open', 'load'], theme: ['table'], required: ['theme'], roles: {},
+  name: 'open', label: 'Open', words: ['open', 'load'], theme: ['table', 'file'], required: ['theme'], roles: {},
   words_pt: ['abrir', 'abre', 'carregar', 'carrega'], label_pt: 'Abrir',
   bind: c => { const v = c.theme[0] && c.theme[0].value; const f = v && Object.values(S.files).find(f => f.name.toLowerCase() === String(v).toLowerCase()); return f ? { tool: 'open', args: { file: { name: f.name, hash: f.hash } } } : { tool: 'open', args: {} }; }
 });
@@ -11149,7 +11039,7 @@ tool({
 })();
 
 /* ==== src/engine/knowledge.js ==== */
-const __m15 = (() => {
+const __m14 = (() => {
 const { T, tool, frame, fmt } = __m0;
 const { parseUnit } = __m1;
 // Knowledge from packs: a Factbook sample, an ODS term index,
@@ -11232,9 +11122,8 @@ const LINT = [
 ];
 const RULE = { 11: 'Use the active voice.', 12: 'Put statements in positive form.', 13: 'Omit needless words.' };
 tool({
-  name: 'lint', rank: 80,
+  name: 'lint',
   skill: { group: 'Knowledge', title: 'Style check', on: 'elements-of-style pack', about: 'Rules compiled into a checker that cites the rule.', examples: ['check: owing to the fact that the samples were lost by the lab, there is no doubt but that the assay was not important'] },
-  read: text => { const m = /^(?:check|lint|review)(?: this| the)?(?: text| sentence| paragraph)?[:,]? (.+)$/i.exec(text); return m ? { text: m[1] } : null; },
   topic: () => ['Style check', 2],
   run: a => {
     const hits = [];
@@ -11281,11 +11170,17 @@ frame({
     return { tool: 'factList', args: { by: by || 'area' } };
   }
 });
+// "check: …", "review this: …"
+frame({
+  name: 'lint', label: 'Check', words: ['check', 'lint', 'review', 'proofread', 'style check'], theme: [], required: ['text'], roles: { text: { preps: [':'], types: ['text'] } },
+  words_pt: ['revisa', 'revise', 'confere', 'confira'], label_pt: 'Revisar',
+  bind: c => { const t = c.roles.text && c.roles.text[0]; return t && t.type === 'text' ? { tool: 'lint', args: { text: t.value } } : null; }
+});
   return { FB, fbFind, ODS, ODSA };
 })();
 
 /* ==== src/engine/device.js ==== */
-const __m16 = (() => {
+const __m15 = (() => {
 const { tool, frame, fmt, iso } = __m0;
 const { findDate, findTime, today, fmtDate } = __m3;
 const { parseUnit } = __m1;
@@ -11367,7 +11262,7 @@ tool({
 })();
 
 /* ==== src/engine/structure.js ==== */
-const __m17 = (() => {
+const __m16 = (() => {
 const { tool, fmt, rad, deg, p3, p2 } = __m0;
 const { conversions, vec3, statistics } = __m4;
 // Structural geometry over @gcu/bearing (vendored): apparent dip, the three-point problem, the line of
@@ -11493,7 +11388,7 @@ tool({
 })();
 
 /* ==== src/vendor/wmm.js ==== */
-const __m18 = (() => {
+const __m17 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/wmm, the World Magnetic Model (WMM2025) evaluated from NOAA's coefficients,
 // copied from ../auditable/ext/wmm/index.js. Re-vendor by copying that file here when the model is reissued.
 
@@ -11744,9 +11639,9 @@ function declination(lat, lon, date = new Date(), height = 0) {
 })();
 
 /* ==== src/engine/geo.js ==== */
-const __m19 = (() => {
+const __m18 = (() => {
 const { tool, clock, fmt, iso, p3 } = __m0;
-const { field, MODEL, VALID_FROM, VALID_TO } = __m18;
+const { field, MODEL, VALID_FROM, VALID_TO } = __m17;
 const { findDate, fmtDate } = __m3;
 // Magnetic declination from @gcu/wmm (vendored WMM2025), and bearings between magnetic and true north.
 // A place is coordinates in the request; device location stays off (SPEC-skills 0.7).
@@ -11804,7 +11699,7 @@ tool({
 })();
 
 /* ==== src/engine/data/timescale.js ==== */
-const __m20 = (() => {
+const __m19 = (() => {
 // The International Chronostratigraphic Chart as a records pack: one row per unit, five ranks.
 // Source: ICS (Cohen, Finney, Gibbard & Fan 2013; updated chart) as served by Macrostrat
 // (macrostrat.org/api/v2/defs/intervals?timescale_id=11, CC BY 4.0), fetched 8 Oct 2026. The Hadean is
@@ -11989,9 +11884,9 @@ const TIMESCALE = [
 })();
 
 /* ==== src/engine/timescale.js ==== */
-const __m21 = (() => {
+const __m20 = (() => {
 const { tool, frame, fmt } = __m0;
-const { TIMESCALE, TIMESCALE_SOURCE } = __m20;
+const { TIMESCALE, TIMESCALE_SOURCE } = __m19;
 // The geologic timescale: the ICS chart as a records pack (data/timescale.js). Ages, bounds, ranks,
 // what a unit sits in, what came before and after, what it is subdivided into, and which unit an age
 // in Ma falls in. Lookups only; the chart is the answer.
@@ -12078,7 +11973,7 @@ frame({
 })();
 
 /* ==== src/vendor/units.js ==== */
-const __m22 = (() => {
+const __m21 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/units, copied from ../auditable/ext/units/index.js (built from its src/ by @gcu/build).
 // Re-vendor by copying that file here. golem uses the sieve and core tables; conversions stay in src/engine/units.js
 // until this package's factors are exact (they are rounded to six figures) and it covers the units golem needs.
@@ -12464,9 +12359,9 @@ function format(value, unit, opts) {
 })();
 
 /* ==== src/engine/sample.js ==== */
-const __m23 = (() => {
+const __m22 = (() => {
 const { tool, fmt } = __m0;
-const { core, sieve } = __m22;
+const { core, sieve } = __m21;
 // Core and sample arithmetic: sample mass from core size, sieve sizes, specific gravity by Archimedes,
 // recovery and RQD. The DCDMA core table and the sieve table come from @gcu/units (vendored); the
 // arithmetic is golem's own and shown step by step.
@@ -12544,7 +12439,7 @@ tool({
 })();
 
 /* ==== src/engine/explain.js ==== */
-const __m24 = (() => {
+const __m23 = (() => {
 const { tool, clock, fmt } = __m0;
 // Explainers: formal notation parsed and described, one row per piece. Cron schedules, epoch times,
 // chmod modes, URLs and ECMAScript regular expressions. Each member has a recogniser so a bare
@@ -12903,7 +12798,7 @@ tool({
 })();
 
 /* ==== src/vendor/parquet.js ==== */
-const __m25 = (() => {
+const __m24 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/parquet, Parquet read and write over vendored hyparquet and hyparquet-writer, pure JS, minified by its own build, copied from ../auditable/ext/parquet/index.js at auditable 5fa5f72e (MIT; hyparquet MIT).
 // Re-vendor by copying that file here.
 
@@ -12912,9 +12807,9 @@ const e=["BOOLEAN","INT32","INT64","INT96","FLOAT","DOUBLE","BYTE_ARRAY","FIXED_
 })();
 
 /* ==== src/engine/convert.js ==== */
-const __m26 = (() => {
-const { S, tool, fmt } = __m0;
-const { writeParquet } = __m25;
+const __m25 = (() => {
+const { S, tool, frame, noun, fmt } = __m0;
+const { writeParquet } = __m24;
 // Conversions that need no file format reader: hashes, text encodings both ways, and the open table
 // as CSV, TSV or JSON with a save action. Format readers (xlsx, dm, parquet) are the second pass.
 
@@ -12951,14 +12846,8 @@ const thisFile = () => (S.table && S.table.source === 'file' && S.files[S.table.
 
 /* ── hash ───────────────────────────────────────────────────── */
 tool({
-  name: 'hash', rank: 46,
+  name: 'hash',
   skill: { group: 'Compute', title: 'Hashes and encodings', on: 'own SHA-256, TextEncoder', about: 'SHA-256 of a text or an opened file; text to and from base64, hex and URL encoding. Bytes that are not UTF-8 are shown as hex, not guessed.', examples: ['sha256: abc', 'sha256 of this file', 'base64 decode: SGVsbG8=', 'hex encode: golem', 'url decode: a%20b%26c'] },
-  read: text => {
-    let m = /^(?:sha-?256|hash)(?:\s+of)?(?:\s+(?:this|the)\s+file|\s+file)\s*$/i.exec(text); if (m) return { file: 'this' };
-    m = /^(?:sha-?256|hash)\s+of\s+(\S+\.\w{1,6})$/i.exec(text); if (m && fileNamed(m[1])) return { file: m[1] };
-    m = /^(?:sha-?256|hash)(?:\s+of)?\s*[:]\s*(.*)$/i.exec(text) || /^(?:sha-?256|hash)\s+of\s+(.+)$/i.exec(text); if (m) return { text: m[1] };
-    return null;
-  },
   topic: () => ['SHA-256', 1],
   run: a => {
     let bytes, read;
@@ -12975,14 +12864,7 @@ tool({
 /* ── text encodings ─────────────────────────────────────────── */
 const ENC = { base64: 'base64', b64: 'base64', hex: 'hex', hexadecimal: 'hex', url: 'url', uri: 'url', percent: 'url', urlencode: 'url', urlencoded: 'url' };
 tool({
-  name: 'encode', rank: 47,
-  read: text => {
-    let m = /^(?:(encode|decode)\s+(?:this\s+|as\s+|from\s+|to\s+)?)?(base64|b64|hex|hexadecimal|url|uri|percent|urlencoded?)(?:[\s-]*(encode|decode|encoded|decoded))?\s*[:]\s*(.*)$/i.exec(text);
-    if (!m) m = /^(?:(encode|decode)\s+(?:this\s+)?(?:as\s+|from\s+|to\s+|in\s+)?)(base64|b64|hex|hexadecimal|url|uri|percent|urlencoded?)\s+(.+)$/i.exec(text) && (x => [x[0], x[1], x[2], null, x[3]])(/^(?:(encode|decode)\s+(?:this\s+)?(?:as\s+|from\s+|to\s+|in\s+)?)(base64|b64|hex|hexadecimal|url|uri|percent|urlencoded?)\s+(.+)$/i.exec(text));
-    if (!m) return null;
-    const op = ((m[1] || m[3] || 'encode').toLowerCase().replace(/d$/, '')).replace(/^encode$|^decode$/, x => x);
-    return { enc: ENC[m[2].toLowerCase()], op: /^dec/.test(op) ? 'decode' : 'encode', text: m[4] };
-  },
+  name: 'encode',
   amend: [{ arg: 'op', match: /^(encode|decode)(?: it| instead)?$/ }],
   topic: a => [`${a.enc} ${a.op}`, 1],
   run: a => {
@@ -13036,9 +12918,8 @@ function parquetOut(t) {
   };
 }
 tool({
-  name: 'tableExport', rank: 48, pre: ['table'],
+  name: 'tableExport', pre: ['table'],
   skill: { group: 'Table', title: 'Table as CSV, TSV, JSON or Parquet', on: 'built in · @gcu/parquet', about: 'The open table written out, with what the format cannot hold stated. Copy or save it; Parquet is saved, not copied.', examples: ['the table as json', 'export the table as tsv', 'the table as parquet'] },
-  read: (text, q) => { const m = /^(?:export |save |convert |write |give me )?(?:the |this )?(?:table|file|data|rows)(?: as| to| in)? (csv|tsv|json|parquet|comma separated|tab separated)(?: file| format)?$/.exec(q); return m ? { fmt: FMT[m[1]] } : null; },
   amend: [{ arg: 'fmt', match: /^(?:as |to |in )?(csv|tsv|json|parquet)(?: instead)?$/ }],
   topic: a => [`Table as ${a.fmt === 'parquet' ? 'Parquet' : a.fmt.toUpperCase()}`, 1],
   run: a => {
@@ -13058,11 +12939,34 @@ tool({
     };
   }
 });
+/* ── what reads them ─────────────────────────────────────────── */
+const payload = c => { const t = c.roles.text && c.roles.text[0]; return t && t.type === 'text' ? t.value.replace(/\r\n/g, '\n') : null; };
+noun({ type: 'encoding', words: { base64: ['base64', 'b64'], hex: ['hex', 'hexadecimal'], url: ['url', 'uri', 'percent', 'urlencoded', 'url-encoded'] }, generic: ['encoding'],
+  words_pt: { base64: ['base64', 'b64'], hex: ['hex', 'hexadecimal'], url: ['url', 'uri', 'percent'] }, generic_pt: ['codificação', 'codificacao'] });
+// "sha256: abc", "sha256 of this file", "hash of holes.csv"
+frame({
+  name: 'hash', label: 'SHA-256', words: ['sha256', 'sha-256', 'hash', 'checksum'], theme: [], required: [],
+  roles: { text: { preps: [':'], types: ['text'] }, of: { preps: ['of', 'for'], types: ['file', 'text'] } },
+  words_pt: ['sha256', 'hash', 'checksum'], label_pt: 'SHA-256',
+  bind: c => {
+    if (payload(c) != null) return { tool: 'hash', args: { text: payload(c) } };
+    const of = c.roles.of && c.roles.of[0]; if (!of) return null;
+    if (of.type === 'text') return { tool: 'hash', args: { text: of.value } };
+    return { tool: 'hash', args: { file: of.value ? fileNamed(of.value).name : 'this' } };
+  }
+});
+// "base64 decode: …", "decode base64: …", "hex encode: golem", "decode from url: …"
+for (const op of ['encode', 'decode']) frame({
+  name: op, label: op === 'encode' ? 'Encode' : 'Decode', words: op === 'encode' ? ['encode', 'encoding'] : ['decode', 'decoding'], elidable: op === 'encode',   // "base64: golem" encodes
+  subject: ['encoding'], theme: ['encoding'], required: ['text'], roles: { as: { preps: ['as', 'to', 'in', 'into', 'from'], types: ['encoding'] }, text: { preps: [':', ''], types: ['text'] } },   // '' = the text may follow bare: "decode hex 676f"
+  words_pt: op === 'encode' ? ['codifica', 'codifique', 'codificar'] : ['decodifica', 'decodifique', 'decodificar'], label_pt: op === 'encode' ? 'Codificar' : 'Decodificar',
+  bind: c => { const e = (c.roles.subject || c.theme || [])[0] || (c.roles.as || [])[0]; return e && payload(c) != null ? { tool: 'encode', args: { enc: e.value, op, text: payload(c) } } : null; }
+});
   return { sha256, tableText };
 })();
 
 /* ==== src/vendor/plan-calendar.js ==== */
-const __m27 = (() => {
+const __m26 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/plan's calendar engine and Brazilian holidays, copied from
 // ../auditable/ext/plan/src/calendar.js and src/holidays-br.js (MIT). The scheduling half of the package is not here.
 // Re-vendor by copying those two files here again and keeping the single export block at the end.
@@ -13419,10 +13323,10 @@ function brazilMunicipalities() {
 })();
 
 /* ==== src/engine/calendar.js ==== */
-const __m28 = (() => {
+const __m27 = (() => {
 const { S, tool, clock, iso } = __m0;
 const { findDate, findTime, today, day0, fmtDate } = __m3;
-const { isWorkingDay, addWorkingDays, brazilCalendar, federalHolidays } = __m27;
+const { isWorkingDay, addWorkingDays, brazilCalendar, federalHolidays } = __m26;
 // Working days and rosters over @gcu/plan's calendar engine (vendored), and time zones through Intl.
 // The calendar is a slot and is always shown: Brazil's federal holidays, or weekdays only.
 
@@ -13591,7 +13495,7 @@ tool({
 })();
 
 /* ==== src/engine/estimate.js ==== */
-const __m29 = (() => {
+const __m28 = (() => {
 const { tool, fmt } = __m0;
 const { U } = __m1;
 // Estimates with ranges: arithmetic over intervals by simulation, units carried through, the seed kept
@@ -13762,7 +13666,7 @@ tool({
 })();
 
 /* ==== src/engine/data/elements.js ==== */
-const __m30 = (() => {
+const __m29 = (() => {
 // The elements with their standard atomic weights, abridged to five significant figures.
 // Source: IUPAC Commission on Isotopic Abundances and Atomic Weights (CIAAW), Standard Atomic Weights 2024
 // (ciaaw.org/atomic-weights.htm, the 2021 report with Gd, Lu and Zr revised in 2024), cross-checked against
@@ -13807,9 +13711,9 @@ const ELEMENTS = [
 })();
 
 /* ==== src/engine/chem.js ==== */
-const __m31 = (() => {
+const __m30 = (() => {
 const { tool, fmt } = __m0;
-const { ELEMENTS, ELEMENTS_SOURCE } = __m30;
+const { ELEMENTS, ELEMENTS_SOURCE } = __m29;
 // Molar mass, conversion factors and element fractions from a parsed formula over the IUPAC weights;
 // the periodic table lookup. No mineral names: the minerals pack is not here, so a formula is required.
 
@@ -13923,6 +13827,144 @@ tool({
   }
 });
   return { parseFormula, molarMass };
+})();
+
+/* ==== src/engine/text.js ==== */
+const __m31 = (() => {
+const { tool, frame, fmt } = __m0;
+// Text tools over a pasted payload: counts and readability, extracted key sentences, and a diff.
+// The payload is what follows the first colon, or every line after the first of a multi-line input;
+// it is never read as a command. Nothing here rewrites text.
+
+// head: the command; body: the payload, from the raw input so lines and case survive
+function payloadOf(raw) {
+  const s = raw.trim();
+  if (/\n/.test(s)) { const i = s.indexOf('\n'); const head = s.slice(0, i).trim(); if (!/:\s*\S/.test(head) || head.indexOf(':') === head.length - 1) return { head: head.replace(/:$/, '').trim(), body: s.slice(i + 1).trim() }; }
+  const i = s.indexOf(':'); if (i < 0) return null;
+  return { head: s.slice(0, i).trim(), body: s.slice(i + 1).trim() };
+}
+const WORD = /[\p{L}\p{N}][\p{L}\p{N}\p{M}'’\-]*/gu;
+const words = s => s.match(WORD) || [];
+function sentences(s) {
+  const out = []; let start = 0; const t = s.replace(/\s+/g, ' ').trim();
+  const re = /[.!?…]+["”’)\]]*(?=\s+[\p{Lu}\p{N}"“(\[]|\s*$)/gu; let m;
+  while ((m = re.exec(t))) { const piece = t.slice(start, m.index + m[0].length).trim(); if (piece) out.push(piece); start = m.index + m[0].length; }
+  const tail = t.slice(start).trim(); if (tail) out.push(tail);
+  return out;
+}
+// an English syllable estimate by rule: vowel groups, less a silent e, at least one
+function syllables(w) {
+  w = w.toLowerCase().replace(/[^a-z]/g, ''); if (!w) return 0; if (w.length <= 3) return 1;
+  let n = (w.replace(/e$/, '').replace(/(?:[^laeiouy]es|ed)$/, '').match(/[aeiouy]{1,2}/g) || []).length;
+  if (/[^aeiou]le$/.test(w)) n++;
+  return Math.max(1, n);
+}
+const quote = s => `“${s.length > 160 ? s.slice(0, 157) + '…' : s}”`;
+
+tool({
+  name: 'wordcount',
+  skill: { group: 'Compute', title: 'Text tools', on: 'own algorithms', about: 'Word count and readability (Flesch, English only, labelled estimates), the key sentences of a text in their original order (TextRank, nothing rewritten), and a diff of two blocks by line, word or character (Myers). The text follows a colon or the first line.', examples: ['word count: the quick brown fox jumps over the lazy dog. it was not amused.', 'summarise this: …', 'diff these: a\\n---\\nb'] },
+  amend: [{ arg: 'lang', match: /^(?:in |it is |it's |this is )?(english|portuguese|spanish|french|german|other)$/, value: m => ({ english: 'en', portuguese: 'pt', spanish: 'es', french: 'fr', german: 'de', other: 'other' })[m[1]] }],
+  topic: () => ['Text', .5],
+  run: a => {
+    const ws = words(a.text), ss = sentences(a.text), paras = a.text.split(/\n\s*\n/).filter(x => x.trim()).length, chars = a.text.length, nospace = a.text.replace(/\s/g, '').length;
+    const longest = ss.reduce((b, s) => words(s).length > words(b).length ? s : b, ss[0] || '');
+    const rows = [['characters', `${chars} (${nospace} without spaces)`], ['words', String(ws.length)], ['sentences', String(ss.length)], ['paragraphs', String(paras)], ['mean sentence', ss.length ? `${fmt(ws.length / ss.length, 3)} words` : '—'], ['longest sentence', ss.length ? `${words(longest).length} words: ${quote(longest)}` : '—']];
+    const body = [{ t: 'big', v: String(ws.length), unit: `word${ws.length === 1 ? '' : 's'}` }, { t: 'kv', rows }];
+    const read = ['count', { v: `${ws.length} words` }, { v: a.lang === 'en' ? 'English' : a.lang === 'pt' ? 'Portuguese' : a.lang, key: 'lang', alts: ['en', 'pt', 'other'], cur: a.lang }];
+    const trace = [`words: ${ws.length}, sentences: ${ss.length}, paragraphs: ${paras}`];
+    if (a.lang === 'en' && ws.length && ss.length) {
+      const syl = ws.reduce((n, w) => n + syllables(w), 0), wps = ws.length / ss.length, spw = syl / ws.length;
+      const fre = 206.835 - 1.015 * wps - 84.6 * spw, fk = 0.39 * wps + 11.8 * spw - 15.59;
+      body.push({ t: 'kv', rows: [['Flesch reading ease', `about ${Math.round(fre)} (estimate; 60 to 70 reads as plain English, under 30 as academic)`], ['Flesch–Kincaid grade', `about ${Math.round(fk)} (estimate; US school grade)`], ['syllables', `${syl}, estimated by rule (vowel groups), ${fmt(spw, 3)} per word`]] });
+      trace.push(`syllables by rule: ${syl}`, `FRE = 206.835 − 1.015 × ${fmt(wps, 4)} − 84.6 × ${fmt(spw, 4)} = ${fmt(fre, 4)}`, `FK = 0.39 × ${fmt(wps, 4)} + 11.8 × ${fmt(spw, 4)} − 15.59 = ${fmt(fk, 4)}`);
+    } else if (a.lang !== 'en') { body.push({ t: 'note', text: `No readability score: I have no checked formula for ${a.lang === 'pt' ? 'Portuguese (the Martins et al. 1996 adaptation is not transcribed yet)' : 'that language'}. The counts stand.` }); trace.push('readability: no formula for ' + a.lang); }
+    return { read, value: ws.length, body, trace, py: `text.stats(payload, lang="${a.lang}")` };
+  }
+});
+
+/* ── key sentences by TextRank, in their original order ─────── */
+const STOP = new Set('a an the and or but if then else of in on at to for from by with without as is are was were be been being it its this that these those there here he she they we you i me him her them us my your our their his not no yes do does did done have has had having will would shall should can could may might must also than too very so such which who whom whose what when where why how all any each few more most other some only own same into over under again further once'.split(' '));
+const content = s => new Set(words(s).map(w => w.toLowerCase()).filter(w => w.length > 2 && !STOP.has(w)));
+function textrank(ss) {
+  const n = ss.length, C = ss.map(content), W = Array.from({ length: n }, () => new Array(n).fill(0));
+  for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) { let shared = 0; for (const w of C[i]) if (C[j].has(w)) shared++; const den = Math.log(C[i].size + 1) + Math.log(C[j].size + 1); W[i][j] = W[j][i] = den > 0 ? shared / den : 0; }
+  let R = new Array(n).fill(1 / n); const out = W.map(row => row.reduce((x, y) => x + y, 0));
+  for (let it = 0; it < 40; it++) { const next = R.map((_, i) => 0.15 / n + 0.85 * W[i].reduce((acc, w, j) => acc + (w && out[j] ? w / out[j] * R[j] : 0), 0)); R = next; }
+  return R;
+}
+tool({
+  name: 'extract',
+  amend: [{ arg: 'n', match: /^(\d+) sentences?$/, value: m => +m[1] }, { arg: 'n', match: /^shorter$/, value: (m, a) => Math.max(1, a.n - 1) }, { arg: 'n', match: /^longer$/, value: (m, a) => a.n + 1 }],
+  topic: () => ['Key sentences', 1],
+  run: a => {
+    const ss = sentences(a.text), read = ['extract', { v: `${a.n} sentence${a.n === 1 ? '' : 's'}` }, 'of', { v: `${ss.length}` }];
+    if (ss.length < 6) return { read, body: [{ t: 'note', kind: 'err', text: `${ss.length} sentence${ss.length === 1 ? '' : 's'}: short enough to read as it is.` }], trace: ['fewer than six sentences'] };
+    const R = textrank(ss), n = Math.min(a.n, ss.length), top = R.map((r, i) => [r, i]).sort((x, y) => y[0] - x[0]).slice(0, n).map(x => x[1]).sort((x, y) => x - y);
+    return { read, value: top.map(i => ss[i]).join(' '), copy: top.map(i => ss[i]).join('\n'), body: [{ t: 'lbl', text: 'Extracted sentences' }, { t: 'list', items: top.map(i => `${quote(ss[i])} (sentence ${i + 1} of ${ss.length})`) }, { t: 'sub', text: 'Nothing was rewritten: these are the source\'s own sentences, in their original order, chosen by TextRank over shared content words.' }, { t: 'actions', items: [{ act: 'copy', label: 'Copy sentences' }] }], trace: [`split → ${ss.length} sentences`, `TextRank, 40 iterations, d = 0.85 → top ${n}: ${top.map(i => i + 1).join(', ')}`, `scores ${top.map(i => fmt(R[i], 3)).join(', ')}`], py: `text.extract(payload, n=${a.n})` };
+  }
+});
+
+/* ── diff of two blocks, Myers O(ND) ────────────────────────── */
+function myers(a, b) {
+  const N = a.length, M = b.length, MAX = N + M, off = MAX + 1, V = new Array(2 * MAX + 3).fill(0), trace = [];
+  V[off + 1] = 0;
+  outer: for (let d = 0; d <= MAX; d++) {
+    trace.push(V.slice());
+    for (let k = -d; k <= d; k += 2) {
+      let x = (k === -d || (k !== d && V[off + k - 1] < V[off + k + 1])) ? V[off + k + 1] : V[off + k - 1] + 1, y = x - k;
+      while (x < N && y < M && a[x] === b[y]) { x++; y++; }
+      V[off + k] = x;
+      if (x >= N && y >= M) break outer;
+    }
+  }
+  const ops = []; let x = N, y = M;
+  for (let d = trace.length - 1; d >= 0; d--) {
+    const v = trace[d], k = x - y, pk = (k === -d || (k !== d && v[off + k - 1] < v[off + k + 1])) ? k + 1 : k - 1, px = v[off + pk], py = px - pk;
+    while (x > px && y > py) { ops.push(['=', a[x - 1]]); x--; y--; }
+    if (d > 0) { if (x === px) { ops.push(['+', b[py]]); y--; } else { ops.push(['-', a[px]]); x--; } }
+  }
+  return ops.reverse();
+}
+const UNITS = ['line', 'word', 'character'];
+const split = (s, unit) => unit === 'line' ? s.split(/\r?\n/) : unit === 'word' ? s.split(/(\s+)/).filter(x => x !== '') : [...s];
+tool({
+  name: 'diff',
+  amend: [{ arg: 'unit', match: /^(?:by |per )?(lines?|words?|characters?|chars?|letters?)$/, value: m => /^l/.test(m[1]) ? 'line' : /^w/.test(m[1]) ? 'word' : 'character' }],
+  topic: () => ['Diff', 1],
+  run: a => {
+    if (a.noSep) return { read: ['diff'], body: [{ t: 'note', kind: 'err', text: 'Put a line of three dashes (---) between the two blocks.' }], trace: ['no separator'] };
+    const A = split(a.a, a.unit), B = split(a.b, a.unit);
+    if (A.length + B.length > 6000) return { read: ['diff'], body: [{ t: 'note', kind: 'err', text: `${A.length + B.length} ${a.unit}s is more than I diff in the page; try by line, or split the text.` }], trace: ['too long'] };
+    const ops = myers(A, B), added = ops.filter(o => o[0] === '+').length, removed = ops.filter(o => o[0] === '-').length, same = ops.filter(o => o[0] === '=').length;
+    const read = ['diff by', { v: a.unit, key: 'unit', alts: UNITS, cur: a.unit }];
+    const view = a.unit === 'line' ? ops.map(([t, s]) => `${t === '=' ? ' ' : t} ${s}`).join('\n') : ops.map(([t, s]) => t === '=' ? s : t === '-' ? `[-${s}-]` : `{+${s}+}`).join(a.unit === 'word' ? '' : '');
+    return { read, value: added + removed, copy: view, body: [{ t: 'big', v: added + removed ? `${added} added, ${removed} removed` : 'Identical', unit: `${a.unit}s; ${same} unchanged` }, { t: 'pre', text: view }, { t: 'sub', text: a.unit === 'line' ? 'Lines marked − are only in the first block, + only in the second.' : 'Removed pieces are in [-…-], added ones in {+…+}.' }, { t: 'actions', items: [{ act: 'copy', label: 'Copy diff' }] }], trace: [`split by ${a.unit}: ${A.length} and ${B.length}`, `Myers O(ND) → ${ops.length} operations, D = ${added + removed}`], py: `difflib.unified_diff(a.splitlines(), b.splitlines())` };
+  }
+});
+/* ── what reads them: a head, then the text after a colon or a line break ── */
+const payload = c => { const t = c.roles.text && c.roles.text[0]; return t && t.type === 'text' ? t.value.replace(/\r\n/g, '\n') : null; };
+const TEXT_ROLE = { text: { preps: [':'], types: ['text'] } };
+frame({
+  name: 'wordcount', label: 'Count words', words: ['word count', 'count words', 'count the words', 'text stats', 'readability', 'reading level', 'how readable is'], theme: [], required: ['text'], roles: TEXT_ROLE,
+  words_pt: ['contar palavras', 'conta as palavras', 'contagem de palavras', 'legibilidade'], label_pt: 'Contar palavras',
+  bind: c => payload(c) ? { tool: 'wordcount', args: { text: payload(c), lang: 'en' } } : null
+});
+frame({
+  name: 'extract', label: 'Key sentences', words: ['summarise', 'summarize', 'summary', 'key sentences', 'extract', 'extract the key sentences', 'main points', 'gist'], theme: [], required: ['text'], roles: TEXT_ROLE,
+  words_pt: ['resume', 'resuma', 'resumir', 'resumo', 'pontos principais', 'frases principais'], label_pt: 'Frases principais',
+  bind: c => payload(c) ? { tool: 'extract', args: { text: payload(c), n: 3 } } : null
+});
+frame({
+  name: 'diff', label: 'Diff', words: ['diff', 'compare', 'difference', 'difference between', 'what changed between', 'what changed in'], theme: [], required: ['text'], roles: TEXT_ROLE,
+  words_pt: ['diferença', 'diferença entre', 'compara', 'compare', 'o que mudou entre'], label_pt: 'Diferença',
+  bind: c => {
+    const p = payload(c); if (!p) return null;
+    const parts = p.split(/\n\s*-{3,}\s*\n/);
+    return { tool: 'diff', args: parts.length === 2 ? { a: parts[0].trim(), b: parts[1].trim(), unit: /\n/.test(parts[0].trim()) || /\n/.test(parts[1].trim()) ? 'line' : 'word' } : { noSep: true } };
+  }
+});
+  return { payloadOf, words, sentences, syllables, textrank, myers };
 })();
 
 /* ==== src/engine/forms.js ==== */
@@ -14395,7 +14437,7 @@ tool({
 const __m36 = (() => {
 const { tool, fmt, rad, deg, iso } = __m0;
 const { findDate, today, fmtDate } = __m3;
-const { zonesOf, offsetOf } = __m28;
+const { zonesOf, offsetOf } = __m27;
 const { placeOf } = __m35;
 // The sun by NOAA's solar position equations (after Meeus), and the moon's phase from the mean
 // synodic cycle, labelled with its accuracy. Times are given in the place's zone when the place name
@@ -14466,8 +14508,8 @@ tool({
 /* ==== src/engine/apply.js ==== */
 const __m37 = (() => {
 const { S, tool, fmt, rad, deg, p3, p2 } = __m0;
-const { whereToSift } = __m14;
-const { evaluatePredicate, predicateToString } = __m13;
+const { whereToSift } = __m13;
+const { evaluatePredicate, predicateToString } = __m12;
 const { conversions, vec3 } = __m4;
 // Field compute over a table: a single-value skill applied to every row the filter selects, the row's
 // columns bound to the skill's arguments through their names, constants filling what no column holds.
@@ -15089,8 +15131,7 @@ function exportNotebook(cells, opts = {}) {
 
 /* ==== src/engine/python.js ==== */
 const __m39 = (() => {
-const { tool, result, fmt } = __m0;
-const { payloadOf } = __m6;
+const { tool, frame, result, fmt } = __m0;
 const { importNotebook } = __m38;
 // Run and trace Python with adder, on the device. The tool itself stays synchronous: a first run returns a
 // "running" card carrying a job, the runner (a Web Worker in the page, adder in-process in the tests)
@@ -15113,9 +15154,8 @@ function rewriteForGcu(code) {
 const HEAD = /^(?:run|run this|run it|python|py|execute|exec|eval(?:uate)?(?: this)?|what does this print|trace|trace this|step through(?: this)?)$/i;
 
 tool({
-  name: 'python', rank: 41,
+  name: 'python',
   skill: { group: 'Compute', title: 'Run and trace Python', on: '@gcu/adder', about: 'Python run on the device by adder, compiled to JavaScript through AIR (tree-walked when tracing, or when the compiler declines a construct): output, the last value, the error with its line. "trace it" adds a table of lines and the variables they changed. No network, no page access, a statement budget; numpy, pandas, scipy, sklearn and matplotlib imports are rewritten to the GCU names (natra, sadpan, scitra, learn, plt) and shown; figures come back as drawings on the card.', examples: ['run this: print(sum(range(10)))', 'run this: import plt; plt.plot([1, 2, 3], [1, 4, 9]); plt.show()', 'trace this: a = 1; b = a * 2; a = a + b'] },
-  read: (text, q, raw) => { const p = payloadOf(raw || text); if (!p || !p.body || !HEAD.test(p.head)) return null; return { code: p.body.replace(/\r\n/g, '\n'), trace: /^(?:trace|step)/i.test(p.head) }; },
   amend: [{ arg: 'trace', match: /^(?:trace it|trace|step through it|show the steps)$/, value: () => true }, { arg: 'trace', match: /^(?:no trace|just run it)$/, value: () => false }],
   topic: () => ['Python', 1],
   run: a => {
@@ -15145,6 +15185,16 @@ tool({
     body.push(...subs, { ...src, text: `@gcu/adder, ${how} · ${limits} · ran in ${fmt(r.ms)} ms` });
     return { read, value: r.value, copy: r.stdout || r.value || '', body, trace: [`adder.run(${lines} lines${a.trace ? ', trace' : ''}) in a fresh interpreter`, `engine: ${r.engine || 'adder'}${r.engineWhy ? ` (${r.engineWhy})` : ''}`, r.error ? `raised ${r.error.type}` : 'finished', `${fmt(r.ms)} ms`], py: a.code };
   }
+});
+/* ── what reads it: "run this:" or "trace this:", then the code after the colon or on the next lines ── */
+const payload = c => { const t = c.roles.text && c.roles.text[0]; return t && t.type === 'text' ? t.value.replace(/\r\n/g, '\n') : null; };
+for (const [name, words, words_pt, trace] of [
+  ['python', ['run', 'python', 'py', 'execute', 'exec', 'eval', 'evaluate', 'what does this print'], ['roda', 'rode', 'rodar', 'executa', 'execute', 'executar', 'avalia', 'avalie'], false],
+  ['pytrace', ['trace', 'step through'], ['rastreia', 'rastreie', 'passo a passo'], true]
+]) frame({
+  name, label: trace ? 'Trace' : 'Run', words, theme: [], required: ['text'], roles: { text: { preps: [':'], types: ['text'] } },
+  words_pt, label_pt: trace ? 'Rastrear' : 'Rodar',
+  bind: c => payload(c) ? { tool: 'python', args: { code: payload(c), trace } } : null
 });
   return { rewriteForGcu };
 })();
@@ -18251,7 +18301,7 @@ function readDM(buffer) {
 const __m45 = (() => {
 const { sheet } = __m43;
 const { readDM } = __m44;
-const { readParquet, parquetInfo } = __m25;
+const { readParquet, parquetInfo } = __m24;
 // Binary table formats, converted to text when a file is opened: xlsx through @gcu/sheet (one text per
 // sheet), Datamine .dm through @gcu/dm, Parquet through @gcu/parquet. Tools stay synchronous and the device keeps the converted text,
 // so a session replays from it. What did not carry over is said on the card.
@@ -18303,13 +18353,13 @@ async function convertBinary(name, buffer) {
 
 /* ==== src/engine/notes.js ==== */
 const __m46 = (() => {
-const { S, tool } = __m0;
+const { S, tool, frame } = __m0;
 // Notes and taught words. Both belong to the device and are shared by every session.
+const textOf = c => c.theme[0] && c.theme[0].type === 'text' ? c.theme[0].value : null;
 
 tool({
-  name: 'remember', rank: 40,
+  name: 'remember',
   skill: { group: 'Session', title: 'Notes', on: 'glass', about: 'Remembers only what you ask it to.', examples: ['remember that hole 12 collar was resurveyed in march', 'what do you know about hole 12'] },
-  read: (text, q) => /^remember /.test(q) ? { text: text.replace(/^remember (that )?/i, '') } : null,
   topic: () => ['Notes', 1],
   run: a => {
     if (!a.done) { S.facts.push(a.text); a.done = true; }
@@ -18317,8 +18367,7 @@ tool({
   }
 });
 tool({
-  name: 'recall', rank: 41,
-  read: (text, q) => { const m = /^what do you (?:know|remember) about (.+)$/.exec(q); return m ? { about: m[1] } : null; },
+  name: 'recall',
   topic: () => ['Notes', 1],
   run: a => {
     const w = a.about.split(/\s+/).filter(Boolean), hit = S.facts.filter(f => w.every(x => f.toLowerCase().includes(x)));
@@ -18326,13 +18375,29 @@ tool({
   }
 });
 tool({
-  name: 'teach', rank: 10,
+  name: 'teach',
   skill: { group: 'Session', title: 'Teach a word', on: 'lexicon', about: 'Stays on the device.', examples: ['pop means population'] },
-  read: (text, q) => { const m = /^(.+?) means (.+)$/.exec(q); return m ? { word: m[1], means: m[2] } : null; },
   run: a => {
     S.aliases[a.word] = a.means;
     return { read: ['learn that', { v: a.word }, 'means', { v: a.means }], body: [{ t: 'note', kind: 'ok', text: `Learned. From now on “${a.word}” reads as “${a.means}” on this device.` }], trace: ['lexicon.add(word → meaning)', 'retrain: instant, the lexicon is a table'] };
   }
+});
+
+// "remember (that) …", "what do you know about …", "pop means population": the words are free text
+frame({
+  name: 'remember', label: 'Remember', words: ['remember', 'note', 'note down', 'make a note', 'keep in mind'], lead: ['that'], theme: ['text'], required: ['theme'], roles: {},
+  words_pt: ['lembra', 'lembre', 'anota', 'anote', 'guarda', 'guarde'], lead_pt: ['que'], label_pt: 'Lembrar',
+  bind: c => textOf(c) ? { tool: 'remember', args: { text: textOf(c) } } : null
+});
+frame({
+  name: 'recall', label: 'Recall', words: ['what do you know about', 'what do you remember about', 'what did i note about', 'recall', 'notes about'], theme: ['text'], required: ['theme'], roles: {},
+  words_pt: ['o que você sabe sobre', 'o que voce sabe sobre', 'o que eu anotei sobre'], label_pt: 'Recordar',
+  bind: c => textOf(c) ? { tool: 'recall', args: { about: textOf(c).toLowerCase() } } : null
+});
+frame({
+  name: 'teach', label: 'Teach', words: ['means', 'stands for', 'is short for', 'is another word for'], subject: ['text'], theme: ['text'], required: ['theme', 'subject'], roles: {},
+  words_pt: ['significa', 'quer dizer', 'é abreviação de'], label_pt: 'Ensinar',
+  bind: c => { const w = c.roles.subject && c.roles.subject[0]; return w && textOf(c) ? { tool: 'teach', args: { word: w.value.toLowerCase(), means: textOf(c).toLowerCase() } } : null; }
 });
   return {  };
 })();
@@ -18381,11 +18446,11 @@ const SUGGESTIONS = ['pop means population', 'histogram of cu', 'log scale', 'po
 
 /* ==== src/engine/ontology.js ==== */
 const __m48 = (() => {
-const { FRAMES, S } = __m0;
+const { FRAMES, LEXICON, S } = __m0;
 const { UNIT_TABLE, COMPOUNDS, DIM, parseUnit, dimName } = __m1;
-const { ELEMENT } = __m14;
-const { FB, ODS, ODSA } = __m15;
-const { TIMESCALE } = __m20;
+const { ELEMENT } = __m13;
+const { FB, ODS, ODSA } = __m14;
+const { TIMESCALE } = __m19;
 // The clause ontology, assembled from what golem knows: units from the conversion table, nouns from the
 // sample packs, verb frames from the declarations. Inert data; the build writes it to dist/golem.json.
 // Portuguese synonyms are listed here by hand until packs carry them in their golem facet.
@@ -18418,16 +18483,23 @@ function ontology() {
       { type: 'filter', words: { landlocked: ['landlocked'] }, words_pt: { landlocked: ['sem litoral', 'sem costa'] } },
       { type: 'scale', words: { log: ['log', 'logarithmic', 'log scale'], linear: ['linear', 'linear scale'] }, words_pt: { log: ['log', 'logarítmica', 'logaritmica', 'escala log'], linear: ['linear', 'escala linear'] } },
       { type: 'term', words: terms, generic: ['term', 'word'], words_pt: { ...terms, 'hash table': ['hash table', 'tabela hash'], 'b-tree': ['b-tree', 'btree', 'árvore b', 'arvore b'] }, generic_pt: ['termo', 'palavra'] },
-      { type: 'table', words: { 'assays.csv': ['assays.csv', 'assays', 'sample table'] }, generic: ['table', 'file', 'csv'], words_pt: { 'assays.csv': ['assays.csv', 'assays', 'tabela de amostra'] }, generic_pt: ['tabela', 'arquivo'] },
-      { type: 'format', words: { script: ['script', 'python', 'adder'], notebook: ['notebook'], csv: ['csv'], tsv: ['tsv'], json: ['json'] }, words_pt: { script: ['script', 'python', 'adder'], notebook: ['notebook', 'caderno'], csv: ['csv'], tsv: ['tsv'], json: ['json'] } },
+      { type: 'table', words: { 'assays.csv': ['assays.csv', 'assays', 'sample table'] }, generic: ['table', 'csv', 'rows', 'data'], words_pt: { 'assays.csv': ['assays.csv', 'assays', 'tabela de amostra'] }, generic_pt: ['tabela', 'arquivo'] },
+      { type: 'format', words: { script: ['script', 'python', 'adder'], notebook: ['notebook'], csv: ['csv', 'comma separated'], tsv: ['tsv', 'tab separated'], json: ['json'], parquet: ['parquet'], yaml: ['yaml', 'yml'], wkt: ['wkt'], geojson: ['geojson'] },
+        words_pt: { script: ['script', 'python', 'adder'], notebook: ['notebook', 'caderno'], csv: ['csv'], tsv: ['tsv'], json: ['json'], parquet: ['parquet'], yaml: ['yaml', 'yml'], wkt: ['wkt'], geojson: ['geojson'] } },
+      // the files kept on this device, by name; "this file" is the generic
+      { type: 'file', words: Object.fromEntries(Object.values(S.files).map(f => [f.name, [f.name.toLowerCase()]])), generic: ['file', 'this file'],
+        words_pt: Object.fromEntries(Object.values(S.files).map(f => [f.name, [f.name.toLowerCase()]])), generic_pt: ['arquivo', 'este arquivo'] },
       { type: 'timer', words: { timer: ['timer', 'countdown'] }, words_pt: { timer: ['timer', 'cronômetro', 'cronometro', 'temporizador', 'contagem'] } },
       // every unit of the chart, by name; the generic words let "what period is …" fail cleanly to the regex reader
       { type: 'chron', words: Object.fromEntries(TIMESCALE.map(u => [u.n, [u.n.toLowerCase()]])), generic: ['period', 'epoch', 'era', 'eon', 'stage', 'series', 'system'],
-        words_pt: Object.fromEntries(TIMESCALE.map(u => [u.n, [u.n.toLowerCase()]])), generic_pt: ['período', 'periodo', 'época', 'epoca', 'era', 'éon', 'eon', 'andar', 'idade'] }
+        words_pt: Object.fromEntries(TIMESCALE.map(u => [u.n, [u.n.toLowerCase()]])), generic_pt: ['período', 'periodo', 'época', 'epoca', 'era', 'éon', 'eon', 'andar', 'idade'] },
+      ...LEXICON.nouns.map(n => typeof n === 'function' ? n() : n).filter(Boolean)
     ],
+    shapes: LEXICON.shapes,
+    fillers: ['golem', 'ok', 'okay'],
     units,
     compounds: [{ mod: 'filter', heads: ['country'], attr: 'filter', echo: true }, { mod: 'scale', heads: ['plot'], attr: 'scale', echo: true }],
-    postmods: [],
+    postmods: LEXICON.postmods,
     qmods: [{ head: 'timer', attr: 'duration', dims: ['time'] }],   // "a 30 minute timer"
     verbs: FRAMES.map(({ bind, ...f }) => f),
     inherit: [],
@@ -18444,7 +18516,7 @@ const __m49 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/dispatch, built from ../auditable/ext/dispatch/src/ by its own build.
 // Source of truth: gentropic/auditable ext/dispatch (local clone: ../auditable). Re-vendor by copying
 // ext/dispatch/index.js here after 'node ext/dispatch/build.js'. golem uses the grammar rung only:
-// createEngine, makeSession, ENGLISH, PORTUGUESE.
+// createEngine, makeSession, ENGLISH, PORTUGUESE. At auditable ea0a7666.
 
 // ⚠ GENERATED FILE — DO NOT EDIT. Source: src/  Build: @gcu/build src/main.js
 // @gcu/dispatch — Session-trained natural-language → tool-call dispatch: a Snips-shaped resolver (averaged-perceptron intent + CRF-class slot tagger + gazetteers + deterministic per-kind assemblers) that trains IN THE BROWSER from the host session's own vocabulary in under a second. Tools are declarative (ten kinds) and a grammar rung (clause: case-grammar frames over an Earley chart with costed repairs, en + pt-BR) reads controlled commands before the learners see them; no shipped model, no network, explainable per decision — refusals return empty calls so the host degrades into its command palette. Born from an incubator where this beat a 26M finetuned transformer 50/52 to 3/24 on a frozen yardstick.
@@ -19456,6 +19528,7 @@ function buildGrammar(X) {
   rule('Cmd', 'AGAIN BUT Theme PPs', (_, __, t, a) => ({ kind: 'again', args: [...t, ...a] }));
   rule('Cmd', 'AGAIN COMMA BUT Theme PPs', (_, __, ___, t, a) => ({ kind: 'again', args: [...t, ...a] }));
 
+  if (X.subject) rule('Cmd', 'NP VERB Theme PPs', (n, v, t, a) => ({ kind: 'cmd', verb: v.verb, args: [...t, { kind: 'pp', prep: '', canon: ['subject'], val: [n] }, ...a] }));   // "pop means population": only frames that declare a subject
   rule('Cmd', 'VERB PPs LATE NPList', (v, a, _, l) => ({ kind: 'cmd', verb: v.verb, args: [{ kind: 'np', list: l }, ...a] }));   // object after the PPs — a repair, never free
   rule('Cmd', 'LATE PP PPs VERB Theme PPs', (_, p, a, v, t, b) => ({ kind: 'cmd', verb: v.verb, args: [...t, p, ...a, ...b] }));   // arguments before the verb — also a repair
   // no verb: a bare thing, maybe with arguments — "density of chalcopyrite", "2 km in miles", "histogram of cu".
@@ -19468,6 +19541,11 @@ function buildGrammar(X) {
   rule('PPs', 'PP PPs', (a, r) => [a, ...r]);
 
   rule('PP', 'PREP NPList', (p, l) => ({ kind: 'pp', prep: p.word, canon: p.canon, val: l }));
+  rule('PP', 'COLON NPList', (_, l) => ({ kind: 'pp', prep: ':', canon: [':'], val: l }));   // "check: …", a payload after a line break
+  rule('PP', 'DEMO COLON NPList', (_, __, l) => ({ kind: 'pp', prep: ':', canon: [':'], val: l }));             // "summarise this: …", "diff these: …"
+  rule('PP', 'PREP:of DEMO COLON NPList', (_, __, ___, l) => ({ kind: 'pp', prep: ':', canon: [':'], val: l }));   // "word count of this: …"
+  rule('PP', 'Date', d => ({ kind: 'pp', prep: '', canon: ['on'], val: [d] }));
+  if (X.bareText) rule('PP', 'TEXT', t => ({ kind: 'pp', prep: '', canon: [''], val: [{ type: 'text', value: t.text, generic: false, attrs: {} }] }));   // a bare text role                   // a bare date is a time argument: "call him tomorrow"
 
   rule('NPList', 'NP NPTail', (n, t) => [n, ...t]);
   rule('NPTail', '', () => []);
@@ -19486,6 +19564,10 @@ function buildGrammar(X) {
   rule('NP', 'IDENT', t => t.type ? { type: t.type, name: t.name, generic: false, attrs: {} } : null);
   rule('NP', 'Quantity', q => q);
   rule('NP', 'UNIT', u => ({ type: 'unit', unit: u.unit, dim: u.dim, generic: false, attrs: {} }));   // "in miles": a unit as a thing
+  rule('NP', 'TEXT', t => ({ type: 'text', value: t.text, generic: false, attrs: {} }));            // a free-text span (the engine cuts it)
+  rule('NP', 'LIT', t => ({ type: t.type, value: t.value, generic: false, attrs: {} }));            // a token shape the ontology declares (270/60, DH-03)
+  rule('NP', 'Date', d => d);
+  rule('NP', 'Clock', c => c);
   rule('NP', 'DET Quantity Head', (_, q, h) => X.qmod(q, h));
   rule('NP', 'Quantity Head', (q, h) => X.qmod(q, h));
   rule('Except', '', () => []);
@@ -19504,7 +19586,7 @@ function buildGrammar(X) {
   rule('PostMods', '', () => []);
   rule('PostMods', 'PostMod PostMods', (m, r) => [m, ...r]);
   for (const p of X.postmodPreps) {
-    if (X.postmodQuantity.has(p)) rule('PostMod', `PREP:${p} Quantity`, (_, q) => ({ prep: p, q }));
+    if (X.postmodQuantity.has(p)) { rule('PostMod', `PREP:${p} Quantity`, (_, q) => ({ prep: p, q })); rule('PostMod', `COP PREP:${p} Quantity`, (_, __, q) => ({ prep: p, q })); }   // "cu above 1", "cu is above 1"
     else rule('PostMod', `PREP:${p} NP`, (_, n) => ({ prep: p, np: n }));
   }
   rule('PostMod', 'PREP:of Quantity', (_, q) => ({ prep: 'of', q, qmod: true }));   // "a search of 200 m" / "busca de 200 m"
@@ -19533,6 +19615,31 @@ function buildGrammar(X) {
     rule('Head', 'NOUN Head', (a, h) => X.compound(leaf(a), h));
   }
 
+  // dates: a weekday or relative day ("friday", "tomorrow", "next monday"), a day and month with an optional
+  // year in either order ("25 december", "oct 16 2026", "16 de outubro de 2026"), an ISO date; a weekday in
+  // front of a full date is checked by the host, not here. Clock times: 09:30, 9pm, "9 am", noon, a bare hour.
+  const date = o => ({ type: 'date', generic: false, attrs: {}, ...o });
+  const dayOf = (n, m, y) => Number.isInteger(n.n) && n.n >= 1 && n.n <= 31 && (!y || (Number.isInteger(y.n) && y.n >= 1000 && y.n <= 9999))
+    ? date({ d: n.n, m: m.m, ...(y ? { y: y.n } : {}), value: [n.n, m.word, y && y.n].filter(Boolean).join(' ') }) : null;
+  rule('Date', 'DAY', d => date(d.dow != null ? { dow: d.dow, value: d.word } : { off: d.off, value: d.word }));   // off = days from today
+  if (X.nextDay) rule('Date', 'THEN:next DAY', (_, d) => d.dow != null ? date({ dow: d.dow, next: true, value: `next ${d.word}` }) : null);
+  rule('Date', 'DATE', d => date({ y: d.y, m: d.m, d: d.d, value: d.word }));
+  rule('Date', 'NUM MONTH', (n, m) => dayOf(n, m));
+  rule('Date', 'NUM MONTH NUM', (n, m, y) => dayOf(n, m, y));
+  rule('Date', 'NUM PREP:of MONTH', (n, _, m) => dayOf(n, m));
+  rule('Date', 'NUM PREP:of MONTH PREP:of NUM', (n, _, m, __, y) => dayOf(n, m, y));
+  rule('Date', 'MONTH NUM', (m, n) => dayOf(n, m));
+  rule('Date', 'MONTH NUM NUM', (m, n, y) => dayOf(n, m, y));
+  rule('Date', 'MONTH NUM COMMA NUM', (m, n, _, y) => dayOf(n, m, y));
+  rule('Date', 'DAY Date', (w, d) => w.dow != null && d.d != null ? { ...d, dow: w.dow, value: `${w.word} ${d.value}` } : null);
+  rule('Date', 'DAY COMMA Date', (w, _, d) => w.dow != null && d.d != null ? { ...d, dow: w.dow, value: `${w.word} ${d.value}` } : null);
+  const clock = (h, mi, value) => ({ type: 'clock', h, mi, value, generic: false, attrs: {} });
+  const hhmm = (h, mi) => `${String(h).padStart(2, '0')}:${String(mi).padStart(2, '0')}`;
+  rule('Clock', 'CLOCK', c => clock(c.h, c.mi, hhmm(c.h, c.mi)));
+  rule('Clock', 'NUM AMPM', (n, a) => { if (!Number.isInteger(n.n) || n.n < 1 || n.n > 12) return null; const pm = /^p/.test(a.word), am = /^a/.test(a.word);
+    const h = pm && n.n < 12 ? n.n + 12 : am && n.n === 12 ? 0 : n.n; return clock(h, 0, hhmm(h, 0)); });
+  rule('Clock', 'NUM', n => Number.isInteger(n.n) && n.n >= 0 && n.n <= 24 ? clock(n.n, 0, hhmm(n.n, 0)) : null);
+
   rule('Quantity', 'NUM', t => ({ type: 'quantity', n: t.n, unit: null, dim: 'bare' }));
   rule('Quantity', 'NUM UNIT', (t, u) => ({ type: 'quantity', n: t.n, unit: u.unit, dim: u.dim }));
   return R;
@@ -19549,15 +19656,26 @@ const ENGLISH = {
   code: 'en', headFirst: false,
   DET: 'the|a|an|this|that|my|our', REF: 'last|previous|latest|current|first|new',
   QUANT: 'all|every|each', EXCEPT: 'except|excluding|minus', CONJ: 'and|or|plus', COMMA: ',',
-  PREP: 'with|using|by|in|on|for|from|to|at|as|above|below|over|under|of|into|without|against',
+  PREP: 'with|using|by|per|in|on|for|from|to|at|as|above|below|over|under|of|into|without|against|where|>|<|>=|<=|=|≥|≤|greater than|more than|less than|at least|at most|equal to|equals',
   THEN: 'then|afterwards|next', BUT: 'but', PRON: 'it|them|those', AGAIN: 'again|rerun|redo|repeat|same',
   QWORD: 'why|how|what|when|who|is|are|does|do|should|can|could|would',
   // closed questions the grammar reads as commands with the verb left out: a wh-word, a copula, the fused forms
+  DEMO: 'this|these|it|that|them|the following|the following text|the text|the two|both',   // before a colon: "summarise this: …"
   WH: 'what|which', COP: 'is|are|was|were', WHCOP: "what is|what's|whats|what are|which is|which are|how much is|how many are",
-  FILLER: 'please|now|just|kindly|go|ahead|me|us|hey|hi|yo|thanks|thank you|cheers|pls|plz|so|can you|could you|would you|will you|i want you to|i need you to|i want to|let us|lets',
-  preps: {},   // identity: every English prep is its own canon
+  TRAIL: 'please|thanks|thank you|pls|plz|cheers',   // politeness that closes a sentence, trimmed from the end of a free text
+  FILLER: "please|now|just|kindly|go|ahead|me|us|hey|hi|hello|yo|thanks|thank you|cheers|pls|plz|so|um|uh|er|erm|hmm|well|oh|alright|can you|could you|would you|will you|i want you to|i need you to|i want to|i need|i'd like|i would like|give me|tell me|for me|let us|lets",
+  // identity for every English preposition except the comparisons, which share a canon with their words
+  preps: { '>': ['above'], 'greater than': ['above'], 'more than': ['above'], '<': ['below'], 'less than': ['below'], '>=': ['atleast'], '≥': ['atleast'], 'at least': ['atleast'],
+    '<=': ['atmost'], '≤': ['atmost'], 'at most': ['atmost'], '=': ['equals'], 'equal to': ['equals'], equals: ['equals'] },
+  // the calendar: weekday numbers (0 = Sunday) or a day relative to today; months; named clock times; am/pm.
+  // "sun" is left out on purpose: it is the sun more often than Sunday.
+  days: { sunday: 0, monday: 1, mon: 1, tuesday: 2, tue: 2, tues: 2, wednesday: 3, wed: 3, thursday: 4, thu: 4, thur: 4, thurs: 4, friday: 5, fri: 5, saturday: 6, sat: 6,
+    today: { rel: 0 }, tonight: { rel: 0 }, tomorrow: { rel: 1 }, yesterday: { rel: -1 } },
+  months: { january: 1, jan: 1, february: 2, feb: 2, march: 3, mar: 3, april: 4, apr: 4, may: 5, june: 6, jun: 6, july: 7, jul: 7, august: 8, aug: 8, september: 9, sep: 9, sept: 9, october: 10, oct: 10, november: 11, nov: 11, december: 12, dec: 12 },
+  clocks: { noon: [12, 0], midday: [12, 0], midnight: [0, 0] },
+  AMPM: "am|pm|a.m.|p.m.|o'clock",
   indefinite: ['a', 'an'], newRef: ['new'], firstRef: ['first'],
-  phr: { new: 'new', last: 'last', every: 'every', except: 'except', fromRun: 'from run', above: 'above', below: 'below', then: 'Then', assuming: 'assuming', of: 'of', hole: '___', than: 'than' },
+  phr: { new: 'new', last: 'last', every: 'every', except: 'except', fromRun: 'from run', above: 'above', below: 'below', atleast: 'at least', atmost: 'at most', equals: 'equal to', then: 'Then', assuming: 'assuming', of: 'of', hole: '___', than: 'than' },
   // morphology: a stem both the lexicon and the input are folded through; plural = word ≠ lexeme and ends in s
   stem: w => { let x = w; if (x.length > 4 && /ies$/.test(x)) x = x.slice(0, -3) + 'y'; else if (x.length > 4 && /(ss|sh|ch|x)es$/.test(x)) x = x.slice(0, -2); else if (x.length > 3 && /[^s]s$/.test(x)) x = x.slice(0, -1);
     if (x.length > 5 && /ing$/.test(x)) x = x.slice(0, -3); else if (x.length > 4 && /ed$/.test(x)) x = x.slice(0, -2);
@@ -19599,13 +19717,19 @@ function createEngine(ont, locale = ENGLISH) {
   // ---- lexicon from ontology + locale ----
   const LEX = {};
   const add = (words, cat, extra = {}) => { for (const w of words.split('|')) (LEX[w] ??= []).push({ cat, word: w, ...extra }); };
-  for (const cat of ['DET', 'REF', 'QUANT', 'EXCEPT', 'CONJ', 'COMMA', 'THEN', 'BUT', 'PRON', 'AGAIN', 'QWORD', 'FILLER', 'REL', 'SUBJ', 'WH', 'COP', 'WHCOP']) if (locale[cat]) add(locale[cat], cat);
+  for (const cat of ['DET', 'REF', 'QUANT', 'EXCEPT', 'CONJ', 'COMMA', 'THEN', 'BUT', 'PRON', 'AGAIN', 'QWORD', 'FILLER', 'REL', 'SUBJ', 'WH', 'COP', 'WHCOP', 'DEMO']) if (locale[cat]) add(locale[cat], cat);
   for (const [w, r] of Object.entries(locale.times)) add(w, 'TIME', { from: r[0], to: r[1] });
   for (const [w, c] of Object.entries(locale.comps)) add(w, 'COMP', { sign: c[0], sup: !!c[1] });
   for (const p of locale.PREP.split('|')) add(p, 'PREP', { canon: locale.preps[p] ?? [p] });
+  // the calendar: weekdays and relative days (DAY), months (MONTH), named clock times (CLOCK), am/pm (AMPM)
+  for (const [w, d] of Object.entries(locale.days ?? {})) add(w, 'DAY', typeof d === 'number' ? { dow: d } : { off: d.rel });   // off, not rel: rel is a relative clause downstream
+  for (const [w, m] of Object.entries(locale.months ?? {})) add(w, 'MONTH', { m });
+  for (const [w, c] of Object.entries(locale.clocks ?? {})) add(w, 'CLOCK', { h: c[0], mi: c[1] });
+  if (locale.AMPM) add(locale.AMPM, 'AMPM');
   const L = k => `${k}_${locale.code}`;   // ontology synonym column for this locale, falling back to the default column
   const col = (o, k) => o[L(k)] ?? o[k];
-  const VERBS = Object.fromEntries(ont.verbs.map(v => [v.name, v]));
+  // a frame may take a subject before its verb ("pop means population"): it binds as the role 'subject'
+  const VERBS = Object.fromEntries(ont.verbs.map(v => [v.name, v.subject ? { ...v, roles: { ...v.roles, subject: { preps: ['subject'], types: v.subject } } } : v]));
   for (const v of ont.verbs) add(col(v, 'words').join('|'), 'VERB', { verb: v.name });
   const NOUNS = Object.fromEntries(ont.nouns.map(n => [n.type, n]));
   for (const n of ont.nouns) {
@@ -19613,6 +19737,7 @@ function createEngine(ont, locale = ENGLISH) {
     if (col(n, 'generic')) add(col(n, 'generic').join('|'), 'NOUN', { type: n.type, value: null, generic: true });
   }
   for (const u of ont.units) add(col(u, 'words').join('|'), 'UNIT', { dim: u.dim, unit: u.unit });
+  for (const w of col(ont, 'fillers') ?? []) if (!LEX[w]) add(w, 'FILLER');   // host words that carry nothing ("golem" in "hey golem")
   const MULTI = Object.keys(LEX).filter(k => k.includes(' ')).map(k => k.split(' ')).sort((a, b) => b.length - a.length);
   const SINGLE = Object.keys(LEX).filter(k => !k.includes(' '));
   const CONTENT = new Set(Object.keys(LEX).filter(k => LEX[k].some(s => ['NOUN', 'VERB', 'UNIT'].includes(s.cat))));
@@ -19623,6 +19748,9 @@ function createEngine(ont, locale = ENGLISH) {
   // ---- type-driven helpers used inside the grammar ----
   const X = {
     headFirst: !!locale.headFirst,
+    nextDay: locale.THEN.split('|').includes('next'),
+    subject: ont.verbs.some(v => v.subject),   // some frame takes a subject before its verb
+    bareText: ont.verbs.some(v => Object.values(v.roles ?? {}).some(r => r.types.includes('text') && r.preps.includes(''))),   // a text with no marker   // "next friday" where the bank has the word
     identTypes: new Set(ont.nouns.filter(n => n.ident).map(n => n.type)),
     postmodPreps: [...new Set(ont.postmods.map(p => p.prep))],
     postmodQuantity: new Set(ont.postmods.filter(p => p.quantity).map(p => p.prep)),
@@ -19649,28 +19777,45 @@ function createEngine(ont, locale = ENGLISH) {
   const R = buildGrammar(X);
 
   // ---- tokenizer ----
+  // pieces of the input with their offsets: a line break or a colon before a space is a COLON (it opens a
+  // payload), comparison signs stand alone, a number may carry a sign and thousands separators, and a colon
+  // inside a word (09:30) stays in it
+  const PIECE = /\r?\n\s*|:(?=\s|$)|[,?!]|[<>]=?|[=≤≥]|-?\d{1,3}(?:,\d{3})+(?:\.\d+)?(?![\d,])|(?:[^\s,?!<>=≤≥:]|:(?!\s|$))+/g;
+  const SHAPES = (ont.shapes ?? []).map(x => ({ type: x.type, re: new RegExp(`^(?:${x.re})$`, 'i') }));
+  // shapes the grammar knows itself: clock times (09:30, 9pm, 9h30) and ISO dates
+  const clockOf = w => { let m = /^(\d{1,2}):(\d{2})(am|pm)?$/.exec(w) || /^(\d{1,2})()(am|pm)$/.exec(w) || /^(\d{1,2})h(\d{2})?()$/.exec(w); if (!m) return null;
+    let h = +m[1]; const mi = m[2] ? +m[2] : 0; if (m[3] === 'pm' && h < 12) h += 12; if (m[3] === 'am' && h === 12) h = 0; return h <= 24 && mi < 60 && (!m[3] || +m[1] <= 12) ? { cat: 'CLOCK', h, mi } : null; };
+  const dateOf = w => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(w); return m && +m[2] >= 1 && +m[2] <= 12 && +m[3] >= 1 && +m[3] <= 31 ? { cat: 'DATE', y: +m[1], m: +m[2], d: +m[3] } : null; };
   function tokenize(text, session) {
-    const raw = text.toLowerCase().replace(/([,?!])/g, ' $1 ').trim().split(/\s+/).filter(Boolean);
+    const raw = [...text.matchAll(PIECE)].map(m => ({ w: /^\r?\n/.test(m[0]) ? ':' : m[0].toLowerCase(), s: m.index, e: m.index + m[0].replace(/\s+$/, '').length, src: m[0] }));
+    for (let k = raw.length - 1; k > 0; k--) if (raw[k].w === ':' && raw[k - 1].w === ':') raw.splice(k, 1);   // "check:\n…" is one break
+    const end = raw.at(-1); if (end && end.w.length > 1 && end.w.endsWith('.') && !/^\d|\.\w+\.$/.test(end.w)) { end.w = end.w.slice(0, -1); end.e--; end.src = end.src.replace(/\.(\s*)$/, '$1'); }   // a full stop ends the sentence, not the word (a.m. keeps its own)
     const toks = []; const notes = []; const unknown = [];
+    const at = (t, a, b) => Object.assign(t, { s: raw[a].s, e: raw[b - 1].e });
     for (let i = 0; i < raw.length;) {
       let hit = null;
       let mwPlural = false;
-      for (const mw of MULTI) if (mw.every((w, k) => raw[i + k] === w || (k === mw.length - 1 && raw[i + k] && locale.stem(raw[i + k]) === locale.stem(w) && LEX[mw.join(' ')].some(x => x.cat === 'NOUN')))) { hit = mw; mwPlural = locale.plural(raw[i + mw.length - 1]); break; }
-      if (hit) { const w = hit.join(' '); if (LEX[w][0].cat !== 'FILLER') toks.push({ word: w, senses: mwPlural ? LEX[w].map(x => x.cat === 'NOUN' ? { ...x, plural: true } : x) : LEX[w] }); i += hit.length; continue; }
-      const w = raw[i++];
+      for (const mw of MULTI) if (mw.every((w, k) => raw[i + k]?.w === w || (k === mw.length - 1 && raw[i + k] && locale.stem(raw[i + k].w) === locale.stem(w) && LEX[mw.join(' ')].some(x => x.cat === 'NOUN')))) { hit = mw; mwPlural = locale.plural(raw[i + mw.length - 1].w); break; }
+      if (hit) { const w = hit.join(' '); if (LEX[w][0].cat !== 'FILLER') toks.push(at({ word: w, senses: mwPlural ? LEX[w].map(x => x.cat === 'NOUN' ? { ...x, plural: true } : x) : LEX[w] }, i, i + hit.length)); i += hit.length; continue; }
+      const i0 = i, w = raw[i++].w, src = raw[i0].src.trim();
       if (w === '?' || w === '!') continue;
-      if (LEX[w]) { if (LEX[w][0].cat !== 'FILLER') { const plural = locale.plural(w); toks.push({ word: w, senses: plural ? LEX[w].map(x => x.cat === 'NOUN' ? { ...x, plural } : x) : LEX[w] }); } continue; }
-      if (/^\d+(\.\d+)?$/.test(w)) { toks.push({ word: w, senses: [{ cat: 'NUM', n: parseFloat(w) }] }); continue; }
-      if (session?.names?.[w]) { toks.push({ word: w, senses: [{ cat: 'IDENT', name: w, type: session.names[w] }] }); continue; }
-      if (/^[a-z]+\d+$/.test(w)) { toks.push({ word: w, senses: [{ cat: 'IDENT', name: w }] }); continue; }
+      if (w === ':') { toks.push(at({ word: ':', senses: [{ cat: 'COLON' }] }, i0, i)); continue; }
+      if (LEX[w]) { if (LEX[w][0].cat !== 'FILLER') { const plural = locale.plural(w); toks.push(at({ word: w, senses: plural ? LEX[w].map(x => x.cat === 'NOUN' ? { ...x, plural } : x) : LEX[w] }, i0, i)); } continue; }
+      const lit = [clockOf(w), dateOf(w), ...SHAPES.filter(x => x.re.test(w)).map(x => ({ cat: 'LIT', type: x.type, value: src }))].filter(Boolean);
+      const num = /^-?\d+(\.\d+)?$/.test(w) || /^-?\d{1,3}(,\d{3})+(\.\d+)?$/.test(w) ? [{ cat: 'NUM', n: parseFloat(w.replace(/,/g, '')) }] : [];
+      if (lit.length || num.length) { toks.push(at({ word: w, senses: [...num, ...lit] }, i0, i)); continue; }
+      if (session?.names?.[w]) { toks.push(at({ word: w, senses: [{ cat: 'IDENT', name: w, type: session.names[w] }] }, i0, i)); continue; }
+      if (/^[a-z]+\d+$/.test(w)) { toks.push(at({ word: w, senses: [{ cat: 'IDENT', name: w }] }, i0, i)); continue; }
       const st = STEMS[locale.stem(w)];
-      if (st) { const plural = locale.plural(w); toks.push({ word: w, senses: st.map(s => ({ ...s, plural })), stemmed: true }); continue; }
+      if (st) { const plural = locale.plural(w); toks.push(at({ word: w, senses: st.map(s => ({ ...s, plural })), stemmed: true }, i0, i)); continue; }
       const tol = w.length < 7 ? 1 : 2;
       const cands = SINGLE.filter(k => k.length > 2 && CONTENT.has(k) && dl(w, k) <= tol);   // never repair into a function word
-      if (cands.length === 1) { notes.push(`read "${w}" as "${cands[0]}"`); toks.push({ word: cands[0], senses: LEX[cands[0]], repaired: w }); continue; }
+      if (cands.length === 1) { notes.push(`read "${w}" as "${cands[0]}"`); toks.push(at({ word: cands[0], senses: LEX[cands[0]], repaired: w }, i0, i)); continue; }
       if (cands.length > 1) notes.push(`"${w}" could be ${cands.map(c => `"${c}"`).join(' / ')} — not guessing`);
-      unknown.push(w); toks.push({ word: w, senses: [{ cat: 'UNK' }] });
+      unknown.push(w); toks.push(at({ word: w, senses: [{ cat: 'UNK' }] }, i0, i));
     }
+    while (toks[0]?.senses.every(x => x.cat === 'COMMA')) toks.shift();   // "hey golem, …": the filler went, its comma goes too
+    while (toks.at(-1)?.senses.every(x => x.cat === 'COMMA')) toks.pop();
     return { toks, notes, unknown };
   }
 
@@ -19714,8 +19859,8 @@ function createEngine(ont, locale = ENGLISH) {
   }
   const describeRepairs = (toks, repairs) => repairs.map(r => r.op === 'skip' ? `ignored "${r.word}"` : r.op === 'subst' ? `read "${r.word}" as "${r.to}"` : r.sym === 'LATE' ? 'read the arguments out of order' : `assumed ${r.sym === 'PREP' ? 'a preposition' : 'an article'} before "${toks[r.at]?.word ?? 'the end'}"`);
   // human names for the terminals the chart was waiting for
-  const EXPECT = { NOUN: 'a thing', VERB: 'a verb', DET: 'an article', PREP: 'a preposition', NUM: 'a number', UNIT: 'a unit', IDENT: 'a name', CONJ: `'${locale.CONJ.split('|')[0]}'`, THEN: `'${locale.THEN.split('|')[0]}'`, COMMA: "','", QUANT: 'a quantifier', REF: `'${locale.REF.split('|')[0]}'`, PRON: 'a pronoun', REL: `'${locale.REL.split('|')[0]}'`, SUBJ: `'${locale.SUBJ.split('|')[0]}'`, TIME: 'a time', COMP: 'a comparative', WH: 'a question word', COP: `'${(locale.COP ?? 'is').split('|')[0]}'`, WHCOP: `'${(locale.WHCOP ?? 'what is').split('|')[0]}'`, EXCEPT: `'${locale.EXCEPT.split('|')[0]}'`, BUT: `'${locale.BUT.split('|')[0]}'`, AGAIN: `'${locale.AGAIN.split('|')[0]}'` };
-  const expectName = sym => { const [cat, w] = sym.split(':'); if (cat === 'LATE') return null; return w ? `'${w}'` : (EXPECT[cat] ?? cat); };
+  const EXPECT = { NOUN: 'a thing', VERB: 'a verb', DET: 'an article', PREP: 'a preposition', NUM: 'a number', UNIT: 'a unit', IDENT: 'a name', CONJ: `'${locale.CONJ.split('|')[0]}'`, THEN: `'${locale.THEN.split('|')[0]}'`, COMMA: "','", QUANT: 'a quantifier', REF: `'${locale.REF.split('|')[0]}'`, PRON: 'a pronoun', REL: `'${locale.REL.split('|')[0]}'`, SUBJ: `'${locale.SUBJ.split('|')[0]}'`, TIME: 'a time', COMP: 'a comparative', WH: 'a question word', COP: `'${(locale.COP ?? 'is').split('|')[0]}'`, WHCOP: `'${(locale.WHCOP ?? 'what is').split('|')[0]}'`, EXCEPT: `'${locale.EXCEPT.split('|')[0]}'`, BUT: `'${locale.BUT.split('|')[0]}'`, AGAIN: `'${locale.AGAIN.split('|')[0]}'`, DAY: 'a date', MONTH: 'a date', DATE: 'a date', CLOCK: 'a clock time', AMPM: "'am' or 'pm'", COLON: "':'", LIT: 'a value', DEMO: `'${(locale.DEMO ?? 'this').split('|')[0]}'` };
+  const expectName = sym => { const [cat, w] = sym.split(':'); if (cat === 'LATE' || cat === 'TEXT' || (cat === 'LIT' && !(ont.shapes ?? []).length)) return null; return w ? `'${w}'` : (EXPECT[cat] ?? cat); };
 
   // ---- binding ----
   const typeOf = v => v.type === 'quantity' ? `quantity:${v.dim}` : v.type;
@@ -19839,6 +19984,8 @@ function createEngine(ont, locale = ENGLISH) {
   function describe(n) {
     if (n.type === 'quantity') return `${n.n}${n.unit ? ' ' + n.unit : ''}`;
     if (n.type === 'unit') return n.unit;
+    if (n.type === 'text') return n.value.length > 60 ? `"${n.value.slice(0, 57).trimEnd()}…"` : `"${n.value}"`;
+    if (n.type === 'date' || n.type === 'clock') return n.value;
     if (n.type === '*') return n.pron ?? 'that';
     if (n.all) return `${locale.agree[locale.gender(typeName(n.type))]?.[P.every] ?? P.every} ${typeName(n.type)}${n.except?.length ? ` ${P.except} ` + n.except.map(describe).join(', ') : ''}`;
     if (n.attrs?.radius) return describe(n.attrs.radius);
@@ -19857,6 +20004,7 @@ function createEngine(ont, locale = ENGLISH) {
     if (n.attrs?.length) post.push(describe(n.attrs.length));
     if (n.attrs?.above) post.push(`${P.above} ${describe(n.attrs.above)}`);
     if (n.attrs?.below) post.push(`${P.below} ${describe(n.attrs.below)}`);
+    for (const k of ['atleast', 'atmost', 'equals']) if (n.attrs?.[k]) post.push(`${P[k] ?? k} ${describe(n.attrs[k])}`);
     if (n.rel?.when) post.push(Object.entries(locale.times).find(([, r]) => r[0] === n.rel.when.from && r[1] === n.rel.when.to)?.[0] ?? '');
     if (n.rel?.verb) post.push(`(${col(VERBS[n.rel.verb], 'words')[0]})`);
     const core = locale.headFirst ? [head, ...mods.map(m => /^[A-Z]/.test(m) ? `${P.of} ${m}` : m)] : [...mods, head];   // "variograma esférico de Cu" / "spherical Cu variogram"
@@ -19907,6 +20055,77 @@ function createEngine(ont, locale = ENGLISH) {
     return { kind: 'cmd', verb: L.verb, args };
   }
 
+  // A slot of type 'text' takes words verbatim: "remember that …", "remind me to … on friday", "check: …".
+  // It opens after the verb of a frame whose theme is text (past an optional lead word such as "that"), after a
+  // preposition a text role declares, or after a colon or line break when a role declares ':'. It ends at the
+  // end of the input, or (unless it opened at a colon) before a preposition after which the rest still reads.
+  // The shortest text that leaves a whole reading wins, wherever it opened: trailing arguments ("on friday at 9")
+  // stay arguments, and "search my notes for resurvey" searches for "resurvey".
+  // The words inside are never repaired, stemmed or looked up: the span becomes one TEXT token before parsing.
+  const TEXT_THEME = new Set(ont.verbs.filter(v => (v.theme ?? []).includes('text')).map(v => v.name));
+  const TEXT_PREPS = new Set(ont.verbs.flatMap(v => Object.values(v.roles ?? {}).filter(r => r.types.includes('text')).flatMap(r => r.preps)));
+  const esc = w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const TRAIL = new RegExp(`(?:[\\s,;]*(?:${(locale.TRAIL ?? 'please').split('|').map(esc).join('|')})\\b|[\\s.?!]+)+$`, 'i');   // what closes a sentence, not a text
+  // a bare text role opens after the verb of its frame, or after a noun of that frame's theme type
+  const BARE = ont.verbs.filter(v => Object.values(v.roles ?? {}).some(r => r.types.includes('text') && r.preps.includes('')));
+  const BARE_VERBS = new Set(BARE.map(v => v.name)), BARE_TYPES = new Set(BARE.flatMap(v => v.theme ?? []));
+  const TEXT_SUBJECT = new Set(ont.verbs.filter(v => (v.subject ?? []).includes('text')).map(v => v.name));
+  // candidate readings with free text: lists of spans [{ i, from, j }] (tokens i..j replaced, text from 'from'),
+  // fewest words of text first; a subject span is the words before the verb of a frame that takes one
+  function textCands(toks) {
+    const one = textSpans(toks), cands = one.map(s => [s]);
+    // the verb as typed (not a typo repair), and a subject with no colon and no verb in it
+    for (let v = 1; v < toks.length; v++) if (!toks[v].repaired && toks[v].senses.some(sn => sn.cat === 'VERB' && TEXT_SUBJECT.has(sn.verb)) && toks.slice(0, v).every(t => !t.senses.some(x => x.cat === 'COLON' || x.cat === 'VERB'))) {
+      const subj = { i: 0, from: 0, j: v };
+      cands.push([subj], ...one.filter(s => s.i > v).map(s => [subj, s]));
+    }
+    const len = c => c.reduce((n, s) => n + s.j - s.from, 0);
+    return cands.sort((a, b) => len(a) - len(b) || a[0].i - b[0].i);
+  }
+  function textSpans(toks) {
+    const out = [];
+    for (let i = 1; i <= toks.length; i++) {
+      let open = null, lead = 0;
+      for (const sn of toks[i - 1].senses) {
+        if (sn.cat === 'VERB' && TEXT_THEME.has(sn.verb)) { open ??= 'verb'; if (i + 1 < toks.length && (col(VERBS[sn.verb], 'lead') ?? []).includes(toks[i].word)) lead = 1; }
+        else if (sn.cat === 'PREP' && sn.canon.some(c => TEXT_PREPS.has(c))) open ??= 'prep';
+        else if (sn.cat === 'COLON' && TEXT_PREPS.has(':')) open = 'colon';
+        if ((sn.cat === 'VERB' && BARE_VERBS.has(sn.verb)) || (sn.cat === 'NOUN' && BARE_TYPES.has(sn.type))) open ??= 'bare';
+      }
+      if (!open || (i === toks.length && open !== 'colon')) continue;
+      if (open === 'colon') { out.push({ i, from: i, j: toks.length, colon: toks[i - 1].e }); continue; }   // a payload is everything after the colon
+      const from = i + lead;
+      const stop = t => t.senses.some(x => x.cat === 'PREP' || x.cat === 'DAY') || (X.nextDay && t.word === 'next');   // where an argument can start
+      for (let j = from + 1; j <= toks.length; j++) if (j === toks.length || stop(toks[j])) out.push({ i, from, j });
+    }
+    return out.sort((a, b) => (a.j - a.from) - (b.j - b.from) || a.i - b.i);
+  }
+  function textRead(toks, text, session, diag, opts) {
+    let fallback = null;
+    for (const spans of textCands(toks)) {
+      let tt = toks;
+      let empty = false;
+      for (const { i, from, j, colon } of [...spans].sort((a, b) => b.i - a.i)) {   // right to left, so the indices hold
+        // after a colon: everything to the end, as typed. Elsewhere a span that runs to the end takes the words up
+        // to the end too (a filler there may be content: "… is ok"), less the closing politeness and punctuation
+        // that belong to the sentence ("…, please.", "… hole 12?"); a span that stops early stops at its last word.
+        const s0 = colon != null ? colon : toks[from].s;
+        const e = colon != null ? text.length : j === toks.length ? text.length - (TRAIL.exec(text)?.[0].length ?? 0) : toks[j - 1].e;
+        const t = text.slice(s0, e).trim(); if (!t) { empty = true; break; }
+        tt = [...tt.slice(0, i), { word: '«text»', senses: [{ cat: 'TEXT', text: t }], s: s0, e }, ...tt.slice(j)];
+      }
+      if (empty) continue;
+      const full = makeParser(tt)('Program', 0).filter(r => r.end === tt.length).map(r => ({ ...r, repairs: [] }));
+      if (!full.length) continue;
+      const inside = new Set(spans.flatMap(({ from, j }) => toks.slice(from, j)).flatMap(x => [x.repaired, x.word]).filter(Boolean));
+      const d2 = { ...diag, notes: diag.notes.filter(n => ![...inside].some(w => n.startsWith(`read "${w}" as`) || n.startsWith(`"${w}" could be`))), unknown: diag.unknown.filter(w => !inside.has(w)), repairs: [] };
+      const r = semantic(full, tt, session, d2, opts);
+      if (r.status === 'ok') { Object.assign(diag, d2); return r; }
+      if (r.status !== 'reject' && !fallback) fallback = r;
+    }
+    return fallback;
+  }
+
   const fanout = c => (VERBS[c.verb].distributive && c.theme.length > 1) ? c.theme.map(t => ({ ...c, theme: [t] })) : [c];
 
   function understand(text, session, opts = {}) {
@@ -19918,6 +20137,10 @@ function createEngine(ont, locale = ENGLISH) {
     const strictFull = isUnk ? [] : parse('Program', 0).filter(r => r.end === toks.length).map(r => ({ ...r, repairs: [] }));
     diag.parses = strictFull.length;
     let result = strictFull.length ? semantic(strictFull, toks, session, diag, opts) : null;
+    if ((!result || result.status !== 'ok') && (TEXT_THEME.size || TEXT_PREPS.size || TEXT_SUBJECT.size || BARE.length)) {   // a free-text slot, before any repair
+      const t = textRead(toks, text, session, diag, opts);
+      if (t && (t.status === 'ok' || !result)) return t;
+    }
     if ((!result || result.status === 'reject') && opts.repair?.budget) {
       // error-correcting pass: candidate derivations by ascending repair cost; the first tier that survives binding wins
       const P2 = makeParser(toks, { ...opts.repair, names: session.names }); const C2 = P2.chart;
@@ -19984,7 +20207,8 @@ function createEngine(ont, locale = ENGLISH) {
     }
     const echos = clean.map(seq => seq.map(r => echo(r.cmd)).join(` ${P.then}: `));
     const distinct = [...new Set(echos)];
-    if (distinct.length > 1) return { status: 'ambiguous', reasons: ['more than one reading survives'], readings: distinct, diag };
+    // each reading's commands come along, so a host whose tools take only one of them can say which and why
+    if (distinct.length > 1) return { status: 'ambiguous', reasons: ['more than one reading survives'], readings: distinct, alternatives: distinct.map(e => clean[echos.indexOf(e)].map(r => r.cmd).flatMap(fanout)), diag };
 
     const cmds = clean[0].map(r => r.cmd).flatMap(fanout);
     const rawRepairs = repairsOf[uniqParse[resolved.indexOf(clean[0])]] ?? [];
@@ -20000,8 +20224,7 @@ function createEngine(ont, locale = ENGLISH) {
   // ───────────────────────────── predictive input ─────────────────────────────
   // suggest(text): what can come next, filtered by grammar (chart expectations), frame (roles still open)
   // and session (objects of the right type). preview(text): echo of what is understood so far, with a hole.
-  const surfacePreps = canon => locale.preps && Object.keys(locale.preps).length
-    ? Object.entries(locale.preps).filter(([, c]) => c.includes(canon)).map(([w]) => w).slice(0, 1) : [canon];
+  const surfacePreps = canon => { const ws = locale.PREP.split('|').filter(w => (locale.preps[w] ?? [w]).includes(canon)); return ws.length ? ws.slice(0, 1) : [canon]; };
   function suggest(text, session, limit = 8) {
     const partial = /\S$/.test(text) ? text.split(/\s+/).at(-1).toLowerCase() : '';
     const head = partial ? text.slice(0, text.length - partial.length) : text;
@@ -20173,20 +20396,28 @@ const PORTUGUESE = {
   DET: 'o|a|os|as|um|uma|uns|umas|este|esta|esse|essa|meu|minha|nosso|nossa',
   REF: 'último|última|ultimo|ultima|últimos|últimas|anterior|atual|primeiro|primeira|novo|nova',
   QUANT: 'todos|todas|todo|toda|cada', EXCEPT: 'exceto|menos|excluindo|tirando|fora', CONJ: 'e|ou|mais', COMMA: ',',
-  PREP: 'com|usando|por|em|no|na|nos|nas|para|pra|pro|de|do|da|dos|das|a|ao|à|até|como|acima de|abaixo de|sem|contra|dentro de|sobre',
+  PREP: 'com|usando|por|em|no|na|nos|nas|para|pra|pro|de|do|da|dos|das|a|ao|à|às|até|como|acima de|abaixo de|sem|contra|dentro de|sobre|onde|>|<|>=|<=|=|≥|≤|maior que|menor que|pelo menos|no mínimo|no minimo|no máximo|no maximo|igual a',
   THEN: 'depois|então|em seguida|aí', BUT: 'mas|porém|só que', PRON: 'isso|isto|ele|ela|eles|elas',
   AGAIN: 'de novo|novamente|repete|repetir|refaz|refazer|mesmo|mesma|igual|outra vez',
   QWORD: 'por que|porque|como|qual|quais|quando|quem|é|são|será|pode|poderia|deveria|dá',
+  DEMO: 'isto|isso|este|esta|estes|estas|o seguinte|o seguinte texto|o texto|os dois|ambos',   // antes dos dois-pontos: "resume isto: …"
   WH: 'qual|quais|que', COP: 'é|são|sao|era|foi|eram|foram', WHCOP: 'qual é|qual e|quais são|quais sao|o que é|o que e|quanto é|quanto e|quanto dá|quanto da|quanto são|quanto sao',
-  FILLER: 'por favor|agora|só|me|favor|pra mim|então|ei|oi|olá|valeu|obrigado|obrigada|beleza|aí|tá|dá pra|dá para|você pode|pode|consegue|queria que você|quero que você|vamos|bora',
+  TRAIL: 'por favor|obrigado|obrigada|valeu|pfv|pf',   // cortesia que fecha a frase, cortada do fim de um texto livre
+  FILLER: 'por favor|agora|só|me|favor|pra mim|então|ei|oi|olá|valeu|obrigado|obrigada|beleza|aí|tá|dá pra|dá para|você pode|pode|consegue|queria que você|quero que você|vamos|bora|hum|bom|me diz|me fala|me dá|preciso de|eu preciso de|gostaria de|eu queria',
   preps: {   // surface → canonical set; polysemy is resolved by types downstream
     com: ['with'], usando: ['using'], por: ['by'], em: ['in', 'on'], no: ['in', 'on'], na: ['in', 'on'], nos: ['in', 'on'], nas: ['in', 'on'],
     para: ['for', 'to', 'into'], pra: ['for', 'to', 'into'], pro: ['for', 'to', 'into'], de: ['of', 'from'], do: ['of', 'from'], da: ['of', 'from'], dos: ['of', 'from'], das: ['of', 'from'],
     a: ['to', 'at'], ao: ['to', 'at'], 'à': ['to', 'at'], 'até': ['to'], como: ['as'], 'acima de': ['above', 'over'], 'abaixo de': ['below', 'under'],
-    sem: ['without'], contra: ['against'], 'dentro de': ['into'], sobre: ['on'],
+    sem: ['without'], contra: ['against'], 'dentro de': ['into'], sobre: ['on'], 'às': ['at', 'to'], onde: ['where'],
+    '>': ['above'], 'maior que': ['above'], '<': ['below'], 'menor que': ['below'], '>=': ['atleast'], '≥': ['atleast'], 'pelo menos': ['atleast'], 'no mínimo': ['atleast'], 'no minimo': ['atleast'],
+    '<=': ['atmost'], '≤': ['atmost'], 'no máximo': ['atmost'], 'no maximo': ['atmost'], '=': ['equals'], 'igual a': ['equals'],
   },
+  days: { domingo: 0, segunda: 1, 'segunda-feira': 1, 'terça': 2, terca: 2, 'terça-feira': 2, 'terca-feira': 2, quarta: 3, 'quarta-feira': 3, quinta: 4, 'quinta-feira': 4, sexta: 5, 'sexta-feira': 5, 'sábado': 6, sabado: 6,
+    hoje: { rel: 0 }, 'amanhã': { rel: 1 }, amanha: { rel: 1 }, ontem: { rel: -1 } },
+  months: { janeiro: 1, fevereiro: 2, 'março': 3, marco: 3, abril: 4, maio: 5, junho: 6, julho: 7, agosto: 8, setembro: 9, outubro: 10, novembro: 11, dezembro: 12 },
+  clocks: { 'meio-dia': [12, 0], 'meia-noite': [0, 0] },
   indefinite: ['um', 'uma', 'uns', 'umas'], newRef: ['novo', 'nova'], firstRef: ['primeiro', 'primeira'],
-  phr: { new: 'novo', last: 'último', every: 'todo', except: 'exceto', fromRun: 'da rodada', above: 'acima de', below: 'abaixo de', then: 'Depois', assuming: 'assumindo', of: 'de', hole: '___', than: 'que' },
+  phr: { new: 'novo', last: 'último', every: 'todo', except: 'exceto', fromRun: 'da rodada', above: 'acima de', below: 'abaixo de', atleast: 'pelo menos', atmost: 'no máximo', equals: 'igual a', then: 'Depois', assuming: 'assumindo', of: 'de', hole: '___', than: 'que' },
   stem: w => { let x = w.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     if (x.length > 5 && /(ando|endo|indo|amos|emos|imos|aram|eram|iram)$/.test(x)) return x.slice(0, -4);
     if (x.length > 3 && /s$/.test(x)) x = x.slice(0, -1);
@@ -20224,13 +20455,23 @@ const norm = s => s.trim().replace(/\s+/g, ' ').replace(/[?.!]+$/, '');
 
 /* ── rung 2, first half: the clause parser over golem's ontology ── */
 let clause = null, clauseFor = null;
-const clauseEngine = () => { const key = S.table ? S.table.hash : 'sample'; if (!clause || clauseFor !== key) { clause = createEngine(ontology(), ENGLISH); clauseFor = key; } return clause; };
+const clauseEngine = () => { const key = (S.table ? S.table.hash : 'sample') + '|' + Object.keys(S.files).sort().join(','); if (!clause || clauseFor !== key) { clause = createEngine(ontology(), ENGLISH); clauseFor = key; } return clause; };
 const clauseSession = () => S.clause || (S.clause = makeSession([]));
 // The parser's verdict on a text, then the frame's bind(): a frame may answer { tool, args }, or
 // { clarify } when the reading is whole but a value is missing, which becomes a clarify verdict too.
 // Only the first command of a sequence is taken for now; "then" chains are a plan the planner does not build yet.
+// When the grammar finds several readings, each is bound: if exactly one names a tool that takes it, that is the
+// reading ("python" is a verb and a format; only the verb has a tool for "python\n<code>"), and the trace says so.
+const bindOf = cmd => { const f = FRAMES.find(x => x.name === cmd.verb), b = f && f.bind(cmd); return b && !b.clarify ? b : null; };
 function verdictOf(text, session) {
-  const r = clauseEngine().understand(text, session);
+  let r = clauseEngine().understand(text, session);
+  if (r.status === 'ambiguous' && r.alternatives) {
+    const takers = r.alternatives.map((cmds, k) => ({ cmds, echo: r.readings[k], b: bindOf(cmds[0]) })).filter(x => x.b);
+    if (takers.length !== 1) return { r };
+    const t = takers[0];
+    r = { status: 'ok', commands: t.cmds, echo: t.echo, diag: { ...r.diag, notes: [...r.diag.notes, `${r.readings.length} readings; only "${t.echo.replace(/\.$/, '')}" names a tool that takes it`] } };
+    return { r, b: t.b };
+  }
   if (r.status !== 'ok') return { r };
   const cmd = r.commands[0], f = FRAMES.find(x => x.name === cmd.verb), b = f && f.bind(cmd), echo = r.echo.replace(/\.$/, '');
   if (!b) return { r: { status: 'clarify', reasons: [`I read "${echo}" but no tool takes that`], partial: [echo], diag: r.diag } };
@@ -20249,7 +20490,7 @@ const describeVerdict = r => `clause: ${r.status}${r.reasons ? ' — ' + r.reaso
 /* ── rung 2, second half: the regex rules the declarations carry, by rank ── */
 const readers = () => TOOLS.filter(d => d.read).sort((a, b) => a.rank - b.rank);
 function grammar(text, q, rung, raw) {
-  const c = clauseRead(text, rung); if (c.tool) return c;
+  const c = clauseRead(raw || text, rung); if (c.tool) return c;   // the parser reads what was typed: a payload keeps its line breaks
   for (const d of readers()) {
     const args = d.read(text, q, raw); if (!args) continue;
     const res = runTool(d.name, args); if (res) return { tool: d.name, args, rung, res };
@@ -20275,7 +20516,7 @@ function taught(text, q, raw) {
   let q2 = ' ' + q + ' ', t2 = ' ' + text + ' ';
   Object.entries(S.aliases).forEach(([k, v]) => { const re = new RegExp('(?<=\\s)' + k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?=\\s)', 'gi'); q2 = q2.replace(re, v); t2 = t2.replace(re, v); });
   q2 = q2.trim(); if (q2 === q) return null;
-  const r = grammar(t2.trim(), q2, 'taught', raw);
+  const r = grammar(t2.trim(), q2, 'taught', null);
   if (r) r.res.trace.unshift(`lexicon: "${q}" → "${q2}"`);
   return r;
 }
@@ -20315,9 +20556,8 @@ tool({
 tool({ name: 'amend', skill: { group: 'Session', title: 'Amend, repeat, undo', on: 'dispatch-meta', about: 'Change the last card without retyping it.', examples: ['in feet', 'log scale', 'and chile', 'again', 'undo'] } });
 tool({ name: 'sessions', skill: { group: 'Session', title: 'Sessions and history', on: 'plan store', about: 'Sessions name themselves from the tools that ran. Search covers all of them.', examples: ['new session', 'name this session friday lab run', 'history'] } });
 tool({
-  name: 'export', rank: 20,
+  name: 'export',
   skill: { group: 'Session', title: 'Export the plan', on: 'adder', about: 'The session as a script. Every line is a tool call it made.', examples: ['export as script'] },
-  read: (text, q) => /^(export|save|give me)\b.*\b(script|notebook|python|adder)$/.test(q) ? {} : null,
   run: () => {
     const body = S.cards.filter(c => c.res.py).map(c => `# ${c.raw}\n${c.res.py}`).join('\n\n');
     const src = `# golem session, exported ${iso(new Date())}\n# every line is a tool call the session made\nfrom gcu import *\n\n${body || '# nothing to export yet'}`;
@@ -20325,9 +20565,10 @@ tool({
   }
 });
 frame({
-  name: 'export', label: 'Export', words: ['export', 'save'], theme: [], required: ['as'], roles: { as: { preps: ['as', 'to'], types: ['format'] } },
+  name: 'export', label: 'Export', words: ['export', 'save', 'write', 'give me'], elidable: true, theme: ['table'], required: ['as'], roles: { as: { preps: ['as', 'to', 'in'], types: ['format'] } },
   words_pt: ['exportar', 'exporta', 'salvar', 'salva'], label_pt: 'Exportar',
-  bind: c => { const as = c.roles.as && c.roles.as[0] && c.roles.as[0].value; return ['csv', 'tsv', 'json'].includes(as) ? { tool: 'tableExport', args: { fmt: as } } : { tool: 'export', args: {} }; }
+  // csv, tsv, json and parquet are the open table as a file; script and notebook are the session as code
+  bind: c => { const as = c.roles.as && c.roles.as[0] && c.roles.as[0].value; return ['csv', 'tsv', 'json', 'parquet'].includes(as) ? { tool: 'tableExport', args: { fmt: as } } : ['script', 'notebook'].includes(as) ? { tool: 'export', args: {} } : null; }
 });
   return { norm, clauseEngine, clauseRead, grammar, context, taught };
 })();
@@ -20425,10 +20666,10 @@ function reset() {
 /* ==== src/engine/engine.js ==== */
 const __m52 = (() => {
 const { S, T, runTool, toolByName, startJobs } = __m0;
-const { DOCUMENT } = __m10;
+const { DOCUMENT } = __m9;
 const { DOCTEXT } = __m41;
 const { recipeAt, bindingsOf, runSteps } = __m42;
-const { tableFromText } = __m14;
+const { tableFromText } = __m13;
 const { convertBinary } = __m45;
 const { norm, grammar, context, taught } = __m50;
 const { current, newSession, renameSession, touch } = __m51;
