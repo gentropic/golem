@@ -2,7 +2,7 @@
 // A recipe is stored as card specs, plain JSON like a session; running it replays every step with the
 // new subjects into a new session, and stops at the first step that no longer reads. Nothing is skipped
 // and nothing is guessed. Recipes live on the device, like taught words.
-import { S, tool, runTool } from './core.js';
+import { S, tool, frame, noun, runTool } from './core.js';
 import { listOf } from './forms.js';
 
 // cards that are about the session or about recipes are not steps
@@ -80,15 +80,8 @@ export function recipeAt(text) {
 
 /* ── save ───────────────────────────────────────────────────── */
 tool({
-  name: 'recipeSave', rank: 30,
+  name: 'recipeSave',
   skill: { group: 'Session', title: 'Recipes', on: 'session plans', about: 'Save this session\'s steps under a name, choose which subjects change between runs (the file, the columns), then run it again for other ones, or on every kept table. A step that no longer reads stops the run there; nothing is skipped or guessed.', examples: ['save this as a recipe called cu check', 'run cu check for au', 'run cu check on every table', 'recipes'] },
-  read: (text) => {
-    const m = /^(?:save|keep|make)\s+(?:this|this session|the session|it)\s+(?:as\s+)?(?:a\s+)?recipe(?:\s+(?:called|named))?\s+(.+)$/i.exec(text.trim()) || /^save\s+(?:as\s+)?(?:a\s+)?recipe\s+(?:called\s+|named\s+)?(.+)$/i.exec(text.trim());
-    if (!m) return null;
-    // a card that failed (an error, an open question) is not a step
-    const steps = S.cards.filter(c => !NOT_STEPS.has(c.tool) && !failed(c.res)).map(c => ({ tool: c.tool, args: JSON.parse(JSON.stringify(c.args)), raw: c.raw }));
-    return { name: m[1].trim().replace(/^["'“]|["'”]$/g, '').toLowerCase(), steps, cols: S.table ? S.table.cols.map(c => c.name) : [] };
-  },
   topic: a => [`recipe ${a.name}`, 1],
   run: a => {
     const read = ['save recipe', { v: a.name }];
@@ -119,8 +112,7 @@ tool({
 
 /* ── list and forget ────────────────────────────────────────── */
 tool({
-  name: 'recipeList', rank: 30,
-  read: text => /^(?:my |the |list |show )*recipes$/i.test(text.trim()) ? {} : null,
+  name: 'recipeList',
   topic: () => ['recipes', 1],
   run: () => {
     const rs = Object.values(S.recipes), read = ['recipes'];
@@ -129,8 +121,7 @@ tool({
   }
 });
 tool({
-  name: 'recipeForget', rank: 30,
-  read: text => { const m = /^(?:forget|delete|remove)\s+(?:the\s+)?recipe\s+(.+)$/i.exec(text.trim()); return m ? { name: m[1].trim().toLowerCase() } : null; },
+  name: 'recipeForget',
   run: a => {
     const read = ['forget recipe', { v: a.name }];
     if (!S.recipes[a.name]) return { read, body: [{ t: 'note', text: `There is no recipe called ${a.name}; it may be forgotten already.` }], trace: ['recipe: absent'] };
@@ -143,12 +134,7 @@ tool({
 // tables the device keeps: files that are not documents, drawings or other conversions
 const tableFiles = () => Object.values(S.files).filter(f => f.kind !== 'doc' && !/\.(dxf|ya?ml|wkt|geojson)$/i.test(f.name));
 tool({
-  name: 'recipeBatch', rank: 29,
-  read: text => {
-    const m = /^run\s+(.+?)\s+on\s+(?:every|each|all(?: the)?)\s+(?:kept\s+)?(?:tables?|files?|csvs?|sheets?)(?:\s+(?:on this device|i have|kept))?$/i.exec(text.trim());
-    if (!m || !recipeNamed(m[1])) return null;
-    return { name: m[1].trim().toLowerCase(), files: tableFiles().map(f => ({ name: f.name, hash: f.hash })) };
-  },
+  name: 'recipeBatch',
   topic: a => [`${a.name} on every table`, 2],
   run: a => {
     const r = recipeNamed(a.name), read = ['run recipe', { v: a.name }, 'on every kept table'];
@@ -168,4 +154,32 @@ tool({
     const ok = rows.filter(x => x[1] === 'ran').length;
     return { read, value: ok, body: [{ t: 'big', v: `${ok} of ${a.files.length}`, unit: 'ran to the end' }, { t: 'table', head: ['File', 'Status', 'Last value, or why it stopped'], num: [false, false, false], rows }, { t: 'sub', text: `The last value is the answer of step ${r.steps.length}, "${r.steps[r.steps.length - 1].raw}". Run one file on its own to see every step.` }], trace };
   }
+});
+/* ── what reads them ─────────────────────────────────────────── */
+// a recipe's name is free text; the recipes kept on this device are nouns, so "run cu check …" finds them
+noun(() => { const rs = Object.keys(S.recipes); return rs.length ? { type: 'recipe', exact: true, words: Object.fromEntries(rs.map(n => [n, [n]])), words_pt: Object.fromEntries(rs.map(n => [n, [n]])) } : null; });
+noun({ type: 'recipes', words: { all: ['recipes', 'my recipes', 'the recipes'] }, words_pt: { all: ['receitas', 'minhas receitas'] } });
+const nameOf = s => s.trim().replace(/^["'“]|["'”]$/g, '').toLowerCase();
+// save | keep | make, (this | this session | the session | it), (as), (a), recipe, (called | named)
+const SAVE_WORDS = ['save', 'keep', 'make'].flatMap(v => ['', ' this', ' this session', ' the session', ' it'].flatMap(o => ['', ' as'].flatMap(as => ['', ' a'].flatMap(a => ['', ' called', ' named'].map(c => `${v}${o}${as}${a} recipe${c}`)))))
+  .filter(w => !/^make recipe/.test(w));
+frame({
+  name: 'recipeSave', label: 'Save recipe', words: SAVE_WORDS,
+  theme: ['text'], required: ['theme'], roles: {}, words_pt: ['salva isto como receita', 'salvar como receita'], label_pt: 'Salvar receita',
+  bind: c => {
+    const steps = S.cards.filter(x => !NOT_STEPS.has(x.tool) && !failed(x.res)).map(x => ({ tool: x.tool, args: JSON.parse(JSON.stringify(x.args)), raw: x.raw }));
+    return { tool: 'recipeSave', args: { name: nameOf(c.theme[0].value), steps, cols: S.table ? S.table.cols.map(x => x.name) : [] } };
+  }
+});
+frame({ name: 'recipeList', label: 'Recipes', words: ['list', 'show'], elidable: true, theme: ['recipes'], required: ['theme'], roles: {}, label_pt: 'Receitas', bind: () => ({ tool: 'recipeList', args: {} }) });
+frame({
+  name: 'recipeForget', label: 'Forget recipe', words: ['forget recipe', 'forget the recipe', 'delete recipe', 'delete the recipe', 'remove recipe', 'remove the recipe'], theme: ['text', 'recipe'], required: ['theme'], roles: {},
+  words_pt: ['esquece a receita', 'apaga a receita'], label_pt: 'Esquecer receita',
+  bind: c => ({ tool: 'recipeForget', args: { name: nameOf(String(c.theme[0].value)) } })
+});
+// "run cu check on every table"
+noun({ type: 'everytable', words: { all: ['every table', 'each table', 'all tables', 'all the tables', 'every kept table', 'every file', 'each file', 'all files', 'every csv', 'every sheet'] }, words_pt: { all: ['cada tabela', 'todas as tabelas'] } });
+frame({
+  name: 'recipeBatch', label: 'Run on every table', words: ['run', 'apply'], theme: ['recipe'], required: ['theme', 'on'], roles: { on: { preps: ['on', 'over', 'for', 'across'], types: ['everytable'] } }, words_pt: ['roda', 'aplica'], label_pt: 'Rodar em cada tabela',
+  bind: c => ({ tool: 'recipeBatch', args: { name: c.theme[0].value, files: tableFiles().map(f => ({ name: f.name, hash: f.hash })) } })
 });

@@ -11169,7 +11169,7 @@ frame({
 
 /* ==== src/engine/knowledge.js ==== */
 const __m14 = (() => {
-const { T, tool, frame, fmt } = __m0;
+const { T, tool, frame, unit, fmt } = __m0;
 const { parseUnit } = __m1;
 // Knowledge from packs: a Factbook sample, an ODS term index,
 // and a style check from The Elements of Style (1918). All sample data, labelled as such.
@@ -11183,9 +11183,8 @@ const fbFind = n => FB.find(r => r[0].toLowerCase() === n.trim().toLowerCase().r
 const FBSRC = { t: 'src', text: 'factbook pack · 14-country rounded sample in this mock' };
 const FIELDS = ['capital', 'population', 'area', 'density'];
 tool({
-  name: 'fact', rank: 70,
+  name: 'fact',
   skill: { group: 'Knowledge', title: 'Records', on: 'factbook pack', about: 'Lookups, unit changes and filters across records.', examples: ['population density of mongolia in people per square mile', 'landlocked countries by population', 'area of brazil in square miles'] },
-  read: (text, q) => { const m = /^(?:what is |what's )?(?:the )?(capital|population density|density|population|area) of (.+?)(?: in (.+))?$/.exec(q); return m ? { field: m[1] === 'population density' ? 'density' : m[1], country: m[2], unit: m[3] } : null; },
   amend: [
     { arg: 'unit', match: /^(?:and |now |same (?:but )?)?(?:in|to|as) (.+)$/, when: a => /area|density/.test(a.field) },
     { arg: 'country', match: /^(?:and|same for|what about|now|and for)(?: the)? (.+)$/, value: m => fbFind(m[1]) ? m[1] : null }
@@ -11210,8 +11209,7 @@ tool({
   }
 });
 tool({
-  name: 'factList', rank: 72,
-  read: (text, q) => { const m = /^(?:which |list |show )?landlocked countries(?: (?:by|sorted by) (area|population))?$/.exec(q); return m ? { by: m[1] || 'area' } : null; },
+  name: 'factList',
   topic: () => ['Landlocked countries', 2],
   run: a => {
     const k = a.by === 'population' ? 3 : 2, rows = FB.filter(r => r[4]).sort((x, y) => y[k] - x[k]);
@@ -11227,9 +11225,8 @@ tool({
 const ODS = { skiplist: ['4 Skiplists', '4.1 The Basic Structure'], 'hash table': ['5 Hash Tables', '5.1 ChainedHashTable'], 'binary heap': ['10 Heaps', '10.1 BinaryHeap'], treap: ['7 Random Binary Search Trees', '7.2 Treap'], 'scapegoat tree': ['8 Scapegoat Trees', '8.1 ScapegoatTree'], 'red-black tree': ['9 Red-Black Trees', '9.2 RedBlackTree'], 'b-tree': ['14 External Memory Searching', '14.2 B-Trees'] };
 const ODSA = { 'skip list': 'skiplist', heap: 'binary heap', 'red black tree': 'red-black tree', btree: 'b-tree', 'b tree': 'b-tree', hashtable: 'hash table' };
 tool({
-  name: 'define', rank: 120,
+  name: 'define',
   skill: { group: 'Knowledge', title: 'Definitions', on: 'ods pack', about: 'Finds where a term is defined and opens the reader there.', examples: ['what is a skiplist'] },
-  read: (text, q) => { const m = /^(?:what is|what's|define|explain|describe)(?: an?| the)? (.+)$/.exec(q); return m ? { term: m[1] } : null; },
   topic: a => [a.term, 2],
   run: a => {
     const t = a.term.replace(/s$/, ''), k = ODS[t] ? t : ODSA[t];
@@ -11305,6 +11302,8 @@ frame({
   words_pt: ['revisa', 'revise', 'confere', 'confira'], label_pt: 'Revisar',
   bind: c => { const t = c.roles.text && c.roles.text[0]; return t && t.type === 'text' ? { tool: 'lint', args: { text: t.value } } : null; }
 });
+// areas the records are asked in: parseUnit knows them, the grammar learns their words here
+for (const [u, words] of [['mi2', ['square miles', 'square mile', 'sq mi', 'mi2']], ['km2', ['square kilometres', 'square kilometers', 'square km', 'sq km', 'km2']], ['ha', ['hectares', 'hectare', 'ha']], ['acres', ['acres', 'acre']]]) unit({ unit: u, dim: 'area', words });
   return { FB, fbFind, ODS, ODSA };
 })();
 
@@ -12086,7 +12085,7 @@ const TIMESCALE = [
 
 /* ==== src/engine/timescale.js ==== */
 const __m20 = (() => {
-const { tool, frame, fmt } = __m0;
+const { tool, frame, noun, unit, fmt } = __m0;
 const { TIMESCALE, TIMESCALE_SOURCE } = __m19;
 // The geologic timescale: the ICS chart as a records pack (data/timescale.js). Ages, bounds, ranks,
 // what a unit sits in, what came before and after, what it is subdivided into, and which unit an age
@@ -12117,17 +12116,8 @@ const SRC = { t: 'src', text: TIMESCALE_SOURCE };
 const UNITRE = '(.+?)(?: (?:period|epoch|era|eon|age|stage|series|system))?';
 
 tool({
-  name: 'timescale', rank: 75,
+  name: 'timescale',
   skill: { group: 'Knowledge', title: 'Geologic timescale', on: 'ICS chart · Macrostrat · CC BY 4.0', about: 'Ages and bounds of every unit on the chart, what it sits in, what came before and after, and which unit an age falls in.', examples: ['how old is the permian', 'what period is 250 ma', 'how long was the cretaceous', 'stages of the triassic'] },
-  read: (text, q) => {
-    let m;
-    if ((m = new RegExp(`^(?:how old is|when was|when is|age of|dates? of|bounds of)(?: the)? ${UNITRE}$`).exec(q))) return { unit: m[1] };
-    if ((m = new RegExp(`^(?:how long (?:was|is|did)|duration of|length of)(?: the)? ${UNITRE}(?: last)?$`).exec(q))) return { unit: m[1], ask: 'duration' };
-    if ((m = new RegExp(`^(?:what|which) (?:came|comes|was|is) (before|after)(?: the)? ${UNITRE}$`).exec(q))) return { unit: m[2], ask: m[1] };
-    if ((m = new RegExp(`^(stages|ages|epochs|periods|eras|series|systems|subdivisions|parts|divisions) of(?: the)? ${UNITRE}$`).exec(q))) { const r = { stages: 'age', ages: 'age', epochs: 'epoch', series: 'epoch', periods: 'period', systems: 'period', eras: 'era' }[m[1]]; return { unit: m[2], ask: 'children', ...(r ? { rank: r } : {}) }; }
-    if ((m = /^(?:(?:what|which) (?:period|epoch|era|eon|age|stage|unit|time) (?:is|was|contains|had) )?(\d+(?:\.\d+)?) ?(ma|myr|ga|million years(?: ago)?|billion years(?: ago)?)$/.exec(q))) return { age: +m[1] * (/^(ga|billion)/.test(m[2]) ? 1000 : 1) };
-    return null;
-  },
   topic: a => [a.unit ? `${a.unit} (timescale)` : 'Timescale', 1],
   run: a => {
     if (a.age != null) {
@@ -12170,6 +12160,28 @@ frame({
   words_pt: ['quando foi', 'idade de', 'datar', 'data'], label_pt: 'Datar',
   bind: c => { const t = c.theme[0]; return t && t.value ? { tool: 'timescale', args: { unit: t.value } } : null; }
 });
+/* ── what reads the rest: duration, before and after, subdivisions, an age in Ma ── */
+const unitArg = c => c.theme[0] && c.theme[0].value;
+for (const [name, words, ask, words_pt] of [
+  ['chronlength', ['how long was', 'how long is', 'how long did', 'duration of', 'length of', 'how long did it last'], 'duration', ['quanto durou', 'duração de']],
+  ['chronbefore', ['what came before', 'what comes before', 'what was before', 'which came before', 'what is before', 'before'], 'before', ['o que veio antes de', 'antes de']],
+  ['chronafter', ['what came after', 'what comes after', 'what was after', 'which came after', 'what is after', 'after'], 'after', ['o que veio depois de', 'depois de']]
+]) frame({ name, label: 'Timescale', words, theme: ['chron'], required: ['theme'], roles: {}, words_pt, label_pt: 'Escala do tempo', bind: c => unitArg(c) ? { tool: 'timescale', args: { unit: unitArg(c), ask } } : null });
+noun({ type: 'chronpart', words: { age: ['stages', 'ages'], epoch: ['epochs', 'series'], period: ['periods', 'systems'], era: ['eras'], parts: ['subdivisions', 'parts', 'divisions', 'units'] },
+  words_pt: { age: ['andares', 'idades'], epoch: ['épocas', 'epocas'], period: ['períodos', 'periodos'], era: ['eras'], parts: ['subdivisões', 'subdivisoes'] } });
+frame({
+  name: 'chronparts', label: 'Timescale', words: ['list', 'show'], elidable: true, theme: ['chronpart'], required: ['theme', 'of'], roles: { of: { preps: ['of', 'in', 'within'], types: ['chron'] } }, label_pt: 'Escala do tempo',
+  bind: c => ({ tool: 'timescale', args: { unit: c.roles.of[0].value, ask: 'children', ...(c.theme[0].value === 'parts' ? {} : { rank: c.theme[0].value }) } })
+});
+unit({ unit: 'Ma', dim: 'geologic age', words: ['ma', 'myr', 'my', 'million years ago', 'million years', 'mya'] });
+unit({ unit: 'Ga', dim: 'geologic age', words: ['ga', 'billion years ago', 'billion years', 'gya'] });
+frame({
+  name: 'chronage', label: 'Timescale', words: ['what period is', 'which period is', 'what epoch is', 'what era is', 'what age is', 'what stage is', 'what unit is', 'what was at', 'what period was', 'which period contains'],
+  elidable: true, theme: ['quantity:geologic age'], required: ['theme'], roles: {}, words_pt: ['que período é', 'qual período é'], label_pt: 'Escala do tempo',
+  bind: c => { const q = c.theme[0]; return q.unit ? { tool: 'timescale', args: { age: q.n * (q.unit === 'Ga' ? 1000 : 1) } } : null; }
+});
+// names retired from the chart are nouns too, so the card can say what replaced them
+noun({ type: 'chron', words: Object.fromEntries(Object.keys(RETIRED).map(k => [k, [k]])), words_pt: Object.fromEntries(Object.keys(RETIRED).map(k => [k, [k]])) });
   return { RANKS, unitByName, parentOf, chainOf, childrenOf, beforeOf, afterOf, atAge };
 })();
 
@@ -12688,7 +12700,7 @@ frame({
 
 /* ==== src/engine/explain.js ==== */
 const __m23 = (() => {
-const { tool, clock, fmt } = __m0;
+const { tool, frame, noun, shape, clock, fmt } = __m0;
 // Explainers: formal notation parsed and described, one row per piece. Cron schedules, epoch times,
 // chmod modes, URLs and ECMAScript regular expressions. Each member has a recogniser so a bare
 // payload ("what is 1700000000") finds its member; when two accept, the member is a slot.
@@ -13022,17 +13034,8 @@ const RECOG = { cron: isCron, time: s => isEpoch(s) || isIso(s), chmod: isChmod,
 const RUN = { cron: explainCron, time: explainTime, chmod: explainChmod, url: explainUrl, regex: explainRegex };
 const seedOf = () => Math.floor(Math.random() * 2 ** 31);
 tool({
-  name: 'explain', rank: 45,
+  name: 'explain',
   skill: { group: 'Compute', title: 'Explainers', on: 'own parsers', about: 'Cron schedules, epoch times, chmod modes, URLs and regular expressions, parsed and described piece by piece. A bare payload finds its own kind.', examples: ['explain cron: 0 9 * * 1-5', 'what is 1700000000', 'chmod 754', 'explain regex: ^\\d{3}-\\d{2}$', 'explain url: https://example.org:8443/a/b?q=1#top'] },
-  read: text => {
-    let m = /^(?:explain|decode|describe)\s+(?:this\s+|the\s+|a\s+)?(regex|regexp|regular expression|cron|crontab|schedule|time|epoch|timestamp|url|link|chmod|mode|permissions?)\s*[:,]?\s*(.+)$/i.exec(text);
-    if (m) { const k = { regexp: 'regex', 'regular expression': 'regex', crontab: 'cron', schedule: 'cron', epoch: 'time', timestamp: 'time', link: 'url', mode: 'chmod', permission: 'chmod', permissions: 'chmod' }[m[1].toLowerCase()] || m[1].toLowerCase(); return { kind: k, payload: m[2], ...(k === 'regex' ? { seed: seedOf() } : {}) }; }
-    m = /^(?:chmod|mode)\s+(.+)$/i.exec(text); if (m && isChmod(m[1])) return { kind: 'chmod', payload: m[1] };
-    m = /^(?:cron|crontab)\s*[:]?\s+(.+)$/i.exec(text); if (m && isCron(m[1])) return { kind: 'cron', payload: m[1] };
-    m = /^(?:explain|decode|describe|what is|what's|whats|parse)(?:\s+this)?\s*[:]?\s+(.+)$/i.exec(text); const p = m ? m[1] : text;
-    const slashed = /^\/.+\/[gimsuyd]*$/.test(p.trim()), kinds = MEMBERS.filter(k => RECOG[k](p) && (k !== 'regex' || m || slashed)); if (!kinds.length) return null;
-    return { kind: kinds[0], payload: p, ...(kinds.length > 1 ? { kinds } : {}), ...(kinds.includes('regex') ? { seed: seedOf() } : {}) };
-  },
   amend: [{ arg: 'kind', match: /^as (?:a |an )?(regex|cron|time|epoch|url|chmod)$/, value: m => m[1] === 'epoch' ? 'time' : m[1] }, { arg: 'unit', match: /^(?:in |as )?(seconds|milliseconds|microseconds|nanoseconds|s|ms|us|ns)$/, value: m => ({ seconds: 's', milliseconds: 'ms', microseconds: 'us', nanoseconds: 'ns' })[m[1]] || m[1], when: a => a.kind === 'time' }],
   topic: a => [`Explain ${a.kind}`, 1],
   run: a => {
@@ -13040,6 +13043,28 @@ tool({
     const res = RUN[a.kind](a); if (!res) return null;
     if (a.kinds && a.kinds.length > 1) res.read.push({ v: `as ${a.kind}`, key: 'kind', alts: a.kinds, cur: a.kind });
     return res;
+  }
+});
+/* ── what reads it: "explain cron: 0 9 * * 1-5", "chmod 754", "what is 1700000000", a bare URL or cron line ── */
+noun({ type: 'notation', words: { regex: ['regex', 'regexp', 'regular expression'], cron: ['cron', 'crontab', 'cron schedule'], time: ['time', 'epoch', 'timestamp', 'unix time', 'epoch time'], url: ['url', 'link'], chmod: ['chmod', 'mode', 'permission', 'permissions', 'file mode'] },
+  words_pt: { regex: ['regex', 'expressão regular'], cron: ['cron'], time: ['timestamp', 'epoch'], url: ['url', 'link'], chmod: ['chmod', 'permissões'] } });
+shape({ type: 'explainable', re: String.raw`\d{9,13}(?:\.\d+)?` });                                                   // an epoch: 1700000000
+shape({ type: 'explainable', re: String.raw`\d{4}-\d{2}-\d{2}[t ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:z|[+-]\d{2}:?\d{2})?` });   // 2023-11-14T22:13:20Z
+shape({ type: 'explainable', re: String.raw`[a-z][a-z0-9+.-]*://\S+` });                                                   // a URL
+shape({ type: 'explainable', re: String.raw`(?:[\d*](?:[\d*/,-]*[\d*])?\s+){4}[\d*](?:[\d*/,-]*[\d*])?` });                // a cron line (a field never ends in a comma, so "12, 8, 25, 4, 31" is a list)
+shape({ type: 'explainable', re: String.raw`/(?:[^/\s]|\\/)+/[gimsuyd]*` });                                              // /a regex/
+const explainOf = (p, kind) => {
+  const slashed = /^\/.+\/[gimsuyd]*$/.test(p.trim()), kinds = kind ? [kind] : MEMBERS.filter(k => RECOG[k](p) && (k !== 'regex' || slashed));
+  return kinds.length ? { tool: 'explain', args: { kind: kinds[0], payload: p, ...(kinds.length > 1 ? { kinds } : {}), ...(kinds.includes('regex') ? { seed: seedOf() } : {}) } } : null;
+};
+frame({
+  name: 'explain', label: 'Explain', words: ['explain', 'decode', 'describe', 'parse', 'what does', 'read'], elidable: true, theme: ['notation', 'explainable'], required: [],
+  roles: { text: { preps: [':', ''], types: ['text'] } }, words_pt: ['explica', 'explique', 'decodifica'], label_pt: 'Explicar',
+  bind: c => {
+    const n = c.theme.find(t => t.type === 'notation'), lit = c.theme.find(t => t.type === 'explainable'), t = c.roles.text && c.roles.text[0];
+    if (n) { const p = t ? t.value : null; if (!p || (n.value === 'chmod' && !isChmod(p)) || (n.value === 'cron' && !t && !isCron(p))) return null; return explainOf(p, n.value); }
+    if (lit) return t ? null : explainOf(lit.value);
+    return t ? explainOf(t.value) : null;   // "explain this: 0 */2 * * *": the notation is what the payload is
   }
 });
   return {  };
@@ -14021,6 +14046,7 @@ const ELEMENTS = [
 const __m30 = (() => {
 const { tool, frame, noun, shape, postmod, fmt } = __m0;
 const { ELEMENTS, ELEMENTS_SOURCE } = __m29;
+const { UNIT_TABLE } = __m1;
 // Molar mass, conversion factors and element fractions from a parsed formula over the IUPAC weights;
 // the periodic table lookup. No mineral names: the minerals pack is not here, so a formula is required.
 
@@ -14132,7 +14158,8 @@ const SYMS = ELEMENTS.map(e => e[1].toLowerCase()).sort((a, b) => b.length - a.l
 // with a count, or short (cuo, nacl): longer plain words spelled in symbols ("python" is P Y Th O N) stay words
 shape({ type: 'formula', re: `(?=[a-z.]*\\d|[a-z]{2,5}(?![a-z\\d]))(?:(?:${SYMS})\\d*(?:\\.\\d+)?){2,}` });
 // symbols that are English words (in, as, at, no, be, he, so) and single letters stay out; the names cover them
-const PLAIN = new Set(['in', 'as', 'at', 'no', 'be', 'he', 'so', 'is', 'am', 'pm', 'or', 'es', 'md']);
+// and symbols that are units (cm, mg, pa, cd, pt, ga): "9 cm" is a length, not curium
+const PLAIN = new Set(['in', 'as', 'at', 'no', 'be', 'he', 'so', 'is', 'am', 'pm', 'or', 'es', 'md', 'ga', ...UNIT_TABLE.flatMap(u => u.words.map(w => w.toLowerCase()))]);
 noun({ type: 'element', words: Object.fromEntries(ELEMENTS.map(e => [e[1], [e[2], ...(e[1].length > 1 && !PLAIN.has(e[1].toLowerCase()) ? [e[1].toLowerCase()] : [])]])),
   words_pt: Object.fromEntries(ELEMENTS.map(e => [e[1], [e[2], ...(e[1].length > 1 && !PLAIN.has(e[1].toLowerCase()) ? [e[1].toLowerCase()] : [])]])) });
 noun({ type: 'chemword', words: { mass: ['molar mass', 'molecular mass', 'molecular weight', 'formula weight', 'formula mass'], atomicmass: ['atomic mass', 'atomic weight'], number: ['atomic number'], element: ['element', 'element number', 'the element'], oxide: ['oxide', 'its oxide'] },
@@ -14312,7 +14339,7 @@ frame({
 
 /* ==== src/engine/forms.js ==== */
 const __m32 = (() => {
-const { tool } = __m0;
+const { tool, frame, noun } = __m0;
 // The form card: a tool that still needs answers asks for them one at a time; each answer lands in
 // args and is an editable slot, and the result recomputes when any changes. The decision matrix is the
 // first form; the economics formulas use the same helpers.
@@ -14337,13 +14364,8 @@ const slot = (label, key, cur) => ({ v: `${label} ${cur}`, key, alts: [1, 2, 3, 
 
 /* ── the decision matrix ────────────────────────────────────── */
 tool({
-  name: 'decide', rank: 38,
+  name: 'decide',
   skill: { group: 'Compute', title: 'Decision matrix', on: 'form card', about: 'Options, criteria, a weight for each criterion and a score for each option on each, asked one at a time; weighted totals, bars, and the smallest single weight change that would change the top option. It reports the highest score and does not say what to do.', examples: ['help me decide between perth, vancouver and santiago', 'compare these options'] },
-  read: (text, q) => {
-    let m = /^(?:help me |can you help me )?(?:decide|choose|pick|weigh up)(?: between| among| from)? (.+)$/.exec(q);
-    if (m) { const at = q.indexOf(m[1]), xs = listOf(text.slice(at)); return xs.length >= 2 ? { options: xs } : null; }
-    return /^(?:compare (?:these |the |my )?options|decision matrix|weighted decision|help me decide)$/.test(q) ? {} : null;
-  },
   amend: [
     { arg: '_set', match: /^(?:weight (?:of |for )?)?(.+?) (?:weighs|weight|=|is) ([1-5])$/, value: (m, a) => (a.criteria || []).map(c => c.toLowerCase()).includes(m[1].toLowerCase()) ? { key: 'w:' + a.criteria.find(c => c.toLowerCase() === m[1].toLowerCase()), v: +m[2] } : null },
     { arg: '_set', match: /^(.+?) (?:on|for) (.+?) (?:=|is|scores|gets) ([1-5])$/, value: (m, a) => { const o = (a.options || []).find(x => x.toLowerCase() === m[1].toLowerCase()), c = (a.criteria || []).find(x => x.toLowerCase() === m[2].toLowerCase()); return o && c ? { key: `s:${o}|${c}`, v: +m[3] } : null; } }
@@ -14378,12 +14400,21 @@ tool({
     };
   }
 });
+// "help me decide between perth, vancouver and santiago", "compare these options", "decision matrix"
+frame({
+  name: 'decide', label: 'Decide', words: ['decide', 'choose', 'pick', 'weigh up', 'help me decide', 'help me choose', 'help me pick'], theme: [], required: [],
+  roles: { between: { preps: ['between', 'among', 'from', ''], types: ['text'] } }, words_pt: ['decide', 'decidir', 'escolhe', 'escolher', 'me ajuda a decidir'], label_pt: 'Decidir',
+  bind: c => { const t = c.roles.between && c.roles.between[0]; if (!t) return { tool: 'decide', args: {} }; const xs = listOf(t.value); return xs.length >= 2 ? { tool: 'decide', args: { options: xs } } : null; }
+});
+noun({ type: 'decision', words: { matrix: ['decision matrix', 'weighted decision', 'these options', 'the options', 'my options', 'options'] }, words_pt: { matrix: ['matriz de decisão', 'essas opções', 'as opções'] } });
+frame({ name: 'decideblank', label: 'Decide', words: ['compare', 'weigh', 'make a'], elidable: true, theme: ['decision'], required: ['theme'], roles: {}, label_pt: 'Decidir', bind: () => ({ tool: 'decide', args: {} }) });
   return { numberAsk, listAsk, listOf, firstNeed };
 })();
 
 /* ==== src/engine/econ.js ==== */
 const __m33 = (() => {
-const { tool, fmt } = __m0;
+const { tool, frame, noun, shape, postmod, qmod, fmt } = __m0;
+const { ELEMENTS } = __m29;
 const { numberAsk, firstNeed } = __m32;
 // Sampling theory and mine economics as declared formulas. Every term is a slot; a term the person did
 // not give is asked for, with the conventional value offered first and never applied on its own. Prices
@@ -14409,15 +14440,8 @@ const gyFactors = a => {
   return { frac, c, l, d3: dcm ** 3 };
 };
 tool({
-  name: 'gy', rank: 36,
+  name: 'gy',
   skill: { group: 'Field', title: 'Sampling and economics formulas', on: 'declared formulas', about: 'Gy\'s fundamental sampling error, solved for the error or the sample mass; break-even cutoff grade; net smelter return per tonne and metal equivalents. Every term is a slot; a missing one is asked for, with the convention offered first. Prices are yours.', examples: ['sampling error for a 1 kg sample at 2 mm from a 20 kg lot, 2% chalcopyrite', 'sample mass for 5% precision at 10 mm', 'cutoff grade for copper at 9000 usd/t, 88% recovery, processing 14 usd/t, g&a 3 usd/t', 'cueq of 0.8% cu and 0.3 g/t au at 9000 usd/t and 2300 usd/oz'] },
-  read: (text, q) => {
-    let m = new RegExp(`^(?:gy |fundamental )?(?:sampling|fundamental) error (?:for|of) (?:a )?${NUM} ?(kg|g|t) sample at ${NUM} ?(mm|cm)(?: (?:from|of) (?:a )?${NUM} ?(kg|g|t) lot)?(?:,? ${NUM} ?% (\\w+))?$`).exec(q);
-    if (m) return { solve: 'sigma', ms: +m[1] * (m[2] === 'kg' ? 1000 : m[2] === 't' ? 1e6 : 1), d_cm: +m[3] / (m[4] === 'mm' ? 10 : 1), ...(m[5] ? { ml: +m[5] * (m[6] === 'kg' ? 1000 : m[6] === 't' ? 1e6 : 1) } : {}), ...(m[7] ? { a: +m[7] / 100, mineral: m[8] } : {}) };
-    m = new RegExp(`^(?:gy )?(?:sample|minimum sample) mass for ${NUM} ?% (?:precision|error|relative error) at ${NUM} ?(mm|cm)(?: top size)?$`).exec(q);
-    if (m) return { solve: 'ms', sigma: +m[1] / 100, d_cm: +m[2] / (m[3] === 'mm' ? 10 : 1) };
-    return null;
-  },
   topic: () => ['Sampling error', 1],
   run: a => {
     const read = a.solve === 'sigma' ? ['Gy: error of a', { v: `${fmt(a.ms)} g sample` }, 'at', { v: `${fmt(a.d_cm * 10)} mm` }] : ['Gy: sample mass for', { v: `${fmt(a.sigma * 100)} %` }, 'at', { v: `${fmt(a.d_cm * 10)} mm` }];
@@ -14443,18 +14467,7 @@ const perUnit = s => /^(t|tonne)$/.test(s) ? 't' : /^(oz|ounce)$/.test(s) ? 'oz'
 // a grade in the unit the price implies: price per t of metal → %, per oz → g/t, per lb → %, per kg → kg/t, per g → g/t
 const gradeOut = (metalPerT, per) => per === 't' ? [metalPerT * 100, '%'] : per === 'oz' ? [metalPerT * TROY, 'g/t'] : per === 'lb' ? [metalPerT * LB / 1000 * 100, '%'] : per === 'kg' ? [metalPerT, 'kg/t'] : [metalPerT, 'g/t'];
 tool({
-  name: 'cutoff', rank: 37,
-  read: (text, q) => {
-    const m = new RegExp(`^(?:break-?even )?cut-?off(?: grade)? (?:for|of) ([a-z]+)(?: at ${PRICE})?(.*)$`).exec(q); if (!m) return null;
-    const a = { metal: m[1], ...(m[2] ? { price: +m[2], per: perUnit(m[3]) } : {}) }, rest = m[4] || '';
-    let x;
-    if ((x = new RegExp(`${NUM} ?% recovery|recovery(?: of)? ${NUM} ?%`).exec(rest))) a.recovery = +(x[1] || x[2]);
-    if ((x = new RegExp(`(?:processing|process(?:ing)? cost|milling)(?: of| cost)? ${NUM}`).exec(rest))) a.c_process = +x[1];
-    if ((x = new RegExp(`(?:g&a|g and a|general and admin(?:istration)?|overheads?)(?: of| cost)? ${NUM}`).exec(rest))) a.c_ga = +x[1];
-    if ((x = new RegExp(`(?:selling|refining|realisation|realization)(?: cost| charge)?(?: of)? ${NUM}`).exec(rest))) a.c_sell = +x[1];
-    if ((x = new RegExp(`(?:mining)(?: cost)?(?: of)? ${NUM}`).exec(rest))) a.c_mine = +x[1];
-    return a;
-  },
+  name: 'cutoff',
   topic: a => [`Cutoff grade, ${a.metal}`, 1],
   run: a => {
     const read = ['cutoff grade for', { v: a.metal }];
@@ -14476,17 +14489,7 @@ const readPrices = s => [...s.matchAll(new RegExp(PRICE, 'g'))].map(m => ({ pric
 // metal per tonne of ore in the price's unit
 const metalPerT = (e, per) => { const gpt = e.unit === '%' ? e.grade * 1e4 : e.unit === 'oz/t' ? e.grade * TROY : e.grade; return per === 't' ? gpt / 1e6 : per === 'oz' ? gpt / TROY : per === 'lb' ? gpt / 1000 / LB : per === 'kg' ? gpt / 1000 : gpt; };
 tool({
-  name: 'nsr', rank: 39,
-  read: (text, q) => {
-    let m = /^(?:nsr|net smelter return)(?: per (?:t|tonne))? (?:for|of) (.+)$/.exec(q), kind = 'nsr';
-    if (!m) { m = /^([a-z]{1,2})-?(?:eq|equivalent|equiv)(?: grade)? (?:for|of) (.+)$/.exec(q); if (m) { kind = 'equiv'; } }
-    if (!m) return null;
-    const body = kind === 'equiv' ? m[2] : m[1], els = readElements(body), prices = readPrices(body);
-    if (els.length < (kind === 'equiv' ? 2 : 1)) return null;
-    const a = { kind, els: els.map((e, i) => ({ ...e, ...(prices[i] ? prices[i] : {}) })) };
-    if (kind === 'equiv') { a.lead = m[1]; if (!els.some(e => e.el === a.lead)) return null; }
-    return a;
-  },
+  name: 'nsr',
   topic: a => [a.kind === 'nsr' ? 'NSR' : `${a.lead.toUpperCase()} equivalent`, 1],
   run: a => {
     const read = [a.kind === 'nsr' ? 'NSR for' : `${a.lead.toUpperCase()}-equivalent of`, { v: a.els.map(e => `${fmt(e.grade)} ${e.unit} ${e.el}`).join(', ') }];
@@ -14510,6 +14513,66 @@ tool({
     const total = parts.reduce((s, p) => s + p.v, 0), eq = total / unitValue;
     const factors = parts.filter(p => p !== lead).map(p => [`1 ${p.unit} ${p.el}`, `${fmt(metalPerT({ ...p, grade: 1 }, p.per) * p.rec * a[`price:${parts.indexOf(p)}`] / unitValue, 4)} ${lead.unit} ${lead.el}`]);
     return { read, value: eq, body: [{ t: 'big', v: fmt(eq, 4), unit: `${lead.unit} ${a.lead.toUpperCase()}-equivalent` }, { t: 'kv', rows: [...parts.map(p => [`${p.el} value per t`, `${fmt(p.v, 4)} (${fmt(p.grade)} ${p.unit} × ${fmt(p.rec * 100)} % × ${fmt(a[`price:${parts.indexOf(p)}`])})`]), ['value of 1 ' + lead.unit + ' ' + lead.el, fmt(unitValue, 4)], ...factors] }, { t: 'sub', text: `Σ value ÷ value of one ${lead.unit} of ${a.lead} at ${fmt(lead.rec * 100)} % recovery. The factor${factors.length === 1 ? '' : 's'} above ${factors.length === 1 ? 'is' : 'are'} what this card used; a published equivalent may use other recoveries and prices.` }], trace: parts.map(p => `${p.el}: ${fmt(p.v, 6)} per t`).concat([`unit value of ${lead.el}: ${fmt(unitValue, 6)}`, `${fmt(total, 6)} ÷ ${fmt(unitValue, 6)} = ${fmt(eq, 6)}`]), py: `econ.equiv(lead="${a.lead}", elements=${JSON.stringify(parts.map(p => ({ el: p.el, grade: p.grade, unit: p.unit, recovery: p.rec, price: a[`price:${parts.indexOf(p)}`] })))})` };
+  }
+});
+/* ── what reads them ─────────────────────────────────────────── */
+const EL_NAME = Object.fromEntries(ELEMENTS.map(e => [e[1], e[2]]));
+const massG = q => { const f = { kg: 1000, g: 1, t: 1e6, mg: 1e-3 }[q.unit]; return f ? q.n * f : null; };
+const sizeCm = q => { const f = { mm: 0.1, cm: 1, m: 100, 'µm': 1e-4 }[q.unit]; return f ? q.n * f : null; };
+// Gy: "sampling error for a 1 kg sample at 2 mm from a 20 kg lot, 2% chalcopyrite"; "sample mass for 5% precision at 10 mm"
+noun({ type: 'gyword', words: { sigma: ['sampling error', 'fundamental error', 'gy error', 'fundamental sampling error', 'the sampling error'], ms: ['sample mass', 'minimum sample mass', 'gy sample mass'] }, words_pt: { sigma: ['erro de amostragem', 'erro fundamental'], ms: ['massa mínima'] } });
+noun({ type: 'gysample', words: {}, generic: ['sample'], generic_pt: ['amostra'] }); qmod({ head: 'gysample', attr: 'mass', dims: ['mass'] });
+noun({ type: 'gylot', words: {}, generic: ['lot'], generic_pt: ['lote'] }); qmod({ head: 'gylot', attr: 'mass', dims: ['mass'] });
+noun({ type: 'precision', words: { p: ['precision', 'error', 'relative error'] }, words_pt: { p: ['precisão', 'erro'] } }); qmod({ head: 'precision', attr: 'value', dims: ['mass ratio'] });
+frame({
+  name: 'gy', label: 'Sampling error', words: ['calculate', 'compute'], elidable: true, theme: ['gyword'], required: ['theme', 'at'],
+  roles: { for: { preps: ['for', 'of'], types: ['gysample', 'precision'] }, at: { preps: ['at', 'with'], types: ['quantity:length'] }, from: { preps: ['from', 'of', 'in'], types: ['gylot', 'quantity:mass ratio'] }, mineral: { preps: [''], types: ['text'] } },
+  label_pt: 'Erro de amostragem',
+  bind: c => {
+    const w = c.theme[0].value, d = sizeCm(c.roles.at[0]); if (d == null) return null;
+    const of = c.roles.for || [], from = c.roles.from || [], s = of.find(n => n.type === 'gysample'), p = of.find(n => n.type === 'precision'), lot = from.find(n => n.type === 'gylot'), pc = from.find(n => n.type === 'quantity'), min = c.roles.mineral && c.roles.mineral[0];
+    if (w === 'ms') return p && p.attrs.value ? { tool: 'gy', args: { solve: 'ms', sigma: p.attrs.value.n / 100, d_cm: d } } : null;
+    const ms = s && s.attrs.mass && massG(s.attrs.mass); if (!ms) return null;
+    const ml = lot && lot.attrs.mass && massG(lot.attrs.mass);
+    return { tool: 'gy', args: { solve: 'sigma', ms, d_cm: d, ...(ml ? { ml } : {}), ...(pc && pc.unit === '%' && min ? { a: pc.n / 100, mineral: min.value.trim().toLowerCase() } : {}) } };
+  }
+});
+// prices: "9000 usd/t", "2300 usd/oz", "$14/t"
+shape({ type: 'price', re: String.raw`(?:us\$|\$|r\$|€)?\s?\d[\d,]*(?:\.\d+)?\s?(?:usd|us\$|\$|dollars?|aud|cad|brl|r\$|eur|€)?\s?(?:/|per\s)\s?(?:t|tonne|oz|ounce|lb|pound|kg|g)` });
+const priceOf = n => { const m = /([\d,]+(?:\.\d+)?)\D*?(?:\/|per\s)\s?(t|tonne|oz|ounce|lb|pound|kg|g)$/i.exec(n.value.trim()); return m ? { price: +m[1].replace(/,/g, ''), per: perUnit(m[2].toLowerCase()) } : null; };
+// cutoff: "cutoff grade for copper at 9000 usd/t, 88% recovery, processing 14 usd/t, g&a 3 usd/t"
+noun({ type: 'cutoffword', words: { cutoff: ['cutoff grade', 'cut-off grade', 'cutoff', 'cut-off', 'break-even cutoff', 'breakeven cutoff', 'break-even cutoff grade'] }, words_pt: { cutoff: ['teor de corte', 'teor de corte de equilíbrio'] } });
+noun({ type: 'costterm', words: { recovery: ['recovery'], c_process: ['processing', 'processing cost', 'process cost', 'milling', 'milling cost'], c_ga: ['g&a', 'g and a', 'general and admin', 'general and administration', 'overhead', 'overheads'], c_sell: ['selling', 'selling cost', 'refining', 'refining charge', 'realisation', 'realization'], c_mine: ['mining', 'mining cost'] },
+  words_pt: { recovery: ['recuperação'], c_process: ['processamento', 'beneficiamento'], c_ga: ['g&a', 'administrativo'], c_sell: ['venda', 'refino'], c_mine: ['lavra', 'mineração'] } });
+qmod({ head: 'costterm', attr: 'value', dims: ['mass ratio', 'bare'] });                          // "88% recovery"
+postmod({ prep: '', heads: ['costterm'], attr: 'value', quantity: true });                   // "recovery 88%"
+postmod({ prep: '', heads: ['costterm'], attr: 'price', mod: 'price' });                     // "processing 14 usd/t"
+postmod({ prep: 'of', heads: ['costterm'], attr: 'price', mod: 'price' });                   // "processing of 14 usd/t"
+frame({
+  name: 'cutoff', label: 'Cutoff grade', words: ['calculate', 'compute'], elidable: true, theme: ['cutoffword'], required: ['theme', 'for'],
+  roles: { for: { preps: ['for', 'of'], types: ['element'] }, at: { preps: ['at', 'with', ''], types: ['price', 'costterm'] } }, label_pt: 'Teor de corte',
+  bind: c => {
+    const metal = c.roles.for[0], a = { metal: (EL_NAME[metal.value] || metal.value).toLowerCase() };
+    for (const n of c.roles.at || []) {
+      if (n.type === 'price') { const p = priceOf(n); if (!p) return null; a.price = p.price; a.per = p.per; continue; }
+      const v = n.attrs.value ? n.attrs.value.n : n.attrs.price ? (priceOf({ value: n.attrs.price }) || {}).price : null; if (v == null) return null; a[n.value] = v;
+    }
+    return { tool: 'cutoff', args: a };
+  }
+});
+// NSR and equivalents: "cueq of 0.8% cu and 0.3 g/t au at 9000 usd/t and 2300 usd/oz", "nsr for 0.8% cu …"
+qmod({ head: 'element', attr: 'grade', dims: ['mass ratio'] });                                   // "0.8% cu", "0.3 g/t au"
+noun({ type: 'nsrword', words: { nsr: ['nsr', 'net smelter return', 'nsr per tonne', 'nsr per t'] }, words_pt: { nsr: ['nsr', 'retorno líquido de fundição'] } });
+shape({ type: 'equiv', re: String.raw`[a-z]{1,2}[- ]?(?:eq|equiv|equivalent)(?:\s+grade)?` });                 // cueq, au-eq, cu equivalent
+frame({
+  name: 'nsr', label: 'NSR', words: ['calculate', 'compute'], elidable: true, theme: ['nsrword', 'equiv'], required: ['theme', 'of'],
+  roles: { of: { preps: ['of', 'for'], types: ['element'] }, at: { preps: ['at', 'with'], types: ['price'] } }, label_pt: 'NSR',
+  bind: c => {
+    const els = c.roles.of.map(n => n.attrs.grade ? { el: n.value.toLowerCase(), grade: n.attrs.grade.n, unit: n.attrs.grade.unit === 'ppm' ? 'g/t' : n.attrs.grade.unit } : null); if (els.some(e => !e)) return null;
+    const prices = (c.roles.at || []).map(priceOf), t = c.theme[0], kind = t.type === 'equiv' ? 'equiv' : 'nsr';
+    const a = { kind, els: els.map((e, i) => ({ ...e, ...(prices[i] ? prices[i] : {}) })) };
+    if (kind === 'equiv') { a.lead = /^[a-z]{1,2}/i.exec(t.value)[0].toLowerCase(); if (els.length < 2 || !els.some(e => e.el === a.lead)) return null; }
+    return { tool: 'nsr', args: a };
   }
 });
   return {  };
@@ -16865,7 +16928,7 @@ const Librarian = {
 
 /* ==== src/engine/docs.js ==== */
 const __m41 = (() => {
-const { S, tool } = __m0;
+const { S, tool, frame, noun, postmod } = __m0;
 const { Librarian } = __m40;
 // Search my documents (A7). Markdown, plain text and HTML opened with the paperclip are kept on the device,
 // cut into passages (by heading, then by paragraph) and indexed by @gcu/librarian. A search returns
@@ -16952,9 +17015,8 @@ const SEARCH = [
   /^(?:search\s+)?(?:my\s+)?(?:documents|docs)\s*:\s*(.+)$/i
 ];
 tool({
-  name: 'docSearch', rank: 38,
+  name: 'docSearch',
   skill: { group: 'Knowledge', title: 'Search my documents', on: '@gcu/librarian', about: 'Markdown, text and HTML files you open are kept on this device and searched by word, with near spellings. Passages come back as written, with the matched words marked and where they are.', examples: ['find resurvey in my documents', 'where did i write about the collar check', 'docs: core loss'] },
-  read: text => { for (const re of SEARCH) { const m = re.exec(text.trim()); if (m) return { query: m[1].trim(), limit: 5 }; } return null; },
   amend: [{ arg: 'limit', match: /^(?:show )?more(?: results)?$/, value: () => 15 }],
   topic: a => [a.query, 1],
   run: a => {
@@ -16978,12 +17040,7 @@ tool({
 
 /* ── one passage, whole ─────────────────────────────────────── */
 tool({
-  name: 'docPassage', rank: 39,
-  read: text => {
-    const m = /^show passage (\d+) of (.+)$/i.exec(text.trim()); if (!m) return null;
-    const f = Object.values(S.files).filter(isDoc).find(x => x.name.toLowerCase() === m[2].toLowerCase());
-    return f ? { file: { name: f.name, hash: f.hash }, n: +m[1] } : null;
-  },
+  name: 'docPassage',
   amend: [{ arg: 'n', match: /^(next|previous|back)(?: passage| one)?$/, value: (m, a) => a.n + (m[1] === 'next' ? 1 : -1) }],
   topic: a => [a.file.name, 1],
   run: a => {
@@ -16998,12 +17055,32 @@ tool({
     };
   }
 });
+/* ── what reads them: "find resurvey in my documents", "search my notes for X", "where did i write about X", "docs: X" ── */
+noun({ type: 'docs', words: { docs: ['my documents', 'my docs', 'my notes', 'my files', 'the documents', 'the docs', 'documents', 'docs'] }, words_pt: { docs: ['meus documentos', 'minhas notas', 'documentos'] } });
+const queryOf = c => { const t = [...c.theme, ...(c.roles.for || []), ...(c.roles.text || [])].find(n => n.type === 'text'); return t ? t.value.trim() : null; };
+frame({
+  name: 'docsearch', label: 'Search documents', words: ['find', 'search', 'search for', 'look for', 'look up'], elidable: true, theme: ['text', 'docs'], required: ['theme'],
+  roles: { in: { preps: ['in', 'through'], types: ['docs'] }, for: { preps: ['for'], types: ['text'] }, text: { preps: [':'], types: ['text'] } }, words_pt: ['procura', 'procure', 'busca', 'busque'], label_pt: 'Procurar',
+  bind: c => { const inDocs = c.theme.some(n => n.type === 'docs') || c.roles.in; const q = queryOf(c); return inDocs && q ? { tool: 'docSearch', args: { query: q, limit: 5 } } : null; }
+});
+frame({
+  name: 'docwhere', label: 'Search documents', words: ['where did i write about', 'where did i read about', 'where did i note', 'where did i see', 'where did i put', 'where did i write', 'where did i mention'], theme: ['text'], required: ['theme'], roles: {},
+  words_pt: ['onde eu escrevi sobre', 'onde anotei'], label_pt: 'Procurar',
+  bind: c => ({ tool: 'docSearch', args: { query: c.theme[0].value.trim(), limit: 5 } })
+});
+// "show passage 2 of notes.md"
+noun({ type: 'passage', words: {}, generic: ['passage', 'paragraph'], generic_pt: ['trecho', 'parágrafo'] });
+postmod({ prep: '', heads: ['passage'], attr: 'n', quantity: true });
+frame({
+  name: 'docpassage', label: 'Passage', words: ['show', 'open', 'read'], elidable: true, theme: ['passage'], required: ['theme', 'of'], roles: { of: { preps: ['of', 'in', 'from'], types: ['file'] } }, label_pt: 'Trecho',
+  bind: c => { const n = c.theme[0].attrs && c.theme[0].attrs.n, f = Object.values(S.files).find(x => isDoc(x) && x.name === c.roles.of[0].value); return n && f ? { tool: 'docPassage', args: { file: { name: f.name, hash: f.hash }, n: n.n } } : null; }
+});
   return { DOCTEXT, passages };
 })();
 
 /* ==== src/engine/recipes.js ==== */
 const __m42 = (() => {
-const { S, tool, runTool } = __m0;
+const { S, tool, frame, noun, runTool } = __m0;
 const { listOf } = __m32;
 // Recipes (A9): a session's plan saved under a name, with the subjects that may change between runs.
 // A recipe is stored as card specs, plain JSON like a session; running it replays every step with the
@@ -17085,15 +17162,8 @@ function recipeAt(text) {
 
 /* ── save ───────────────────────────────────────────────────── */
 tool({
-  name: 'recipeSave', rank: 30,
+  name: 'recipeSave',
   skill: { group: 'Session', title: 'Recipes', on: 'session plans', about: 'Save this session\'s steps under a name, choose which subjects change between runs (the file, the columns), then run it again for other ones, or on every kept table. A step that no longer reads stops the run there; nothing is skipped or guessed.', examples: ['save this as a recipe called cu check', 'run cu check for au', 'run cu check on every table', 'recipes'] },
-  read: (text) => {
-    const m = /^(?:save|keep|make)\s+(?:this|this session|the session|it)\s+(?:as\s+)?(?:a\s+)?recipe(?:\s+(?:called|named))?\s+(.+)$/i.exec(text.trim()) || /^save\s+(?:as\s+)?(?:a\s+)?recipe\s+(?:called\s+|named\s+)?(.+)$/i.exec(text.trim());
-    if (!m) return null;
-    // a card that failed (an error, an open question) is not a step
-    const steps = S.cards.filter(c => !NOT_STEPS.has(c.tool) && !failed(c.res)).map(c => ({ tool: c.tool, args: JSON.parse(JSON.stringify(c.args)), raw: c.raw }));
-    return { name: m[1].trim().replace(/^["'“]|["'”]$/g, '').toLowerCase(), steps, cols: S.table ? S.table.cols.map(c => c.name) : [] };
-  },
   topic: a => [`recipe ${a.name}`, 1],
   run: a => {
     const read = ['save recipe', { v: a.name }];
@@ -17124,8 +17194,7 @@ tool({
 
 /* ── list and forget ────────────────────────────────────────── */
 tool({
-  name: 'recipeList', rank: 30,
-  read: text => /^(?:my |the |list |show )*recipes$/i.test(text.trim()) ? {} : null,
+  name: 'recipeList',
   topic: () => ['recipes', 1],
   run: () => {
     const rs = Object.values(S.recipes), read = ['recipes'];
@@ -17134,8 +17203,7 @@ tool({
   }
 });
 tool({
-  name: 'recipeForget', rank: 30,
-  read: text => { const m = /^(?:forget|delete|remove)\s+(?:the\s+)?recipe\s+(.+)$/i.exec(text.trim()); return m ? { name: m[1].trim().toLowerCase() } : null; },
+  name: 'recipeForget',
   run: a => {
     const read = ['forget recipe', { v: a.name }];
     if (!S.recipes[a.name]) return { read, body: [{ t: 'note', text: `There is no recipe called ${a.name}; it may be forgotten already.` }], trace: ['recipe: absent'] };
@@ -17148,12 +17216,7 @@ tool({
 // tables the device keeps: files that are not documents, drawings or other conversions
 const tableFiles = () => Object.values(S.files).filter(f => f.kind !== 'doc' && !/\.(dxf|ya?ml|wkt|geojson)$/i.test(f.name));
 tool({
-  name: 'recipeBatch', rank: 29,
-  read: text => {
-    const m = /^run\s+(.+?)\s+on\s+(?:every|each|all(?: the)?)\s+(?:kept\s+)?(?:tables?|files?|csvs?|sheets?)(?:\s+(?:on this device|i have|kept))?$/i.exec(text.trim());
-    if (!m || !recipeNamed(m[1])) return null;
-    return { name: m[1].trim().toLowerCase(), files: tableFiles().map(f => ({ name: f.name, hash: f.hash })) };
-  },
+  name: 'recipeBatch',
   topic: a => [`${a.name} on every table`, 2],
   run: a => {
     const r = recipeNamed(a.name), read = ['run recipe', { v: a.name }, 'on every kept table'];
@@ -17173,6 +17236,34 @@ tool({
     const ok = rows.filter(x => x[1] === 'ran').length;
     return { read, value: ok, body: [{ t: 'big', v: `${ok} of ${a.files.length}`, unit: 'ran to the end' }, { t: 'table', head: ['File', 'Status', 'Last value, or why it stopped'], num: [false, false, false], rows }, { t: 'sub', text: `The last value is the answer of step ${r.steps.length}, "${r.steps[r.steps.length - 1].raw}". Run one file on its own to see every step.` }], trace };
   }
+});
+/* ── what reads them ─────────────────────────────────────────── */
+// a recipe's name is free text; the recipes kept on this device are nouns, so "run cu check …" finds them
+noun(() => { const rs = Object.keys(S.recipes); return rs.length ? { type: 'recipe', exact: true, words: Object.fromEntries(rs.map(n => [n, [n]])), words_pt: Object.fromEntries(rs.map(n => [n, [n]])) } : null; });
+noun({ type: 'recipes', words: { all: ['recipes', 'my recipes', 'the recipes'] }, words_pt: { all: ['receitas', 'minhas receitas'] } });
+const nameOf = s => s.trim().replace(/^["'“]|["'”]$/g, '').toLowerCase();
+// save | keep | make, (this | this session | the session | it), (as), (a), recipe, (called | named)
+const SAVE_WORDS = ['save', 'keep', 'make'].flatMap(v => ['', ' this', ' this session', ' the session', ' it'].flatMap(o => ['', ' as'].flatMap(as => ['', ' a'].flatMap(a => ['', ' called', ' named'].map(c => `${v}${o}${as}${a} recipe${c}`)))))
+  .filter(w => !/^make recipe/.test(w));
+frame({
+  name: 'recipeSave', label: 'Save recipe', words: SAVE_WORDS,
+  theme: ['text'], required: ['theme'], roles: {}, words_pt: ['salva isto como receita', 'salvar como receita'], label_pt: 'Salvar receita',
+  bind: c => {
+    const steps = S.cards.filter(x => !NOT_STEPS.has(x.tool) && !failed(x.res)).map(x => ({ tool: x.tool, args: JSON.parse(JSON.stringify(x.args)), raw: x.raw }));
+    return { tool: 'recipeSave', args: { name: nameOf(c.theme[0].value), steps, cols: S.table ? S.table.cols.map(x => x.name) : [] } };
+  }
+});
+frame({ name: 'recipeList', label: 'Recipes', words: ['list', 'show'], elidable: true, theme: ['recipes'], required: ['theme'], roles: {}, label_pt: 'Receitas', bind: () => ({ tool: 'recipeList', args: {} }) });
+frame({
+  name: 'recipeForget', label: 'Forget recipe', words: ['forget recipe', 'forget the recipe', 'delete recipe', 'delete the recipe', 'remove recipe', 'remove the recipe'], theme: ['text', 'recipe'], required: ['theme'], roles: {},
+  words_pt: ['esquece a receita', 'apaga a receita'], label_pt: 'Esquecer receita',
+  bind: c => ({ tool: 'recipeForget', args: { name: nameOf(String(c.theme[0].value)) } })
+});
+// "run cu check on every table"
+noun({ type: 'everytable', words: { all: ['every table', 'each table', 'all tables', 'all the tables', 'every kept table', 'every file', 'each file', 'all files', 'every csv', 'every sheet'] }, words_pt: { all: ['cada tabela', 'todas as tabelas'] } });
+frame({
+  name: 'recipeBatch', label: 'Run on every table', words: ['run', 'apply'], theme: ['recipe'], required: ['theme', 'on'], roles: { on: { preps: ['on', 'over', 'for', 'across'], types: ['everytable'] } }, words_pt: ['roda', 'aplica'], label_pt: 'Rodar em cada tabela',
+  bind: c => ({ tool: 'recipeBatch', args: { name: c.theme[0].value, files: tableFiles().map(f => ({ name: f.name, hash: f.hash })) } })
 });
   return { subjects, runSteps, bindingsOf, recipeNamed, recipeAt };
 })();
@@ -18856,7 +18947,9 @@ function ontology() {
   for (const w of COMPOUNDS) { const p = parseUnit(w); if (p) units.push({ unit: w, dim: dimName(p.dim), words: [w] }); }
   units.push({ unit: 'oz', dim: 'mass', words: ['oz', 'ounce', 'ounces'] });   // troy or avoirdupois: the tool decides and shows the slot
   units.push({ unit: 'people per square mile', dim: 'population density', words: ['people per square mile', 'per square mile'], words_pt: ['pessoas por milha quadrada', 'por milha quadrada'] });
-  units.push(...LEXICON.units);
+  // a unit a file adds keeps only the words the table does not already have: one word, one unit
+  const have = new Set(units.flatMap(u => u.words));
+  for (const u of LEXICON.units) { const words = u.words.filter(w => !have.has(w)); if (words.length) units.push({ ...u, words }); }
   units.push({ unit: 'people per km2', dim: 'population density', words: ['people per km2', 'people per square kilometre', 'people per square km', 'per km2'], words_pt: ['pessoas por km2', 'habitantes por km2', 'por km2'] });
   const terms = {}; for (const k of Object.keys(ODS)) terms[k] = [k]; for (const [a, k] of Object.entries(ODSA)) terms[k].push(a);
   return {
@@ -18906,7 +18999,7 @@ const __m49 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/dispatch, built from ../auditable/ext/dispatch/src/ by its own build.
 // Source of truth: gentropic/auditable ext/dispatch (local clone: ../auditable). Re-vendor by copying
 // ext/dispatch/index.js here after 'node ext/dispatch/build.js'. golem uses the grammar rung only:
-// createEngine, makeSession, ENGLISH, PORTUGUESE. At auditable 10ef7fb6.
+// createEngine, makeSession, ENGLISH, PORTUGUESE. At auditable 3a5c438c.
 
 // ⚠ GENERATED FILE — DO NOT EDIT. Source: src/  Build: @gcu/build src/main.js
 // @gcu/dispatch — Session-trained natural-language → tool-call dispatch: a Snips-shaped resolver (averaged-perceptron intent + CRF-class slot tagger + gazetteers + deterministic per-kind assemblers) that trains IN THE BROWSER from the host session's own vocabulary in under a second. Tools are declarative (ten kinds) and a grammar rung (clause: case-grammar frames over an Earley chart with costed repairs, en + pt-BR) reads controlled commands before the learners see them; no shipped model, no network, explainable per decision — refusals return empty calls so the host degrades into its command palette. Born from an incubator where this beat a 26M finetuned transformer 50/52 to 3/24 on a frozen yardstick.
@@ -20428,7 +20521,8 @@ function createEngine(ont, locale = ENGLISH) {
   }
   function echo(c) {
     const parts = [c.theme.length ? `${col(VERBS[c.verb], 'label')} ${c.theme.map(describe).join(', ')}` : col(VERBS[c.verb], 'label')];
-    for (const k of ont.echoOrder) if (c.roles[k]?.length) { const vs = c.roles[k]; const redundant = vs.every(v => v.type === k && describe(v).includes(typeName(v.type))); parts.push(`${redundant ? '' : roleLabel(k) + ' '}${vs.map(describe).join(', ')}`); }
+    // every role the command has, the ontology's order first: two readings that differ only in a role must not echo the same
+    for (const k of [...ont.echoOrder, ...Object.keys(c.roles).filter(k => !ont.echoOrder.includes(k)).sort()]) if (c.roles[k]?.length) { const vs = c.roles[k]; const redundant = vs.every(v => v.type === k && describe(v).includes(typeName(v.type))); parts.push(`${redundant ? '' : roleLabel(k) + ' '}${vs.map(describe).join(', ')}`); }
     return parts.join('; ') + '.';
   }
 
@@ -20488,6 +20582,7 @@ function createEngine(ont, locale = ENGLISH) {
   // a bare text role opens after the verb of its frame, or after a noun of that frame's theme type
   const BARE = ont.verbs.filter(v => Object.values(v.roles ?? {}).some(r => r.types.includes('text') && r.preps.includes('')));
   const BARE_VERBS = new Set(BARE.map(v => v.name)), BARE_TYPES = new Set(BARE.flatMap(v => v.theme ?? []));
+  const BARE_TEXT = ont.verbs.filter(v => Object.values(v.roles ?? {}).some(r => r.types.includes('text') && r.preps.includes('')));
   const TEXT_SUBJECT = new Set(ont.verbs.filter(v => (v.subject ?? []).includes('text')).map(v => v.name));
   // candidate readings with free text: lists of spans [{ i, from, j }] (tokens i..j replaced, text from 'from'),
   // fewest words of text first; a subject span is the words before the verb of a frame that takes one
@@ -20513,6 +20608,8 @@ function createEngine(ont, locale = ENGLISH) {
         else if (sn.cat === 'COLON' && TEXT_PREPS.has(':') && meant(':')) open = 'colon';
         if ((sn.cat === 'VERB' && BARE_VERBS.has(sn.verb)) || (sn.cat === 'NOUN' && BARE_TYPES.has(sn.type))) open ??= 'bare';
       }
+      // a bare text role may also start at a word nothing else knows ("… 2% chalcopyrite"), where its frame is said or elidable
+      if (!open && i < toks.length && toks[i].senses.every(x => x.cat === 'UNK') && BARE_TEXT.some(v => v.elidable || said.has(v.name))) open = 'bare';
       if (!open || (i === toks.length && open !== 'colon')) continue;
       if (open === 'colon') { out.push({ i, from: i, j: toks.length, colon: toks[i - 1].e }); continue; }   // a payload is everything after the colon
       const from = i + lead;
@@ -21094,7 +21191,7 @@ const { DOCTEXT } = __m41;
 const { recipeAt, bindingsOf, runSteps } = __m42;
 const { tableFromText } = __m13;
 const { convertBinary } = __m45;
-const { norm, grammar, context, taught } = __m50;
+const { norm, grammar, context, taught, clauseRead } = __m50;
 const { current, newSession, renameSession, touch } = __m51;
 // The entry point: submit(raw) reads a request and returns what happened. Cards are recomputed in
 // place by rerun(); answers and slot flips go through it, so args stay the only state that matters.
@@ -21145,7 +21242,7 @@ function submit(raw) {
   if (/^(again|repeat|rerun|do it again)$/.test(q)) return last ? submit(last.raw) : { kind: 'nothing', msg: 'Nothing to repeat.' };
   // a saved recipe by name: replayed with the new subjects into a session of its own (a batch is a card)
   if ((m = /^run\s+(.+)$/i.exec(text))) {
-    const ba = toolByName('recipeBatch').read(text); if (ba) return { kind: 'card', card: addCard(raw, { tool: 'recipeBatch', args: ba, rung: 'grammar', res: T.recipeBatch(ba) }, performance.now() - t0) };
+    const ba = clauseRead(raw, 'grammar'); if (ba.tool === 'recipeBatch') return { kind: 'card', card: addCard(raw, ba, performance.now() - t0) };
     const at = recipeAt(m[1]); if (at) return runRecipe(at[0], at[1]);
   }
   const r = context(q, last) || grammar(text, q, 'grammar', raw) || taught(text, q, raw) || { tool: 'none', args: { q }, rung: 'none', res: T.none({ q }) };

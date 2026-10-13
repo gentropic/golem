@@ -1,7 +1,8 @@
 // Sampling theory and mine economics as declared formulas. Every term is a slot; a term the person did
 // not give is asked for, with the conventional value offered first and never applied on its own. Prices
 // are always the person's input. No geostatistics here: these are formulas over given numbers.
-import { tool, fmt } from './core.js';
+import { tool, frame, noun, shape, postmod, qmod, fmt } from './core.js';
+import { ELEMENTS } from './data/elements.js';
 import { numberAsk, firstNeed } from './forms.js';
 
 const NUM = '(\\d+(?:\\.\\d+)?)';
@@ -24,15 +25,8 @@ const gyFactors = a => {
   return { frac, c, l, d3: dcm ** 3 };
 };
 tool({
-  name: 'gy', rank: 36,
+  name: 'gy',
   skill: { group: 'Field', title: 'Sampling and economics formulas', on: 'declared formulas', about: 'Gy\'s fundamental sampling error, solved for the error or the sample mass; break-even cutoff grade; net smelter return per tonne and metal equivalents. Every term is a slot; a missing one is asked for, with the convention offered first. Prices are yours.', examples: ['sampling error for a 1 kg sample at 2 mm from a 20 kg lot, 2% chalcopyrite', 'sample mass for 5% precision at 10 mm', 'cutoff grade for copper at 9000 usd/t, 88% recovery, processing 14 usd/t, g&a 3 usd/t', 'cueq of 0.8% cu and 0.3 g/t au at 9000 usd/t and 2300 usd/oz'] },
-  read: (text, q) => {
-    let m = new RegExp(`^(?:gy |fundamental )?(?:sampling|fundamental) error (?:for|of) (?:a )?${NUM} ?(kg|g|t) sample at ${NUM} ?(mm|cm)(?: (?:from|of) (?:a )?${NUM} ?(kg|g|t) lot)?(?:,? ${NUM} ?% (\\w+))?$`).exec(q);
-    if (m) return { solve: 'sigma', ms: +m[1] * (m[2] === 'kg' ? 1000 : m[2] === 't' ? 1e6 : 1), d_cm: +m[3] / (m[4] === 'mm' ? 10 : 1), ...(m[5] ? { ml: +m[5] * (m[6] === 'kg' ? 1000 : m[6] === 't' ? 1e6 : 1) } : {}), ...(m[7] ? { a: +m[7] / 100, mineral: m[8] } : {}) };
-    m = new RegExp(`^(?:gy )?(?:sample|minimum sample) mass for ${NUM} ?% (?:precision|error|relative error) at ${NUM} ?(mm|cm)(?: top size)?$`).exec(q);
-    if (m) return { solve: 'ms', sigma: +m[1] / 100, d_cm: +m[2] / (m[3] === 'mm' ? 10 : 1) };
-    return null;
-  },
   topic: () => ['Sampling error', 1],
   run: a => {
     const read = a.solve === 'sigma' ? ['Gy: error of a', { v: `${fmt(a.ms)} g sample` }, 'at', { v: `${fmt(a.d_cm * 10)} mm` }] : ['Gy: sample mass for', { v: `${fmt(a.sigma * 100)} %` }, 'at', { v: `${fmt(a.d_cm * 10)} mm` }];
@@ -58,18 +52,7 @@ const perUnit = s => /^(t|tonne)$/.test(s) ? 't' : /^(oz|ounce)$/.test(s) ? 'oz'
 // a grade in the unit the price implies: price per t of metal → %, per oz → g/t, per lb → %, per kg → kg/t, per g → g/t
 const gradeOut = (metalPerT, per) => per === 't' ? [metalPerT * 100, '%'] : per === 'oz' ? [metalPerT * TROY, 'g/t'] : per === 'lb' ? [metalPerT * LB / 1000 * 100, '%'] : per === 'kg' ? [metalPerT, 'kg/t'] : [metalPerT, 'g/t'];
 tool({
-  name: 'cutoff', rank: 37,
-  read: (text, q) => {
-    const m = new RegExp(`^(?:break-?even )?cut-?off(?: grade)? (?:for|of) ([a-z]+)(?: at ${PRICE})?(.*)$`).exec(q); if (!m) return null;
-    const a = { metal: m[1], ...(m[2] ? { price: +m[2], per: perUnit(m[3]) } : {}) }, rest = m[4] || '';
-    let x;
-    if ((x = new RegExp(`${NUM} ?% recovery|recovery(?: of)? ${NUM} ?%`).exec(rest))) a.recovery = +(x[1] || x[2]);
-    if ((x = new RegExp(`(?:processing|process(?:ing)? cost|milling)(?: of| cost)? ${NUM}`).exec(rest))) a.c_process = +x[1];
-    if ((x = new RegExp(`(?:g&a|g and a|general and admin(?:istration)?|overheads?)(?: of| cost)? ${NUM}`).exec(rest))) a.c_ga = +x[1];
-    if ((x = new RegExp(`(?:selling|refining|realisation|realization)(?: cost| charge)?(?: of)? ${NUM}`).exec(rest))) a.c_sell = +x[1];
-    if ((x = new RegExp(`(?:mining)(?: cost)?(?: of)? ${NUM}`).exec(rest))) a.c_mine = +x[1];
-    return a;
-  },
+  name: 'cutoff',
   topic: a => [`Cutoff grade, ${a.metal}`, 1],
   run: a => {
     const read = ['cutoff grade for', { v: a.metal }];
@@ -91,17 +74,7 @@ const readPrices = s => [...s.matchAll(new RegExp(PRICE, 'g'))].map(m => ({ pric
 // metal per tonne of ore in the price's unit
 const metalPerT = (e, per) => { const gpt = e.unit === '%' ? e.grade * 1e4 : e.unit === 'oz/t' ? e.grade * TROY : e.grade; return per === 't' ? gpt / 1e6 : per === 'oz' ? gpt / TROY : per === 'lb' ? gpt / 1000 / LB : per === 'kg' ? gpt / 1000 : gpt; };
 tool({
-  name: 'nsr', rank: 39,
-  read: (text, q) => {
-    let m = /^(?:nsr|net smelter return)(?: per (?:t|tonne))? (?:for|of) (.+)$/.exec(q), kind = 'nsr';
-    if (!m) { m = /^([a-z]{1,2})-?(?:eq|equivalent|equiv)(?: grade)? (?:for|of) (.+)$/.exec(q); if (m) { kind = 'equiv'; } }
-    if (!m) return null;
-    const body = kind === 'equiv' ? m[2] : m[1], els = readElements(body), prices = readPrices(body);
-    if (els.length < (kind === 'equiv' ? 2 : 1)) return null;
-    const a = { kind, els: els.map((e, i) => ({ ...e, ...(prices[i] ? prices[i] : {}) })) };
-    if (kind === 'equiv') { a.lead = m[1]; if (!els.some(e => e.el === a.lead)) return null; }
-    return a;
-  },
+  name: 'nsr',
   topic: a => [a.kind === 'nsr' ? 'NSR' : `${a.lead.toUpperCase()} equivalent`, 1],
   run: a => {
     const read = [a.kind === 'nsr' ? 'NSR for' : `${a.lead.toUpperCase()}-equivalent of`, { v: a.els.map(e => `${fmt(e.grade)} ${e.unit} ${e.el}`).join(', ') }];
@@ -125,5 +98,65 @@ tool({
     const total = parts.reduce((s, p) => s + p.v, 0), eq = total / unitValue;
     const factors = parts.filter(p => p !== lead).map(p => [`1 ${p.unit} ${p.el}`, `${fmt(metalPerT({ ...p, grade: 1 }, p.per) * p.rec * a[`price:${parts.indexOf(p)}`] / unitValue, 4)} ${lead.unit} ${lead.el}`]);
     return { read, value: eq, body: [{ t: 'big', v: fmt(eq, 4), unit: `${lead.unit} ${a.lead.toUpperCase()}-equivalent` }, { t: 'kv', rows: [...parts.map(p => [`${p.el} value per t`, `${fmt(p.v, 4)} (${fmt(p.grade)} ${p.unit} × ${fmt(p.rec * 100)} % × ${fmt(a[`price:${parts.indexOf(p)}`])})`]), ['value of 1 ' + lead.unit + ' ' + lead.el, fmt(unitValue, 4)], ...factors] }, { t: 'sub', text: `Σ value ÷ value of one ${lead.unit} of ${a.lead} at ${fmt(lead.rec * 100)} % recovery. The factor${factors.length === 1 ? '' : 's'} above ${factors.length === 1 ? 'is' : 'are'} what this card used; a published equivalent may use other recoveries and prices.` }], trace: parts.map(p => `${p.el}: ${fmt(p.v, 6)} per t`).concat([`unit value of ${lead.el}: ${fmt(unitValue, 6)}`, `${fmt(total, 6)} ÷ ${fmt(unitValue, 6)} = ${fmt(eq, 6)}`]), py: `econ.equiv(lead="${a.lead}", elements=${JSON.stringify(parts.map(p => ({ el: p.el, grade: p.grade, unit: p.unit, recovery: p.rec, price: a[`price:${parts.indexOf(p)}`] })))})` };
+  }
+});
+/* ── what reads them ─────────────────────────────────────────── */
+const EL_NAME = Object.fromEntries(ELEMENTS.map(e => [e[1], e[2]]));
+const massG = q => { const f = { kg: 1000, g: 1, t: 1e6, mg: 1e-3 }[q.unit]; return f ? q.n * f : null; };
+const sizeCm = q => { const f = { mm: 0.1, cm: 1, m: 100, 'µm': 1e-4 }[q.unit]; return f ? q.n * f : null; };
+// Gy: "sampling error for a 1 kg sample at 2 mm from a 20 kg lot, 2% chalcopyrite"; "sample mass for 5% precision at 10 mm"
+noun({ type: 'gyword', words: { sigma: ['sampling error', 'fundamental error', 'gy error', 'fundamental sampling error', 'the sampling error'], ms: ['sample mass', 'minimum sample mass', 'gy sample mass'] }, words_pt: { sigma: ['erro de amostragem', 'erro fundamental'], ms: ['massa mínima'] } });
+noun({ type: 'gysample', words: {}, generic: ['sample'], generic_pt: ['amostra'] }); qmod({ head: 'gysample', attr: 'mass', dims: ['mass'] });
+noun({ type: 'gylot', words: {}, generic: ['lot'], generic_pt: ['lote'] }); qmod({ head: 'gylot', attr: 'mass', dims: ['mass'] });
+noun({ type: 'precision', words: { p: ['precision', 'error', 'relative error'] }, words_pt: { p: ['precisão', 'erro'] } }); qmod({ head: 'precision', attr: 'value', dims: ['mass ratio'] });
+frame({
+  name: 'gy', label: 'Sampling error', words: ['calculate', 'compute'], elidable: true, theme: ['gyword'], required: ['theme', 'at'],
+  roles: { for: { preps: ['for', 'of'], types: ['gysample', 'precision'] }, at: { preps: ['at', 'with'], types: ['quantity:length'] }, from: { preps: ['from', 'of', 'in'], types: ['gylot', 'quantity:mass ratio'] }, mineral: { preps: [''], types: ['text'] } },
+  label_pt: 'Erro de amostragem',
+  bind: c => {
+    const w = c.theme[0].value, d = sizeCm(c.roles.at[0]); if (d == null) return null;
+    const of = c.roles.for || [], from = c.roles.from || [], s = of.find(n => n.type === 'gysample'), p = of.find(n => n.type === 'precision'), lot = from.find(n => n.type === 'gylot'), pc = from.find(n => n.type === 'quantity'), min = c.roles.mineral && c.roles.mineral[0];
+    if (w === 'ms') return p && p.attrs.value ? { tool: 'gy', args: { solve: 'ms', sigma: p.attrs.value.n / 100, d_cm: d } } : null;
+    const ms = s && s.attrs.mass && massG(s.attrs.mass); if (!ms) return null;
+    const ml = lot && lot.attrs.mass && massG(lot.attrs.mass);
+    return { tool: 'gy', args: { solve: 'sigma', ms, d_cm: d, ...(ml ? { ml } : {}), ...(pc && pc.unit === '%' && min ? { a: pc.n / 100, mineral: min.value.trim().toLowerCase() } : {}) } };
+  }
+});
+// prices: "9000 usd/t", "2300 usd/oz", "$14/t"
+shape({ type: 'price', re: String.raw`(?:us\$|\$|r\$|€)?\s?\d[\d,]*(?:\.\d+)?\s?(?:usd|us\$|\$|dollars?|aud|cad|brl|r\$|eur|€)?\s?(?:/|per\s)\s?(?:t|tonne|oz|ounce|lb|pound|kg|g)` });
+const priceOf = n => { const m = /([\d,]+(?:\.\d+)?)\D*?(?:\/|per\s)\s?(t|tonne|oz|ounce|lb|pound|kg|g)$/i.exec(n.value.trim()); return m ? { price: +m[1].replace(/,/g, ''), per: perUnit(m[2].toLowerCase()) } : null; };
+// cutoff: "cutoff grade for copper at 9000 usd/t, 88% recovery, processing 14 usd/t, g&a 3 usd/t"
+noun({ type: 'cutoffword', words: { cutoff: ['cutoff grade', 'cut-off grade', 'cutoff', 'cut-off', 'break-even cutoff', 'breakeven cutoff', 'break-even cutoff grade'] }, words_pt: { cutoff: ['teor de corte', 'teor de corte de equilíbrio'] } });
+noun({ type: 'costterm', words: { recovery: ['recovery'], c_process: ['processing', 'processing cost', 'process cost', 'milling', 'milling cost'], c_ga: ['g&a', 'g and a', 'general and admin', 'general and administration', 'overhead', 'overheads'], c_sell: ['selling', 'selling cost', 'refining', 'refining charge', 'realisation', 'realization'], c_mine: ['mining', 'mining cost'] },
+  words_pt: { recovery: ['recuperação'], c_process: ['processamento', 'beneficiamento'], c_ga: ['g&a', 'administrativo'], c_sell: ['venda', 'refino'], c_mine: ['lavra', 'mineração'] } });
+qmod({ head: 'costterm', attr: 'value', dims: ['mass ratio', 'bare'] });                          // "88% recovery"
+postmod({ prep: '', heads: ['costterm'], attr: 'value', quantity: true });                   // "recovery 88%"
+postmod({ prep: '', heads: ['costterm'], attr: 'price', mod: 'price' });                     // "processing 14 usd/t"
+postmod({ prep: 'of', heads: ['costterm'], attr: 'price', mod: 'price' });                   // "processing of 14 usd/t"
+frame({
+  name: 'cutoff', label: 'Cutoff grade', words: ['calculate', 'compute'], elidable: true, theme: ['cutoffword'], required: ['theme', 'for'],
+  roles: { for: { preps: ['for', 'of'], types: ['element'] }, at: { preps: ['at', 'with', ''], types: ['price', 'costterm'] } }, label_pt: 'Teor de corte',
+  bind: c => {
+    const metal = c.roles.for[0], a = { metal: (EL_NAME[metal.value] || metal.value).toLowerCase() };
+    for (const n of c.roles.at || []) {
+      if (n.type === 'price') { const p = priceOf(n); if (!p) return null; a.price = p.price; a.per = p.per; continue; }
+      const v = n.attrs.value ? n.attrs.value.n : n.attrs.price ? (priceOf({ value: n.attrs.price }) || {}).price : null; if (v == null) return null; a[n.value] = v;
+    }
+    return { tool: 'cutoff', args: a };
+  }
+});
+// NSR and equivalents: "cueq of 0.8% cu and 0.3 g/t au at 9000 usd/t and 2300 usd/oz", "nsr for 0.8% cu …"
+qmod({ head: 'element', attr: 'grade', dims: ['mass ratio'] });                                   // "0.8% cu", "0.3 g/t au"
+noun({ type: 'nsrword', words: { nsr: ['nsr', 'net smelter return', 'nsr per tonne', 'nsr per t'] }, words_pt: { nsr: ['nsr', 'retorno líquido de fundição'] } });
+shape({ type: 'equiv', re: String.raw`[a-z]{1,2}[- ]?(?:eq|equiv|equivalent)(?:\s+grade)?` });                 // cueq, au-eq, cu equivalent
+frame({
+  name: 'nsr', label: 'NSR', words: ['calculate', 'compute'], elidable: true, theme: ['nsrword', 'equiv'], required: ['theme', 'of'],
+  roles: { of: { preps: ['of', 'for'], types: ['element'] }, at: { preps: ['at', 'with'], types: ['price'] } }, label_pt: 'NSR',
+  bind: c => {
+    const els = c.roles.of.map(n => n.attrs.grade ? { el: n.value.toLowerCase(), grade: n.attrs.grade.n, unit: n.attrs.grade.unit === 'ppm' ? 'g/t' : n.attrs.grade.unit } : null); if (els.some(e => !e)) return null;
+    const prices = (c.roles.at || []).map(priceOf), t = c.theme[0], kind = t.type === 'equiv' ? 'equiv' : 'nsr';
+    const a = { kind, els: els.map((e, i) => ({ ...e, ...(prices[i] ? prices[i] : {}) })) };
+    if (kind === 'equiv') { a.lead = /^[a-z]{1,2}/i.exec(t.value)[0].toLowerCase(); if (els.length < 2 || !els.some(e => e.el === a.lead)) return null; }
+    return { tool: 'nsr', args: a };
   }
 });

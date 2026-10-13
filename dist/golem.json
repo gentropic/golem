@@ -2176,6 +2176,120 @@
       }
     },
     {
+      "type": "chronpart",
+      "words": {
+        "age": [
+          "stages",
+          "ages"
+        ],
+        "epoch": [
+          "epochs",
+          "series"
+        ],
+        "period": [
+          "periods",
+          "systems"
+        ],
+        "era": [
+          "eras"
+        ],
+        "parts": [
+          "subdivisions",
+          "parts",
+          "divisions",
+          "units"
+        ]
+      },
+      "words_pt": {
+        "age": [
+          "andares",
+          "idades"
+        ],
+        "epoch": [
+          "épocas",
+          "epocas"
+        ],
+        "period": [
+          "períodos",
+          "periodos"
+        ],
+        "era": [
+          "eras"
+        ],
+        "parts": [
+          "subdivisões",
+          "subdivisoes"
+        ]
+      }
+    },
+    {
+      "type": "chron",
+      "words": {
+        "tertiary": [
+          "tertiary"
+        ],
+        "precambrian": [
+          "precambrian"
+        ],
+        "upper pleistocene": [
+          "upper pleistocene"
+        ],
+        "middle pleistocene": [
+          "middle pleistocene"
+        ],
+        "lower pleistocene": [
+          "lower pleistocene"
+        ],
+        "upper cretaceous": [
+          "upper cretaceous"
+        ],
+        "lower cretaceous": [
+          "lower cretaceous"
+        ],
+        "upper jurassic": [
+          "upper jurassic"
+        ],
+        "lower jurassic": [
+          "lower jurassic"
+        ],
+        "carboniferous": [
+          "carboniferous"
+        ]
+      },
+      "words_pt": {
+        "tertiary": [
+          "tertiary"
+        ],
+        "precambrian": [
+          "precambrian"
+        ],
+        "upper pleistocene": [
+          "upper pleistocene"
+        ],
+        "middle pleistocene": [
+          "middle pleistocene"
+        ],
+        "lower pleistocene": [
+          "lower pleistocene"
+        ],
+        "upper cretaceous": [
+          "upper cretaceous"
+        ],
+        "lower cretaceous": [
+          "lower cretaceous"
+        ],
+        "upper jurassic": [
+          "upper jurassic"
+        ],
+        "lower jurassic": [
+          "lower jurassic"
+        ],
+        "carboniferous": [
+          "carboniferous"
+        ]
+      }
+    },
+    {
       "type": "corecode",
       "words": {
         "AQ": [
@@ -2312,6 +2426,60 @@
       "generic_pt": [
         "manobra"
       ]
+    },
+    {
+      "type": "notation",
+      "words": {
+        "regex": [
+          "regex",
+          "regexp",
+          "regular expression"
+        ],
+        "cron": [
+          "cron",
+          "crontab",
+          "cron schedule"
+        ],
+        "time": [
+          "time",
+          "epoch",
+          "timestamp",
+          "unix time",
+          "epoch time"
+        ],
+        "url": [
+          "url",
+          "link"
+        ],
+        "chmod": [
+          "chmod",
+          "mode",
+          "permission",
+          "permissions",
+          "file mode"
+        ]
+      },
+      "words_pt": {
+        "regex": [
+          "regex",
+          "expressão regular"
+        ],
+        "cron": [
+          "cron"
+        ],
+        "time": [
+          "timestamp",
+          "epoch"
+        ],
+        "url": [
+          "url",
+          "link"
+        ],
+        "chmod": [
+          "chmod",
+          "permissões"
+        ]
+      }
     },
     {
       "type": "encoding",
@@ -5389,8 +5557,7 @@
           "zn"
         ],
         "Ga": [
-          "gallium",
-          "ga"
+          "gallium"
         ],
         "Ge": [
           "germanium",
@@ -5622,8 +5789,7 @@
           "th"
         ],
         "Pa": [
-          "protactinium",
-          "pa"
+          "protactinium"
         ],
         "U": [
           "uranium"
@@ -5640,8 +5806,7 @@
           "americium"
         ],
         "Cm": [
-          "curium",
-          "cm"
+          "curium"
         ],
         "Bk": [
           "berkelium",
@@ -5839,8 +6004,7 @@
           "zn"
         ],
         "Ga": [
-          "gallium",
-          "ga"
+          "gallium"
         ],
         "Ge": [
           "germanium",
@@ -6072,8 +6236,7 @@
           "th"
         ],
         "Pa": [
-          "protactinium",
-          "pa"
+          "protactinium"
         ],
         "U": [
           "uranium"
@@ -6090,8 +6253,7 @@
           "americium"
         ],
         "Cm": [
-          "curium",
-          "cm"
+          "curium"
         ],
         "Bk": [
           "berkelium",
@@ -6226,6 +6388,181 @@
         "oxide": [
           "óxido",
           "oxido"
+        ]
+      }
+    },
+    {
+      "type": "decision",
+      "words": {
+        "matrix": [
+          "decision matrix",
+          "weighted decision",
+          "these options",
+          "the options",
+          "my options",
+          "options"
+        ]
+      },
+      "words_pt": {
+        "matrix": [
+          "matriz de decisão",
+          "essas opções",
+          "as opções"
+        ]
+      }
+    },
+    {
+      "type": "gyword",
+      "words": {
+        "sigma": [
+          "sampling error",
+          "fundamental error",
+          "gy error",
+          "fundamental sampling error",
+          "the sampling error"
+        ],
+        "ms": [
+          "sample mass",
+          "minimum sample mass",
+          "gy sample mass"
+        ]
+      },
+      "words_pt": {
+        "sigma": [
+          "erro de amostragem",
+          "erro fundamental"
+        ],
+        "ms": [
+          "massa mínima"
+        ]
+      }
+    },
+    {
+      "type": "gysample",
+      "words": {},
+      "generic": [
+        "sample"
+      ],
+      "generic_pt": [
+        "amostra"
+      ]
+    },
+    {
+      "type": "gylot",
+      "words": {},
+      "generic": [
+        "lot"
+      ],
+      "generic_pt": [
+        "lote"
+      ]
+    },
+    {
+      "type": "precision",
+      "words": {
+        "p": [
+          "precision",
+          "error",
+          "relative error"
+        ]
+      },
+      "words_pt": {
+        "p": [
+          "precisão",
+          "erro"
+        ]
+      }
+    },
+    {
+      "type": "cutoffword",
+      "words": {
+        "cutoff": [
+          "cutoff grade",
+          "cut-off grade",
+          "cutoff",
+          "cut-off",
+          "break-even cutoff",
+          "breakeven cutoff",
+          "break-even cutoff grade"
+        ]
+      },
+      "words_pt": {
+        "cutoff": [
+          "teor de corte",
+          "teor de corte de equilíbrio"
+        ]
+      }
+    },
+    {
+      "type": "costterm",
+      "words": {
+        "recovery": [
+          "recovery"
+        ],
+        "c_process": [
+          "processing",
+          "processing cost",
+          "process cost",
+          "milling",
+          "milling cost"
+        ],
+        "c_ga": [
+          "g&a",
+          "g and a",
+          "general and admin",
+          "general and administration",
+          "overhead",
+          "overheads"
+        ],
+        "c_sell": [
+          "selling",
+          "selling cost",
+          "refining",
+          "refining charge",
+          "realisation",
+          "realization"
+        ],
+        "c_mine": [
+          "mining",
+          "mining cost"
+        ]
+      },
+      "words_pt": {
+        "recovery": [
+          "recuperação"
+        ],
+        "c_process": [
+          "processamento",
+          "beneficiamento"
+        ],
+        "c_ga": [
+          "g&a",
+          "administrativo"
+        ],
+        "c_sell": [
+          "venda",
+          "refino"
+        ],
+        "c_mine": [
+          "lavra",
+          "mineração"
+        ]
+      }
+    },
+    {
+      "type": "nsrword",
+      "words": {
+        "nsr": [
+          "nsr",
+          "net smelter return",
+          "nsr per tonne",
+          "nsr per t"
+        ]
+      },
+      "words_pt": {
+        "nsr": [
+          "nsr",
+          "retorno líquido de fundição"
         ]
       }
     },
@@ -6430,6 +6767,79 @@
           "fase lunar"
         ]
       }
+    },
+    {
+      "type": "docs",
+      "words": {
+        "docs": [
+          "my documents",
+          "my docs",
+          "my notes",
+          "my files",
+          "the documents",
+          "the docs",
+          "documents",
+          "docs"
+        ]
+      },
+      "words_pt": {
+        "docs": [
+          "meus documentos",
+          "minhas notas",
+          "documentos"
+        ]
+      }
+    },
+    {
+      "type": "passage",
+      "words": {},
+      "generic": [
+        "passage",
+        "paragraph"
+      ],
+      "generic_pt": [
+        "trecho",
+        "parágrafo"
+      ]
+    },
+    {
+      "type": "recipes",
+      "words": {
+        "all": [
+          "recipes",
+          "my recipes",
+          "the recipes"
+        ]
+      },
+      "words_pt": {
+        "all": [
+          "receitas",
+          "minhas receitas"
+        ]
+      }
+    },
+    {
+      "type": "everytable",
+      "words": {
+        "all": [
+          "every table",
+          "each table",
+          "all tables",
+          "all the tables",
+          "every kept table",
+          "every file",
+          "each file",
+          "all files",
+          "every csv",
+          "every sheet"
+        ]
+      },
+      "words_pt": {
+        "all": [
+          "cada tabela",
+          "todas as tabelas"
+        ]
+      }
     }
   ],
   "shapes": [
@@ -6450,6 +6860,26 @@
       "re": "p\\d{1,2}"
     },
     {
+      "type": "explainable",
+      "re": "\\d{9,13}(?:\\.\\d+)?"
+    },
+    {
+      "type": "explainable",
+      "re": "\\d{4}-\\d{2}-\\d{2}[t ]\\d{2}:\\d{2}(?::\\d{2}(?:\\.\\d+)?)?(?:z|[+-]\\d{2}:?\\d{2})?"
+    },
+    {
+      "type": "explainable",
+      "re": "[a-z][a-z0-9+.-]*://\\S+"
+    },
+    {
+      "type": "explainable",
+      "re": "(?:[\\d*](?:[\\d*/,-]*[\\d*])?\\s+){4}[\\d*](?:[\\d*/,-]*[\\d*])?"
+    },
+    {
+      "type": "explainable",
+      "re": "/(?:[^/\\s]|\\\\/)+/[gimsuyd]*"
+    },
+    {
       "type": "place",
       "re": "(?:utc|gmt)\\s?[+-]\\d{1,2}(?::?\\d{2})?"
     },
@@ -6465,6 +6895,14 @@
     {
       "type": "formula",
       "re": "(?=[a-z.]*\\d|[a-z]{2,5}(?![a-z\\d]))(?:(?:he|li|be|ne|na|mg|al|si|cl|ar|ca|sc|ti|cr|mn|fe|co|ni|cu|zn|ga|ge|as|se|br|kr|rb|sr|zr|nb|mo|tc|ru|rh|pd|ag|cd|in|sn|sb|te|xe|cs|ba|la|ce|pr|nd|pm|sm|eu|gd|tb|dy|ho|er|tm|yb|lu|hf|ta|re|os|ir|pt|au|hg|tl|pb|bi|po|at|rn|fr|ra|ac|th|pa|np|pu|am|cm|bk|cf|es|fm|md|no|lr|rf|db|sg|bh|hs|mt|ds|rg|cn|nh|fl|mc|lv|ts|og|h|b|c|n|o|f|p|s|k|v|y|i|w|u)\\d*(?:\\.\\d+)?){2,}"
+    },
+    {
+      "type": "price",
+      "re": "(?:us\\$|\\$|r\\$|€)?\\s?\\d[\\d,]*(?:\\.\\d+)?\\s?(?:usd|us\\$|\\$|dollars?|aud|cad|brl|r\\$|eur|€)?\\s?(?:/|per\\s)\\s?(?:t|tonne|oz|ounce|lb|pound|kg|g)"
+    },
+    {
+      "type": "equiv",
+      "re": "[a-z]{1,2}[- ]?(?:eq|equiv|equivalent)(?:\\s+grade)?"
     },
     {
       "type": "coords",
@@ -6927,6 +7365,57 @@
       ]
     },
     {
+      "unit": "mi2",
+      "dim": "area",
+      "words": [
+        "square miles"
+      ]
+    },
+    {
+      "unit": "km2",
+      "dim": "area",
+      "words": [
+        "square kilometres",
+        "square kilometers"
+      ]
+    },
+    {
+      "unit": "ha",
+      "dim": "area",
+      "words": [
+        "hectares"
+      ]
+    },
+    {
+      "unit": "acres",
+      "dim": "area",
+      "words": [
+        "acres"
+      ]
+    },
+    {
+      "unit": "Ma",
+      "dim": "geologic age",
+      "words": [
+        "ma",
+        "myr",
+        "my",
+        "million years ago",
+        "million years",
+        "mya"
+      ]
+    },
+    {
+      "unit": "Ga",
+      "dim": "geologic age",
+      "words": [
+        "ga",
+        "billion years ago",
+        "billion years",
+        "gya"
+      ]
+    },
+    {
       "unit": "µm",
       "dim": "length",
       "words": [
@@ -7139,6 +7628,38 @@
       ],
       "attr": "n",
       "quantity": true
+    },
+    {
+      "prep": "",
+      "heads": [
+        "costterm"
+      ],
+      "attr": "value",
+      "quantity": true
+    },
+    {
+      "prep": "",
+      "heads": [
+        "costterm"
+      ],
+      "attr": "price",
+      "mod": "price"
+    },
+    {
+      "prep": "of",
+      "heads": [
+        "costterm"
+      ],
+      "attr": "price",
+      "mod": "price"
+    },
+    {
+      "prep": "",
+      "heads": [
+        "passage"
+      ],
+      "attr": "n",
+      "quantity": true
     }
   ],
   "qmods": [
@@ -7184,6 +7705,42 @@
       "attr": "length",
       "dims": [
         "length"
+      ]
+    },
+    {
+      "head": "gysample",
+      "attr": "mass",
+      "dims": [
+        "mass"
+      ]
+    },
+    {
+      "head": "gylot",
+      "attr": "mass",
+      "dims": [
+        "mass"
+      ]
+    },
+    {
+      "head": "precision",
+      "attr": "value",
+      "dims": [
+        "mass ratio"
+      ]
+    },
+    {
+      "head": "costterm",
+      "attr": "value",
+      "dims": [
+        "mass ratio",
+        "bare"
+      ]
+    },
+    {
+      "head": "element",
+      "attr": "grade",
+      "dims": [
+        "mass ratio"
       ]
     }
   ],
@@ -8481,6 +9038,136 @@
       "label_pt": "Datar"
     },
     {
+      "name": "chronlength",
+      "label": "Timescale",
+      "words": [
+        "how long was",
+        "how long is",
+        "how long did",
+        "duration of",
+        "length of",
+        "how long did it last"
+      ],
+      "theme": [
+        "chron"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {},
+      "words_pt": [
+        "quanto durou",
+        "duração de"
+      ],
+      "label_pt": "Escala do tempo"
+    },
+    {
+      "name": "chronbefore",
+      "label": "Timescale",
+      "words": [
+        "what came before",
+        "what comes before",
+        "what was before",
+        "which came before",
+        "what is before",
+        "before"
+      ],
+      "theme": [
+        "chron"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {},
+      "words_pt": [
+        "o que veio antes de",
+        "antes de"
+      ],
+      "label_pt": "Escala do tempo"
+    },
+    {
+      "name": "chronafter",
+      "label": "Timescale",
+      "words": [
+        "what came after",
+        "what comes after",
+        "what was after",
+        "which came after",
+        "what is after",
+        "after"
+      ],
+      "theme": [
+        "chron"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {},
+      "words_pt": [
+        "o que veio depois de",
+        "depois de"
+      ],
+      "label_pt": "Escala do tempo"
+    },
+    {
+      "name": "chronparts",
+      "label": "Timescale",
+      "words": [
+        "list",
+        "show"
+      ],
+      "elidable": true,
+      "theme": [
+        "chronpart"
+      ],
+      "required": [
+        "theme",
+        "of"
+      ],
+      "roles": {
+        "of": {
+          "preps": [
+            "of",
+            "in",
+            "within"
+          ],
+          "types": [
+            "chron"
+          ]
+        }
+      },
+      "label_pt": "Escala do tempo"
+    },
+    {
+      "name": "chronage",
+      "label": "Timescale",
+      "words": [
+        "what period is",
+        "which period is",
+        "what epoch is",
+        "what era is",
+        "what age is",
+        "what stage is",
+        "what unit is",
+        "what was at",
+        "what period was",
+        "which period contains"
+      ],
+      "elidable": true,
+      "theme": [
+        "quantity:geologic age"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {},
+      "words_pt": [
+        "que período é",
+        "qual período é"
+      ],
+      "label_pt": "Escala do tempo"
+    },
+    {
       "name": "coremass2",
       "label": "Sample mass",
       "words": [],
@@ -8638,6 +9325,41 @@
         }
       },
       "label_pt": "RQD"
+    },
+    {
+      "name": "explain",
+      "label": "Explain",
+      "words": [
+        "explain",
+        "decode",
+        "describe",
+        "parse",
+        "what does",
+        "read"
+      ],
+      "elidable": true,
+      "theme": [
+        "notation",
+        "explainable"
+      ],
+      "required": [],
+      "roles": {
+        "text": {
+          "preps": [
+            ":",
+            ""
+          ],
+          "types": [
+            "text"
+          ]
+        }
+      },
+      "words_pt": [
+        "explica",
+        "explique",
+        "decodifica"
+      ],
+      "label_pt": "Explicar"
     },
     {
       "name": "hash",
@@ -9296,6 +10018,194 @@
       "label_pt": "Diferença"
     },
     {
+      "name": "decide",
+      "label": "Decide",
+      "words": [
+        "decide",
+        "choose",
+        "pick",
+        "weigh up",
+        "help me decide",
+        "help me choose",
+        "help me pick"
+      ],
+      "theme": [],
+      "required": [],
+      "roles": {
+        "between": {
+          "preps": [
+            "between",
+            "among",
+            "from",
+            ""
+          ],
+          "types": [
+            "text"
+          ]
+        }
+      },
+      "words_pt": [
+        "decide",
+        "decidir",
+        "escolhe",
+        "escolher",
+        "me ajuda a decidir"
+      ],
+      "label_pt": "Decidir"
+    },
+    {
+      "name": "decideblank",
+      "label": "Decide",
+      "words": [
+        "compare",
+        "weigh",
+        "make a"
+      ],
+      "elidable": true,
+      "theme": [
+        "decision"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {},
+      "label_pt": "Decidir"
+    },
+    {
+      "name": "gy",
+      "label": "Sampling error",
+      "words": [
+        "calculate",
+        "compute"
+      ],
+      "elidable": true,
+      "theme": [
+        "gyword"
+      ],
+      "required": [
+        "theme",
+        "at"
+      ],
+      "roles": {
+        "for": {
+          "preps": [
+            "for",
+            "of"
+          ],
+          "types": [
+            "gysample",
+            "precision"
+          ]
+        },
+        "at": {
+          "preps": [
+            "at",
+            "with"
+          ],
+          "types": [
+            "quantity:length"
+          ]
+        },
+        "from": {
+          "preps": [
+            "from",
+            "of",
+            "in"
+          ],
+          "types": [
+            "gylot",
+            "quantity:mass ratio"
+          ]
+        },
+        "mineral": {
+          "preps": [
+            ""
+          ],
+          "types": [
+            "text"
+          ]
+        }
+      },
+      "label_pt": "Erro de amostragem"
+    },
+    {
+      "name": "cutoff",
+      "label": "Cutoff grade",
+      "words": [
+        "calculate",
+        "compute"
+      ],
+      "elidable": true,
+      "theme": [
+        "cutoffword"
+      ],
+      "required": [
+        "theme",
+        "for"
+      ],
+      "roles": {
+        "for": {
+          "preps": [
+            "for",
+            "of"
+          ],
+          "types": [
+            "element"
+          ]
+        },
+        "at": {
+          "preps": [
+            "at",
+            "with",
+            ""
+          ],
+          "types": [
+            "price",
+            "costterm"
+          ]
+        }
+      },
+      "label_pt": "Teor de corte"
+    },
+    {
+      "name": "nsr",
+      "label": "NSR",
+      "words": [
+        "calculate",
+        "compute"
+      ],
+      "elidable": true,
+      "theme": [
+        "nsrword",
+        "equiv"
+      ],
+      "required": [
+        "theme",
+        "of"
+      ],
+      "roles": {
+        "of": {
+          "preps": [
+            "of",
+            "for"
+          ],
+          "types": [
+            "element"
+          ]
+        },
+        "at": {
+          "preps": [
+            "at",
+            "with"
+          ],
+          "types": [
+            "price"
+          ]
+        }
+      },
+      "label_pt": "NSR"
+    },
+    {
       "name": "logAdd",
       "label": "Log",
       "words": [
@@ -9709,6 +10619,384 @@
         }
       },
       "label_pt": "Lua"
+    },
+    {
+      "name": "docsearch",
+      "label": "Search documents",
+      "words": [
+        "find",
+        "search",
+        "search for",
+        "look for",
+        "look up"
+      ],
+      "elidable": true,
+      "theme": [
+        "text",
+        "docs"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {
+        "in": {
+          "preps": [
+            "in",
+            "through"
+          ],
+          "types": [
+            "docs"
+          ]
+        },
+        "for": {
+          "preps": [
+            "for"
+          ],
+          "types": [
+            "text"
+          ]
+        },
+        "text": {
+          "preps": [
+            ":"
+          ],
+          "types": [
+            "text"
+          ]
+        }
+      },
+      "words_pt": [
+        "procura",
+        "procure",
+        "busca",
+        "busque"
+      ],
+      "label_pt": "Procurar"
+    },
+    {
+      "name": "docwhere",
+      "label": "Search documents",
+      "words": [
+        "where did i write about",
+        "where did i read about",
+        "where did i note",
+        "where did i see",
+        "where did i put",
+        "where did i write",
+        "where did i mention"
+      ],
+      "theme": [
+        "text"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {},
+      "words_pt": [
+        "onde eu escrevi sobre",
+        "onde anotei"
+      ],
+      "label_pt": "Procurar"
+    },
+    {
+      "name": "docpassage",
+      "label": "Passage",
+      "words": [
+        "show",
+        "open",
+        "read"
+      ],
+      "elidable": true,
+      "theme": [
+        "passage"
+      ],
+      "required": [
+        "theme",
+        "of"
+      ],
+      "roles": {
+        "of": {
+          "preps": [
+            "of",
+            "in",
+            "from"
+          ],
+          "types": [
+            "file"
+          ]
+        }
+      },
+      "label_pt": "Trecho"
+    },
+    {
+      "name": "recipeSave",
+      "label": "Save recipe",
+      "words": [
+        "save recipe",
+        "save recipe called",
+        "save recipe named",
+        "save a recipe",
+        "save a recipe called",
+        "save a recipe named",
+        "save as recipe",
+        "save as recipe called",
+        "save as recipe named",
+        "save as a recipe",
+        "save as a recipe called",
+        "save as a recipe named",
+        "save this recipe",
+        "save this recipe called",
+        "save this recipe named",
+        "save this a recipe",
+        "save this a recipe called",
+        "save this a recipe named",
+        "save this as recipe",
+        "save this as recipe called",
+        "save this as recipe named",
+        "save this as a recipe",
+        "save this as a recipe called",
+        "save this as a recipe named",
+        "save this session recipe",
+        "save this session recipe called",
+        "save this session recipe named",
+        "save this session a recipe",
+        "save this session a recipe called",
+        "save this session a recipe named",
+        "save this session as recipe",
+        "save this session as recipe called",
+        "save this session as recipe named",
+        "save this session as a recipe",
+        "save this session as a recipe called",
+        "save this session as a recipe named",
+        "save the session recipe",
+        "save the session recipe called",
+        "save the session recipe named",
+        "save the session a recipe",
+        "save the session a recipe called",
+        "save the session a recipe named",
+        "save the session as recipe",
+        "save the session as recipe called",
+        "save the session as recipe named",
+        "save the session as a recipe",
+        "save the session as a recipe called",
+        "save the session as a recipe named",
+        "save it recipe",
+        "save it recipe called",
+        "save it recipe named",
+        "save it a recipe",
+        "save it a recipe called",
+        "save it a recipe named",
+        "save it as recipe",
+        "save it as recipe called",
+        "save it as recipe named",
+        "save it as a recipe",
+        "save it as a recipe called",
+        "save it as a recipe named",
+        "keep recipe",
+        "keep recipe called",
+        "keep recipe named",
+        "keep a recipe",
+        "keep a recipe called",
+        "keep a recipe named",
+        "keep as recipe",
+        "keep as recipe called",
+        "keep as recipe named",
+        "keep as a recipe",
+        "keep as a recipe called",
+        "keep as a recipe named",
+        "keep this recipe",
+        "keep this recipe called",
+        "keep this recipe named",
+        "keep this a recipe",
+        "keep this a recipe called",
+        "keep this a recipe named",
+        "keep this as recipe",
+        "keep this as recipe called",
+        "keep this as recipe named",
+        "keep this as a recipe",
+        "keep this as a recipe called",
+        "keep this as a recipe named",
+        "keep this session recipe",
+        "keep this session recipe called",
+        "keep this session recipe named",
+        "keep this session a recipe",
+        "keep this session a recipe called",
+        "keep this session a recipe named",
+        "keep this session as recipe",
+        "keep this session as recipe called",
+        "keep this session as recipe named",
+        "keep this session as a recipe",
+        "keep this session as a recipe called",
+        "keep this session as a recipe named",
+        "keep the session recipe",
+        "keep the session recipe called",
+        "keep the session recipe named",
+        "keep the session a recipe",
+        "keep the session a recipe called",
+        "keep the session a recipe named",
+        "keep the session as recipe",
+        "keep the session as recipe called",
+        "keep the session as recipe named",
+        "keep the session as a recipe",
+        "keep the session as a recipe called",
+        "keep the session as a recipe named",
+        "keep it recipe",
+        "keep it recipe called",
+        "keep it recipe named",
+        "keep it a recipe",
+        "keep it a recipe called",
+        "keep it a recipe named",
+        "keep it as recipe",
+        "keep it as recipe called",
+        "keep it as recipe named",
+        "keep it as a recipe",
+        "keep it as a recipe called",
+        "keep it as a recipe named",
+        "make a recipe",
+        "make a recipe called",
+        "make a recipe named",
+        "make as recipe",
+        "make as recipe called",
+        "make as recipe named",
+        "make as a recipe",
+        "make as a recipe called",
+        "make as a recipe named",
+        "make this recipe",
+        "make this recipe called",
+        "make this recipe named",
+        "make this a recipe",
+        "make this a recipe called",
+        "make this a recipe named",
+        "make this as recipe",
+        "make this as recipe called",
+        "make this as recipe named",
+        "make this as a recipe",
+        "make this as a recipe called",
+        "make this as a recipe named",
+        "make this session recipe",
+        "make this session recipe called",
+        "make this session recipe named",
+        "make this session a recipe",
+        "make this session a recipe called",
+        "make this session a recipe named",
+        "make this session as recipe",
+        "make this session as recipe called",
+        "make this session as recipe named",
+        "make this session as a recipe",
+        "make this session as a recipe called",
+        "make this session as a recipe named",
+        "make the session recipe",
+        "make the session recipe called",
+        "make the session recipe named",
+        "make the session a recipe",
+        "make the session a recipe called",
+        "make the session a recipe named",
+        "make the session as recipe",
+        "make the session as recipe called",
+        "make the session as recipe named",
+        "make the session as a recipe",
+        "make the session as a recipe called",
+        "make the session as a recipe named",
+        "make it recipe",
+        "make it recipe called",
+        "make it recipe named",
+        "make it a recipe",
+        "make it a recipe called",
+        "make it a recipe named",
+        "make it as recipe",
+        "make it as recipe called",
+        "make it as recipe named",
+        "make it as a recipe",
+        "make it as a recipe called",
+        "make it as a recipe named"
+      ],
+      "theme": [
+        "text"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {},
+      "words_pt": [
+        "salva isto como receita",
+        "salvar como receita"
+      ],
+      "label_pt": "Salvar receita"
+    },
+    {
+      "name": "recipeList",
+      "label": "Recipes",
+      "words": [
+        "list",
+        "show"
+      ],
+      "elidable": true,
+      "theme": [
+        "recipes"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {},
+      "label_pt": "Receitas"
+    },
+    {
+      "name": "recipeForget",
+      "label": "Forget recipe",
+      "words": [
+        "forget recipe",
+        "forget the recipe",
+        "delete recipe",
+        "delete the recipe",
+        "remove recipe",
+        "remove the recipe"
+      ],
+      "theme": [
+        "text",
+        "recipe"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {},
+      "words_pt": [
+        "esquece a receita",
+        "apaga a receita"
+      ],
+      "label_pt": "Esquecer receita"
+    },
+    {
+      "name": "recipeBatch",
+      "label": "Run on every table",
+      "words": [
+        "run",
+        "apply"
+      ],
+      "theme": [
+        "recipe"
+      ],
+      "required": [
+        "theme",
+        "on"
+      ],
+      "roles": {
+        "on": {
+          "preps": [
+            "on",
+            "over",
+            "for",
+            "across"
+          ],
+          "types": [
+            "everytable"
+          ]
+        }
+      },
+      "words_pt": [
+        "roda",
+        "aplica"
+      ],
+      "label_pt": "Rodar em cada tabela"
     },
     {
       "name": "remember",

@@ -31,7 +31,7 @@ import { recipeAt, bindingsOf, runSteps } from './recipes.js';
 import { tableFromText } from './table.js';
 import { convertBinary } from './formats.js';
 import './notes.js';
-import { norm, grammar, context, taught } from './reading.js';
+import { norm, grammar, context, taught, clauseRead } from './reading.js';
 import { current, newSession, renameSession, touch } from './sessions.js';
 
 export function addCard(raw, r, ms) {
@@ -80,7 +80,7 @@ export function submit(raw) {
   if (/^(again|repeat|rerun|do it again)$/.test(q)) return last ? submit(last.raw) : { kind: 'nothing', msg: 'Nothing to repeat.' };
   // a saved recipe by name: replayed with the new subjects into a session of its own (a batch is a card)
   if ((m = /^run\s+(.+)$/i.exec(text))) {
-    const ba = toolByName('recipeBatch').read(text); if (ba) return { kind: 'card', card: addCard(raw, { tool: 'recipeBatch', args: ba, rung: 'grammar', res: T.recipeBatch(ba) }, performance.now() - t0) };
+    const ba = clauseRead(raw, 'grammar'); if (ba.tool === 'recipeBatch') return { kind: 'card', card: addCard(raw, ba, performance.now() - t0) };
     const at = recipeAt(m[1]); if (at) return runRecipe(at[0], at[1]);
   }
   const r = context(q, last) || grammar(text, q, 'grammar', raw) || taught(text, q, raw) || { tool: 'none', args: { q }, rung: 'none', res: T.none({ q }) };

@@ -1,7 +1,7 @@
 // Explainers: formal notation parsed and described, one row per piece. Cron schedules, epoch times,
 // chmod modes, URLs and ECMAScript regular expressions. Each member has a recogniser so a bare
 // payload ("what is 1700000000") finds its member; when two accept, the member is a slot.
-import { tool, clock, fmt } from './core.js';
+import { tool, frame, noun, shape, clock, fmt } from './core.js';
 
 const MEMBERS = ['cron', 'time', 'url', 'chmod', 'regex'];
 const DOWN = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -332,17 +332,8 @@ const RECOG = { cron: isCron, time: s => isEpoch(s) || isIso(s), chmod: isChmod,
 const RUN = { cron: explainCron, time: explainTime, chmod: explainChmod, url: explainUrl, regex: explainRegex };
 const seedOf = () => Math.floor(Math.random() * 2 ** 31);
 tool({
-  name: 'explain', rank: 45,
+  name: 'explain',
   skill: { group: 'Compute', title: 'Explainers', on: 'own parsers', about: 'Cron schedules, epoch times, chmod modes, URLs and regular expressions, parsed and described piece by piece. A bare payload finds its own kind.', examples: ['explain cron: 0 9 * * 1-5', 'what is 1700000000', 'chmod 754', 'explain regex: ^\\d{3}-\\d{2}$', 'explain url: https://example.org:8443/a/b?q=1#top'] },
-  read: text => {
-    let m = /^(?:explain|decode|describe)\s+(?:this\s+|the\s+|a\s+)?(regex|regexp|regular expression|cron|crontab|schedule|time|epoch|timestamp|url|link|chmod|mode|permissions?)\s*[:,]?\s*(.+)$/i.exec(text);
-    if (m) { const k = { regexp: 'regex', 'regular expression': 'regex', crontab: 'cron', schedule: 'cron', epoch: 'time', timestamp: 'time', link: 'url', mode: 'chmod', permission: 'chmod', permissions: 'chmod' }[m[1].toLowerCase()] || m[1].toLowerCase(); return { kind: k, payload: m[2], ...(k === 'regex' ? { seed: seedOf() } : {}) }; }
-    m = /^(?:chmod|mode)\s+(.+)$/i.exec(text); if (m && isChmod(m[1])) return { kind: 'chmod', payload: m[1] };
-    m = /^(?:cron|crontab)\s*[:]?\s+(.+)$/i.exec(text); if (m && isCron(m[1])) return { kind: 'cron', payload: m[1] };
-    m = /^(?:explain|decode|describe|what is|what's|whats|parse)(?:\s+this)?\s*[:]?\s+(.+)$/i.exec(text); const p = m ? m[1] : text;
-    const slashed = /^\/.+\/[gimsuyd]*$/.test(p.trim()), kinds = MEMBERS.filter(k => RECOG[k](p) && (k !== 'regex' || m || slashed)); if (!kinds.length) return null;
-    return { kind: kinds[0], payload: p, ...(kinds.length > 1 ? { kinds } : {}), ...(kinds.includes('regex') ? { seed: seedOf() } : {}) };
-  },
   amend: [{ arg: 'kind', match: /^as (?:a |an )?(regex|cron|time|epoch|url|chmod)$/, value: m => m[1] === 'epoch' ? 'time' : m[1] }, { arg: 'unit', match: /^(?:in |as )?(seconds|milliseconds|microseconds|nanoseconds|s|ms|us|ns)$/, value: m => ({ seconds: 's', milliseconds: 'ms', microseconds: 'us', nanoseconds: 'ns' })[m[1]] || m[1], when: a => a.kind === 'time' }],
   topic: a => [`Explain ${a.kind}`, 1],
   run: a => {
@@ -350,5 +341,27 @@ tool({
     const res = RUN[a.kind](a); if (!res) return null;
     if (a.kinds && a.kinds.length > 1) res.read.push({ v: `as ${a.kind}`, key: 'kind', alts: a.kinds, cur: a.kind });
     return res;
+  }
+});
+/* ── what reads it: "explain cron: 0 9 * * 1-5", "chmod 754", "what is 1700000000", a bare URL or cron line ── */
+noun({ type: 'notation', words: { regex: ['regex', 'regexp', 'regular expression'], cron: ['cron', 'crontab', 'cron schedule'], time: ['time', 'epoch', 'timestamp', 'unix time', 'epoch time'], url: ['url', 'link'], chmod: ['chmod', 'mode', 'permission', 'permissions', 'file mode'] },
+  words_pt: { regex: ['regex', 'expressão regular'], cron: ['cron'], time: ['timestamp', 'epoch'], url: ['url', 'link'], chmod: ['chmod', 'permissões'] } });
+shape({ type: 'explainable', re: String.raw`\d{9,13}(?:\.\d+)?` });                                                   // an epoch: 1700000000
+shape({ type: 'explainable', re: String.raw`\d{4}-\d{2}-\d{2}[t ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:z|[+-]\d{2}:?\d{2})?` });   // 2023-11-14T22:13:20Z
+shape({ type: 'explainable', re: String.raw`[a-z][a-z0-9+.-]*://\S+` });                                                   // a URL
+shape({ type: 'explainable', re: String.raw`(?:[\d*](?:[\d*/,-]*[\d*])?\s+){4}[\d*](?:[\d*/,-]*[\d*])?` });                // a cron line (a field never ends in a comma, so "12, 8, 25, 4, 31" is a list)
+shape({ type: 'explainable', re: String.raw`/(?:[^/\s]|\\/)+/[gimsuyd]*` });                                              // /a regex/
+const explainOf = (p, kind) => {
+  const slashed = /^\/.+\/[gimsuyd]*$/.test(p.trim()), kinds = kind ? [kind] : MEMBERS.filter(k => RECOG[k](p) && (k !== 'regex' || slashed));
+  return kinds.length ? { tool: 'explain', args: { kind: kinds[0], payload: p, ...(kinds.length > 1 ? { kinds } : {}), ...(kinds.includes('regex') ? { seed: seedOf() } : {}) } } : null;
+};
+frame({
+  name: 'explain', label: 'Explain', words: ['explain', 'decode', 'describe', 'parse', 'what does', 'read'], elidable: true, theme: ['notation', 'explainable'], required: [],
+  roles: { text: { preps: [':', ''], types: ['text'] } }, words_pt: ['explica', 'explique', 'decodifica'], label_pt: 'Explicar',
+  bind: c => {
+    const n = c.theme.find(t => t.type === 'notation'), lit = c.theme.find(t => t.type === 'explainable'), t = c.roles.text && c.roles.text[0];
+    if (n) { const p = t ? t.value : null; if (!p || (n.value === 'chmod' && !isChmod(p)) || (n.value === 'cron' && !t && !isCron(p))) return null; return explainOf(p, n.value); }
+    if (lit) return t ? null : explainOf(lit.value);
+    return t ? explainOf(t.value) : null;   // "explain this: 0 */2 * * *": the notation is what the payload is
   }
 });

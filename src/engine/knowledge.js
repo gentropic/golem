@@ -1,6 +1,6 @@
 // Knowledge from packs: a Factbook sample, an ODS term index,
 // and a style check from The Elements of Style (1918). All sample data, labelled as such.
-import { T, tool, frame, fmt } from './core.js';
+import { T, tool, frame, unit, fmt } from './core.js';
 import { parseUnit } from './units.js';
 
 /* ── records: Factbook sample (rounded) ────────────────────── */
@@ -12,9 +12,8 @@ export const fbFind = n => FB.find(r => r[0].toLowerCase() === n.trim().toLowerC
 const FBSRC = { t: 'src', text: 'factbook pack · 14-country rounded sample in this mock' };
 const FIELDS = ['capital', 'population', 'area', 'density'];
 tool({
-  name: 'fact', rank: 70,
+  name: 'fact',
   skill: { group: 'Knowledge', title: 'Records', on: 'factbook pack', about: 'Lookups, unit changes and filters across records.', examples: ['population density of mongolia in people per square mile', 'landlocked countries by population', 'area of brazil in square miles'] },
-  read: (text, q) => { const m = /^(?:what is |what's )?(?:the )?(capital|population density|density|population|area) of (.+?)(?: in (.+))?$/.exec(q); return m ? { field: m[1] === 'population density' ? 'density' : m[1], country: m[2], unit: m[3] } : null; },
   amend: [
     { arg: 'unit', match: /^(?:and |now |same (?:but )?)?(?:in|to|as) (.+)$/, when: a => /area|density/.test(a.field) },
     { arg: 'country', match: /^(?:and|same for|what about|now|and for)(?: the)? (.+)$/, value: m => fbFind(m[1]) ? m[1] : null }
@@ -39,8 +38,7 @@ tool({
   }
 });
 tool({
-  name: 'factList', rank: 72,
-  read: (text, q) => { const m = /^(?:which |list |show )?landlocked countries(?: (?:by|sorted by) (area|population))?$/.exec(q); return m ? { by: m[1] || 'area' } : null; },
+  name: 'factList',
   topic: () => ['Landlocked countries', 2],
   run: a => {
     const k = a.by === 'population' ? 3 : 2, rows = FB.filter(r => r[4]).sort((x, y) => y[k] - x[k]);
@@ -56,9 +54,8 @@ tool({
 export const ODS = { skiplist: ['4 Skiplists', '4.1 The Basic Structure'], 'hash table': ['5 Hash Tables', '5.1 ChainedHashTable'], 'binary heap': ['10 Heaps', '10.1 BinaryHeap'], treap: ['7 Random Binary Search Trees', '7.2 Treap'], 'scapegoat tree': ['8 Scapegoat Trees', '8.1 ScapegoatTree'], 'red-black tree': ['9 Red-Black Trees', '9.2 RedBlackTree'], 'b-tree': ['14 External Memory Searching', '14.2 B-Trees'] };
 export const ODSA = { 'skip list': 'skiplist', heap: 'binary heap', 'red black tree': 'red-black tree', btree: 'b-tree', 'b tree': 'b-tree', hashtable: 'hash table' };
 tool({
-  name: 'define', rank: 120,
+  name: 'define',
   skill: { group: 'Knowledge', title: 'Definitions', on: 'ods pack', about: 'Finds where a term is defined and opens the reader there.', examples: ['what is a skiplist'] },
-  read: (text, q) => { const m = /^(?:what is|what's|define|explain|describe)(?: an?| the)? (.+)$/.exec(q); return m ? { term: m[1] } : null; },
   topic: a => [a.term, 2],
   run: a => {
     const t = a.term.replace(/s$/, ''), k = ODS[t] ? t : ODSA[t];
@@ -134,3 +131,5 @@ frame({
   words_pt: ['revisa', 'revise', 'confere', 'confira'], label_pt: 'Revisar',
   bind: c => { const t = c.roles.text && c.roles.text[0]; return t && t.type === 'text' ? { tool: 'lint', args: { text: t.value } } : null; }
 });
+// areas the records are asked in: parseUnit knows them, the grammar learns their words here
+for (const [u, words] of [['mi2', ['square miles', 'square mile', 'sq mi', 'mi2']], ['km2', ['square kilometres', 'square kilometers', 'square km', 'sq km', 'km2']], ['ha', ['hectares', 'hectare', 'ha']], ['acres', ['acres', 'acre']]]) unit({ unit: u, dim: 'area', words });

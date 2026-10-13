@@ -2,7 +2,7 @@
 // cut into passages (by heading, then by paragraph) and indexed by @gcu/librarian. A search returns
 // passages verbatim with the matched words marked; golem never rewrites them. The index is derived
 // from the kept files, so it is rebuilt, never stored, and a session replays against what the device holds.
-import { S, tool } from './core.js';
+import { S, tool, frame, noun, postmod } from './core.js';
 import { Librarian } from '../vendor/librarian.js';
 
 export const DOCTEXT = /\.(md|markdown|txt|html?)$/i;
@@ -85,9 +85,8 @@ const SEARCH = [
   /^(?:search\s+)?(?:my\s+)?(?:documents|docs)\s*:\s*(.+)$/i
 ];
 tool({
-  name: 'docSearch', rank: 38,
+  name: 'docSearch',
   skill: { group: 'Knowledge', title: 'Search my documents', on: '@gcu/librarian', about: 'Markdown, text and HTML files you open are kept on this device and searched by word, with near spellings. Passages come back as written, with the matched words marked and where they are.', examples: ['find resurvey in my documents', 'where did i write about the collar check', 'docs: core loss'] },
-  read: text => { for (const re of SEARCH) { const m = re.exec(text.trim()); if (m) return { query: m[1].trim(), limit: 5 }; } return null; },
   amend: [{ arg: 'limit', match: /^(?:show )?more(?: results)?$/, value: () => 15 }],
   topic: a => [a.query, 1],
   run: a => {
@@ -111,12 +110,7 @@ tool({
 
 /* ── one passage, whole ─────────────────────────────────────── */
 tool({
-  name: 'docPassage', rank: 39,
-  read: text => {
-    const m = /^show passage (\d+) of (.+)$/i.exec(text.trim()); if (!m) return null;
-    const f = Object.values(S.files).filter(isDoc).find(x => x.name.toLowerCase() === m[2].toLowerCase());
-    return f ? { file: { name: f.name, hash: f.hash }, n: +m[1] } : null;
-  },
+  name: 'docPassage',
   amend: [{ arg: 'n', match: /^(next|previous|back)(?: passage| one)?$/, value: (m, a) => a.n + (m[1] === 'next' ? 1 : -1) }],
   topic: a => [a.file.name, 1],
   run: a => {
@@ -130,4 +124,24 @@ tool({
       trace: [`passages(${f.name}) → ${ps.length}`, `passage ${p.n}: line ${p.line}`]
     };
   }
+});
+/* ── what reads them: "find resurvey in my documents", "search my notes for X", "where did i write about X", "docs: X" ── */
+noun({ type: 'docs', words: { docs: ['my documents', 'my docs', 'my notes', 'my files', 'the documents', 'the docs', 'documents', 'docs'] }, words_pt: { docs: ['meus documentos', 'minhas notas', 'documentos'] } });
+const queryOf = c => { const t = [...c.theme, ...(c.roles.for || []), ...(c.roles.text || [])].find(n => n.type === 'text'); return t ? t.value.trim() : null; };
+frame({
+  name: 'docsearch', label: 'Search documents', words: ['find', 'search', 'search for', 'look for', 'look up'], elidable: true, theme: ['text', 'docs'], required: ['theme'],
+  roles: { in: { preps: ['in', 'through'], types: ['docs'] }, for: { preps: ['for'], types: ['text'] }, text: { preps: [':'], types: ['text'] } }, words_pt: ['procura', 'procure', 'busca', 'busque'], label_pt: 'Procurar',
+  bind: c => { const inDocs = c.theme.some(n => n.type === 'docs') || c.roles.in; const q = queryOf(c); return inDocs && q ? { tool: 'docSearch', args: { query: q, limit: 5 } } : null; }
+});
+frame({
+  name: 'docwhere', label: 'Search documents', words: ['where did i write about', 'where did i read about', 'where did i note', 'where did i see', 'where did i put', 'where did i write', 'where did i mention'], theme: ['text'], required: ['theme'], roles: {},
+  words_pt: ['onde eu escrevi sobre', 'onde anotei'], label_pt: 'Procurar',
+  bind: c => ({ tool: 'docSearch', args: { query: c.theme[0].value.trim(), limit: 5 } })
+});
+// "show passage 2 of notes.md"
+noun({ type: 'passage', words: {}, generic: ['passage', 'paragraph'], generic_pt: ['trecho', 'parágrafo'] });
+postmod({ prep: '', heads: ['passage'], attr: 'n', quantity: true });
+frame({
+  name: 'docpassage', label: 'Passage', words: ['show', 'open', 'read'], elidable: true, theme: ['passage'], required: ['theme', 'of'], roles: { of: { preps: ['of', 'in', 'from'], types: ['file'] } }, label_pt: 'Trecho',
+  bind: c => { const n = c.theme[0].attrs && c.theme[0].attrs.n, f = Object.values(S.files).find(x => isDoc(x) && x.name === c.roles.of[0].value); return n && f ? { tool: 'docPassage', args: { file: { name: f.name, hash: f.hash }, n: n.n } } : null; }
 });

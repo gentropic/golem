@@ -1,7 +1,7 @@
 // The form card: a tool that still needs answers asks for them one at a time; each answer lands in
 // args and is an editable slot, and the result recomputes when any changes. The decision matrix is the
 // first form; the economics formulas use the same helpers.
-import { tool } from './core.js';
+import { tool, frame, noun } from './core.js';
 
 // an open question answered by a typed number (or an offered option); the whole answer must be the number
 export const numberAsk = (prompt, { offer = [], min, max, unit } = {}) => ({
@@ -23,13 +23,8 @@ const slot = (label, key, cur) => ({ v: `${label} ${cur}`, key, alts: [1, 2, 3, 
 
 /* ── the decision matrix ────────────────────────────────────── */
 tool({
-  name: 'decide', rank: 38,
+  name: 'decide',
   skill: { group: 'Compute', title: 'Decision matrix', on: 'form card', about: 'Options, criteria, a weight for each criterion and a score for each option on each, asked one at a time; weighted totals, bars, and the smallest single weight change that would change the top option. It reports the highest score and does not say what to do.', examples: ['help me decide between perth, vancouver and santiago', 'compare these options'] },
-  read: (text, q) => {
-    let m = /^(?:help me |can you help me )?(?:decide|choose|pick|weigh up)(?: between| among| from)? (.+)$/.exec(q);
-    if (m) { const at = q.indexOf(m[1]), xs = listOf(text.slice(at)); return xs.length >= 2 ? { options: xs } : null; }
-    return /^(?:compare (?:these |the |my )?options|decision matrix|weighted decision|help me decide)$/.test(q) ? {} : null;
-  },
   amend: [
     { arg: '_set', match: /^(?:weight (?:of |for )?)?(.+?) (?:weighs|weight|=|is) ([1-5])$/, value: (m, a) => (a.criteria || []).map(c => c.toLowerCase()).includes(m[1].toLowerCase()) ? { key: 'w:' + a.criteria.find(c => c.toLowerCase() === m[1].toLowerCase()), v: +m[2] } : null },
     { arg: '_set', match: /^(.+?) (?:on|for) (.+?) (?:=|is|scores|gets) ([1-5])$/, value: (m, a) => { const o = (a.options || []).find(x => x.toLowerCase() === m[1].toLowerCase()), c = (a.criteria || []).find(x => x.toLowerCase() === m[2].toLowerCase()); return o && c ? { key: `s:${o}|${c}`, v: +m[3] } : null; } }
@@ -64,3 +59,11 @@ tool({
     };
   }
 });
+// "help me decide between perth, vancouver and santiago", "compare these options", "decision matrix"
+frame({
+  name: 'decide', label: 'Decide', words: ['decide', 'choose', 'pick', 'weigh up', 'help me decide', 'help me choose', 'help me pick'], theme: [], required: [],
+  roles: { between: { preps: ['between', 'among', 'from', ''], types: ['text'] } }, words_pt: ['decide', 'decidir', 'escolhe', 'escolher', 'me ajuda a decidir'], label_pt: 'Decidir',
+  bind: c => { const t = c.roles.between && c.roles.between[0]; if (!t) return { tool: 'decide', args: {} }; const xs = listOf(t.value); return xs.length >= 2 ? { tool: 'decide', args: { options: xs } } : null; }
+});
+noun({ type: 'decision', words: { matrix: ['decision matrix', 'weighted decision', 'these options', 'the options', 'my options', 'options'] }, words_pt: { matrix: ['matriz de decisão', 'essas opções', 'as opções'] } });
+frame({ name: 'decideblank', label: 'Decide', words: ['compare', 'weigh', 'make a'], elidable: true, theme: ['decision'], required: ['theme'], roles: {}, label_pt: 'Decidir', bind: () => ({ tool: 'decide', args: {} }) });

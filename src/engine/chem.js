@@ -2,6 +2,7 @@
 // the periodic table lookup. No mineral names: the minerals pack is not here, so a formula is required.
 import { tool, frame, noun, shape, postmod, fmt } from './core.js';
 import { ELEMENTS, ELEMENTS_SOURCE } from './data/elements.js';
+import { UNIT_TABLE } from './units.js';
 
 const BY_SYMBOL = new Map(ELEMENTS.map(e => [e[1], e])), BY_NAME = new Map(ELEMENTS.map(e => [e[2], e])), BY_Z = new Map(ELEMENTS.map(e => [e[0], e]));
 BY_NAME.set('aluminum', BY_SYMBOL.get('Al')); BY_NAME.set('sulphur', BY_SYMBOL.get('S')); BY_NAME.set('cesium', BY_SYMBOL.get('Cs'));
@@ -111,7 +112,8 @@ const SYMS = ELEMENTS.map(e => e[1].toLowerCase()).sort((a, b) => b.length - a.l
 // with a count, or short (cuo, nacl): longer plain words spelled in symbols ("python" is P Y Th O N) stay words
 shape({ type: 'formula', re: `(?=[a-z.]*\\d|[a-z]{2,5}(?![a-z\\d]))(?:(?:${SYMS})\\d*(?:\\.\\d+)?){2,}` });
 // symbols that are English words (in, as, at, no, be, he, so) and single letters stay out; the names cover them
-const PLAIN = new Set(['in', 'as', 'at', 'no', 'be', 'he', 'so', 'is', 'am', 'pm', 'or', 'es', 'md']);
+// and symbols that are units (cm, mg, pa, cd, pt, ga): "9 cm" is a length, not curium
+const PLAIN = new Set(['in', 'as', 'at', 'no', 'be', 'he', 'so', 'is', 'am', 'pm', 'or', 'es', 'md', 'ga', ...UNIT_TABLE.flatMap(u => u.words.map(w => w.toLowerCase()))]);
 noun({ type: 'element', words: Object.fromEntries(ELEMENTS.map(e => [e[1], [e[2], ...(e[1].length > 1 && !PLAIN.has(e[1].toLowerCase()) ? [e[1].toLowerCase()] : [])]])),
   words_pt: Object.fromEntries(ELEMENTS.map(e => [e[1], [e[2], ...(e[1].length > 1 && !PLAIN.has(e[1].toLowerCase()) ? [e[1].toLowerCase()] : [])]])) });
 noun({ type: 'chemword', words: { mass: ['molar mass', 'molecular mass', 'molecular weight', 'formula weight', 'formula mass'], atomicmass: ['atomic mass', 'atomic weight'], number: ['atomic number'], element: ['element', 'element number', 'the element'], oxide: ['oxide', 'its oxide'] },

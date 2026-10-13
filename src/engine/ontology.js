@@ -20,7 +20,9 @@ export function ontology() {
   for (const w of COMPOUNDS) { const p = parseUnit(w); if (p) units.push({ unit: w, dim: dimName(p.dim), words: [w] }); }
   units.push({ unit: 'oz', dim: 'mass', words: ['oz', 'ounce', 'ounces'] });   // troy or avoirdupois: the tool decides and shows the slot
   units.push({ unit: 'people per square mile', dim: 'population density', words: ['people per square mile', 'per square mile'], words_pt: ['pessoas por milha quadrada', 'por milha quadrada'] });
-  units.push(...LEXICON.units);
+  // a unit a file adds keeps only the words the table does not already have: one word, one unit
+  const have = new Set(units.flatMap(u => u.words));
+  for (const u of LEXICON.units) { const words = u.words.filter(w => !have.has(w)); if (words.length) units.push({ ...u, words }); }
   units.push({ unit: 'people per km2', dim: 'population density', words: ['people per km2', 'people per square kilometre', 'people per square km', 'per km2'], words_pt: ['pessoas por km2', 'habitantes por km2', 'por km2'] });
   const terms = {}; for (const k of Object.keys(ODS)) terms[k] = [k]; for (const [a, k] of Object.entries(ODSA)) terms[k].push(a);
   return {

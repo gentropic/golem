@@ -1,7 +1,7 @@
 // The geologic timescale: the ICS chart as a records pack (data/timescale.js). Ages, bounds, ranks,
 // what a unit sits in, what came before and after, what it is subdivided into, and which unit an age
 // in Ma falls in. Lookups only; the chart is the answer.
-import { tool, frame, fmt } from './core.js';
+import { tool, frame, noun, unit, fmt } from './core.js';
 import { TIMESCALE, TIMESCALE_SOURCE } from './data/timescale.js';
 
 export const RANKS = ['eon', 'era', 'period', 'epoch', 'age'];
@@ -29,17 +29,8 @@ const SRC = { t: 'src', text: TIMESCALE_SOURCE };
 const UNITRE = '(.+?)(?: (?:period|epoch|era|eon|age|stage|series|system))?';
 
 tool({
-  name: 'timescale', rank: 75,
+  name: 'timescale',
   skill: { group: 'Knowledge', title: 'Geologic timescale', on: 'ICS chart · Macrostrat · CC BY 4.0', about: 'Ages and bounds of every unit on the chart, what it sits in, what came before and after, and which unit an age falls in.', examples: ['how old is the permian', 'what period is 250 ma', 'how long was the cretaceous', 'stages of the triassic'] },
-  read: (text, q) => {
-    let m;
-    if ((m = new RegExp(`^(?:how old is|when was|when is|age of|dates? of|bounds of)(?: the)? ${UNITRE}$`).exec(q))) return { unit: m[1] };
-    if ((m = new RegExp(`^(?:how long (?:was|is|did)|duration of|length of)(?: the)? ${UNITRE}(?: last)?$`).exec(q))) return { unit: m[1], ask: 'duration' };
-    if ((m = new RegExp(`^(?:what|which) (?:came|comes|was|is) (before|after)(?: the)? ${UNITRE}$`).exec(q))) return { unit: m[2], ask: m[1] };
-    if ((m = new RegExp(`^(stages|ages|epochs|periods|eras|series|systems|subdivisions|parts|divisions) of(?: the)? ${UNITRE}$`).exec(q))) { const r = { stages: 'age', ages: 'age', epochs: 'epoch', series: 'epoch', periods: 'period', systems: 'period', eras: 'era' }[m[1]]; return { unit: m[2], ask: 'children', ...(r ? { rank: r } : {}) }; }
-    if ((m = /^(?:(?:what|which) (?:period|epoch|era|eon|age|stage|unit|time) (?:is|was|contains|had) )?(\d+(?:\.\d+)?) ?(ma|myr|ga|million years(?: ago)?|billion years(?: ago)?)$/.exec(q))) return { age: +m[1] * (/^(ga|billion)/.test(m[2]) ? 1000 : 1) };
-    return null;
-  },
   topic: a => [a.unit ? `${a.unit} (timescale)` : 'Timescale', 1],
   run: a => {
     if (a.age != null) {
@@ -82,3 +73,25 @@ frame({
   words_pt: ['quando foi', 'idade de', 'datar', 'data'], label_pt: 'Datar',
   bind: c => { const t = c.theme[0]; return t && t.value ? { tool: 'timescale', args: { unit: t.value } } : null; }
 });
+/* ── what reads the rest: duration, before and after, subdivisions, an age in Ma ── */
+const unitArg = c => c.theme[0] && c.theme[0].value;
+for (const [name, words, ask, words_pt] of [
+  ['chronlength', ['how long was', 'how long is', 'how long did', 'duration of', 'length of', 'how long did it last'], 'duration', ['quanto durou', 'duração de']],
+  ['chronbefore', ['what came before', 'what comes before', 'what was before', 'which came before', 'what is before', 'before'], 'before', ['o que veio antes de', 'antes de']],
+  ['chronafter', ['what came after', 'what comes after', 'what was after', 'which came after', 'what is after', 'after'], 'after', ['o que veio depois de', 'depois de']]
+]) frame({ name, label: 'Timescale', words, theme: ['chron'], required: ['theme'], roles: {}, words_pt, label_pt: 'Escala do tempo', bind: c => unitArg(c) ? { tool: 'timescale', args: { unit: unitArg(c), ask } } : null });
+noun({ type: 'chronpart', words: { age: ['stages', 'ages'], epoch: ['epochs', 'series'], period: ['periods', 'systems'], era: ['eras'], parts: ['subdivisions', 'parts', 'divisions', 'units'] },
+  words_pt: { age: ['andares', 'idades'], epoch: ['épocas', 'epocas'], period: ['períodos', 'periodos'], era: ['eras'], parts: ['subdivisões', 'subdivisoes'] } });
+frame({
+  name: 'chronparts', label: 'Timescale', words: ['list', 'show'], elidable: true, theme: ['chronpart'], required: ['theme', 'of'], roles: { of: { preps: ['of', 'in', 'within'], types: ['chron'] } }, label_pt: 'Escala do tempo',
+  bind: c => ({ tool: 'timescale', args: { unit: c.roles.of[0].value, ask: 'children', ...(c.theme[0].value === 'parts' ? {} : { rank: c.theme[0].value }) } })
+});
+unit({ unit: 'Ma', dim: 'geologic age', words: ['ma', 'myr', 'my', 'million years ago', 'million years', 'mya'] });
+unit({ unit: 'Ga', dim: 'geologic age', words: ['ga', 'billion years ago', 'billion years', 'gya'] });
+frame({
+  name: 'chronage', label: 'Timescale', words: ['what period is', 'which period is', 'what epoch is', 'what era is', 'what age is', 'what stage is', 'what unit is', 'what was at', 'what period was', 'which period contains'],
+  elidable: true, theme: ['quantity:geologic age'], required: ['theme'], roles: {}, words_pt: ['que período é', 'qual período é'], label_pt: 'Escala do tempo',
+  bind: c => { const q = c.theme[0]; return q.unit ? { tool: 'timescale', args: { age: q.n * (q.unit === 'Ga' ? 1000 : 1) } } : null; }
+});
+// names retired from the chart are nouns too, so the card can say what replaced them
+noun({ type: 'chron', words: Object.fromEntries(Object.keys(RETIRED).map(k => [k, [k]])), words_pt: Object.fromEntries(Object.keys(RETIRED).map(k => [k, [k]])) });
