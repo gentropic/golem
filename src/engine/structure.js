@@ -127,8 +127,12 @@ const ori2 = n => oriOf(n);
 // "apparent dip of 000/30 on a section at 045"
 frame({
   name: 'apparent', label: 'Apparent dip', words: ['calculate', 'compute'], elidable: true, theme: ['appdip'], required: ['theme', 'of', 'on'],
-  roles: { of: { preps: ['of', 'for'], types: PLANE_T }, on: { preps: ['on', 'along', 'in', 'for'], types: ['section'] } }, label_pt: 'Mergulho aparente',
-  bind: c => { const p = c.roles.of[0], o = !p.all && ori2(p), az = c.roles.on[0].attrs && c.roles.on[0].attrs.az; return o && az ? { tool: 'apparent', args: { a1: o[0], a2: o[1], conv: 'dd', az: az.n } } : null; }
+  roles: { of: { preps: ['of', 'for'], types: PLANE_T }, on: { preps: ['on', 'along', 'in', 'for'], types: ['section'] }, where: { preps: ['where'], types: ['text'] } }, label_pt: 'Mergulho aparente',
+  bind: c => {
+    const p = c.roles.of[0], az = c.roles.on[0].attrs && c.roles.on[0].attrs.az; if (!az) return null;
+    if (p.all) return { tool: 'apply', args: { skill: 'apparent', az: az.n, ...(c.roles.where ? { where: c.roles.where[0].value } : {}) } };   // every plane of the open table
+    const o = ori2(p); return o ? { tool: 'apparent', args: { a1: o[0], a2: o[1], conv: 'dd', az: az.n } } : null;
+  }
 });
 // "plane through 0,0,100 and 100,0,100 and 0,100,0"
 frame({

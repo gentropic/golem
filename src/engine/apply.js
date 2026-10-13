@@ -12,15 +12,8 @@ const colNamed = (T, re) => T.cols.find(c => re.test(c.name) && c.type === 'nume
 const consts = s => { const out = {}; if (!s) return out; let m; if ((m = new RegExp(`hole ${ORI}`).exec(s))) out.hole = { az: +m[1], dip: +m[2] }; if ((m = new RegExp(`(?:bedding|plane|vein|foliation|contact|fault) ${ORI}`).exec(s))) out.plane = { dd: +m[1], dip: +m[2] }; return out; };
 
 tool({
-  name: 'apply', rank: 59, pre: ['table'],
+  name: 'apply', pre: ['table'],
   skill: { group: 'Table', title: 'Field compute over a table', on: '@gcu/bearing · sift', about: 'A single-value skill on every row: true thickness of each intercept from from/to and the hole and plane columns, or apparent dip of each plane on a section. Constants fill what no column holds ("with hole 270/60"); rows that cannot be filled are listed.', examples: ['true thickness of every intercept with hole 270/60, bedding 045/30', 'apparent dip of each plane on a section at 090'] },
-  read: (text, q) => {
-    let m = /^(?:true )?thickness of (?:every|each|all) (?:intercepts?|intervals?|rows?|samples?)(?: in (\S+?))?(?: where (.+?))?(?: with (.+))?$/.exec(q);
-    if (m) return { skill: 'thickness', ...(m[1] ? { hole: m[1] } : {}), ...(m[2] ? { where: m[2] } : {}), ...(m[3] ? { consts: consts(m[3]), constText: m[3] } : {}) };
-    m = /^apparent dip of (?:every|each|all) (?:planes?|rows?|measurements?|readings?) (?:on|along|in) (?:a )?section (?:at|of|azimuth|striking) (\d{1,3})(?: where (.+))?$/.exec(q);
-    if (m) return { skill: 'apparent', az: +m[1], ...(m[2] ? { where: m[2] } : {}) };
-    return null;
-  },
   amend: [{ arg: 'constText', match: /^with (.+)$/, value: (m, a) => { a.consts = consts(m[1]); return m[1]; }, when: a => a.skill === 'thickness' }, { arg: 'where', match: /^where (.+)$/ }, { arg: 'az', match: /^(?:on a )?section (?:at|of) (\d{1,3})$/, value: m => +m[1], when: a => a.skill === 'apparent' }],
   topic: a => [a.skill === 'thickness' ? 'True thickness of intercepts' : 'Apparent dips', 2],
   run: a => {

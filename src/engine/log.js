@@ -1,9 +1,9 @@
 // The log: a device table of things done, written from cards and asked about in plain words.
 // Rows belong to the device, like notes; a card writes its row once (by id), undo removes it, and
 // "open the log" makes it the open table so every table question works on it.
-import { S, tool, fmt, iso } from './core.js';
+import { S, tool, frame, noun, fmt, iso } from './core.js';
 import { parseUnit, dimName } from './units.js';
-import { findDate, today, fmtDate } from './dates.js';
+import { findDate, today, fmtDate, dateWords } from './dates.js';
 
 export const LOG_COLS = [{ name: 'date', type: 'category' }, { name: 'activity', type: 'category' }, { name: 'value', type: 'numeric' }, { name: 'unit', type: 'category' }, { name: 'note', type: 'category' }];
 export const logTable = () => S.tables.log || (S.tables.log = { name: 'log', cols: LOG_COLS, rows: [] });
@@ -48,9 +48,8 @@ export function readLog(text) {
   return { id: newId(), activity, value, unit, date, note };
 }
 tool({
-  name: 'logAdd', rank: 35,
+  name: 'logAdd',
   skill: { group: 'Device', title: 'Log', on: 'device table', about: 'Log what you did with a quantity and a date, ask totals and means by week or month, and open the log as a table. Rows stay on this device.', examples: ['log 30 min run', 'log 5 km run yesterday', 'log weight 78.4 kg', 'how many km did i run this month', 'mean weight by week', 'open the log'] },
-  read: text => readLog(text),
   amend: [{ arg: 'value', match: /^(?:that was|make it|correct(?:ion)?:?|actually) (\d+(?:\.\d+)?)(?: ?([a-zµ%°][\w%°/³²]*))?$/, value: (m, a) => { if (m[2]) a.unit = m[2]; return +m[1]; } }, { arg: 'date', match: /^(?:that was |it was )?(?:on )?(yesterday|today|\d{4}-\d{2}-\d{2}|\d{1,2} \w{3,9}(?: \d{4})?|last \w+)$/, value: m => { const d = findDate(m[1], { back: true }); return d ? iso(d.d) : null; } }],
   topic: a => [`Log: ${a.activity}`, 1],
   undo: a => { const t = logTable(); t.rows = t.rows.filter(r => r.id !== a.id); },
@@ -81,18 +80,7 @@ function readPeriod(s) {
   return { p: { kind: 'all' }, rest: s };
 }
 tool({
-  name: 'logQuery', rank: 34,
-  read: (text, q) => {
-    const m = /^(how many times|how many|how much|how often|total|sum of|sum|mean|average|count)\s+(.+)$/.exec(q); if (!m) return null;
-    let by = null, rest = m[2]; const bm = /\s+by (week|month|day|activity)$/.exec(rest); if (bm) { by = bm[1]; rest = rest.slice(0, bm.index); }
-    const per = readPeriod(rest); if (!per) return null;
-    const words = per.rest.split(/\s+/).filter(w => w && !/^(?:did|have|i|do|we|of|the|my|in|on|total|times)$/.test(w));
-    let unit = null; const ui = words.findIndex(w => unitOf(w)); if (ui >= 0 && m[1] !== 'count' && !/^how often|how many times/.test(m[1])) { unit = words[ui]; words.splice(ui, 1); }
-    const activity = words.join(' ').trim(); if (!activity) return null;
-    const acts = new Set(rows().map(r => stem(r.activity)));
-    if (!acts.has(stem(activity))) return null;   // not a logged activity: let other readers try
-    return { agg: unit || m[1] === 'count' || /often|times/.test(m[1]) ? (unit ? AGG[m[1]] : 'count') : AGG[m[1]], activity, unit, period: per.p, by };
-  },
+  name: 'logQuery',
   amend: [{ arg: 'by', match: /^by (week|month|day|activity)$/ }, { arg: 'period', match: /^(this|last) (week|month|year)$/, value: m => ({ kind: 'period', which: m[1], unit: m[2] }) }],
   topic: a => [`Log: ${a.activity}`, 1],
   run: a => {
@@ -113,5 +101,35 @@ tool({
     }
     const v = agg(usable);
     return { read, value: v, body: [{ t: 'big', v: fmt(v, 4), unit: `${unitText} ${a.agg === 'count' ? '' : a.agg === 'sum' ? 'in total' : 'on average'}`.trim() }, { t: 'kv', rows: [['entries', `${usable.length} of ${all.length} ${periodText(a.period)}${left ? `; ${left} left out (no value, or another dimension)` : ''}`], ['dates', usable.length ? `${fmtDate(new Date(usable[0].date + 'T00:00'))} to ${fmtDate(new Date(usable[usable.length - 1].date + 'T00:00'))}` : '—'], ...(u ? [['unit', `${u.name} (${dimName(u.dim)}); entries in other ${dimName(u.dim)} units were converted`]] : [])] }, SRC], trace: [`log.filter(${a.activity}, ${periodText(a.period)}) → ${all.length} rows`, `${a.agg}${u ? ' in ' + u.name : ''} over ${usable.length} → ${fmt(v, 6)}`], py: `log.query(activity="${a.activity}", period=${JSON.stringify(a.period)}, agg="${a.agg}"${u ? `, unit="${u.name}"` : ''})` };
+  }
+});
+/* ── what reads them ─────────────────────────────────────────── */
+// writing: "log 5 km run yesterday", "log weight 78.4 kg on 29 sep", "log 2000 m run on 6 oct note: easy pace". The words
+// after "log" are the entry as typed; readLog splits them into amount, activity, date and note.
+frame({
+  name: 'logAdd', label: 'Log', words: ['log', 'logged', 'record', 'track', 'log a', 'log my'], theme: ['text'], required: ['theme'], roles: { on: { preps: ['on'], types: ['date', 'holiday'] } },
+  words_pt: ['registra', 'registre', 'anota no log'], label_pt: 'Registrar',
+  bind: c => {
+    const on = c.roles.on && c.roles.on[0], entry = readLog('log ' + c.theme[0].value + (on ? ' on ' + dateWords(on) : '')); return entry ? { tool: 'logAdd', args: entry } : null;
+  }
+});
+// asking: "how many km did i run this month", "how often did i run this month", "total run in miles this month",
+// "mean weight by week", "mean weight since 1 oct". The activities are what the log holds, matched as written.
+noun(() => { const acts = [...new Set(rows().map(r => r.activity))]; return acts.length ? { type: 'activity', exact: true, words: Object.fromEntries(acts.map(a => [a, [a]])), words_pt: Object.fromEntries(acts.map(a => [a, [a]])) } : null; });
+noun({ type: 'period', words: { 'this week': ['this week'], 'last week': ['last week'], 'this month': ['this month'], 'last month': ['last month'], 'this year': ['this year'], 'last year': ['last year'], today: ['today'], yesterday: ['yesterday'], all: ['ever', 'all time', 'in all time', 'over all time'] },
+  words_pt: { 'this week': ['esta semana', 'essa semana'], 'last week': ['semana passada'], 'this month': ['este mês', 'esse mês'], 'last month': ['mês passado'], 'this year': ['este ano'], 'last year': ['ano passado'], today: ['hoje'], yesterday: ['ontem'] } });
+noun({ type: 'logby', words: { week: ['week', 'weeks'], month: ['month', 'months'], day: ['day', 'days'], activity: ['activity'] }, words_pt: { week: ['semana'], month: ['mês'], day: ['dia'], activity: ['atividade'] } });
+const PERIOD = v => v === 'all' ? { kind: 'all' } : v === 'today' || v === 'yesterday' ? { kind: v } : { kind: 'period', which: v.split(' ')[0], unit: v.split(' ')[1] };
+for (const [name, words, agg] of [['logSum', ['how many', 'how much', 'total', 'sum of', 'sum'], 'sum'], ['logCount', ['how often', 'how many times'], 'count'], ['logMean', ['mean', 'average'], 'mean']]) frame({
+  name, label: 'Log question', words, theme: ['unit'], required: [],
+  roles: { what: { preps: ['', 'of'], types: ['activity'] }, in: { preps: ['in'], types: ['unit'] }, when: { preps: [''], types: ['period'] }, since: { preps: ['since', 'from'], types: ['date', 'holiday'] }, by: { preps: ['by', 'per'], types: ['logby'] } },
+  label_pt: 'Pergunta ao log',
+  bind: c => {
+    const act = (c.roles.what || [])[0], u = [...c.theme, ...(c.roles.in || [])].find(n => n.type === 'unit');
+    if (!act) return null;
+    const since = c.roles.since && findDate(dateWords(c.roles.since[0]), { back: true }), when = c.roles.when && c.roles.when[0];
+    const period = since ? { kind: 'since', from: iso(since.d) } : when ? PERIOD(when.value) : { kind: 'all' };
+    const a = agg === 'sum' && !u ? 'count' : agg;
+    return { tool: 'logQuery', args: { agg: a, activity: act.value, unit: u ? u.unit : null, period, by: c.roles.by ? c.roles.by[0].value : null } };
   }
 });

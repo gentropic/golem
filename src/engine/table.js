@@ -1,7 +1,7 @@
 // The open table: a real delimited file typed by @gcu/recon, or the synthetic sample; a histogram; and
 // table questions in controlled English answered through @gcu/sadpan and @gcu/sift (all vendored).
 // Sample data stays labelled as sample data; a file is named on every card that reads it.
-import { S, T, tool, frame, condition, fmt } from './core.js';
+import { S, T, tool, frame, noun, shape, postmod, qmod, compound, condition, fmt } from './core.js';
 import { DOCUMENT } from './interchange.js';
 import { series } from '../vendor/sadpan.js';
 import { sniff, detectAnalyte, NULL_SENTINELS } from '../vendor/recon.js';
@@ -96,9 +96,8 @@ condition('table', {
   establish: () => [{ label: 'open assays.csv', tool: 'open', args: {} }, ...Object.entries(S.tables).filter(([, t]) => t.rows.length).map(([k]) => ({ label: `open the ${k}`, tool: 'open', args: { device: k } })), ...Object.values(S.files).map(f => ({ label: `open ${f.name}`, tool: 'open', args: { file: { name: f.name, hash: f.hash } } }))]
 });
 tool({
-  name: 'open', rank: 50,
+  name: 'open',
   skill: { group: 'Table', title: 'Open and validate', on: '@gcu/recon · sheet · dm · parquet', about: 'A CSV, TSV, xlsx, Parquet or Datamine .dm from your files, typed by recon: numbers, categories, units, analytes, hole and interval columns. A workbook with several sheets asks which.', examples: ['open assays.csv'] },
-  read: (text, q) => { let m; if (/^open (?:the sample|sample|assays|assays\.csv)$/.test(q)) return {}; if ((m = /^open (?:the |my )?(log)$/.exec(q))) return { device: m[1] }; if ((m = /^open (.+)$/.exec(q))) { const f = Object.values(S.files).find(f => f.name.toLowerCase() === m[1]); return f ? { file: { name: f.name, hash: f.hash } } : null; } return null; },
   topic: () => null,
   run: a => {
     let t;
@@ -132,9 +131,12 @@ tool({
   }
 });
 frame({
-  name: 'open', label: 'Open', words: ['open', 'load'], theme: ['table', 'file'], required: ['theme'], roles: {},
+  name: 'open', label: 'Open', words: ['open', 'load', 'show me', 'use'], theme: ['table', 'file', 'devtable'], required: ['theme'], roles: {},
   words_pt: ['abrir', 'abre', 'carregar', 'carrega'], label_pt: 'Abrir',
-  bind: c => { const v = c.theme[0] && c.theme[0].value; const f = v && Object.values(S.files).find(f => f.name.toLowerCase() === String(v).toLowerCase()); return f ? { tool: 'open', args: { file: { name: f.name, hash: f.hash } } } : { tool: 'open', args: {} }; }
+  bind: c => {
+    const t = c.theme[0], v = t && t.value; if (t && t.type === 'devtable') return { tool: 'open', args: { device: v } };
+    const f = v && Object.values(S.files).find(f => f.name.toLowerCase() === String(v).toLowerCase()); return f ? { tool: 'open', args: { file: { name: f.name, hash: f.hash } } } : { tool: 'open', args: {} };
+  }
 });
 
 /* ── values of a column, with the below-detection policy ───── */
@@ -153,9 +155,8 @@ const BDL = ['exclude', 'half', 'limit', 'zero'];
 const bdlSlot = (a, skipped) => skipped.bdl ? [{ v: `below detection: ${a.bdl || 'exclude'}`, key: 'bdl', alts: BDL, cur: a.bdl || 'exclude' }] : [];
 
 tool({
-  name: 'hist', rank: 51, pre: ['table'],
+  name: 'hist', pre: ['table'],
   skill: { group: 'Table', title: 'Histogram', on: '@gcu/sadpan · @gcu/plot', about: 'Any numeric column of the open table. Amend it afterwards with “log scale”.', examples: ['histogram of cu'] },
-  read: (text, q) => { const m = /^hist(?:ogram)? (?:of )?(\w+)( (?:in )?log(?: scale)?)?$/.exec(q); return m ? { col: m[1], log: !!m[2] } : null; },
   amend: [{ arg: 'log', match: /^(?:in )?(log|linear)(?: scale)?$/, value: m => m[1] === 'log' }],
   topic: a => [`${shown(a.col)} histogram`, 3],
   run: a => {
@@ -182,7 +183,7 @@ tool({
 });
 // "histogram of cu", "plot a histogram of fe in log scale"
 frame({
-  name: 'plot', label: 'Plot', words: ['plot', 'draw', 'show', 'display'], elidable: true,
+  name: 'plot', label: 'Plot', words: ['plot', 'draw', 'show', 'show me', 'display'], elidable: true,
   theme: ['plot'], required: ['theme', 'of'], roles: { of: { preps: ['of', 'for'], types: ['variable'] }, scale: { preps: ['in', 'on', 'with'], types: ['scale'] } },
   words_pt: ['plotar', 'plota', 'mostrar', 'mostra', 'desenhar', 'desenha'], label_pt: 'Plotar',
   bind: c => {
@@ -241,9 +242,8 @@ function aggregate(agg, v, w) {
   return st[agg];
 }
 tool({
-  name: 'query', rank: 49, pre: ['table'],
+  name: 'query', pre: ['table'],
   skill: { group: 'Table', title: 'Table questions', on: '@gcu/sift · @gcu/sadpan', about: 'Means, medians, percentiles, counts, lists and correlations in controlled English, with where and by.', examples: ['mean cu by lith where au > 0.1', 'how many samples where cu > 0.5 and lith is BRX', 'top 5 rows sorted by au descending', 'check intervals'] },
-  read: readQuery,
   amend: [
     { arg: 'by', match: /^by (\w+(?: and \w+)?)$/, value: m => m[1].split(' and ') },
     { arg: 'where', match: /^where (.+)$/ },
@@ -331,4 +331,84 @@ tool({
     const sorted = by.length && a.aggs.length === 1 && cols.length === 1 ? [...table].sort((x, y) => (y[1] ?? -Infinity) - (x[1] ?? -Infinity)) : table;
     return { read, body: [{ t: 'table', head, num: head.map((_, i) => i > 0 || !by.length), rows: sorted.map(r => r.map((v, i) => i === 0 && by.length ? String(v) : fmtCell(v))) }, ...(a.view !== 'table' && by.length && cols.length === 1 && a.aggs.length === 1 && sorted.length >= 2 && sorted.length <= 20 ? [{ t: 'hbars', rows: sorted.filter(r => r[1] != null).map(r => [String(r[0]), r[1], fmt(r[1], 3)]) }] : []), src], trace, py };
   }
+});
+/* ── the words of a table: its columns, statistics, and what a question is about ─── */
+const numericVar = c => c.type === 'numeric' && !/^(from|to|x|y|z|east|north|elev)/i.test(c.name);
+// columns that are not grades (hole, lith, from, to): what a question groups by, lists or sorts by
+noun(() => {
+  const cols = S.table ? S.table.cols.filter(c => !numericVar(c)).map(c => c.name) : ['hole', 'lith', 'from', 'to'];
+  const words = Object.fromEntries(cols.map(n => [n, [n.toLowerCase()]]));
+  return { type: 'column', words, generic: ['field', 'fields'], words_pt: words, generic_pt: ['campo', 'campos'] };
+});
+// the values of the hole column, as written: "in DH-03"
+noun(() => {
+  const T0 = S.table, h = T0 && T0.roles.hole; if (!h) return null;
+  const ids = [...new Set(T0.rows.map(r => r[h]).filter(v => v != null).map(String))];
+  return { type: 'holeid', exact: true, words: Object.fromEntries(ids.map(v => [v, [v.toLowerCase()]])), words_pt: Object.fromEntries(ids.map(v => [v, [v.toLowerCase()]])) };
+});
+noun({ type: 'devtable', words: { log: ['log', 'my log', 'the log'] }, words_pt: { log: ['log', 'meu log', 'registro'] } });
+noun({ type: 'stat', words: { mean: ['mean', 'average', 'avg'], median: ['median'], sum: ['sum', 'total'], min: ['min', 'minimum', 'lowest', 'smallest'], max: ['max', 'maximum', 'highest', 'largest'],
+  std: ['std', 'stdev', 'standard deviation', 'sd'], var: ['variance'], cv: ['cv', 'coefficient of variation'] },
+  words_pt: { mean: ['média', 'media'], median: ['mediana'], sum: ['soma', 'total'], min: ['mínimo', 'minimo', 'menor'], max: ['máximo', 'maximo', 'maior'], std: ['desvio padrão', 'desvio padrao'], var: ['variância', 'variancia'], cv: ['cv', 'coeficiente de variação'] } });
+shape({ type: 'stat', re: String.raw`p\d{1,2}` });                                       // p90
+postmod({ prep: 'of', heads: ['stat'], attr: 'of', mod: 'variable' });                    // "mean of cu"
+compound({ mod: 'stat', heads: ['variable', 'column'], attr: 'stat', echo: true });       // "mean cu", "the average copper grade"; "mean litho" reaches the tool, which says it is a category
+noun({ type: 'sample', words: {}, generic: ['samples', 'sample', 'rows', 'row', 'records', 'intervals', 'interval', 'assays'], generic_pt: ['amostras', 'amostra', 'linhas', 'linha', 'registros', 'intervalos'] });
+qmod({ head: 'sample', attr: 'limit', dims: ['bare'] });                                    // "top 5 rows"
+noun({ type: 'order', words: { desc: ['descending', 'desc', 'highest first', 'largest first', 'decreasing'], asc: ['ascending', 'asc', 'lowest first', 'smallest first', 'increasing'] }, words_pt: { desc: ['decrescente'], asc: ['crescente'] } });
+noun({ type: 'weightkind', words: { length: ['length', 'interval length'], count: ['count', 'sample count'] }, words_pt: { length: ['comprimento'], count: ['contagem'] } });
+noun({ type: 'view', words: { chart: ['chart', 'a chart', 'bar chart', 'graph'], table: ['a table'] }, words_pt: { chart: ['gráfico', 'grafico'], table: ['tabela'] } });
+noun({ type: 'corr', words: { corr: ['correlation', 'corr', 'correlation coefficient', 'pearson correlation'] }, words_pt: { corr: ['correlação', 'correlacao'] } });
+noun({ type: 'ivcheck', words: { intervals: ['intervals', 'interval', 'overlaps', 'gaps', 'interval overlaps', 'from and to'] }, words_pt: { intervals: ['intervalos', 'sobreposições'] } });
+
+/* ── what reads a question: "mean cu by lith where au > 0.1", "how many samples have au above 1" ── */
+// a condition is the words after "where" (or "with", "having"), read by whereToSift; grouping and sorting are columns
+const COLS = ['variable', 'column'];
+const COND = { preps: ['where', 'with', 'if', 'when'], types: ['text'] };
+const common = c => {
+  const out = {}, by = (c.roles.by || []).map(n => n.value), w = c.roles.where && c.roles.where[0], wt = c.roles.weighted && c.roles.weighted[0], v = c.roles.as && c.roles.as[0];
+  if (by.length) out.by = by; if (w) out.where = w.value; if (wt) out.weight = wt.value; if (v) out.view = v.value;
+  return out;
+};
+frame({
+  name: 'agg', label: 'Table question', words: ['calculate', 'compute', 'give me', 'show', 'get', 'find', 'tell me'], elidable: true, theme: ['variable', 'column', 'stat'], required: ['theme'],
+  roles: { by: { preps: ['by', 'per', 'across', 'for', 'in'], types: COLS }, where: COND, weighted: { preps: ['weighted'], types: ['weightkind'] }, as: { preps: ['as', 'in'], types: ['view'] } },
+  words_pt: ['calcula', 'calcule', 'mostra', 'mostre'], label_pt: 'Pergunta à tabela',
+  bind: c => {
+    const aggs = [], cols = [];
+    for (const n of c.theme) {
+      if (n.type === 'stat') { aggs.push(n.value); if (n.attrs.of) cols.push(n.attrs.of); }
+      else if (n.value) { cols.push(n.value); if (n.attrs.stat) aggs.push(n.attrs.stat); }
+    }
+    const ag = [...new Set(aggs)], co = [...new Set(cols)];
+    return ag.length && co.length ? { tool: 'query', args: { kind: 'agg', aggs: ag, cols: co, ...common(c) } } : null;
+  }
+});
+frame({
+  name: 'count', label: 'Count', words: ['count', 'how many', 'number of', 'count the', 'total number of'], theme: ['sample'], required: [],
+  roles: { by: { preps: ['by', 'per', 'across', 'for', 'in'], types: COLS }, where: { preps: [...COND.preps, 'where', 'having'], types: ['text'] } },
+  words_pt: ['conta', 'conte', 'quantas', 'quantos', 'número de'], label_pt: 'Contar',
+  bind: c => ({ tool: 'query', args: { kind: 'count', ...common(c) } })
+});
+frame({
+  name: 'rows', label: 'Rows', words: ['show', 'list', 'show me', 'top', 'display', 'give me'], theme: ['sample'], required: ['theme'],
+  roles: { where: COND, sort: { preps: ['sort', 'by'], types: COLS }, order: { preps: [''], types: ['order'] } },
+  words_pt: ['mostra', 'lista', 'mostre', 'liste'], label_pt: 'Linhas',
+  bind: c => { const s = c.roles.sort && c.roles.sort[0], o = c.roles.order && c.roles.order[0], lim = c.theme[0].attrs.limit;
+    return { tool: 'query', args: { kind: 'list', limit: lim ? lim.n : 20, ...(c.roles.where ? { where: c.roles.where[0].value } : {}), ...(s ? { sort: s.value, desc: !!o && o.value === 'desc' } : {}) } }; }
+});
+frame({
+  name: 'distinct', label: 'Values', words: ['distinct', 'unique', 'values of', 'distinct values of', 'unique values of', 'list the values of', 'categories of'], theme: COLS, required: ['theme'], roles: { where: COND },
+  words_pt: ['valores de', 'valores distintos de'], label_pt: 'Valores',
+  bind: c => c.theme.length === 1 ? { tool: 'query', args: { kind: 'distinct', cols: [c.theme[0].value], ...common(c) } } : null
+});
+frame({
+  name: 'corr', label: 'Correlation', words: ['calculate', 'compute'], elidable: true, theme: ['corr'], required: ['theme', 'of'], roles: { of: { preps: ['of', 'between', 'for'], types: ['variable'] }, where: COND },
+  label_pt: 'Correlação',
+  bind: c => c.roles.of.length === 2 ? { tool: 'query', args: { kind: 'corr', cols: c.roles.of.map(n => n.value), ...common(c) } } : null
+});
+frame({
+  name: 'ivcheck', label: 'Check intervals', words: ['check', 'validate', 'check the', 'look for'], theme: ['ivcheck'], required: ['theme'], roles: { by: { preps: ['by', 'per'], types: COLS } },
+  words_pt: ['verifica', 'verifique', 'confere'], label_pt: 'Verificar intervalos',
+  bind: c => ({ tool: 'query', args: { kind: 'check', ...(c.roles.by ? { by: [c.roles.by[0].value] } : {}) } })
 });

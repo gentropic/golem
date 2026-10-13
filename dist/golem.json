@@ -42,7 +42,8 @@
       "words": {
         "histogram": [
           "histogram",
-          "hist"
+          "hist",
+          "distribution"
         ]
       },
       "generic": [
@@ -354,13 +355,14 @@
         "assays.csv": [
           "assays.csv",
           "assays",
-          "sample table"
+          "sample table",
+          "the sample",
+          "sample data"
         ]
       },
       "generic": [
         "table",
         "csv",
-        "rows",
         "data"
       ],
       "words_pt": {
@@ -1678,8 +1680,11 @@
         ]
       },
       "generic": [
+        "plane",
         "planes",
+        "measurement",
         "measurements",
+        "reading",
         "readings",
         "structures"
       ],
@@ -1716,30 +1721,27 @@
     },
     {
       "type": "intercept",
-      "words": {
-        "intercept": [
-          "intercept",
-          "interval",
-          "core length",
-          "downhole length",
-          "drilled length"
-        ]
-      },
+      "words": {},
       "generic": [
+        "intercept",
         "intercepts",
+        "interval",
         "intervals",
+        "row",
         "rows",
-        "samples"
+        "sample",
+        "samples",
+        "core length",
+        "downhole length",
+        "drilled length"
       ],
-      "words_pt": {
-        "intercept": [
-          "intervalo",
-          "intercepto"
-        ]
-      },
       "generic_pt": [
+        "intervalo",
         "intervalos",
+        "intercepto",
+        "linha",
         "linhas",
+        "amostra",
         "amostras"
       ]
     },
@@ -1755,6 +1757,268 @@
         "true": [
           "espessura verdadeira",
           "espessura real"
+        ]
+      }
+    },
+    {
+      "type": "column",
+      "words": {
+        "hole": [
+          "hole"
+        ],
+        "lith": [
+          "lith"
+        ],
+        "from": [
+          "from"
+        ],
+        "to": [
+          "to"
+        ]
+      },
+      "generic": [
+        "field",
+        "fields"
+      ],
+      "words_pt": {
+        "hole": [
+          "hole"
+        ],
+        "lith": [
+          "lith"
+        ],
+        "from": [
+          "from"
+        ],
+        "to": [
+          "to"
+        ]
+      },
+      "generic_pt": [
+        "campo",
+        "campos"
+      ]
+    },
+    {
+      "type": "devtable",
+      "words": {
+        "log": [
+          "log",
+          "my log",
+          "the log"
+        ]
+      },
+      "words_pt": {
+        "log": [
+          "log",
+          "meu log",
+          "registro"
+        ]
+      }
+    },
+    {
+      "type": "stat",
+      "words": {
+        "mean": [
+          "mean",
+          "average",
+          "avg"
+        ],
+        "median": [
+          "median"
+        ],
+        "sum": [
+          "sum",
+          "total"
+        ],
+        "min": [
+          "min",
+          "minimum",
+          "lowest",
+          "smallest"
+        ],
+        "max": [
+          "max",
+          "maximum",
+          "highest",
+          "largest"
+        ],
+        "std": [
+          "std",
+          "stdev",
+          "standard deviation",
+          "sd"
+        ],
+        "var": [
+          "variance"
+        ],
+        "cv": [
+          "cv",
+          "coefficient of variation"
+        ]
+      },
+      "words_pt": {
+        "mean": [
+          "média",
+          "media"
+        ],
+        "median": [
+          "mediana"
+        ],
+        "sum": [
+          "soma",
+          "total"
+        ],
+        "min": [
+          "mínimo",
+          "minimo",
+          "menor"
+        ],
+        "max": [
+          "máximo",
+          "maximo",
+          "maior"
+        ],
+        "std": [
+          "desvio padrão",
+          "desvio padrao"
+        ],
+        "var": [
+          "variância",
+          "variancia"
+        ],
+        "cv": [
+          "cv",
+          "coeficiente de variação"
+        ]
+      }
+    },
+    {
+      "type": "sample",
+      "words": {},
+      "generic": [
+        "samples",
+        "sample",
+        "rows",
+        "row",
+        "records",
+        "intervals",
+        "interval",
+        "assays"
+      ],
+      "generic_pt": [
+        "amostras",
+        "amostra",
+        "linhas",
+        "linha",
+        "registros",
+        "intervalos"
+      ]
+    },
+    {
+      "type": "order",
+      "words": {
+        "desc": [
+          "descending",
+          "desc",
+          "highest first",
+          "largest first",
+          "decreasing"
+        ],
+        "asc": [
+          "ascending",
+          "asc",
+          "lowest first",
+          "smallest first",
+          "increasing"
+        ]
+      },
+      "words_pt": {
+        "desc": [
+          "decrescente"
+        ],
+        "asc": [
+          "crescente"
+        ]
+      }
+    },
+    {
+      "type": "weightkind",
+      "words": {
+        "length": [
+          "length",
+          "interval length"
+        ],
+        "count": [
+          "count",
+          "sample count"
+        ]
+      },
+      "words_pt": {
+        "length": [
+          "comprimento"
+        ],
+        "count": [
+          "contagem"
+        ]
+      }
+    },
+    {
+      "type": "view",
+      "words": {
+        "chart": [
+          "chart",
+          "a chart",
+          "bar chart",
+          "graph"
+        ],
+        "table": [
+          "a table"
+        ]
+      },
+      "words_pt": {
+        "chart": [
+          "gráfico",
+          "grafico"
+        ],
+        "table": [
+          "tabela"
+        ]
+      }
+    },
+    {
+      "type": "corr",
+      "words": {
+        "corr": [
+          "correlation",
+          "corr",
+          "correlation coefficient",
+          "pearson correlation"
+        ]
+      },
+      "words_pt": {
+        "corr": [
+          "correlação",
+          "correlacao"
+        ]
+      }
+    },
+    {
+      "type": "ivcheck",
+      "words": {
+        "intervals": [
+          "intervals",
+          "interval",
+          "overlaps",
+          "gaps",
+          "interval overlaps",
+          "from and to"
+        ]
+      },
+      "words_pt": {
+        "intervals": [
+          "intervalos",
+          "sobreposições"
         ]
       }
     },
@@ -4876,6 +5140,103 @@
       }
     },
     {
+      "type": "period",
+      "words": {
+        "this week": [
+          "this week"
+        ],
+        "last week": [
+          "last week"
+        ],
+        "this month": [
+          "this month"
+        ],
+        "last month": [
+          "last month"
+        ],
+        "this year": [
+          "this year"
+        ],
+        "last year": [
+          "last year"
+        ],
+        "today": [
+          "today"
+        ],
+        "yesterday": [
+          "yesterday"
+        ],
+        "all": [
+          "ever",
+          "all time",
+          "in all time",
+          "over all time"
+        ]
+      },
+      "words_pt": {
+        "this week": [
+          "esta semana",
+          "essa semana"
+        ],
+        "last week": [
+          "semana passada"
+        ],
+        "this month": [
+          "este mês",
+          "esse mês"
+        ],
+        "last month": [
+          "mês passado"
+        ],
+        "this year": [
+          "este ano"
+        ],
+        "last year": [
+          "ano passado"
+        ],
+        "today": [
+          "hoje"
+        ],
+        "yesterday": [
+          "ontem"
+        ]
+      }
+    },
+    {
+      "type": "logby",
+      "words": {
+        "week": [
+          "week",
+          "weeks"
+        ],
+        "month": [
+          "month",
+          "months"
+        ],
+        "day": [
+          "day",
+          "days"
+        ],
+        "activity": [
+          "activity"
+        ]
+      },
+      "words_pt": {
+        "week": [
+          "semana"
+        ],
+        "month": [
+          "mês"
+        ],
+        "day": [
+          "dia"
+        ],
+        "activity": [
+          "atividade"
+        ]
+      }
+    },
+    {
       "type": "geographic",
       "words": {
         "latlon": [
@@ -4995,6 +5356,10 @@
       "re": "-?\\d+(?:\\.\\d+)?\\s*,\\s*-?\\d+(?:\\.\\d+)?\\s*,\\s*-?\\d+(?:\\.\\d+)?"
     },
     {
+      "type": "stat",
+      "re": "p\\d{1,2}"
+    },
+    {
       "type": "place",
       "re": "(?:utc|gmt)\\s?[+-]\\d{1,2}(?::?\\d{2})?"
     },
@@ -5014,7 +5379,12 @@
   "fillers": [
     "golem",
     "ok",
-    "okay"
+    "okay",
+    "did i",
+    "have i",
+    "do i",
+    "did we",
+    "have we"
   ],
   "units": [
     {
@@ -5501,6 +5871,15 @@
       ],
       "attr": "scale",
       "echo": true
+    },
+    {
+      "mod": "stat",
+      "heads": [
+        "variable",
+        "column"
+      ],
+      "attr": "stat",
+      "echo": true
     }
   ],
   "postmods": [
@@ -5519,6 +5898,14 @@
       ],
       "attr": "ori",
       "mod": "orientation"
+    },
+    {
+      "prep": "of",
+      "heads": [
+        "stat"
+      ],
+      "attr": "of",
+      "mod": "variable"
     },
     {
       "prep": "",
@@ -5606,6 +5993,13 @@
       "attr": "length",
       "dims": [
         "length"
+      ]
+    },
+    {
+      "head": "sample",
+      "attr": "limit",
+      "dims": [
+        "bare"
       ]
     },
     {
@@ -5864,7 +6258,8 @@
             "with"
           ],
           "types": [
-            "hole"
+            "hole",
+            "holeid"
           ]
         },
         "through": {
@@ -5876,6 +6271,14 @@
           ],
           "types": [
             "plane"
+          ]
+        },
+        "where": {
+          "preps": [
+            "where"
+          ],
+          "types": [
+            "text"
           ]
         }
       },
@@ -5961,11 +6364,14 @@
       "label": "Open",
       "words": [
         "open",
-        "load"
+        "load",
+        "show me",
+        "use"
       ],
       "theme": [
         "table",
-        "file"
+        "file",
+        "devtable"
       ],
       "required": [
         "theme"
@@ -5986,6 +6392,7 @@
         "plot",
         "draw",
         "show",
+        "show me",
         "display"
       ],
       "elidable": true,
@@ -6026,6 +6433,297 @@
         "desenha"
       ],
       "label_pt": "Plotar"
+    },
+    {
+      "name": "agg",
+      "label": "Table question",
+      "words": [
+        "calculate",
+        "compute",
+        "give me",
+        "show",
+        "get",
+        "find",
+        "tell me"
+      ],
+      "elidable": true,
+      "theme": [
+        "variable",
+        "column",
+        "stat"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {
+        "by": {
+          "preps": [
+            "by",
+            "per",
+            "across",
+            "for",
+            "in"
+          ],
+          "types": [
+            "variable",
+            "column"
+          ]
+        },
+        "where": {
+          "preps": [
+            "where",
+            "with",
+            "if",
+            "when"
+          ],
+          "types": [
+            "text"
+          ]
+        },
+        "weighted": {
+          "preps": [
+            "weighted"
+          ],
+          "types": [
+            "weightkind"
+          ]
+        },
+        "as": {
+          "preps": [
+            "as",
+            "in"
+          ],
+          "types": [
+            "view"
+          ]
+        }
+      },
+      "words_pt": [
+        "calcula",
+        "calcule",
+        "mostra",
+        "mostre"
+      ],
+      "label_pt": "Pergunta à tabela"
+    },
+    {
+      "name": "count",
+      "label": "Count",
+      "words": [
+        "count",
+        "how many",
+        "number of",
+        "count the",
+        "total number of"
+      ],
+      "theme": [
+        "sample"
+      ],
+      "required": [],
+      "roles": {
+        "by": {
+          "preps": [
+            "by",
+            "per",
+            "across",
+            "for",
+            "in"
+          ],
+          "types": [
+            "variable",
+            "column"
+          ]
+        },
+        "where": {
+          "preps": [
+            "where",
+            "with",
+            "if",
+            "when",
+            "where",
+            "having"
+          ],
+          "types": [
+            "text"
+          ]
+        }
+      },
+      "words_pt": [
+        "conta",
+        "conte",
+        "quantas",
+        "quantos",
+        "número de"
+      ],
+      "label_pt": "Contar"
+    },
+    {
+      "name": "rows",
+      "label": "Rows",
+      "words": [
+        "show",
+        "list",
+        "show me",
+        "top",
+        "display",
+        "give me"
+      ],
+      "theme": [
+        "sample"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {
+        "where": {
+          "preps": [
+            "where",
+            "with",
+            "if",
+            "when"
+          ],
+          "types": [
+            "text"
+          ]
+        },
+        "sort": {
+          "preps": [
+            "sort",
+            "by"
+          ],
+          "types": [
+            "variable",
+            "column"
+          ]
+        },
+        "order": {
+          "preps": [
+            ""
+          ],
+          "types": [
+            "order"
+          ]
+        }
+      },
+      "words_pt": [
+        "mostra",
+        "lista",
+        "mostre",
+        "liste"
+      ],
+      "label_pt": "Linhas"
+    },
+    {
+      "name": "distinct",
+      "label": "Values",
+      "words": [
+        "distinct",
+        "unique",
+        "values of",
+        "distinct values of",
+        "unique values of",
+        "list the values of",
+        "categories of"
+      ],
+      "theme": [
+        "variable",
+        "column"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {
+        "where": {
+          "preps": [
+            "where",
+            "with",
+            "if",
+            "when"
+          ],
+          "types": [
+            "text"
+          ]
+        }
+      },
+      "words_pt": [
+        "valores de",
+        "valores distintos de"
+      ],
+      "label_pt": "Valores"
+    },
+    {
+      "name": "corr",
+      "label": "Correlation",
+      "words": [
+        "calculate",
+        "compute"
+      ],
+      "elidable": true,
+      "theme": [
+        "corr"
+      ],
+      "required": [
+        "theme",
+        "of"
+      ],
+      "roles": {
+        "of": {
+          "preps": [
+            "of",
+            "between",
+            "for"
+          ],
+          "types": [
+            "variable"
+          ]
+        },
+        "where": {
+          "preps": [
+            "where",
+            "with",
+            "if",
+            "when"
+          ],
+          "types": [
+            "text"
+          ]
+        }
+      },
+      "label_pt": "Correlação"
+    },
+    {
+      "name": "ivcheck",
+      "label": "Check intervals",
+      "words": [
+        "check",
+        "validate",
+        "check the",
+        "look for"
+      ],
+      "theme": [
+        "ivcheck"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {
+        "by": {
+          "preps": [
+            "by",
+            "per"
+          ],
+          "types": [
+            "variable",
+            "column"
+          ]
+        }
+      },
+      "words_pt": [
+        "verifica",
+        "verifique",
+        "confere"
+      ],
+      "label_pt": "Verificar intervalos"
     },
     {
       "name": "lookup",
@@ -6332,6 +7030,14 @@
           ],
           "types": [
             "section"
+          ]
+        },
+        "where": {
+          "preps": [
+            "where"
+          ],
+          "types": [
+            "text"
           ]
         }
       },
@@ -7151,6 +7857,221 @@
         "o que mudou entre"
       ],
       "label_pt": "Diferença"
+    },
+    {
+      "name": "logAdd",
+      "label": "Log",
+      "words": [
+        "log",
+        "logged",
+        "record",
+        "track",
+        "log a",
+        "log my"
+      ],
+      "theme": [
+        "text"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {
+        "on": {
+          "preps": [
+            "on"
+          ],
+          "types": [
+            "date",
+            "holiday"
+          ]
+        }
+      },
+      "words_pt": [
+        "registra",
+        "registre",
+        "anota no log"
+      ],
+      "label_pt": "Registrar"
+    },
+    {
+      "name": "logSum",
+      "label": "Log question",
+      "words": [
+        "how many",
+        "how much",
+        "total",
+        "sum of",
+        "sum"
+      ],
+      "theme": [
+        "unit"
+      ],
+      "required": [],
+      "roles": {
+        "what": {
+          "preps": [
+            "",
+            "of"
+          ],
+          "types": [
+            "activity"
+          ]
+        },
+        "in": {
+          "preps": [
+            "in"
+          ],
+          "types": [
+            "unit"
+          ]
+        },
+        "when": {
+          "preps": [
+            ""
+          ],
+          "types": [
+            "period"
+          ]
+        },
+        "since": {
+          "preps": [
+            "since",
+            "from"
+          ],
+          "types": [
+            "date",
+            "holiday"
+          ]
+        },
+        "by": {
+          "preps": [
+            "by",
+            "per"
+          ],
+          "types": [
+            "logby"
+          ]
+        }
+      },
+      "label_pt": "Pergunta ao log"
+    },
+    {
+      "name": "logCount",
+      "label": "Log question",
+      "words": [
+        "how often",
+        "how many times"
+      ],
+      "theme": [
+        "unit"
+      ],
+      "required": [],
+      "roles": {
+        "what": {
+          "preps": [
+            "",
+            "of"
+          ],
+          "types": [
+            "activity"
+          ]
+        },
+        "in": {
+          "preps": [
+            "in"
+          ],
+          "types": [
+            "unit"
+          ]
+        },
+        "when": {
+          "preps": [
+            ""
+          ],
+          "types": [
+            "period"
+          ]
+        },
+        "since": {
+          "preps": [
+            "since",
+            "from"
+          ],
+          "types": [
+            "date",
+            "holiday"
+          ]
+        },
+        "by": {
+          "preps": [
+            "by",
+            "per"
+          ],
+          "types": [
+            "logby"
+          ]
+        }
+      },
+      "label_pt": "Pergunta ao log"
+    },
+    {
+      "name": "logMean",
+      "label": "Log question",
+      "words": [
+        "mean",
+        "average"
+      ],
+      "theme": [
+        "unit"
+      ],
+      "required": [],
+      "roles": {
+        "what": {
+          "preps": [
+            "",
+            "of"
+          ],
+          "types": [
+            "activity"
+          ]
+        },
+        "in": {
+          "preps": [
+            "in"
+          ],
+          "types": [
+            "unit"
+          ]
+        },
+        "when": {
+          "preps": [
+            ""
+          ],
+          "types": [
+            "period"
+          ]
+        },
+        "since": {
+          "preps": [
+            "since",
+            "from"
+          ],
+          "types": [
+            "date",
+            "holiday"
+          ]
+        },
+        "by": {
+          "preps": [
+            "by",
+            "per"
+          ],
+          "types": [
+            "logby"
+          ]
+        }
+      },
+      "label_pt": "Pergunta ao log"
     },
     {
       "name": "place",

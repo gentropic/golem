@@ -57,7 +57,7 @@ test('table questions: aggregates, where, by, weighting, counts, lists, distinct
   c = ask('median and p90 of fe');
   assert.equal(c.res.body[0].head.length, 2);
   c = ask('mean of nothing');
-  assert.ok(g.textOf(c).includes('No column called "nothing"'), 'an unknown column is refused with the list');
+  assert.equal(c.rung, 'none', 'a word that names no column is no reading');
   c = ask('mean litho');
   assert.ok(g.textOf(c).includes('is a category'));
 });

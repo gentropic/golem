@@ -10,7 +10,8 @@ import { TIMESCALE } from './data/timescale.js';
 const FB_PT = { Australia: ['austrália', 'australia'], Brazil: ['brasil'], Canada: ['canadá', 'canada'], Chile: ['chile'], Germany: ['alemanha'], Indonesia: ['indonésia', 'indonesia'], Ireland: ['irlanda'], Japan: ['japão', 'japao'], Kazakhstan: ['cazaquistão', 'cazaquistao'], Mongolia: ['mongólia', 'mongolia'], Peru: ['peru'], Portugal: ['portugal'], 'South Africa': ['áfrica do sul', 'africa do sul'], Zambia: ['zâmbia', 'zambia'] };
 const uniq = a => [...new Set(a)];
 function variables() {
-  const cols = S.table ? S.table.cols.filter(c => c.type === 'numeric' && !/^(from|to|x|y|z|east|north|elev)/i.test(c.name)) : [{ name: 'cu', analyte: 'Cu' }, { name: 'au', analyte: 'Au' }];
+  const cols = S.table ? S.table.cols.filter(c => c.type === 'numeric' && !/^(from|to|x|y|z|east|north|elev)/i.test(c.name))
+    : [{ name: 'cu', analyte: 'Cu' }, { name: 'au', analyte: 'Au' }, ...Object.values(S.tables).filter(t => t.rows.length).flatMap(t => t.cols.filter(c => c.type === 'numeric'))];
   return Object.fromEntries(cols.map(c => [c.name, uniq([c.name.toLowerCase(), ...(c.analyte ? [c.analyte.toLowerCase(), ELEMENT[c.analyte]] : [])].filter(Boolean))]));
 }
 
@@ -28,7 +29,7 @@ export function ontology() {
       // the open table's numeric columns, by name, analyte symbol and element name; the sample's when none is open
       { type: 'variable', needsId: true, words: variables(), generic: ['grade', 'grades', 'column', 'columns'],
         words_pt: variables(), generic_pt: ['teor', 'teores', 'coluna', 'colunas'] },
-      { type: 'plot', words: { histogram: ['histogram', 'hist'] }, generic: ['plot', 'chart'], words_pt: { histogram: ['histograma'] }, generic_pt: ['gráfico', 'grafico'] },
+      { type: 'plot', words: { histogram: ['histogram', 'hist', 'distribution'] }, generic: ['plot', 'chart'], words_pt: { histogram: ['histograma'] }, generic_pt: ['gráfico', 'grafico'] },
       { type: 'country', words: Object.fromEntries(FB.map(r => [r[0], [r[0].toLowerCase()]])), generic: ['country', 'countries', 'nation', 'nations'],
         words_pt: Object.fromEntries(FB.map(r => [r[0], FB_PT[r[0]]])), generic_pt: ['país', 'pais', 'países', 'paises'] },
       { type: 'property', words: { density: ['density'], hardness: ['hardness'], formula: ['formula'], streak: ['streak'], capital: ['capital'], population: ['population'], area: ['area'], 'population density': ['population density'] }, generic: ['property', 'value'],
@@ -36,7 +37,7 @@ export function ontology() {
       { type: 'filter', words: { landlocked: ['landlocked'] }, words_pt: { landlocked: ['sem litoral', 'sem costa'] } },
       { type: 'scale', words: { log: ['log', 'logarithmic', 'log scale'], linear: ['linear', 'linear scale'] }, words_pt: { log: ['log', 'logarítmica', 'logaritmica', 'escala log'], linear: ['linear', 'escala linear'] } },
       { type: 'term', words: terms, generic: ['term', 'word'], words_pt: { ...terms, 'hash table': ['hash table', 'tabela hash'], 'b-tree': ['b-tree', 'btree', 'árvore b', 'arvore b'] }, generic_pt: ['termo', 'palavra'] },
-      { type: 'table', words: { 'assays.csv': ['assays.csv', 'assays', 'sample table'] }, generic: ['table', 'csv', 'rows', 'data'], words_pt: { 'assays.csv': ['assays.csv', 'assays', 'tabela de amostra'] }, generic_pt: ['tabela', 'arquivo'] },
+      { type: 'table', words: { 'assays.csv': ['assays.csv', 'assays', 'sample table', 'the sample', 'sample data'] }, generic: ['table', 'csv', 'data'], words_pt: { 'assays.csv': ['assays.csv', 'assays', 'tabela de amostra'] }, generic_pt: ['tabela', 'arquivo'] },
       { type: 'format', words: { script: ['script', 'python', 'adder'], notebook: ['notebook'], csv: ['csv', 'comma separated'], tsv: ['tsv', 'tab separated'], json: ['json'], parquet: ['parquet'], yaml: ['yaml', 'yml'], wkt: ['wkt'], geojson: ['geojson'] },
         words_pt: { script: ['script', 'python', 'adder'], notebook: ['notebook', 'caderno'], csv: ['csv'], tsv: ['tsv'], json: ['json'], parquet: ['parquet'], yaml: ['yaml', 'yml'], wkt: ['wkt'], geojson: ['geojson'] } },
       // the files kept on this device, by name; "this file" is the generic
@@ -49,9 +50,9 @@ export function ontology() {
       ...LEXICON.nouns.map(n => typeof n === 'function' ? n() : n).filter(Boolean)
     ],
     shapes: LEXICON.shapes,
-    fillers: ['golem', 'ok', 'okay'],
+    fillers: ['golem', 'ok', 'okay', 'did i', 'have i', 'do i', 'did we', 'have we'],
     units,
-    compounds: [{ mod: 'filter', heads: ['country'], attr: 'filter', echo: true }, { mod: 'scale', heads: ['plot'], attr: 'scale', echo: true }],
+    compounds: [{ mod: 'filter', heads: ['country'], attr: 'filter', echo: true }, { mod: 'scale', heads: ['plot'], attr: 'scale', echo: true }, ...LEXICON.compounds],
     postmods: LEXICON.postmods,
     qmods: [{ head: 'timer', attr: 'duration', dims: ['time'] }, ...LEXICON.qmods],   // "a 30 minute timer"
     verbs: FRAMES.map(({ bind, ...f }) => f),

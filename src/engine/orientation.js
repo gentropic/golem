@@ -49,10 +49,10 @@ shape({ type: 'orientation', re: String.raw`\d{1,3}\s*/\s*\d{1,2}` });          
 shape({ type: 'point3', re: String.raw`-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?` });   // 0,0,100
 noun({ type: 'hole', words: { hole: ['hole', 'drill hole', 'drillhole', 'borehole'] }, words_pt: { hole: ['furo', 'furo de sonda'] } });
 noun({ type: 'plane', words: { bedding: ['bedding', 'bed', 'beds'], vein: ['vein'], foliation: ['foliation'], contact: ['contact'], fault: ['fault'], plane: ['plane'], surface: ['surface'], joint: ['joint'], cleavage: ['cleavage'], shear: ['shear zone', 'shear'] },
-  generic: ['planes', 'measurements', 'readings', 'structures'],
+  generic: ['plane', 'planes', 'measurement', 'measurements', 'reading', 'readings', 'structures'],
   words_pt: { bedding: ['acamamento', 'estratificação'], vein: ['veio'], foliation: ['foliação', 'foliacao'], contact: ['contato'], fault: ['falha'], plane: ['plano'], joint: ['junta', 'fratura'] }, generic_pt: ['planos', 'medidas'] });
-noun({ type: 'intercept', words: { intercept: ['intercept', 'interval', 'core length', 'downhole length', 'drilled length'] }, generic: ['intercepts', 'intervals', 'rows', 'samples'],
-  words_pt: { intercept: ['intervalo', 'intercepto'] }, generic_pt: ['intervalos', 'linhas', 'amostras'] });
+noun({ type: 'intercept', words: {}, generic: ['intercept', 'intercepts', 'interval', 'intervals', 'row', 'rows', 'sample', 'samples', 'core length', 'downhole length', 'drilled length'],
+  generic_pt: ['intervalo', 'intervalos', 'intercepto', 'linha', 'linhas', 'amostra', 'amostras'] });
 noun({ type: 'thickness', words: { true: ['true thickness', 'true width'] }, words_pt: { true: ['espessura verdadeira', 'espessura real'] } });
 for (const head of ['hole', 'plane']) postmod({ prep: '', heads: [head], attr: 'ori', mod: 'orientation' });   // "hole 270/60", "bedding 045/30"
 qmod({ head: 'intercept', attr: 'length', dims: ['length'] });                                                   // "a 14 m intercept"
@@ -61,11 +61,16 @@ const metres = q => { if (!q) return null; if (!q.unit) return q.n; const u = pa
 // "true thickness of a 14 m intercept, hole 270/60, bedding 045/30"; "… in hole 270/60 through bedding 045/30"
 frame({
   name: 'thickness', label: 'True thickness', words: ['calculate', 'compute', 'work out', 'find', 'get'], elidable: true, theme: ['thickness'], required: ['theme'],
-  roles: { of: { preps: ['of', 'for'], types: ['intercept', 'hole', 'plane', 'quantity:length'] }, in: { preps: ['in', 'down', 'along', 'from', 'with'], types: ['hole'] }, through: { preps: ['through', 'across', 'against', 'with'], types: ['plane'] } },
+  roles: { of: { preps: ['of', 'for'], types: ['intercept', 'hole', 'plane', 'quantity:length'] }, in: { preps: ['in', 'down', 'along', 'from', 'with'], types: ['hole', 'holeid'] }, through: { preps: ['through', 'across', 'against', 'with'], types: ['plane'] },
+    where: { preps: ['where'], types: ['text'] } },
   words_pt: ['calcula', 'calcule'], label_pt: 'Espessura verdadeira',
   bind: c => {
     const all = Object.values(c.roles).flat(), it = all.find(n => n.type === 'intercept'), q = all.find(n => n.type === 'quantity'), h = all.find(n => n.type === 'hole'), p = all.find(n => n.type === 'plane');
-    if (it && it.all) return null;   // every intercept: the table batch (apply)
+    if (it && it.all) {   // every intercept: the tool over each row of the open table, the hole and plane given or from columns
+      const id = all.find(n => n.type === 'holeid'), ho = oriOf(h), po = oriOf(p), consts = { ...(ho ? { hole: { az: ho[0], dip: ho[1] } } : {}), ...(po ? { plane: { dd: po[0], dip: po[1] } } : {}) };
+      const constText = [h && ho && `hole ${h.attrs.ori}`, p && po && `${p.value} ${p.attrs.ori}`].filter(Boolean).join(', ');
+      return { tool: 'apply', args: { skill: 'thickness', ...(id ? { hole: id.value } : {}), ...(c.roles.where ? { where: c.roles.where[0].value } : {}), ...(constText ? { consts, constText } : {}) } };
+    }
     const len = metres(it ? it.attrs.length : q), ho = oriOf(h), po = oriOf(p);
     return len != null && ho && po ? { tool: 'thickness', args: { len, htr: ho[0], hpl: ho[1], a1: po[0], a2: po[1], conv: 'dd' } } : null;
   }

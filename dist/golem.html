@@ -386,13 +386,15 @@ function frame(f) { FRAMES.push(f); return f; }
 //                                                           called each time (a noun that follows the open table)
 //   shape({ type, re })                                     a token shape that is a thing of that type (270/60)
 //   postmod({ prep, heads, attr, quantity })                a modifier after a noun ("cu above 0.5")
-const LEXICON = { nouns: [], shapes: [], postmods: [], units: [], qmods: [] };
+const LEXICON = { nouns: [], shapes: [], postmods: [], units: [], qmods: [], compounds: [] };
 const noun = n => { LEXICON.nouns.push(n); return n; };
 const shape = s => { LEXICON.shapes.push(s); return s; };
 const postmod = p => { LEXICON.postmods.push(p); return p; };
 //   unit({ unit, dim, words })   a unit only the grammar needs ("15 working days"); qmod({ head, attr, dims }) "045 magnetic"
 const unit = u => { LEXICON.units.push(u); return u; };
 const qmod = q => { LEXICON.qmods.push(q); return q; };
+//   compound({ mod, heads, attr, echo })   a noun that modifies another before it ("mean cu")
+const compound = c => { LEXICON.compounds.push(c); return c; };
 
 // Conditions a tool may declare in `pre`. Each knows whether it holds now and how it can be established:
 // a list of steps { label, tool, args }. When a tool's condition is unmet, runTool() asks which step to
@@ -456,7 +458,7 @@ const p3 = x => String(Math.round(x) % 360).padStart(3, '0');
 const p2 = x => String(Math.round(x)).padStart(2, '0');
 // a quantity node from the parser as a number in a base unit, given the unit's factor
 const qty = (node, f) => node && node.type === 'quantity' ? node.n * f(node.unit) : null;
-  return { S, T, TOOLS, tool, toolByName, FRAMES, frame, LEXICON, noun, shape, postmod, unit, qmod, CONDITIONS, condition, setRunner, onJobDone, result, clearResults, startJobs, settle, runTool, clock, fmt, iso, rad, deg, p3, p2, qty };
+  return { S, T, TOOLS, tool, toolByName, FRAMES, frame, LEXICON, noun, shape, postmod, unit, qmod, compound, CONDITIONS, condition, setRunner, onJobDone, result, clearResults, startJobs, settle, runTool, clock, fmt, iso, rad, deg, p3, p2, qty };
 })();
 
 /* ==== src/engine/units.js ==== */
@@ -4659,10 +4661,10 @@ shape({ type: 'orientation', re: String.raw`\d{1,3}\s*/\s*\d{1,2}` });          
 shape({ type: 'point3', re: String.raw`-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?` });   // 0,0,100
 noun({ type: 'hole', words: { hole: ['hole', 'drill hole', 'drillhole', 'borehole'] }, words_pt: { hole: ['furo', 'furo de sonda'] } });
 noun({ type: 'plane', words: { bedding: ['bedding', 'bed', 'beds'], vein: ['vein'], foliation: ['foliation'], contact: ['contact'], fault: ['fault'], plane: ['plane'], surface: ['surface'], joint: ['joint'], cleavage: ['cleavage'], shear: ['shear zone', 'shear'] },
-  generic: ['planes', 'measurements', 'readings', 'structures'],
+  generic: ['plane', 'planes', 'measurement', 'measurements', 'reading', 'readings', 'structures'],
   words_pt: { bedding: ['acamamento', 'estratificação'], vein: ['veio'], foliation: ['foliação', 'foliacao'], contact: ['contato'], fault: ['falha'], plane: ['plano'], joint: ['junta', 'fratura'] }, generic_pt: ['planos', 'medidas'] });
-noun({ type: 'intercept', words: { intercept: ['intercept', 'interval', 'core length', 'downhole length', 'drilled length'] }, generic: ['intercepts', 'intervals', 'rows', 'samples'],
-  words_pt: { intercept: ['intervalo', 'intercepto'] }, generic_pt: ['intervalos', 'linhas', 'amostras'] });
+noun({ type: 'intercept', words: {}, generic: ['intercept', 'intercepts', 'interval', 'intervals', 'row', 'rows', 'sample', 'samples', 'core length', 'downhole length', 'drilled length'],
+  generic_pt: ['intervalo', 'intervalos', 'intercepto', 'linha', 'linhas', 'amostra', 'amostras'] });
 noun({ type: 'thickness', words: { true: ['true thickness', 'true width'] }, words_pt: { true: ['espessura verdadeira', 'espessura real'] } });
 for (const head of ['hole', 'plane']) postmod({ prep: '', heads: [head], attr: 'ori', mod: 'orientation' });   // "hole 270/60", "bedding 045/30"
 qmod({ head: 'intercept', attr: 'length', dims: ['length'] });                                                   // "a 14 m intercept"
@@ -4671,11 +4673,16 @@ const metres = q => { if (!q) return null; if (!q.unit) return q.n; const u = pa
 // "true thickness of a 14 m intercept, hole 270/60, bedding 045/30"; "… in hole 270/60 through bedding 045/30"
 frame({
   name: 'thickness', label: 'True thickness', words: ['calculate', 'compute', 'work out', 'find', 'get'], elidable: true, theme: ['thickness'], required: ['theme'],
-  roles: { of: { preps: ['of', 'for'], types: ['intercept', 'hole', 'plane', 'quantity:length'] }, in: { preps: ['in', 'down', 'along', 'from', 'with'], types: ['hole'] }, through: { preps: ['through', 'across', 'against', 'with'], types: ['plane'] } },
+  roles: { of: { preps: ['of', 'for'], types: ['intercept', 'hole', 'plane', 'quantity:length'] }, in: { preps: ['in', 'down', 'along', 'from', 'with'], types: ['hole', 'holeid'] }, through: { preps: ['through', 'across', 'against', 'with'], types: ['plane'] },
+    where: { preps: ['where'], types: ['text'] } },
   words_pt: ['calcula', 'calcule'], label_pt: 'Espessura verdadeira',
   bind: c => {
     const all = Object.values(c.roles).flat(), it = all.find(n => n.type === 'intercept'), q = all.find(n => n.type === 'quantity'), h = all.find(n => n.type === 'hole'), p = all.find(n => n.type === 'plane');
-    if (it && it.all) return null;   // every intercept: the table batch (apply)
+    if (it && it.all) {   // every intercept: the tool over each row of the open table, the hole and plane given or from columns
+      const id = all.find(n => n.type === 'holeid'), ho = oriOf(h), po = oriOf(p), consts = { ...(ho ? { hole: { az: ho[0], dip: ho[1] } } : {}), ...(po ? { plane: { dd: po[0], dip: po[1] } } : {}) };
+      const constText = [h && ho && `hole ${h.attrs.ori}`, p && po && `${p.value} ${p.attrs.ori}`].filter(Boolean).join(', ');
+      return { tool: 'apply', args: { skill: 'thickness', ...(id ? { hole: id.value } : {}), ...(c.roles.where ? { where: c.roles.where[0].value } : {}), ...(constText ? { consts, constText } : {}) } };
+    }
     const len = metres(it ? it.attrs.length : q), ho = oriOf(h), po = oriOf(p);
     return len != null && ho && po ? { tool: 'thickness', args: { len, htr: ho[0], hpl: ho[1], a1: po[0], a2: po[1], conv: 'dd' } } : null;
   }
@@ -10743,7 +10750,7 @@ function _wrap(n) { return n && PARENS.has(n.op) ? '(' + _str(n) + ')' : _str(n)
 
 /* ==== src/engine/table.js ==== */
 const __m13 = (() => {
-const { S, T, tool, frame, condition, fmt } = __m0;
+const { S, T, tool, frame, noun, shape, postmod, qmod, compound, condition, fmt } = __m0;
 const { DOCUMENT } = __m9;
 const { series } = __m10;
 const { sniff, detectAnalyte, NULL_SENTINELS } = __m11;
@@ -10841,9 +10848,8 @@ condition('table', {
   establish: () => [{ label: 'open assays.csv', tool: 'open', args: {} }, ...Object.entries(S.tables).filter(([, t]) => t.rows.length).map(([k]) => ({ label: `open the ${k}`, tool: 'open', args: { device: k } })), ...Object.values(S.files).map(f => ({ label: `open ${f.name}`, tool: 'open', args: { file: { name: f.name, hash: f.hash } } }))]
 });
 tool({
-  name: 'open', rank: 50,
+  name: 'open',
   skill: { group: 'Table', title: 'Open and validate', on: '@gcu/recon · sheet · dm · parquet', about: 'A CSV, TSV, xlsx, Parquet or Datamine .dm from your files, typed by recon: numbers, categories, units, analytes, hole and interval columns. A workbook with several sheets asks which.', examples: ['open assays.csv'] },
-  read: (text, q) => { let m; if (/^open (?:the sample|sample|assays|assays\.csv)$/.test(q)) return {}; if ((m = /^open (?:the |my )?(log)$/.exec(q))) return { device: m[1] }; if ((m = /^open (.+)$/.exec(q))) { const f = Object.values(S.files).find(f => f.name.toLowerCase() === m[1]); return f ? { file: { name: f.name, hash: f.hash } } : null; } return null; },
   topic: () => null,
   run: a => {
     let t;
@@ -10877,9 +10883,12 @@ tool({
   }
 });
 frame({
-  name: 'open', label: 'Open', words: ['open', 'load'], theme: ['table', 'file'], required: ['theme'], roles: {},
+  name: 'open', label: 'Open', words: ['open', 'load', 'show me', 'use'], theme: ['table', 'file', 'devtable'], required: ['theme'], roles: {},
   words_pt: ['abrir', 'abre', 'carregar', 'carrega'], label_pt: 'Abrir',
-  bind: c => { const v = c.theme[0] && c.theme[0].value; const f = v && Object.values(S.files).find(f => f.name.toLowerCase() === String(v).toLowerCase()); return f ? { tool: 'open', args: { file: { name: f.name, hash: f.hash } } } : { tool: 'open', args: {} }; }
+  bind: c => {
+    const t = c.theme[0], v = t && t.value; if (t && t.type === 'devtable') return { tool: 'open', args: { device: v } };
+    const f = v && Object.values(S.files).find(f => f.name.toLowerCase() === String(v).toLowerCase()); return f ? { tool: 'open', args: { file: { name: f.name, hash: f.hash } } } : { tool: 'open', args: {} };
+  }
 });
 
 /* ── values of a column, with the below-detection policy ───── */
@@ -10898,9 +10907,8 @@ const BDL = ['exclude', 'half', 'limit', 'zero'];
 const bdlSlot = (a, skipped) => skipped.bdl ? [{ v: `below detection: ${a.bdl || 'exclude'}`, key: 'bdl', alts: BDL, cur: a.bdl || 'exclude' }] : [];
 
 tool({
-  name: 'hist', rank: 51, pre: ['table'],
+  name: 'hist', pre: ['table'],
   skill: { group: 'Table', title: 'Histogram', on: '@gcu/sadpan · @gcu/plot', about: 'Any numeric column of the open table. Amend it afterwards with “log scale”.', examples: ['histogram of cu'] },
-  read: (text, q) => { const m = /^hist(?:ogram)? (?:of )?(\w+)( (?:in )?log(?: scale)?)?$/.exec(q); return m ? { col: m[1], log: !!m[2] } : null; },
   amend: [{ arg: 'log', match: /^(?:in )?(log|linear)(?: scale)?$/, value: m => m[1] === 'log' }],
   topic: a => [`${shown(a.col)} histogram`, 3],
   run: a => {
@@ -10927,7 +10935,7 @@ tool({
 });
 // "histogram of cu", "plot a histogram of fe in log scale"
 frame({
-  name: 'plot', label: 'Plot', words: ['plot', 'draw', 'show', 'display'], elidable: true,
+  name: 'plot', label: 'Plot', words: ['plot', 'draw', 'show', 'show me', 'display'], elidable: true,
   theme: ['plot'], required: ['theme', 'of'], roles: { of: { preps: ['of', 'for'], types: ['variable'] }, scale: { preps: ['in', 'on', 'with'], types: ['scale'] } },
   words_pt: ['plotar', 'plota', 'mostrar', 'mostra', 'desenhar', 'desenha'], label_pt: 'Plotar',
   bind: c => {
@@ -10986,9 +10994,8 @@ function aggregate(agg, v, w) {
   return st[agg];
 }
 tool({
-  name: 'query', rank: 49, pre: ['table'],
+  name: 'query', pre: ['table'],
   skill: { group: 'Table', title: 'Table questions', on: '@gcu/sift · @gcu/sadpan', about: 'Means, medians, percentiles, counts, lists and correlations in controlled English, with where and by.', examples: ['mean cu by lith where au > 0.1', 'how many samples where cu > 0.5 and lith is BRX', 'top 5 rows sorted by au descending', 'check intervals'] },
-  read: readQuery,
   amend: [
     { arg: 'by', match: /^by (\w+(?: and \w+)?)$/, value: m => m[1].split(' and ') },
     { arg: 'where', match: /^where (.+)$/ },
@@ -11076,6 +11083,86 @@ tool({
     const sorted = by.length && a.aggs.length === 1 && cols.length === 1 ? [...table].sort((x, y) => (y[1] ?? -Infinity) - (x[1] ?? -Infinity)) : table;
     return { read, body: [{ t: 'table', head, num: head.map((_, i) => i > 0 || !by.length), rows: sorted.map(r => r.map((v, i) => i === 0 && by.length ? String(v) : fmtCell(v))) }, ...(a.view !== 'table' && by.length && cols.length === 1 && a.aggs.length === 1 && sorted.length >= 2 && sorted.length <= 20 ? [{ t: 'hbars', rows: sorted.filter(r => r[1] != null).map(r => [String(r[0]), r[1], fmt(r[1], 3)]) }] : []), src], trace, py };
   }
+});
+/* ── the words of a table: its columns, statistics, and what a question is about ─── */
+const numericVar = c => c.type === 'numeric' && !/^(from|to|x|y|z|east|north|elev)/i.test(c.name);
+// columns that are not grades (hole, lith, from, to): what a question groups by, lists or sorts by
+noun(() => {
+  const cols = S.table ? S.table.cols.filter(c => !numericVar(c)).map(c => c.name) : ['hole', 'lith', 'from', 'to'];
+  const words = Object.fromEntries(cols.map(n => [n, [n.toLowerCase()]]));
+  return { type: 'column', words, generic: ['field', 'fields'], words_pt: words, generic_pt: ['campo', 'campos'] };
+});
+// the values of the hole column, as written: "in DH-03"
+noun(() => {
+  const T0 = S.table, h = T0 && T0.roles.hole; if (!h) return null;
+  const ids = [...new Set(T0.rows.map(r => r[h]).filter(v => v != null).map(String))];
+  return { type: 'holeid', exact: true, words: Object.fromEntries(ids.map(v => [v, [v.toLowerCase()]])), words_pt: Object.fromEntries(ids.map(v => [v, [v.toLowerCase()]])) };
+});
+noun({ type: 'devtable', words: { log: ['log', 'my log', 'the log'] }, words_pt: { log: ['log', 'meu log', 'registro'] } });
+noun({ type: 'stat', words: { mean: ['mean', 'average', 'avg'], median: ['median'], sum: ['sum', 'total'], min: ['min', 'minimum', 'lowest', 'smallest'], max: ['max', 'maximum', 'highest', 'largest'],
+  std: ['std', 'stdev', 'standard deviation', 'sd'], var: ['variance'], cv: ['cv', 'coefficient of variation'] },
+  words_pt: { mean: ['média', 'media'], median: ['mediana'], sum: ['soma', 'total'], min: ['mínimo', 'minimo', 'menor'], max: ['máximo', 'maximo', 'maior'], std: ['desvio padrão', 'desvio padrao'], var: ['variância', 'variancia'], cv: ['cv', 'coeficiente de variação'] } });
+shape({ type: 'stat', re: String.raw`p\d{1,2}` });                                       // p90
+postmod({ prep: 'of', heads: ['stat'], attr: 'of', mod: 'variable' });                    // "mean of cu"
+compound({ mod: 'stat', heads: ['variable', 'column'], attr: 'stat', echo: true });       // "mean cu", "the average copper grade"; "mean litho" reaches the tool, which says it is a category
+noun({ type: 'sample', words: {}, generic: ['samples', 'sample', 'rows', 'row', 'records', 'intervals', 'interval', 'assays'], generic_pt: ['amostras', 'amostra', 'linhas', 'linha', 'registros', 'intervalos'] });
+qmod({ head: 'sample', attr: 'limit', dims: ['bare'] });                                    // "top 5 rows"
+noun({ type: 'order', words: { desc: ['descending', 'desc', 'highest first', 'largest first', 'decreasing'], asc: ['ascending', 'asc', 'lowest first', 'smallest first', 'increasing'] }, words_pt: { desc: ['decrescente'], asc: ['crescente'] } });
+noun({ type: 'weightkind', words: { length: ['length', 'interval length'], count: ['count', 'sample count'] }, words_pt: { length: ['comprimento'], count: ['contagem'] } });
+noun({ type: 'view', words: { chart: ['chart', 'a chart', 'bar chart', 'graph'], table: ['a table'] }, words_pt: { chart: ['gráfico', 'grafico'], table: ['tabela'] } });
+noun({ type: 'corr', words: { corr: ['correlation', 'corr', 'correlation coefficient', 'pearson correlation'] }, words_pt: { corr: ['correlação', 'correlacao'] } });
+noun({ type: 'ivcheck', words: { intervals: ['intervals', 'interval', 'overlaps', 'gaps', 'interval overlaps', 'from and to'] }, words_pt: { intervals: ['intervalos', 'sobreposições'] } });
+
+/* ── what reads a question: "mean cu by lith where au > 0.1", "how many samples have au above 1" ── */
+// a condition is the words after "where" (or "with", "having"), read by whereToSift; grouping and sorting are columns
+const COLS = ['variable', 'column'];
+const COND = { preps: ['where', 'with', 'if', 'when'], types: ['text'] };
+const common = c => {
+  const out = {}, by = (c.roles.by || []).map(n => n.value), w = c.roles.where && c.roles.where[0], wt = c.roles.weighted && c.roles.weighted[0], v = c.roles.as && c.roles.as[0];
+  if (by.length) out.by = by; if (w) out.where = w.value; if (wt) out.weight = wt.value; if (v) out.view = v.value;
+  return out;
+};
+frame({
+  name: 'agg', label: 'Table question', words: ['calculate', 'compute', 'give me', 'show', 'get', 'find', 'tell me'], elidable: true, theme: ['variable', 'column', 'stat'], required: ['theme'],
+  roles: { by: { preps: ['by', 'per', 'across', 'for', 'in'], types: COLS }, where: COND, weighted: { preps: ['weighted'], types: ['weightkind'] }, as: { preps: ['as', 'in'], types: ['view'] } },
+  words_pt: ['calcula', 'calcule', 'mostra', 'mostre'], label_pt: 'Pergunta à tabela',
+  bind: c => {
+    const aggs = [], cols = [];
+    for (const n of c.theme) {
+      if (n.type === 'stat') { aggs.push(n.value); if (n.attrs.of) cols.push(n.attrs.of); }
+      else if (n.value) { cols.push(n.value); if (n.attrs.stat) aggs.push(n.attrs.stat); }
+    }
+    const ag = [...new Set(aggs)], co = [...new Set(cols)];
+    return ag.length && co.length ? { tool: 'query', args: { kind: 'agg', aggs: ag, cols: co, ...common(c) } } : null;
+  }
+});
+frame({
+  name: 'count', label: 'Count', words: ['count', 'how many', 'number of', 'count the', 'total number of'], theme: ['sample'], required: [],
+  roles: { by: { preps: ['by', 'per', 'across', 'for', 'in'], types: COLS }, where: { preps: [...COND.preps, 'where', 'having'], types: ['text'] } },
+  words_pt: ['conta', 'conte', 'quantas', 'quantos', 'número de'], label_pt: 'Contar',
+  bind: c => ({ tool: 'query', args: { kind: 'count', ...common(c) } })
+});
+frame({
+  name: 'rows', label: 'Rows', words: ['show', 'list', 'show me', 'top', 'display', 'give me'], theme: ['sample'], required: ['theme'],
+  roles: { where: COND, sort: { preps: ['sort', 'by'], types: COLS }, order: { preps: [''], types: ['order'] } },
+  words_pt: ['mostra', 'lista', 'mostre', 'liste'], label_pt: 'Linhas',
+  bind: c => { const s = c.roles.sort && c.roles.sort[0], o = c.roles.order && c.roles.order[0], lim = c.theme[0].attrs.limit;
+    return { tool: 'query', args: { kind: 'list', limit: lim ? lim.n : 20, ...(c.roles.where ? { where: c.roles.where[0].value } : {}), ...(s ? { sort: s.value, desc: !!o && o.value === 'desc' } : {}) } }; }
+});
+frame({
+  name: 'distinct', label: 'Values', words: ['distinct', 'unique', 'values of', 'distinct values of', 'unique values of', 'list the values of', 'categories of'], theme: COLS, required: ['theme'], roles: { where: COND },
+  words_pt: ['valores de', 'valores distintos de'], label_pt: 'Valores',
+  bind: c => c.theme.length === 1 ? { tool: 'query', args: { kind: 'distinct', cols: [c.theme[0].value], ...common(c) } } : null
+});
+frame({
+  name: 'corr', label: 'Correlation', words: ['calculate', 'compute'], elidable: true, theme: ['corr'], required: ['theme', 'of'], roles: { of: { preps: ['of', 'between', 'for'], types: ['variable'] }, where: COND },
+  label_pt: 'Correlação',
+  bind: c => c.roles.of.length === 2 ? { tool: 'query', args: { kind: 'corr', cols: c.roles.of.map(n => n.value), ...common(c) } } : null
+});
+frame({
+  name: 'ivcheck', label: 'Check intervals', words: ['check', 'validate', 'check the', 'look for'], theme: ['ivcheck'], required: ['theme'], roles: { by: { preps: ['by', 'per'], types: COLS } },
+  words_pt: ['verifica', 'verifique', 'confere'], label_pt: 'Verificar intervalos',
+  bind: c => ({ tool: 'query', args: { kind: 'check', ...(c.roles.by ? { by: [c.roles.by[0].value] } : {}) } })
 });
   return { makeData, sampleTable, ELEMENT, parseDelimited, tableFromText, openTable, colOf, stats, whereToSift };
 })();
@@ -11454,8 +11541,12 @@ const ori2 = n => oriOf(n);
 // "apparent dip of 000/30 on a section at 045"
 frame({
   name: 'apparent', label: 'Apparent dip', words: ['calculate', 'compute'], elidable: true, theme: ['appdip'], required: ['theme', 'of', 'on'],
-  roles: { of: { preps: ['of', 'for'], types: PLANE_T }, on: { preps: ['on', 'along', 'in', 'for'], types: ['section'] } }, label_pt: 'Mergulho aparente',
-  bind: c => { const p = c.roles.of[0], o = !p.all && ori2(p), az = c.roles.on[0].attrs && c.roles.on[0].attrs.az; return o && az ? { tool: 'apparent', args: { a1: o[0], a2: o[1], conv: 'dd', az: az.n } } : null; }
+  roles: { of: { preps: ['of', 'for'], types: PLANE_T }, on: { preps: ['on', 'along', 'in', 'for'], types: ['section'] }, where: { preps: ['where'], types: ['text'] } }, label_pt: 'Mergulho aparente',
+  bind: c => {
+    const p = c.roles.of[0], az = c.roles.on[0].attrs && c.roles.on[0].attrs.az; if (!az) return null;
+    if (p.all) return { tool: 'apply', args: { skill: 'apparent', az: az.n, ...(c.roles.where ? { where: c.roles.where[0].value } : {}) } };   // every plane of the open table
+    const o = ori2(p); return o ? { tool: 'apparent', args: { a1: o[0], a2: o[1], conv: 'dd', az: az.n } } : null;
+  }
 });
 // "plane through 0,0,100 and 100,0,100 and 0,100,0"
 frame({
@@ -14343,9 +14434,9 @@ tool({
 
 /* ==== src/engine/log.js ==== */
 const __m34 = (() => {
-const { S, tool, fmt, iso } = __m0;
+const { S, tool, frame, noun, fmt, iso } = __m0;
 const { parseUnit, dimName } = __m1;
-const { findDate, today, fmtDate } = __m3;
+const { findDate, today, fmtDate, dateWords } = __m3;
 // The log: a device table of things done, written from cards and asked about in plain words.
 // Rows belong to the device, like notes; a card writes its row once (by id), undo removes it, and
 // "open the log" makes it the open table so every table question works on it.
@@ -14393,9 +14484,8 @@ function readLog(text) {
   return { id: newId(), activity, value, unit, date, note };
 }
 tool({
-  name: 'logAdd', rank: 35,
+  name: 'logAdd',
   skill: { group: 'Device', title: 'Log', on: 'device table', about: 'Log what you did with a quantity and a date, ask totals and means by week or month, and open the log as a table. Rows stay on this device.', examples: ['log 30 min run', 'log 5 km run yesterday', 'log weight 78.4 kg', 'how many km did i run this month', 'mean weight by week', 'open the log'] },
-  read: text => readLog(text),
   amend: [{ arg: 'value', match: /^(?:that was|make it|correct(?:ion)?:?|actually) (\d+(?:\.\d+)?)(?: ?([a-zµ%°][\w%°/³²]*))?$/, value: (m, a) => { if (m[2]) a.unit = m[2]; return +m[1]; } }, { arg: 'date', match: /^(?:that was |it was )?(?:on )?(yesterday|today|\d{4}-\d{2}-\d{2}|\d{1,2} \w{3,9}(?: \d{4})?|last \w+)$/, value: m => { const d = findDate(m[1], { back: true }); return d ? iso(d.d) : null; } }],
   topic: a => [`Log: ${a.activity}`, 1],
   undo: a => { const t = logTable(); t.rows = t.rows.filter(r => r.id !== a.id); },
@@ -14426,18 +14516,7 @@ function readPeriod(s) {
   return { p: { kind: 'all' }, rest: s };
 }
 tool({
-  name: 'logQuery', rank: 34,
-  read: (text, q) => {
-    const m = /^(how many times|how many|how much|how often|total|sum of|sum|mean|average|count)\s+(.+)$/.exec(q); if (!m) return null;
-    let by = null, rest = m[2]; const bm = /\s+by (week|month|day|activity)$/.exec(rest); if (bm) { by = bm[1]; rest = rest.slice(0, bm.index); }
-    const per = readPeriod(rest); if (!per) return null;
-    const words = per.rest.split(/\s+/).filter(w => w && !/^(?:did|have|i|do|we|of|the|my|in|on|total|times)$/.test(w));
-    let unit = null; const ui = words.findIndex(w => unitOf(w)); if (ui >= 0 && m[1] !== 'count' && !/^how often|how many times/.test(m[1])) { unit = words[ui]; words.splice(ui, 1); }
-    const activity = words.join(' ').trim(); if (!activity) return null;
-    const acts = new Set(rows().map(r => stem(r.activity)));
-    if (!acts.has(stem(activity))) return null;   // not a logged activity: let other readers try
-    return { agg: unit || m[1] === 'count' || /often|times/.test(m[1]) ? (unit ? AGG[m[1]] : 'count') : AGG[m[1]], activity, unit, period: per.p, by };
-  },
+  name: 'logQuery',
   amend: [{ arg: 'by', match: /^by (week|month|day|activity)$/ }, { arg: 'period', match: /^(this|last) (week|month|year)$/, value: m => ({ kind: 'period', which: m[1], unit: m[2] }) }],
   topic: a => [`Log: ${a.activity}`, 1],
   run: a => {
@@ -14458,6 +14537,36 @@ tool({
     }
     const v = agg(usable);
     return { read, value: v, body: [{ t: 'big', v: fmt(v, 4), unit: `${unitText} ${a.agg === 'count' ? '' : a.agg === 'sum' ? 'in total' : 'on average'}`.trim() }, { t: 'kv', rows: [['entries', `${usable.length} of ${all.length} ${periodText(a.period)}${left ? `; ${left} left out (no value, or another dimension)` : ''}`], ['dates', usable.length ? `${fmtDate(new Date(usable[0].date + 'T00:00'))} to ${fmtDate(new Date(usable[usable.length - 1].date + 'T00:00'))}` : '—'], ...(u ? [['unit', `${u.name} (${dimName(u.dim)}); entries in other ${dimName(u.dim)} units were converted`]] : [])] }, SRC], trace: [`log.filter(${a.activity}, ${periodText(a.period)}) → ${all.length} rows`, `${a.agg}${u ? ' in ' + u.name : ''} over ${usable.length} → ${fmt(v, 6)}`], py: `log.query(activity="${a.activity}", period=${JSON.stringify(a.period)}, agg="${a.agg}"${u ? `, unit="${u.name}"` : ''})` };
+  }
+});
+/* ── what reads them ─────────────────────────────────────────── */
+// writing: "log 5 km run yesterday", "log weight 78.4 kg on 29 sep", "log 2000 m run on 6 oct note: easy pace". The words
+// after "log" are the entry as typed; readLog splits them into amount, activity, date and note.
+frame({
+  name: 'logAdd', label: 'Log', words: ['log', 'logged', 'record', 'track', 'log a', 'log my'], theme: ['text'], required: ['theme'], roles: { on: { preps: ['on'], types: ['date', 'holiday'] } },
+  words_pt: ['registra', 'registre', 'anota no log'], label_pt: 'Registrar',
+  bind: c => {
+    const on = c.roles.on && c.roles.on[0], entry = readLog('log ' + c.theme[0].value + (on ? ' on ' + dateWords(on) : '')); return entry ? { tool: 'logAdd', args: entry } : null;
+  }
+});
+// asking: "how many km did i run this month", "how often did i run this month", "total run in miles this month",
+// "mean weight by week", "mean weight since 1 oct". The activities are what the log holds, matched as written.
+noun(() => { const acts = [...new Set(rows().map(r => r.activity))]; return acts.length ? { type: 'activity', exact: true, words: Object.fromEntries(acts.map(a => [a, [a]])), words_pt: Object.fromEntries(acts.map(a => [a, [a]])) } : null; });
+noun({ type: 'period', words: { 'this week': ['this week'], 'last week': ['last week'], 'this month': ['this month'], 'last month': ['last month'], 'this year': ['this year'], 'last year': ['last year'], today: ['today'], yesterday: ['yesterday'], all: ['ever', 'all time', 'in all time', 'over all time'] },
+  words_pt: { 'this week': ['esta semana', 'essa semana'], 'last week': ['semana passada'], 'this month': ['este mês', 'esse mês'], 'last month': ['mês passado'], 'this year': ['este ano'], 'last year': ['ano passado'], today: ['hoje'], yesterday: ['ontem'] } });
+noun({ type: 'logby', words: { week: ['week', 'weeks'], month: ['month', 'months'], day: ['day', 'days'], activity: ['activity'] }, words_pt: { week: ['semana'], month: ['mês'], day: ['dia'], activity: ['atividade'] } });
+const PERIOD = v => v === 'all' ? { kind: 'all' } : v === 'today' || v === 'yesterday' ? { kind: v } : { kind: 'period', which: v.split(' ')[0], unit: v.split(' ')[1] };
+for (const [name, words, agg] of [['logSum', ['how many', 'how much', 'total', 'sum of', 'sum'], 'sum'], ['logCount', ['how often', 'how many times'], 'count'], ['logMean', ['mean', 'average'], 'mean']]) frame({
+  name, label: 'Log question', words, theme: ['unit'], required: [],
+  roles: { what: { preps: ['', 'of'], types: ['activity'] }, in: { preps: ['in'], types: ['unit'] }, when: { preps: [''], types: ['period'] }, since: { preps: ['since', 'from'], types: ['date', 'holiday'] }, by: { preps: ['by', 'per'], types: ['logby'] } },
+  label_pt: 'Pergunta ao log',
+  bind: c => {
+    const act = (c.roles.what || [])[0], u = [...c.theme, ...(c.roles.in || [])].find(n => n.type === 'unit');
+    if (!act) return null;
+    const since = c.roles.since && findDate(dateWords(c.roles.since[0]), { back: true }), when = c.roles.when && c.roles.when[0];
+    const period = since ? { kind: 'since', from: iso(since.d) } : when ? PERIOD(when.value) : { kind: 'all' };
+    const a = agg === 'sum' && !u ? 'count' : agg;
+    return { tool: 'logQuery', args: { agg: a, activity: act.value, unit: u ? u.unit : null, period, by: c.roles.by ? c.roles.by[0].value : null } };
   }
 });
   return { LOG_COLS, logTable, readLog };
@@ -14724,15 +14833,8 @@ const colNamed = (T, re) => T.cols.find(c => re.test(c.name) && c.type === 'nume
 const consts = s => { const out = {}; if (!s) return out; let m; if ((m = new RegExp(`hole ${ORI}`).exec(s))) out.hole = { az: +m[1], dip: +m[2] }; if ((m = new RegExp(`(?:bedding|plane|vein|foliation|contact|fault) ${ORI}`).exec(s))) out.plane = { dd: +m[1], dip: +m[2] }; return out; };
 
 tool({
-  name: 'apply', rank: 59, pre: ['table'],
+  name: 'apply', pre: ['table'],
   skill: { group: 'Table', title: 'Field compute over a table', on: '@gcu/bearing · sift', about: 'A single-value skill on every row: true thickness of each intercept from from/to and the hole and plane columns, or apparent dip of each plane on a section. Constants fill what no column holds ("with hole 270/60"); rows that cannot be filled are listed.', examples: ['true thickness of every intercept with hole 270/60, bedding 045/30', 'apparent dip of each plane on a section at 090'] },
-  read: (text, q) => {
-    let m = /^(?:true )?thickness of (?:every|each|all) (?:intercepts?|intervals?|rows?|samples?)(?: in (\S+?))?(?: where (.+?))?(?: with (.+))?$/.exec(q);
-    if (m) return { skill: 'thickness', ...(m[1] ? { hole: m[1] } : {}), ...(m[2] ? { where: m[2] } : {}), ...(m[3] ? { consts: consts(m[3]), constText: m[3] } : {}) };
-    m = /^apparent dip of (?:every|each|all) (?:planes?|rows?|measurements?|readings?) (?:on|along|in) (?:a )?section (?:at|of|azimuth|striking) (\d{1,3})(?: where (.+))?$/.exec(q);
-    if (m) return { skill: 'apparent', az: +m[1], ...(m[2] ? { where: m[2] } : {}) };
-    return null;
-  },
   amend: [{ arg: 'constText', match: /^with (.+)$/, value: (m, a) => { a.consts = consts(m[1]); return m[1]; }, when: a => a.skill === 'thickness' }, { arg: 'where', match: /^where (.+)$/ }, { arg: 'az', match: /^(?:on a )?section (?:at|of) (\d{1,3})$/, value: m => +m[1], when: a => a.skill === 'apparent' }],
   topic: a => [a.skill === 'thickness' ? 'True thickness of intercepts' : 'Apparent dips', 2],
   run: a => {
@@ -18661,7 +18763,8 @@ const { TIMESCALE } = __m19;
 const FB_PT = { Australia: ['austrália', 'australia'], Brazil: ['brasil'], Canada: ['canadá', 'canada'], Chile: ['chile'], Germany: ['alemanha'], Indonesia: ['indonésia', 'indonesia'], Ireland: ['irlanda'], Japan: ['japão', 'japao'], Kazakhstan: ['cazaquistão', 'cazaquistao'], Mongolia: ['mongólia', 'mongolia'], Peru: ['peru'], Portugal: ['portugal'], 'South Africa': ['áfrica do sul', 'africa do sul'], Zambia: ['zâmbia', 'zambia'] };
 const uniq = a => [...new Set(a)];
 function variables() {
-  const cols = S.table ? S.table.cols.filter(c => c.type === 'numeric' && !/^(from|to|x|y|z|east|north|elev)/i.test(c.name)) : [{ name: 'cu', analyte: 'Cu' }, { name: 'au', analyte: 'Au' }];
+  const cols = S.table ? S.table.cols.filter(c => c.type === 'numeric' && !/^(from|to|x|y|z|east|north|elev)/i.test(c.name))
+    : [{ name: 'cu', analyte: 'Cu' }, { name: 'au', analyte: 'Au' }, ...Object.values(S.tables).filter(t => t.rows.length).flatMap(t => t.cols.filter(c => c.type === 'numeric'))];
   return Object.fromEntries(cols.map(c => [c.name, uniq([c.name.toLowerCase(), ...(c.analyte ? [c.analyte.toLowerCase(), ELEMENT[c.analyte]] : [])].filter(Boolean))]));
 }
 
@@ -18679,7 +18782,7 @@ function ontology() {
       // the open table's numeric columns, by name, analyte symbol and element name; the sample's when none is open
       { type: 'variable', needsId: true, words: variables(), generic: ['grade', 'grades', 'column', 'columns'],
         words_pt: variables(), generic_pt: ['teor', 'teores', 'coluna', 'colunas'] },
-      { type: 'plot', words: { histogram: ['histogram', 'hist'] }, generic: ['plot', 'chart'], words_pt: { histogram: ['histograma'] }, generic_pt: ['gráfico', 'grafico'] },
+      { type: 'plot', words: { histogram: ['histogram', 'hist', 'distribution'] }, generic: ['plot', 'chart'], words_pt: { histogram: ['histograma'] }, generic_pt: ['gráfico', 'grafico'] },
       { type: 'country', words: Object.fromEntries(FB.map(r => [r[0], [r[0].toLowerCase()]])), generic: ['country', 'countries', 'nation', 'nations'],
         words_pt: Object.fromEntries(FB.map(r => [r[0], FB_PT[r[0]]])), generic_pt: ['país', 'pais', 'países', 'paises'] },
       { type: 'property', words: { density: ['density'], hardness: ['hardness'], formula: ['formula'], streak: ['streak'], capital: ['capital'], population: ['population'], area: ['area'], 'population density': ['population density'] }, generic: ['property', 'value'],
@@ -18687,7 +18790,7 @@ function ontology() {
       { type: 'filter', words: { landlocked: ['landlocked'] }, words_pt: { landlocked: ['sem litoral', 'sem costa'] } },
       { type: 'scale', words: { log: ['log', 'logarithmic', 'log scale'], linear: ['linear', 'linear scale'] }, words_pt: { log: ['log', 'logarítmica', 'logaritmica', 'escala log'], linear: ['linear', 'escala linear'] } },
       { type: 'term', words: terms, generic: ['term', 'word'], words_pt: { ...terms, 'hash table': ['hash table', 'tabela hash'], 'b-tree': ['b-tree', 'btree', 'árvore b', 'arvore b'] }, generic_pt: ['termo', 'palavra'] },
-      { type: 'table', words: { 'assays.csv': ['assays.csv', 'assays', 'sample table'] }, generic: ['table', 'csv', 'rows', 'data'], words_pt: { 'assays.csv': ['assays.csv', 'assays', 'tabela de amostra'] }, generic_pt: ['tabela', 'arquivo'] },
+      { type: 'table', words: { 'assays.csv': ['assays.csv', 'assays', 'sample table', 'the sample', 'sample data'] }, generic: ['table', 'csv', 'data'], words_pt: { 'assays.csv': ['assays.csv', 'assays', 'tabela de amostra'] }, generic_pt: ['tabela', 'arquivo'] },
       { type: 'format', words: { script: ['script', 'python', 'adder'], notebook: ['notebook'], csv: ['csv', 'comma separated'], tsv: ['tsv', 'tab separated'], json: ['json'], parquet: ['parquet'], yaml: ['yaml', 'yml'], wkt: ['wkt'], geojson: ['geojson'] },
         words_pt: { script: ['script', 'python', 'adder'], notebook: ['notebook', 'caderno'], csv: ['csv'], tsv: ['tsv'], json: ['json'], parquet: ['parquet'], yaml: ['yaml', 'yml'], wkt: ['wkt'], geojson: ['geojson'] } },
       // the files kept on this device, by name; "this file" is the generic
@@ -18700,9 +18803,9 @@ function ontology() {
       ...LEXICON.nouns.map(n => typeof n === 'function' ? n() : n).filter(Boolean)
     ],
     shapes: LEXICON.shapes,
-    fillers: ['golem', 'ok', 'okay'],
+    fillers: ['golem', 'ok', 'okay', 'did i', 'have i', 'do i', 'did we', 'have we'],
     units,
-    compounds: [{ mod: 'filter', heads: ['country'], attr: 'filter', echo: true }, { mod: 'scale', heads: ['plot'], attr: 'scale', echo: true }],
+    compounds: [{ mod: 'filter', heads: ['country'], attr: 'filter', echo: true }, { mod: 'scale', heads: ['plot'], attr: 'scale', echo: true }, ...LEXICON.compounds],
     postmods: LEXICON.postmods,
     qmods: [{ head: 'timer', attr: 'duration', dims: ['time'] }, ...LEXICON.qmods],   // "a 30 minute timer"
     verbs: FRAMES.map(({ bind, ...f }) => f),
@@ -18720,7 +18823,7 @@ const __m49 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/dispatch, built from ../auditable/ext/dispatch/src/ by its own build.
 // Source of truth: gentropic/auditable ext/dispatch (local clone: ../auditable). Re-vendor by copying
 // ext/dispatch/index.js here after 'node ext/dispatch/build.js'. golem uses the grammar rung only:
-// createEngine, makeSession, ENGLISH, PORTUGUESE. At auditable 228451e1.
+// createEngine, makeSession, ENGLISH, PORTUGUESE. At auditable ac6b2da5.
 
 // ⚠ GENERATED FILE — DO NOT EDIT. Source: src/  Build: @gcu/build src/main.js
 // @gcu/dispatch — Session-trained natural-language → tool-call dispatch: a Snips-shaped resolver (averaged-perceptron intent + CRF-class slot tagger + gazetteers + deterministic per-kind assemblers) that trains IN THE BROWSER from the host session's own vocabulary in under a second. Tools are declarative (ten kinds) and a grammar rung (clause: case-grammar frames over an Earley chart with costed repairs, en + pt-BR) reads controlled commands before the learners see them; no shipped model, no network, explainable per decision — refusals return empty calls so the host degrades into its command palette. Born from an incubator where this beat a 26M finetuned transformer 50/52 to 3/24 on a frozen yardstick.
@@ -19764,6 +19867,7 @@ function buildGrammar(X) {
   rule('NP', 'REF Core', (r, c) => ({ ...c, ref: r.word }));
   rule('NP', 'QUANT Core Except', (q, c, e) => c.generic ? { ...c, all: true, except: e } : null);
   rule('NP', 'QUANT DET Core Except', (q, _, c, e) => c.generic ? { ...c, all: true, except: e } : null);   // all the domains / todos os domínios
+  rule('NP', 'QUANT Core', (q, c) => c.generic ? null : { ...c, each: true });   // "each hole" where hole names one thing (a column): per hole, for the host
   if (X.headFirst) rule('NP', 'DET Core REF', (d, c, r) => ({ ...c, ref: r.word }));                        // a rodada anterior
   rule('NP', 'PRON', p => ({ type: '*', pron: p.word }));
   rule('NP', 'IDENT', t => t.type ? { type: t.type, name: t.name, generic: false, attrs: {} } : null);
@@ -19870,7 +19974,7 @@ const ENGLISH = {
   code: 'en', headFirst: false,
   DET: 'the|a|an|this|that|my|our', REF: 'last|previous|latest|current|first|new',
   QUANT: 'all|every|each', EXCEPT: 'except|excluding|minus', CONJ: 'and|or|plus', COMMA: ',',
-  PREP: 'with|using|by|per|in|on|for|from|to|at|as|above|below|over|under|of|into|without|against|where|until|till|after|before|since|between|across|through|during|within|around|near|>|<|>=|<=|=|≥|≤|greater than|more than|less than|at least|at most|equal to|equals',
+  PREP: 'with|using|by|per|in|on|for|from|to|at|as|above|below|over|under|of|into|without|against|where|until|till|after|before|since|between|across|through|during|within|around|near|grouped by|weighted by|sorted by|ordered by|having|that have|which have|that has|which has|have|has|>|<|>=|<=|=|≥|≤|greater than|more than|less than|at least|at most|equal to|equals',
   THEN: 'then|afterwards|next', BUT: 'but', PRON: 'it|them|those', AGAIN: 'again|rerun|redo|repeat|same',
   QWORD: 'why|how|what|when|who|is|are|does|do|should|can|could|would',
   // closed questions the grammar reads as commands with the verb left out: a wh-word, a copula, the fused forms
@@ -19880,7 +19984,9 @@ const ENGLISH = {
   FILLER: "please|now|just|kindly|go|ahead|me|us|hey|hi|hello|yo|thanks|thank you|cheers|pls|plz|so|um|uh|er|erm|hmm|well|oh|alright|can you|could you|would you|will you|i want you to|i need you to|i want to|i need|i'd like|i would like|give me|tell me|for me|let us|lets",
   // identity for every English preposition except the comparisons, which share a canon with their words
   preps: { '>': ['above'], 'greater than': ['above'], 'more than': ['above'], '<': ['below'], 'less than': ['below'], '>=': ['atleast'], '≥': ['atleast'], 'at least': ['atleast'],
-    '<=': ['atmost'], '≤': ['atmost'], 'at most': ['atmost'], '=': ['equals'], 'equal to': ['equals'], equals: ['equals'] },
+    '<=': ['atmost'], '≤': ['atmost'], 'at most': ['atmost'], '=': ['equals'], 'equal to': ['equals'], equals: ['equals'],
+    'grouped by': ['by'], 'weighted by': ['weighted'], 'sorted by': ['sort'], 'ordered by': ['sort'],
+    having: ['where'], 'that have': ['where'], 'which have': ['where'], 'that has': ['where'], 'which has': ['where'], have: ['where'], has: ['where'] },
   // the calendar: weekday numbers (0 = Sunday) or a day relative to today; months; named clock times; am/pm.
   // "sun" is left out on purpose: it is the sun more often than Sunday.
   days: { sunday: 0, monday: 1, mon: 1, tuesday: 2, tue: 2, tues: 2, wednesday: 3, wed: 3, thursday: 4, thu: 4, thur: 4, thurs: 4, friday: 5, fri: 5, saturday: 6, sat: 6,
@@ -20138,7 +20244,8 @@ function createEngine(ont, locale = ENGLISH) {
     const fix = (list, slot) => list.flatMap(n => {
       if (n.type === 'quantity') return [n];
       if (n.pron) { const src = prev ?? session.last; if (!src?.theme?.length) { missing.push(`"${n.pron}" — nothing to refer to`); return []; } return src.theme; }
-      if (n.all) { const pool = session.objects.filter(o => o.type === n.type); const ex = new Set(n.except.map(e => e.value)); return pool.filter(o => !ex.has(o.value)); }
+      // every X: the session's Xs; when the session holds none, the quantifier stays for the host ("every intercept" of a table)
+      if (n.all) { const pool = session.objects.filter(o => o.type === n.type); if (!pool.length) return [n]; const ex = new Set(n.except.map(e => e.value)); return pool.filter(o => !ex.has(o.value)); }
       const now = session.now ?? 0; const DAY = 86400000;
       const relOk = o => { const r = n.rel; if (!r) return true;
         if (r.verb && o.by && o.by !== r.verb) return false;
@@ -20298,8 +20405,8 @@ function createEngine(ont, locale = ENGLISH) {
   // fewest words of text first; a subject span is the words before the verb of a frame that takes one
   function textCands(toks) {
     const one = textSpans(toks), cands = one.map(s => [s]);
-    // the verb as typed (not a typo repair), and a subject with no colon and no verb in it
-    for (let v = 1; v < toks.length; v++) if (!toks[v].repaired && toks[v].senses.some(sn => sn.cat === 'VERB' && TEXT_SUBJECT.has(sn.verb)) && toks.slice(0, v).every(t => !t.senses.some(x => x.cat === 'COLON' || x.cat === 'VERB'))) {
+    // the verb as typed (not a typo repair), and a subject with no colon and no verb in it as typed ("pop" is not "top")
+    for (let v = 1; v < toks.length; v++) if (!toks[v].repaired && toks[v].senses.some(sn => sn.cat === 'VERB' && TEXT_SUBJECT.has(sn.verb)) && toks.slice(0, v).every(t => t.repaired || !t.senses.some(x => x.cat === 'COLON' || x.cat === 'VERB'))) {
       const subj = { i: 0, from: 0, j: v };
       cands.push([subj], ...one.filter(s => s.i > v).map(s => [subj, s]));
     }
@@ -20622,7 +20729,7 @@ const PORTUGUESE = {
   DET: 'o|a|os|as|um|uma|uns|umas|este|esta|esse|essa|meu|minha|nosso|nossa',
   REF: 'último|última|ultimo|ultima|últimos|últimas|anterior|atual|primeiro|primeira|novo|nova',
   QUANT: 'todos|todas|todo|toda|cada', EXCEPT: 'exceto|menos|excluindo|tirando|fora', CONJ: 'e|ou|mais', COMMA: ',',
-  PREP: 'com|usando|por|em|no|na|nos|nas|para|pra|pro|de|do|da|dos|das|a|ao|à|às|até|como|acima de|abaixo de|sem|contra|dentro de|sobre|onde|depois de|antes de|desde|entre|durante|através de|atraves de|perto de|>|<|>=|<=|=|≥|≤|maior que|menor que|pelo menos|no mínimo|no minimo|no máximo|no maximo|igual a',
+  PREP: 'com|usando|por|em|no|na|nos|nas|para|pra|pro|de|do|da|dos|das|a|ao|à|às|até|como|acima de|abaixo de|sem|contra|dentro de|sobre|onde|agrupado por|ponderado por|ordenado por|que têm|que tem|depois de|antes de|desde|entre|durante|através de|atraves de|perto de|>|<|>=|<=|=|≥|≤|maior que|menor que|pelo menos|no mínimo|no minimo|no máximo|no maximo|igual a',
   THEN: 'depois|então|em seguida|aí', BUT: 'mas|porém|só que', PRON: 'isso|isto|ele|ela|eles|elas',
   AGAIN: 'de novo|novamente|repete|repetir|refaz|refazer|mesmo|mesma|igual|outra vez',
   QWORD: 'por que|porque|como|qual|quais|quando|quem|é|são|será|pode|poderia|deveria|dá',
@@ -20634,7 +20741,7 @@ const PORTUGUESE = {
     com: ['with'], usando: ['using'], por: ['by'], em: ['in', 'on'], no: ['in', 'on'], na: ['in', 'on'], nos: ['in', 'on'], nas: ['in', 'on'],
     para: ['for', 'to', 'into'], pra: ['for', 'to', 'into'], pro: ['for', 'to', 'into'], de: ['of', 'from'], do: ['of', 'from'], da: ['of', 'from'], dos: ['of', 'from'], das: ['of', 'from'],
     a: ['to', 'at'], ao: ['to', 'at'], 'à': ['to', 'at'], 'até': ['to'], como: ['as'], 'acima de': ['above', 'over'], 'abaixo de': ['below', 'under'],
-    sem: ['without'], contra: ['against'], 'dentro de': ['into'], sobre: ['on'], 'às': ['at', 'to'], onde: ['where'], 'depois de': ['after'], 'antes de': ['before'], desde: ['since', 'from'], entre: ['between'], durante: ['during'], 'através de': ['through'], 'atraves de': ['through'], 'perto de': ['near'],
+    sem: ['without'], contra: ['against'], 'dentro de': ['into'], sobre: ['on'], 'às': ['at', 'to'], onde: ['where'], 'agrupado por': ['by'], 'ponderado por': ['weighted'], 'ordenado por': ['sort'], 'que têm': ['where'], 'que tem': ['where'], 'depois de': ['after'], 'antes de': ['before'], desde: ['since', 'from'], entre: ['between'], durante: ['during'], 'através de': ['through'], 'atraves de': ['through'], 'perto de': ['near'],
     '>': ['above'], 'maior que': ['above'], '<': ['below'], 'menor que': ['below'], '>=': ['atleast'], '≥': ['atleast'], 'pelo menos': ['atleast'], 'no mínimo': ['atleast'], 'no minimo': ['atleast'],
     '<=': ['atmost'], '≤': ['atmost'], 'no máximo': ['atmost'], 'no maximo': ['atmost'], '=': ['equals'], 'igual a': ['equals'],
   },
@@ -20681,7 +20788,8 @@ const norm = s => s.trim().replace(/\s+/g, ' ').replace(/[?.!]+$/, '');
 
 /* ── rung 2, first half: the clause parser over golem's ontology ── */
 let clause = null, clauseFor = null;
-const clauseEngine = () => { const key = (S.table ? S.table.hash : 'sample') + '|' + Object.keys(S.files).sort().join(','); if (!clause || clauseFor !== key) { clause = createEngine(ontology(), ENGLISH); clauseFor = key; } return clause; };
+// rebuilt whenever what it reads changes: the open table's columns, kept files, saved places, logged activities
+const clauseEngine = () => { const o = ontology(), key = JSON.stringify(o); if (!clause || clauseFor !== key) { clause = createEngine(o, ENGLISH); clauseFor = key; } return clause; };
 const clauseSession = () => S.clause || (S.clause = makeSession([]));
 // The parser's verdict on a text, then the frame's bind(): a frame may answer { tool, args }, or
 // { clarify } when the reading is whole but a value is missing, which becomes a clarify verdict too.
@@ -20692,7 +20800,8 @@ const bindOf = cmd => { const f = FRAMES.find(x => x.name === cmd.verb), b = f &
 function verdictOf(text, session) {
   let r = clauseEngine().understand(text, session);
   if (r.status === 'ambiguous' && r.alternatives) {
-    const takers = r.alternatives.map((cmds, k) => ({ cmds, echo: r.readings[k], b: bindOf(cmds[0]) })).filter(x => x.b);
+    const bound = r.alternatives.map((cmds, k) => ({ cmds, echo: r.readings[k], b: bindOf(cmds[0]) })).filter(x => x.b);
+    const takers = bound.filter((x, i) => bound.findIndex(y => JSON.stringify(y.b) === JSON.stringify(x.b)) === i);   // the same call twice is one reading
     if (takers.length !== 1) return { r };
     const t = takers[0];
     r = { status: 'ok', commands: t.cmds, echo: t.echo, diag: { ...r.diag, notes: [...r.diag.notes, `${r.readings.length} readings; only "${t.echo.replace(/\.$/, '')}" names a tool that takes it`] } };

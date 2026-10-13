@@ -10,7 +10,8 @@ export const norm = s => s.trim().replace(/\s+/g, ' ').replace(/[?.!]+$/, '');
 
 /* ── rung 2, first half: the clause parser over golem's ontology ── */
 let clause = null, clauseFor = null;
-export const clauseEngine = () => { const key = (S.table ? S.table.hash : 'sample') + '|' + Object.keys(S.files).sort().join(','); if (!clause || clauseFor !== key) { clause = createEngine(ontology(), ENGLISH); clauseFor = key; } return clause; };
+// rebuilt whenever what it reads changes: the open table's columns, kept files, saved places, logged activities
+export const clauseEngine = () => { const o = ontology(), key = JSON.stringify(o); if (!clause || clauseFor !== key) { clause = createEngine(o, ENGLISH); clauseFor = key; } return clause; };
 const clauseSession = () => S.clause || (S.clause = makeSession([]));
 // The parser's verdict on a text, then the frame's bind(): a frame may answer { tool, args }, or
 // { clarify } when the reading is whole but a value is missing, which becomes a clarify verdict too.
@@ -21,7 +22,8 @@ const bindOf = cmd => { const f = FRAMES.find(x => x.name === cmd.verb), b = f &
 function verdictOf(text, session) {
   let r = clauseEngine().understand(text, session);
   if (r.status === 'ambiguous' && r.alternatives) {
-    const takers = r.alternatives.map((cmds, k) => ({ cmds, echo: r.readings[k], b: bindOf(cmds[0]) })).filter(x => x.b);
+    const bound = r.alternatives.map((cmds, k) => ({ cmds, echo: r.readings[k], b: bindOf(cmds[0]) })).filter(x => x.b);
+    const takers = bound.filter((x, i) => bound.findIndex(y => JSON.stringify(y.b) === JSON.stringify(x.b)) === i);   // the same call twice is one reading
     if (takers.length !== 1) return { r };
     const t = takers[0];
     r = { status: 'ok', commands: t.cmds, echo: t.echo, diag: { ...r.diag, notes: [...r.diag.notes, `${r.readings.length} readings; only "${t.echo.replace(/\.$/, '')}" names a tool that takes it`] } };
