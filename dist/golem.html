@@ -385,6 +385,8 @@ function frame(f) { FRAMES.push(f); return f; }
 //   amend({ tools, name, words, theme, roles, …, bind(cmd, args, card) → { args } | { tool, args } | null })
 // Amendments that change one of a frame's roles need none: "in feet" is the last command with its unit changed.
 const amend = f => frame({ ...f, amends: f.tools });
+// A session frame acts on the session, not through a tool: bind(cmd) → { session: 'new' | 'drawer' | 'rename' | 'undo' | 'again' | 'recipe' | 'yes', … }
+const session = f => frame({ ...f, session: true });
 // The words a file contributes beside its frames, gathered into the ontology by ontology():
 //   noun({ type, words, generic, words_pt, generic_pt })   a type of thing; a function returning one is
 //                                                           called each time (a noun that follows the open table)
@@ -462,7 +464,7 @@ const p3 = x => String(Math.round(x) % 360).padStart(3, '0');
 const p2 = x => String(Math.round(x)).padStart(2, '0');
 // a quantity node from the parser as a number in a base unit, given the unit's factor
 const qty = (node, f) => node && node.type === 'quantity' ? node.n * f(node.unit) : null;
-  return { S, T, TOOLS, tool, toolByName, FRAMES, frame, amend, LEXICON, noun, shape, postmod, unit, qmod, compound, CONDITIONS, condition, setRunner, onJobDone, result, clearResults, startJobs, settle, runTool, clock, fmt, iso, rad, deg, p3, p2, qty };
+  return { S, T, TOOLS, tool, toolByName, FRAMES, frame, amend, session, LEXICON, noun, shape, postmod, unit, qmod, compound, CONDITIONS, condition, setRunner, onJobDone, result, clearResults, startJobs, settle, runTool, clock, fmt, iso, rad, deg, p3, p2, qty };
 })();
 
 /* ==== src/engine/units.js ==== */
@@ -17110,7 +17112,7 @@ amend({ tools: ['docPassage'], name: 'docstep', label: 'Passage', words: [], eli
 
 /* ==== src/engine/recipes.js ==== */
 const __m42 = (() => {
-const { S, tool, frame, noun, runTool } = __m0;
+const { S, tool, frame, noun, session, runTool } = __m0;
 const { listOf } = __m32;
 // Recipes (A9): a session's plan saved under a name, with the subjects that may change between runs.
 // A recipe is stored as card specs, plain JSON like a session; running it replays every step with the
@@ -17290,10 +17292,16 @@ frame({
   bind: c => ({ tool: 'recipeForget', args: { name: nameOf(String(c.theme[0].value)) } })
 });
 // "run cu check on every table"
-noun({ type: 'everytable', words: { all: ['every table', 'each table', 'all tables', 'all the tables', 'every kept table', 'every file', 'each file', 'all files', 'every csv', 'every sheet'] }, words_pt: { all: ['cada tabela', 'todas as tabelas'] } });
+const EVERY = ['every table', 'each table', 'all tables', 'all the tables', 'every kept table', 'every file', 'each file', 'all files', 'every csv', 'every sheet'];
+noun({ type: 'everytable', words: { all: EVERY }, words_pt: { all: ['cada tabela', 'todas as tabelas'] } });
 frame({
   name: 'recipeBatch', label: 'Run on every table', words: ['run', 'apply'], theme: ['recipe'], required: ['theme', 'on'], roles: { on: { preps: ['on', 'over', 'for', 'across'], types: ['everytable'] } }, words_pt: ['roda', 'aplica'], label_pt: 'Rodar em cada tabela',
   bind: c => ({ tool: 'recipeBatch', args: { name: c.theme[0].value, files: tableFiles().map(f => ({ name: f.name, hash: f.hash })) } })
+});
+// "run cu check for au", "run cu check for au on holes.csv", "run cu check": a session of its own, not a card
+session({
+  name: 'recipeRun', label: 'Run recipe', words: ['run', 'apply', 'use', 'replay'], theme: ['recipe'], required: ['theme'], roles: { rest: { preps: ['for', 'on', 'with', 'using', ''], types: ['text'] } }, words_pt: ['roda', 'aplica'], label_pt: 'Rodar receita',
+  bind: c => { const rest = c.roles.rest ? c.roles.rest[0].value.trim() : ''; return EVERY.includes(rest.toLowerCase()) ? null : { session: 'recipe', name: c.theme[0].value, rest }; }
 });
   return { subjects, runSteps, bindingsOf, recipeNamed, recipeAt };
 })();
@@ -19014,7 +19022,7 @@ function ontology(only) {
     compounds: [{ mod: 'filter', heads: ['country'], attr: 'filter', echo: true }, { mod: 'scale', heads: ['plot'], attr: 'scale', echo: true }, ...LEXICON.compounds],
     postmods: LEXICON.postmods,
     qmods: [{ head: 'timer', attr: 'duration', dims: ['time'] }, ...LEXICON.qmods],   // "a 30 minute timer"
-    verbs: (only || FRAMES.filter(f => !f.amends)).map(({ bind, tools, amends, ...f }) => f),
+    verbs: (only || FRAMES.filter(f => !f.amends && !f.session)).map(({ bind, tools, amends, session, ...f }) => f),
     inherit: [],
     echoOrder: ['of', 'unit', 'by', 'scale', 'for', 'as'],
     roleLabels_pt: { of: 'de', unit: 'unidade', by: 'por', scale: 'escala', for: 'duração', as: 'como' },
@@ -21011,7 +21019,7 @@ const PORTUGUESE = {
 
 /* ==== src/engine/reading.js ==== */
 const __m50 = (() => {
-const { S, T, TOOLS, FRAMES, tool, frame, amend, noun, toolByName, runTool, iso } = __m0;
+const { S, T, TOOLS, FRAMES, tool, frame, amend, session, noun, toolByName, runTool, iso } = __m0;
 const { examples, vocab } = __m47;
 const { ontology } = __m48;
 const { calcOf } = __m2;
@@ -21198,7 +21206,25 @@ frame({
 // "why", "show the plan": the steps behind the last card, whatever its tool
 amend({ tools: ['*'], name: 'why', label: 'Why', words: ['why', 'how', 'how so', 'show the plan', 'show me the plan', 'show the trace', 'show the work', 'show me the work', 'what did you do', 'explain that'], theme: [], required: [], roles: {},
   words_pt: ['por quê', 'por que', 'como', 'mostra o plano'], label_pt: 'Por quê', bind: (c, a, card) => ({ tool: 'why', args: { ref: card.id } }) });
-  return { norm, clauseEngine, clauseRead, grammar, commandOf, context, taught };
+/* ── the session's own commands: read first, by a parser of their own ── */
+noun({ amend: true, type: 'history', words: { all: ['sessions', 'history', 'menu', 'my sessions', 'the history', 'the sessions', 'all sessions'] }, words_pt: { all: ['sessões', 'histórico', 'menu'] } });
+session({ name: 'newsession', label: 'New session', words: ['new session', 'start a new session', 'start new session', 'start a session', 'a new session', 'fresh session', 'start over', 'start afresh'], theme: [], required: [], roles: {},
+  words_pt: ['nova sessão', 'nova sessao', 'começar de novo'], label_pt: 'Nova sessão', bind: () => ({ session: 'new' }) });
+session({ name: 'drawer', label: 'Sessions', words: ['show', 'open', 'list'], elidable: true, theme: ['history'], required: ['theme'], roles: {}, words_pt: ['mostra', 'abre'], label_pt: 'Sessões', bind: () => ({ session: 'drawer' }) });
+session({ name: 'rename', label: 'Name session', words: ['name this session', 'name this', 'call this session', 'call this', 'rename this session', 'rename this', 'rename the session', 'rename session', 'name the session'], lead: ['to', 'as'], theme: ['text'], required: ['theme'], roles: {},
+  words_pt: ['chama esta sessão de', 'renomeia a sessão para'], label_pt: 'Nomear sessão', bind: c => ({ session: 'rename', name: c.theme[0].value.trim() }) });
+session({ name: 'undo', label: 'Undo', words: ['undo', 'undo that', 'take that back', 'scratch that', 'remove that', 'never mind'], theme: [], required: [], roles: {}, words_pt: ['desfaz', 'desfazer'], label_pt: 'Desfazer', bind: () => ({ session: 'undo' }) });
+session({ name: 'again', label: 'Again', words: ['again', 'repeat', 'rerun', 'do it again', 'repeat that', 'one more time', 'run it again'], theme: [], required: [], roles: {}, words_pt: ['de novo', 'repete'], label_pt: 'De novo', bind: () => ({ session: 'again' }) });
+session({ name: 'yes', label: 'Yes', words: ['yes', 'ok', 'okay', 'sure', 'do it', 'go', 'go ahead', 'yes please', 'yep', 'yeah', 'please do', 'that one'], theme: [], required: [], roles: {}, words_pt: ['sim', 'pode', 'isso'], label_pt: 'Sim', bind: () => ({ session: 'yes' }) });
+let sessionEngine = null;
+function sessionRead(raw) {
+  const frames = FRAMES.filter(f => f.session), o = ontology(frames), key = JSON.stringify(o);
+  if (!sessionEngine || sessionEngine.key !== key) sessionEngine = { key, E: createEngine(o, ENGLISH) };
+  const r = sessionEngine.E.understand(raw, makeSession([]));
+  if (r.status !== 'ok') return null;
+  const cmd = r.commands[0], f = frames.find(x => x.name === cmd.verb); return f ? f.bind(cmd) : null;
+}
+  return { norm, clauseEngine, clauseRead, grammar, commandOf, context, taught, sessionRead };
 })();
 
 /* ==== src/engine/sessions.js ==== */
@@ -21296,10 +21322,10 @@ const __m52 = (() => {
 const { S, T, runTool, toolByName, startJobs } = __m0;
 const { DOCUMENT } = __m9;
 const { DOCTEXT } = __m41;
-const { recipeAt, bindingsOf, runSteps } = __m42;
+const { bindingsOf, runSteps } = __m42;
 const { tableFromText } = __m13;
 const { convertBinary } = __m45;
-const { norm, grammar, context, taught, clauseRead } = __m50;
+const { norm, grammar, context, taught, sessionRead } = __m50;
 const { current, newSession, renameSession, touch } = __m51;
 // The entry point: submit(raw) reads a request and returns what happened. Cards are recomputed in
 // place by rerun(); answers and slot flips go through it, so args stay the only state that matters.
@@ -21334,26 +21360,26 @@ function undo() {
 function submit(raw) {
   raw = raw.trim(); if (!raw) return { kind: 'empty' };
   const t0 = performance.now(), text = norm(raw), q = text.toLowerCase(), last = S.cards[S.cards.length - 1];
-  let m;
-  if (/^(start )?(a )?new session$/.test(q)) { newSession(); return { kind: 'new-session' }; }
+  // the session's own commands, read by the clause parser over the session frames
+  const s = sessionRead(raw);
+  if (s && s.session === 'new') { newSession(); return { kind: 'new-session' }; }
   if (!current()) newSession();
-  if (/^(sessions|history|menu)$/.test(q)) return { kind: 'drawer' };
-  if ((m = /^(?:(?:name|call|rename) this(?: session)?|rename(?: the)? session)(?: to| as)? (.+)$/.exec(q))) { const name = text.slice(-m[1].length); renameSession(current().id, name); return { kind: 'rename', name }; }
+  if (s && s.session === 'drawer') return { kind: 'drawer' };
+  if (s && s.session === 'rename') { renameSession(current().id, s.name); return { kind: 'rename', name: s.name }; }
   if (last && last.res.ask) {
     // a typed list ("a, b") is an answer of several, before any one option is matched loosely inside it
     const many = last.res.ask.parse && /,|\band\b/.test(q) ? last.res.ask.parse(text) : null;
     if (Array.isArray(many) && many.length > 1) { last.res.ask.set(last.args, many); rerun(last); return { kind: 'answered', card: last, label: many.join(', ') }; }
-    const os = last.res.ask.options, o = os.find(x => x.label.toLowerCase() === q) || os.find(x => x.label.length >= 3 && (x.label.toLowerCase().startsWith(q) || q.includes(x.label.toLowerCase()))) || (os.length === 1 && /^(yes|ok|okay|sure|do it|go)$/.test(q) ? os[0] : null);
+    // an option by its label, as the card wrote it; "yes" when there is only one
+    const os = last.res.ask.options, o = os.find(x => x.label.toLowerCase() === q) || os.find(x => x.label.length >= 3 && (x.label.toLowerCase().startsWith(q) || q.includes(x.label.toLowerCase()))) || (os.length === 1 && s && s.session === 'yes' ? os[0] : null);
     if (o) { last.res.ask.set(last.args, o.value); rerun(last); return { kind: 'answered', card: last, label: o.label }; }
     if (last.res.ask.parse) { const v = last.res.ask.parse(text); if (v != null) { last.res.ask.set(last.args, v); rerun(last); return { kind: 'answered', card: last, label: Array.isArray(v) ? v.join(', ') : String(v) }; } }
   }
-  if (/^undo( that)?$/.test(q)) { const c = undo(); return c ? { kind: 'undo', card: c } : { kind: 'nothing', msg: 'Nothing to undo.' }; }
-  if (/^(again|repeat|rerun|do it again)$/.test(q)) return last ? submit(last.raw) : { kind: 'nothing', msg: 'Nothing to repeat.' };
-  // a saved recipe by name: replayed with the new subjects into a session of its own (a batch is a card)
-  if ((m = /^run\s+(.+)$/i.exec(text))) {
-    const ba = clauseRead(raw, 'grammar'); if (ba.tool === 'recipeBatch') return { kind: 'card', card: addCard(raw, ba, performance.now() - t0) };
-    const at = recipeAt(m[1]); if (at) return runRecipe(at[0], at[1]);
-  }
+  if (s && s.session === 'undo') { const c = undo(); return c ? { kind: 'undo', card: c } : { kind: 'nothing', msg: 'Nothing to undo.' }; }
+  if (s && s.session === 'again') return last ? submit(last.raw) : { kind: 'nothing', msg: 'Nothing to repeat.' };
+  if (s && s.session === 'yes') return { kind: 'nothing', msg: last && last.res.ask ? 'Which one? Tap an option or type it.' : 'Nothing is waiting for a yes.' };
+  // a saved recipe by name: replayed with the new subjects into a session of its own (a batch on every table is a card)
+  if (s && s.session === 'recipe') return runRecipe(S.recipes[s.name], s.rest);
   // a whole command first; then what amends the last card ("in feet", "2 sentences"); then the words taught on this device
   const r = grammar(text, q, 'grammar', raw) || context(q, last, raw) || taught(text, q, raw) || { tool: 'none', args: { q }, rung: 'none', res: T.none({ q }) };
   return { kind: 'card', card: addCard(raw, r, performance.now() - t0) };

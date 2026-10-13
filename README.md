@@ -36,7 +36,7 @@ Open `dist/golem.html`, then:
 - Tap the paperclip and open a CSV of your own. `mean cu by lith where au > 0.1`, `how many rows where cu > 1`, `top 5 rows sorted by au descending`, `check intervals`, `histogram of fe`: the column names come from the file.
 - Tap *sleep* (top right) to put golem to sleep; nothing runs until you tap *wake*.
 
-The Skills tab lists everything that runs, with examples. Each skill is one declaration in `src/engine/`: the tool, the rule that reads it, the phrases that amend it, what it contributes to a session name, and the verb frame the clause parser reads it by.
+The Skills tab lists everything that runs, with examples. Each skill is one declaration in `src/engine/`: the tool, the clause frames that read it and amend it, what it contributes to a session name, and the verb frame the clause parser reads it by.
 
 ## Build and test
 

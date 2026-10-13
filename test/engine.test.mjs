@@ -136,16 +136,15 @@ test('the ontology derives from the declarations and is plain JSON', () => {
 });
 
 // Every query is read by the clause parser. Arithmetic is the one exception by design: it goes to the
-// expression parser. MOVING lists what still reads by a regex rule while the tools move to frames.
+// expression parser (dispatch SPEC, the grammar rung).
 const ARITHMETIC = new Set(['14 * cos(22) + 3^2']);
-const MOVING = new Set([]);
 test('the clause parser reads every query but arithmetic', () => {
   g.reset();
   for (const [q, rung] of STEPS) {
     const o = g.submit(q);
     if (rung === null || o.kind !== 'card' || o.card.rung === 'none' || o.card.rung === 'context') continue;
     const viaClause = o.card.res.trace.some(t => t.startsWith('clause: '));
-    assert.equal(viaClause, !ARITHMETIC.has(q) && !MOVING.has(q), `"${q}" read by ${viaClause ? 'clause' : 'a regex rule'}: ${o.card.res.trace[0]}`);
+    assert.equal(viaClause, !ARITHMETIC.has(q), `"${q}" read by ${viaClause ? 'clause' : 'a regex rule'}: ${o.card.res.trace[0]}`);
   }
   const asked = g.submit('what is the capital of brazil?').card;
   assert.equal(asked.tool, 'fact');

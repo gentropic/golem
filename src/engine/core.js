@@ -38,6 +38,8 @@ export function frame(f) { FRAMES.push(f); return f; }
 //   amend({ tools, name, words, theme, roles, …, bind(cmd, args, card) → { args } | { tool, args } | null })
 // Amendments that change one of a frame's roles need none: "in feet" is the last command with its unit changed.
 export const amend = f => frame({ ...f, amends: f.tools });
+// A session frame acts on the session, not through a tool: bind(cmd) → { session: 'new' | 'drawer' | 'rename' | 'undo' | 'again' | 'recipe' | 'yes', … }
+export const session = f => frame({ ...f, session: true });
 // The words a file contributes beside its frames, gathered into the ontology by ontology():
 //   noun({ type, words, generic, words_pt, generic_pt })   a type of thing; a function returning one is
 //                                                           called each time (a noun that follows the open table)

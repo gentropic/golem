@@ -1,7 +1,7 @@
 // The reading ladder: context (amendments, meta-intents), grammar (the clause parser, then the regex
 // rules the declarations carry), taught words (device lexicon rewrites, then grammar again). Plus the
 // tools that talk about the session itself: none, why, export.
-import { S, T, TOOLS, FRAMES, tool, frame, amend, noun, toolByName, runTool, iso } from './core.js';
+import { S, T, TOOLS, FRAMES, tool, frame, amend, session, noun, toolByName, runTool, iso } from './core.js';
 import { examples, vocab } from './skills.js';
 import { ontology } from './ontology.js';
 import { calcOf } from './calc.js';
@@ -185,3 +185,21 @@ frame({
 // "why", "show the plan": the steps behind the last card, whatever its tool
 amend({ tools: ['*'], name: 'why', label: 'Why', words: ['why', 'how', 'how so', 'show the plan', 'show me the plan', 'show the trace', 'show the work', 'show me the work', 'what did you do', 'explain that'], theme: [], required: [], roles: {},
   words_pt: ['por quê', 'por que', 'como', 'mostra o plano'], label_pt: 'Por quê', bind: (c, a, card) => ({ tool: 'why', args: { ref: card.id } }) });
+/* ── the session's own commands: read first, by a parser of their own ── */
+noun({ amend: true, type: 'history', words: { all: ['sessions', 'history', 'menu', 'my sessions', 'the history', 'the sessions', 'all sessions'] }, words_pt: { all: ['sessões', 'histórico', 'menu'] } });
+session({ name: 'newsession', label: 'New session', words: ['new session', 'start a new session', 'start new session', 'start a session', 'a new session', 'fresh session', 'start over', 'start afresh'], theme: [], required: [], roles: {},
+  words_pt: ['nova sessão', 'nova sessao', 'começar de novo'], label_pt: 'Nova sessão', bind: () => ({ session: 'new' }) });
+session({ name: 'drawer', label: 'Sessions', words: ['show', 'open', 'list'], elidable: true, theme: ['history'], required: ['theme'], roles: {}, words_pt: ['mostra', 'abre'], label_pt: 'Sessões', bind: () => ({ session: 'drawer' }) });
+session({ name: 'rename', label: 'Name session', words: ['name this session', 'name this', 'call this session', 'call this', 'rename this session', 'rename this', 'rename the session', 'rename session', 'name the session'], lead: ['to', 'as'], theme: ['text'], required: ['theme'], roles: {},
+  words_pt: ['chama esta sessão de', 'renomeia a sessão para'], label_pt: 'Nomear sessão', bind: c => ({ session: 'rename', name: c.theme[0].value.trim() }) });
+session({ name: 'undo', label: 'Undo', words: ['undo', 'undo that', 'take that back', 'scratch that', 'remove that', 'never mind'], theme: [], required: [], roles: {}, words_pt: ['desfaz', 'desfazer'], label_pt: 'Desfazer', bind: () => ({ session: 'undo' }) });
+session({ name: 'again', label: 'Again', words: ['again', 'repeat', 'rerun', 'do it again', 'repeat that', 'one more time', 'run it again'], theme: [], required: [], roles: {}, words_pt: ['de novo', 'repete'], label_pt: 'De novo', bind: () => ({ session: 'again' }) });
+session({ name: 'yes', label: 'Yes', words: ['yes', 'ok', 'okay', 'sure', 'do it', 'go', 'go ahead', 'yes please', 'yep', 'yeah', 'please do', 'that one'], theme: [], required: [], roles: {}, words_pt: ['sim', 'pode', 'isso'], label_pt: 'Sim', bind: () => ({ session: 'yes' }) });
+let sessionEngine = null;
+export function sessionRead(raw) {
+  const frames = FRAMES.filter(f => f.session), o = ontology(frames), key = JSON.stringify(o);
+  if (!sessionEngine || sessionEngine.key !== key) sessionEngine = { key, E: createEngine(o, ENGLISH) };
+  const r = sessionEngine.E.understand(raw, makeSession([]));
+  if (r.status !== 'ok') return null;
+  const cmd = r.commands[0], f = frames.find(x => x.name === cmd.verb); return f ? f.bind(cmd) : null;
+}

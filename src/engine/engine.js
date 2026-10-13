@@ -27,11 +27,11 @@ import './apply.js';
 import './python.js';
 import { DOCUMENT } from './interchange.js';
 import { DOCTEXT } from './docs.js';
-import { recipeAt, bindingsOf, runSteps } from './recipes.js';
+import { bindingsOf, runSteps } from './recipes.js';
 import { tableFromText } from './table.js';
 import { convertBinary } from './formats.js';
 import './notes.js';
-import { norm, grammar, context, taught, clauseRead } from './reading.js';
+import { norm, grammar, context, taught, sessionRead } from './reading.js';
 import { current, newSession, renameSession, touch } from './sessions.js';
 
 export function addCard(raw, r, ms) {
@@ -64,26 +64,26 @@ export function undo() {
 export function submit(raw) {
   raw = raw.trim(); if (!raw) return { kind: 'empty' };
   const t0 = performance.now(), text = norm(raw), q = text.toLowerCase(), last = S.cards[S.cards.length - 1];
-  let m;
-  if (/^(start )?(a )?new session$/.test(q)) { newSession(); return { kind: 'new-session' }; }
+  // the session's own commands, read by the clause parser over the session frames
+  const s = sessionRead(raw);
+  if (s && s.session === 'new') { newSession(); return { kind: 'new-session' }; }
   if (!current()) newSession();
-  if (/^(sessions|history|menu)$/.test(q)) return { kind: 'drawer' };
-  if ((m = /^(?:(?:name|call|rename) this(?: session)?|rename(?: the)? session)(?: to| as)? (.+)$/.exec(q))) { const name = text.slice(-m[1].length); renameSession(current().id, name); return { kind: 'rename', name }; }
+  if (s && s.session === 'drawer') return { kind: 'drawer' };
+  if (s && s.session === 'rename') { renameSession(current().id, s.name); return { kind: 'rename', name: s.name }; }
   if (last && last.res.ask) {
     // a typed list ("a, b") is an answer of several, before any one option is matched loosely inside it
     const many = last.res.ask.parse && /,|\band\b/.test(q) ? last.res.ask.parse(text) : null;
     if (Array.isArray(many) && many.length > 1) { last.res.ask.set(last.args, many); rerun(last); return { kind: 'answered', card: last, label: many.join(', ') }; }
-    const os = last.res.ask.options, o = os.find(x => x.label.toLowerCase() === q) || os.find(x => x.label.length >= 3 && (x.label.toLowerCase().startsWith(q) || q.includes(x.label.toLowerCase()))) || (os.length === 1 && /^(yes|ok|okay|sure|do it|go)$/.test(q) ? os[0] : null);
+    // an option by its label, as the card wrote it; "yes" when there is only one
+    const os = last.res.ask.options, o = os.find(x => x.label.toLowerCase() === q) || os.find(x => x.label.length >= 3 && (x.label.toLowerCase().startsWith(q) || q.includes(x.label.toLowerCase()))) || (os.length === 1 && s && s.session === 'yes' ? os[0] : null);
     if (o) { last.res.ask.set(last.args, o.value); rerun(last); return { kind: 'answered', card: last, label: o.label }; }
     if (last.res.ask.parse) { const v = last.res.ask.parse(text); if (v != null) { last.res.ask.set(last.args, v); rerun(last); return { kind: 'answered', card: last, label: Array.isArray(v) ? v.join(', ') : String(v) }; } }
   }
-  if (/^undo( that)?$/.test(q)) { const c = undo(); return c ? { kind: 'undo', card: c } : { kind: 'nothing', msg: 'Nothing to undo.' }; }
-  if (/^(again|repeat|rerun|do it again)$/.test(q)) return last ? submit(last.raw) : { kind: 'nothing', msg: 'Nothing to repeat.' };
-  // a saved recipe by name: replayed with the new subjects into a session of its own (a batch is a card)
-  if ((m = /^run\s+(.+)$/i.exec(text))) {
-    const ba = clauseRead(raw, 'grammar'); if (ba.tool === 'recipeBatch') return { kind: 'card', card: addCard(raw, ba, performance.now() - t0) };
-    const at = recipeAt(m[1]); if (at) return runRecipe(at[0], at[1]);
-  }
+  if (s && s.session === 'undo') { const c = undo(); return c ? { kind: 'undo', card: c } : { kind: 'nothing', msg: 'Nothing to undo.' }; }
+  if (s && s.session === 'again') return last ? submit(last.raw) : { kind: 'nothing', msg: 'Nothing to repeat.' };
+  if (s && s.session === 'yes') return { kind: 'nothing', msg: last && last.res.ask ? 'Which one? Tap an option or type it.' : 'Nothing is waiting for a yes.' };
+  // a saved recipe by name: replayed with the new subjects into a session of its own (a batch on every table is a card)
+  if (s && s.session === 'recipe') return runRecipe(S.recipes[s.name], s.rest);
   // a whole command first; then what amends the last card ("in feet", "2 sentences"); then the words taught on this device
   const r = grammar(text, q, 'grammar', raw) || context(q, last, raw) || taught(text, q, raw) || { tool: 'none', args: { q }, rung: 'none', res: T.none({ q }) };
   return { kind: 'card', card: addCard(raw, r, performance.now() - t0) };

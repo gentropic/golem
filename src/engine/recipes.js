@@ -2,7 +2,7 @@
 // A recipe is stored as card specs, plain JSON like a session; running it replays every step with the
 // new subjects into a new session, and stops at the first step that no longer reads. Nothing is skipped
 // and nothing is guessed. Recipes live on the device, like taught words.
-import { S, tool, frame, noun, runTool } from './core.js';
+import { S, tool, frame, noun, session, runTool } from './core.js';
 import { listOf } from './forms.js';
 
 // cards that are about the session or about recipes are not steps
@@ -178,8 +178,14 @@ frame({
   bind: c => ({ tool: 'recipeForget', args: { name: nameOf(String(c.theme[0].value)) } })
 });
 // "run cu check on every table"
-noun({ type: 'everytable', words: { all: ['every table', 'each table', 'all tables', 'all the tables', 'every kept table', 'every file', 'each file', 'all files', 'every csv', 'every sheet'] }, words_pt: { all: ['cada tabela', 'todas as tabelas'] } });
+const EVERY = ['every table', 'each table', 'all tables', 'all the tables', 'every kept table', 'every file', 'each file', 'all files', 'every csv', 'every sheet'];
+noun({ type: 'everytable', words: { all: EVERY }, words_pt: { all: ['cada tabela', 'todas as tabelas'] } });
 frame({
   name: 'recipeBatch', label: 'Run on every table', words: ['run', 'apply'], theme: ['recipe'], required: ['theme', 'on'], roles: { on: { preps: ['on', 'over', 'for', 'across'], types: ['everytable'] } }, words_pt: ['roda', 'aplica'], label_pt: 'Rodar em cada tabela',
   bind: c => ({ tool: 'recipeBatch', args: { name: c.theme[0].value, files: tableFiles().map(f => ({ name: f.name, hash: f.hash })) } })
+});
+// "run cu check for au", "run cu check for au on holes.csv", "run cu check": a session of its own, not a card
+session({
+  name: 'recipeRun', label: 'Run recipe', words: ['run', 'apply', 'use', 'replay'], theme: ['recipe'], required: ['theme'], roles: { rest: { preps: ['for', 'on', 'with', 'using', ''], types: ['text'] } }, words_pt: ['roda', 'aplica'], label_pt: 'Rodar receita',
+  bind: c => { const rest = c.roles.rest ? c.roles.rest[0].value.trim() : ''; return EVERY.includes(rest.toLowerCase()) ? null : { session: 'recipe', name: c.theme[0].value, rest }; }
 });

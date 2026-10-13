@@ -57,7 +57,7 @@ export function ontology(only) {
     compounds: [{ mod: 'filter', heads: ['country'], attr: 'filter', echo: true }, { mod: 'scale', heads: ['plot'], attr: 'scale', echo: true }, ...LEXICON.compounds],
     postmods: LEXICON.postmods,
     qmods: [{ head: 'timer', attr: 'duration', dims: ['time'] }, ...LEXICON.qmods],   // "a 30 minute timer"
-    verbs: (only || FRAMES.filter(f => !f.amends)).map(({ bind, tools, amends, ...f }) => f),
+    verbs: (only || FRAMES.filter(f => !f.amends && !f.session)).map(({ bind, tools, amends, session, ...f }) => f),
     inherit: [],
     echoOrder: ['of', 'unit', 'by', 'scale', 'for', 'as'],
     roleLabels_pt: { of: 'de', unit: 'unidade', by: 'por', scale: 'escala', for: 'duração', as: 'como' },
