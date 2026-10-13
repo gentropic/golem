@@ -1,8 +1,9 @@
 // Structural geometry over @gcu/bearing (vendored): apparent dip, the three-point problem, the line of
 // intersection of two planes, rake, oriented core, and the Fisher mean of a set. Every answer draws the
 // net. Planes are read as dip direction/dip with the usual strike/dip slot; lines as trend/plunge.
-import { tool, fmt, rad, deg, p3, p2 } from './core.js';
+import { frame, noun, postmod, qmod, tool, fmt, rad, deg, p3, p2 } from './core.js';
 import { conversions, vec3, statistics } from '../vendor/bearing.js';
+import { oriOf } from './orientation.js';
 
 const ORI = '(\\d{1,3})\\s*/\\s*(\\d{1,2})';
 const ddOf = (a1, conv) => conv === 'sd' ? (a1 + 90) % 360 : a1;
@@ -14,9 +15,8 @@ const ori = (a, b) => `${p3(a)}/${p2(b)}`;
 const SRC = { t: 'src', text: '@gcu/bearing · vendored · lower hemisphere, equal area' };
 
 tool({
-  name: 'apparent', rank: 62,
+  name: 'apparent',
   skill: { group: 'Field', title: 'Structural geometry', on: '@gcu/bearing', about: 'Apparent dip, three-point plane, intersection of planes, rake, oriented core, Fisher mean. Planes as dip direction/dip, flip the slot for strike/dip.', examples: ['apparent dip of 000/30 on a section at 045', 'intersection of 090/45 and 270/45', 'plane through 0,0,100 and 100,0,100 and 0,100,0', 'mean of 120/35, 130/40 and 125/38', 'core alpha 40 beta 230 in hole 270/60'] },
-  read: (text, q) => { const m = new RegExp(`^apparent dip of ${ORI} (?:on|along|in) (?:a )?section (?:at|of|azimuth|striking) (\\d{1,3})$`).exec(q); return m ? { a1: +m[1], a2: +m[2], conv: 'dd', az: +m[3] } : null; },
   topic: () => ['Apparent dip', 2],
   run: a => {
     const dd = ddOf(a.a1, a.conv), delta = a.az - dd, c = Math.cos(rad(delta)), app = deg(Math.atan(Math.tan(rad(a.a2)) * Math.abs(c)));
@@ -29,8 +29,7 @@ tool({
   }
 });
 tool({
-  name: 'threepoint', rank: 63,
-  read: (text, q) => { const N = '(-?\\d+(?:\\.\\d+)?)\\s*,\\s*(-?\\d+(?:\\.\\d+)?)\\s*,\\s*(-?\\d+(?:\\.\\d+)?)'; const m = new RegExp(`^(?:plane|bedding|contact|surface) through ${N} and ${N} and ${N}$`).exec(q); return m ? { p: [[+m[1], +m[2], +m[3]], [+m[4], +m[5], +m[6]], [+m[7], +m[8], +m[9]]] } : null; },
+  name: 'threepoint',
   topic: () => ['Three-point plane', 2],
   run: a => {
     const [p1, p2v, p3v] = a.p, v1 = vec3.sub(p2v, p1), v2 = vec3.sub(p3v, p1), n = vec3.cross(v1, v2);
@@ -45,8 +44,7 @@ tool({
   }
 });
 tool({
-  name: 'intersect', rank: 64,
-  read: (text, q) => { const m = new RegExp(`^(?:line of )?intersection of ${ORI} and ${ORI}$`).exec(q); return m ? { a: [+m[1], +m[2]], b: [+m[3], +m[4]], conv: 'dd' } : null; },
+  name: 'intersect',
   topic: () => ['Plane intersection', 2],
   run: a => {
     const d1 = ddOf(a.a[0], a.conv), d2 = ddOf(a.b[0], a.conv), n1 = conversions.planeToDcos(d1, a.a[1]), n2 = conversions.planeToDcos(d2, a.b[1]), l = vec3.cross(n1, n2);
@@ -61,11 +59,7 @@ tool({
   }
 });
 tool({
-  name: 'rake', rank: 65,
-  read: (text, q) => {
-    let m = new RegExp(`^(?:line (?:at|with) )?rake (?:of )?(\\d{1,3}) on ${ORI}$`).exec(q); if (m) return { rake: +m[1], a1: +m[2], a2: +m[3], conv: 'dd' };
-    m = new RegExp(`^rake of (?:lineation |line |the line )?${ORI} on ${ORI}$`).exec(q); return m ? { tr: +m[1], pl: +m[2], a1: +m[3], a2: +m[4], conv: 'dd' } : null;
-  },
+  name: 'rake',
   topic: () => ['Rake', 1],
   run: a => {
     const dd = ddOf(a.a1, a.conv), n = conversions.planeToDcos(dd, a.a2);
@@ -85,8 +79,7 @@ tool({
 // bottom-of-hole reference line to the down-hole apex of the ellipse. Other conventions exist (SPEC-skills,
 // open decision 9); the slot will carry them when a second one is wired.
 tool({
-  name: 'core', rank: 66,
-  read: (text, q) => { const m = new RegExp(`^(?:oriented )?core alpha (\\d{1,2}) beta (\\d{1,3}) in (?:a )?hole ${ORI}$`).exec(q); return m ? { alpha: +m[1], beta: +m[2], htr: +m[3], hpl: +m[4] } : null; },
+  name: 'core',
   topic: () => ['Oriented core', 2],
   run: a => {
     const read = ['core', { v: `alpha ${a.alpha}` }, { v: `beta ${a.beta}` }, 'in hole', { v: ori(a.htr, a.hpl) }];
@@ -104,8 +97,7 @@ tool({
   }
 });
 tool({
-  name: 'fmean', rank: 67,
-  read: (text, q) => { const m = new RegExp(`^(?:fisher )?mean of ((?:${ORI}(?:,? (?:and )?)?)+)$`).exec(q); if (!m) return null; const items = [...m[1].matchAll(new RegExp(ORI, 'g'))].map(x => [+x[1], +x[2]]); return items.length >= 2 ? { items, kind: 'planes' } : null; },
+  name: 'fmean',
   topic: () => ['Fisher mean', 2],
   run: a => {
     const planes = a.kind === 'planes', dcos = a.items.map(([x, y]) => planes ? conversions.planeToDcos(x, y) : conversions.lineToDcos(x, y));
@@ -118,4 +110,52 @@ tool({
       trace: [`${n} ${planes ? 'poles' : 'lines'} as unit vectors`, 'bearing.statistics.fisherStats → resultant, κ, α95', planes ? 'mean pole → plane' : 'mean vector → line'], py: `bearing.fisher_mean(${JSON.stringify(a.items)}, kind="${a.kind}")`
     };
   }
+});
+/* ── what reads them ─────────────────────────────────────────── */
+const PLANE_T = ['plane', 'orientation'];
+noun({ type: 'appdip', words: { apparent: ['apparent dip'] }, words_pt: { apparent: ['mergulho aparente'] } });
+noun({ type: 'section', words: { section: ['section', 'cross section', 'cross-section', 'profile'] }, words_pt: { section: ['seção', 'secao', 'perfil'] } });
+for (const prep of ['', 'at', 'along']) postmod({ prep, heads: ['section'], attr: 'az', quantity: true });   // "a section at 045"
+noun({ type: 'intersection', words: { intersection: ['intersection', 'line of intersection', 'intersection line'] }, words_pt: { intersection: ['interseção', 'intersecao', 'linha de interseção'] } });
+noun({ type: 'rake', words: { rake: ['rake', 'pitch'] }, words_pt: { rake: ['rake', 'caimento'] } });
+postmod({ prep: '', heads: ['rake'], attr: 'angle', quantity: true });            // "rake 30"
+postmod({ prep: 'of', heads: ['rake'], attr: 'line', mod: 'orientation' });       // "rake of 150/40"
+qmod({ head: 'rake', attr: 'angle', dims: ['bare', 'angle'] });                   // "a rake of 30"
+for (const k of ['alpha', 'beta']) { noun({ type: k, words: { [k]: [k] }, words_pt: { [k]: [k] } }); postmod({ prep: '', heads: [k], attr: 'angle', quantity: true }); }
+noun({ type: 'fmean', words: { mean: ['fisher mean', 'mean orientation', 'mean plane', 'mean', 'average'] }, words_pt: { mean: ['média', 'media', 'média de fisher'] } });
+const ori2 = n => oriOf(n);
+// "apparent dip of 000/30 on a section at 045"
+frame({
+  name: 'apparent', label: 'Apparent dip', words: ['calculate', 'compute'], elidable: true, theme: ['appdip'], required: ['theme', 'of', 'on'],
+  roles: { of: { preps: ['of', 'for'], types: PLANE_T }, on: { preps: ['on', 'along', 'in', 'for'], types: ['section'] } }, label_pt: 'Mergulho aparente',
+  bind: c => { const p = c.roles.of[0], o = !p.all && ori2(p), az = c.roles.on[0].attrs && c.roles.on[0].attrs.az; return o && az ? { tool: 'apparent', args: { a1: o[0], a2: o[1], conv: 'dd', az: az.n } } : null; }
+});
+// "plane through 0,0,100 and 100,0,100 and 0,100,0"
+frame({
+  name: 'threepoint', label: 'Three-point plane', words: ['plane through', 'a plane through', 'fit a plane through', 'surface through', 'bedding through', 'contact through', 'plane from'], theme: ['point3'], required: ['theme'], roles: {},
+  words_pt: ['plano por', 'plano pelos pontos'], label_pt: 'Plano por três pontos',
+  bind: c => c.theme.length === 3 ? { tool: 'threepoint', args: { p: c.theme.map(t => t.value.split(',').map(Number)) } } : null
+});
+// "intersection of 090/45 and 270/45"
+frame({
+  name: 'intersect', label: 'Intersection', words: ['where do', 'find the'], elidable: true, theme: ['intersection'], required: ['theme', 'of'], roles: { of: { preps: ['of', 'between'], types: PLANE_T } }, label_pt: 'Interseção',
+  bind: c => { const [a, b] = c.roles.of.map(ori2); return c.roles.of.length === 2 && a && b ? { tool: 'intersect', args: { a, b, conv: 'dd' } } : null; }
+});
+// "line at rake 90 on 150/40", "rake 30 on 120/50", "rake of 150/40 on 150/40"
+frame({
+  name: 'rake', label: 'Rake', words: ['line at', 'line with', 'the line at', 'line at a'], elidable: true, theme: ['rake'], required: ['theme', 'on'], roles: { on: { preps: ['on', 'in', 'within'], types: PLANE_T } }, label_pt: 'Rake',
+  bind: c => { const r = c.theme[0].attrs || {}, o = ori2(c.roles.on[0]); if (!o) return null;
+    if (r.angle) return { tool: 'rake', args: { rake: r.angle.n, a1: o[0], a2: o[1], conv: 'dd' } };
+    const l = r.line && oriOf({ type: 'orientation', value: r.line }); return l ? { tool: 'rake', args: { tr: l[0], pl: l[1], a1: o[0], a2: o[1], conv: 'dd' } } : null; }
+});
+// "core alpha 40 beta 230 in hole 270/60"
+frame({
+  name: 'core', label: 'Oriented core', words: ['core', 'oriented core'], theme: ['alpha'], required: ['theme', 'beta', 'in'],
+  roles: { beta: { preps: [''], types: ['beta'] }, in: { preps: ['in', 'for', 'from'], types: ['hole'] } }, words_pt: ['testemunho', 'testemunho orientado'], label_pt: 'Testemunho orientado',
+  bind: c => { const a = c.theme[0].attrs.angle, b = c.roles.beta[0].attrs.angle, h = oriOf(c.roles.in[0]); return a && b && h ? { tool: 'core', args: { alpha: a.n, beta: b.n, htr: h[0], hpl: h[1] } } : null; }
+});
+// "mean of 120/35, 130/40 and 125/38", "fisher mean of …"
+frame({
+  name: 'fmean', label: 'Fisher mean', words: ['calculate', 'compute'], elidable: true, theme: ['fmean'], required: ['theme', 'of'], roles: { of: { preps: ['of', 'for'], types: PLANE_T } }, label_pt: 'Média de Fisher',
+  bind: c => { const items = c.roles.of.map(ori2); return items.length >= 2 && items.every(Boolean) ? { tool: 'fmean', args: { items, kind: 'planes' } } : null; }
 });

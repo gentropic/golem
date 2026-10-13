@@ -1,18 +1,14 @@
 // Orientation: true thickness from an intercept, and planes on a stereonet. @gcu/bearing (vendored) does the
 // vectors; the shell draws the `net` block (lower hemisphere, equal area) from the planes and lines it carries.
-import { tool, fmt, deg, p3, p2 } from './core.js';
+import { tool, frame, noun, shape, postmod, qmod, fmt, deg, p3, p2 } from './core.js';
+import { parseUnit } from './units.js';
 import { conversions, vec3 } from '../vendor/bearing.js';
 const planeDD = a => a.conv === 'sd' ? (a.a1 + 90) % 360 : a.a1;
 const convSlot = a => ({ v: `${p3(a.a1)}/${p2(a.a2)} as ${a.conv === 'sd' ? 'strike/dip (right-hand)' : 'dip direction/dip'}`, key: 'conv', alts: ['dd', 'sd'], cur: a.conv || 'dd' });
 
 tool({
-  name: 'thickness', rank: 60,
+  name: 'thickness',
   skill: { group: 'Field', title: 'True thickness', on: '@gcu/bearing', about: 'Intercept length, hole orientation and plane give thickness and a stereonet.', examples: ['true thickness of a 14 m intercept, hole 270/60, bedding 045/30'] },
-  read: (text, q) => {
-    if (!/true thickness/.test(q)) return null;
-    const len = /(\d+(?:\.\d+)?) ?m\b/.exec(q), h = /hole (\d{1,3})\/(\d{1,2})/.exec(q), p = /(?:bedding|vein|foliation|plane|contact|fault) (\d{1,3})\/(\d{1,2})/.exec(q);
-    return len && h && p ? { len: +len[1], htr: +h[1], hpl: +h[2], a1: +p[1], a2: +p[2], conv: 'dd' } : null;
-  },
   topic: () => ['True thickness', 3],
   run: a => {
     const dd = planeDD(a), h = conversions.lineToDcos(a.htr, a.hpl), n = conversions.planeToDcos(dd, a.a2);
@@ -32,9 +28,8 @@ tool({
   }
 });
 tool({
-  name: 'plane', rank: 61,
+  name: 'plane',
   skill: { group: 'Field', title: 'Stereonet', on: '@gcu/bearing', about: 'Planes and poles, equal area, lower hemisphere.', examples: ['plot plane 120/55'] },
-  read: (text, q) => { const m = /^(?:plot|stereonet(?: of)?|show)(?: plane| bedding)? (\d{1,3})\/(\d{1,2})$/.exec(q); return m ? { a1: +m[1], a2: +m[2], conv: 'dd' } : null; },
   topic: a => ['Stereonet ' + p3(a.a1) + '/' + p2(a.a2), 2],
   run: a => {
     const dd = planeDD(a);
@@ -48,4 +43,36 @@ tool({
       trace: ['plane → great circle and pole', 'equal-area projection, lower hemisphere'], py: `stereonet.plane(${dd}, ${a.a2})`
     };
   }
+});
+/* ── the words of structure, shared with structure.js and apply.js ─────────────── */
+shape({ type: 'orientation', re: String.raw`\d{1,3}\s*/\s*\d{1,2}` });                                   // 045/30, 270 / 60
+shape({ type: 'point3', re: String.raw`-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?` });   // 0,0,100
+noun({ type: 'hole', words: { hole: ['hole', 'drill hole', 'drillhole', 'borehole'] }, words_pt: { hole: ['furo', 'furo de sonda'] } });
+noun({ type: 'plane', words: { bedding: ['bedding', 'bed', 'beds'], vein: ['vein'], foliation: ['foliation'], contact: ['contact'], fault: ['fault'], plane: ['plane'], surface: ['surface'], joint: ['joint'], cleavage: ['cleavage'], shear: ['shear zone', 'shear'] },
+  generic: ['planes', 'measurements', 'readings', 'structures'],
+  words_pt: { bedding: ['acamamento', 'estratificação'], vein: ['veio'], foliation: ['foliação', 'foliacao'], contact: ['contato'], fault: ['falha'], plane: ['plano'], joint: ['junta', 'fratura'] }, generic_pt: ['planos', 'medidas'] });
+noun({ type: 'intercept', words: { intercept: ['intercept', 'interval', 'core length', 'downhole length', 'drilled length'] }, generic: ['intercepts', 'intervals', 'rows', 'samples'],
+  words_pt: { intercept: ['intervalo', 'intercepto'] }, generic_pt: ['intervalos', 'linhas', 'amostras'] });
+noun({ type: 'thickness', words: { true: ['true thickness', 'true width'] }, words_pt: { true: ['espessura verdadeira', 'espessura real'] } });
+for (const head of ['hole', 'plane']) postmod({ prep: '', heads: [head], attr: 'ori', mod: 'orientation' });   // "hole 270/60", "bedding 045/30"
+qmod({ head: 'intercept', attr: 'length', dims: ['length'] });                                                   // "a 14 m intercept"
+export const oriOf = n => { const v = n && (n.type === 'orientation' ? n.value : n.attrs && n.attrs.ori); const m = v && /^(\d{1,3})\s*\/\s*(\d{1,2})$/.exec(String(v)); return m ? [+m[1], +m[2]] : null; };
+const metres = q => { if (!q) return null; if (!q.unit) return q.n; const u = parseUnit(q.unit); return u && u.dim === 'L' ? q.n * u.f : null; };
+// "true thickness of a 14 m intercept, hole 270/60, bedding 045/30"; "… in hole 270/60 through bedding 045/30"
+frame({
+  name: 'thickness', label: 'True thickness', words: ['calculate', 'compute', 'work out', 'find', 'get'], elidable: true, theme: ['thickness'], required: ['theme'],
+  roles: { of: { preps: ['of', 'for'], types: ['intercept', 'hole', 'plane', 'quantity:length'] }, in: { preps: ['in', 'down', 'along', 'from', 'with'], types: ['hole'] }, through: { preps: ['through', 'across', 'against', 'with'], types: ['plane'] } },
+  words_pt: ['calcula', 'calcule'], label_pt: 'Espessura verdadeira',
+  bind: c => {
+    const all = Object.values(c.roles).flat(), it = all.find(n => n.type === 'intercept'), q = all.find(n => n.type === 'quantity'), h = all.find(n => n.type === 'hole'), p = all.find(n => n.type === 'plane');
+    if (it && it.all) return null;   // every intercept: the table batch (apply)
+    const len = metres(it ? it.attrs.length : q), ho = oriOf(h), po = oriOf(p);
+    return len != null && ho && po ? { tool: 'thickness', args: { len, htr: ho[0], hpl: ho[1], a1: po[0], a2: po[1], conv: 'dd' } } : null;
+  }
+});
+// "plot plane 120/55", "stereonet 045/30", "show bedding 045/30"
+frame({
+  name: 'stereonet', label: 'Stereonet', words: ['plot', 'stereonet', 'stereonet of', 'show', 'draw', 'plot plane'], elidable: true, theme: ['plane', 'orientation'], required: ['theme'], roles: {},
+  words_pt: ['estereograma', 'plota', 'mostra'], label_pt: 'Estereograma',
+  bind: c => { const o = c.theme.length === 1 && oriOf(c.theme[0]); return o ? { tool: 'plane', args: { a1: o[0], a2: o[1], conv: 'dd' } } : null; }
 });

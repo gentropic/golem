@@ -4608,7 +4608,8 @@ function mapValue(name, value, min, max, options) {
 
 /* ==== src/engine/orientation.js ==== */
 const __m5 = (() => {
-const { tool, fmt, deg, p3, p2 } = __m0;
+const { tool, frame, noun, shape, postmod, qmod, fmt, deg, p3, p2 } = __m0;
+const { parseUnit } = __m1;
 const { conversions, vec3 } = __m4;
 // Orientation: true thickness from an intercept, and planes on a stereonet. @gcu/bearing (vendored) does the
 // vectors; the shell draws the `net` block (lower hemisphere, equal area) from the planes and lines it carries.
@@ -4616,13 +4617,8 @@ const planeDD = a => a.conv === 'sd' ? (a.a1 + 90) % 360 : a.a1;
 const convSlot = a => ({ v: `${p3(a.a1)}/${p2(a.a2)} as ${a.conv === 'sd' ? 'strike/dip (right-hand)' : 'dip direction/dip'}`, key: 'conv', alts: ['dd', 'sd'], cur: a.conv || 'dd' });
 
 tool({
-  name: 'thickness', rank: 60,
+  name: 'thickness',
   skill: { group: 'Field', title: 'True thickness', on: '@gcu/bearing', about: 'Intercept length, hole orientation and plane give thickness and a stereonet.', examples: ['true thickness of a 14 m intercept, hole 270/60, bedding 045/30'] },
-  read: (text, q) => {
-    if (!/true thickness/.test(q)) return null;
-    const len = /(\d+(?:\.\d+)?) ?m\b/.exec(q), h = /hole (\d{1,3})\/(\d{1,2})/.exec(q), p = /(?:bedding|vein|foliation|plane|contact|fault) (\d{1,3})\/(\d{1,2})/.exec(q);
-    return len && h && p ? { len: +len[1], htr: +h[1], hpl: +h[2], a1: +p[1], a2: +p[2], conv: 'dd' } : null;
-  },
   topic: () => ['True thickness', 3],
   run: a => {
     const dd = planeDD(a), h = conversions.lineToDcos(a.htr, a.hpl), n = conversions.planeToDcos(dd, a.a2);
@@ -4642,9 +4638,8 @@ tool({
   }
 });
 tool({
-  name: 'plane', rank: 61,
+  name: 'plane',
   skill: { group: 'Field', title: 'Stereonet', on: '@gcu/bearing', about: 'Planes and poles, equal area, lower hemisphere.', examples: ['plot plane 120/55'] },
-  read: (text, q) => { const m = /^(?:plot|stereonet(?: of)?|show)(?: plane| bedding)? (\d{1,3})\/(\d{1,2})$/.exec(q); return m ? { a1: +m[1], a2: +m[2], conv: 'dd' } : null; },
   topic: a => ['Stereonet ' + p3(a.a1) + '/' + p2(a.a2), 2],
   run: a => {
     const dd = planeDD(a);
@@ -4659,7 +4654,39 @@ tool({
     };
   }
 });
-  return {  };
+/* ── the words of structure, shared with structure.js and apply.js ─────────────── */
+shape({ type: 'orientation', re: String.raw`\d{1,3}\s*/\s*\d{1,2}` });                                   // 045/30, 270 / 60
+shape({ type: 'point3', re: String.raw`-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?` });   // 0,0,100
+noun({ type: 'hole', words: { hole: ['hole', 'drill hole', 'drillhole', 'borehole'] }, words_pt: { hole: ['furo', 'furo de sonda'] } });
+noun({ type: 'plane', words: { bedding: ['bedding', 'bed', 'beds'], vein: ['vein'], foliation: ['foliation'], contact: ['contact'], fault: ['fault'], plane: ['plane'], surface: ['surface'], joint: ['joint'], cleavage: ['cleavage'], shear: ['shear zone', 'shear'] },
+  generic: ['planes', 'measurements', 'readings', 'structures'],
+  words_pt: { bedding: ['acamamento', 'estratificação'], vein: ['veio'], foliation: ['foliação', 'foliacao'], contact: ['contato'], fault: ['falha'], plane: ['plano'], joint: ['junta', 'fratura'] }, generic_pt: ['planos', 'medidas'] });
+noun({ type: 'intercept', words: { intercept: ['intercept', 'interval', 'core length', 'downhole length', 'drilled length'] }, generic: ['intercepts', 'intervals', 'rows', 'samples'],
+  words_pt: { intercept: ['intervalo', 'intercepto'] }, generic_pt: ['intervalos', 'linhas', 'amostras'] });
+noun({ type: 'thickness', words: { true: ['true thickness', 'true width'] }, words_pt: { true: ['espessura verdadeira', 'espessura real'] } });
+for (const head of ['hole', 'plane']) postmod({ prep: '', heads: [head], attr: 'ori', mod: 'orientation' });   // "hole 270/60", "bedding 045/30"
+qmod({ head: 'intercept', attr: 'length', dims: ['length'] });                                                   // "a 14 m intercept"
+const oriOf = n => { const v = n && (n.type === 'orientation' ? n.value : n.attrs && n.attrs.ori); const m = v && /^(\d{1,3})\s*\/\s*(\d{1,2})$/.exec(String(v)); return m ? [+m[1], +m[2]] : null; };
+const metres = q => { if (!q) return null; if (!q.unit) return q.n; const u = parseUnit(q.unit); return u && u.dim === 'L' ? q.n * u.f : null; };
+// "true thickness of a 14 m intercept, hole 270/60, bedding 045/30"; "… in hole 270/60 through bedding 045/30"
+frame({
+  name: 'thickness', label: 'True thickness', words: ['calculate', 'compute', 'work out', 'find', 'get'], elidable: true, theme: ['thickness'], required: ['theme'],
+  roles: { of: { preps: ['of', 'for'], types: ['intercept', 'hole', 'plane', 'quantity:length'] }, in: { preps: ['in', 'down', 'along', 'from', 'with'], types: ['hole'] }, through: { preps: ['through', 'across', 'against', 'with'], types: ['plane'] } },
+  words_pt: ['calcula', 'calcule'], label_pt: 'Espessura verdadeira',
+  bind: c => {
+    const all = Object.values(c.roles).flat(), it = all.find(n => n.type === 'intercept'), q = all.find(n => n.type === 'quantity'), h = all.find(n => n.type === 'hole'), p = all.find(n => n.type === 'plane');
+    if (it && it.all) return null;   // every intercept: the table batch (apply)
+    const len = metres(it ? it.attrs.length : q), ho = oriOf(h), po = oriOf(p);
+    return len != null && ho && po ? { tool: 'thickness', args: { len, htr: ho[0], hpl: ho[1], a1: po[0], a2: po[1], conv: 'dd' } } : null;
+  }
+});
+// "plot plane 120/55", "stereonet 045/30", "show bedding 045/30"
+frame({
+  name: 'stereonet', label: 'Stereonet', words: ['plot', 'stereonet', 'stereonet of', 'show', 'draw', 'plot plane'], elidable: true, theme: ['plane', 'orientation'], required: ['theme'], roles: {},
+  words_pt: ['estereograma', 'plota', 'mostra'], label_pt: 'Estereograma',
+  bind: c => { const o = c.theme.length === 1 && oriOf(c.theme[0]); return o ? { tool: 'plane', args: { a1: o[0], a2: o[1], conv: 'dd' } } : null; }
+});
+  return { oriOf };
 })();
 
 /* ==== src/vendor/yaml.js ==== */
@@ -11298,8 +11325,9 @@ frame({
 
 /* ==== src/engine/structure.js ==== */
 const __m16 = (() => {
-const { tool, fmt, rad, deg, p3, p2 } = __m0;
+const { frame, noun, postmod, qmod, tool, fmt, rad, deg, p3, p2 } = __m0;
 const { conversions, vec3, statistics } = __m4;
+const { oriOf } = __m5;
 // Structural geometry over @gcu/bearing (vendored): apparent dip, the three-point problem, the line of
 // intersection of two planes, rake, oriented core, and the Fisher mean of a set. Every answer draws the
 // net. Planes are read as dip direction/dip with the usual strike/dip slot; lines as trend/plunge.
@@ -11314,9 +11342,8 @@ const ori = (a, b) => `${p3(a)}/${p2(b)}`;
 const SRC = { t: 'src', text: '@gcu/bearing · vendored · lower hemisphere, equal area' };
 
 tool({
-  name: 'apparent', rank: 62,
+  name: 'apparent',
   skill: { group: 'Field', title: 'Structural geometry', on: '@gcu/bearing', about: 'Apparent dip, three-point plane, intersection of planes, rake, oriented core, Fisher mean. Planes as dip direction/dip, flip the slot for strike/dip.', examples: ['apparent dip of 000/30 on a section at 045', 'intersection of 090/45 and 270/45', 'plane through 0,0,100 and 100,0,100 and 0,100,0', 'mean of 120/35, 130/40 and 125/38', 'core alpha 40 beta 230 in hole 270/60'] },
-  read: (text, q) => { const m = new RegExp(`^apparent dip of ${ORI} (?:on|along|in) (?:a )?section (?:at|of|azimuth|striking) (\\d{1,3})$`).exec(q); return m ? { a1: +m[1], a2: +m[2], conv: 'dd', az: +m[3] } : null; },
   topic: () => ['Apparent dip', 2],
   run: a => {
     const dd = ddOf(a.a1, a.conv), delta = a.az - dd, c = Math.cos(rad(delta)), app = deg(Math.atan(Math.tan(rad(a.a2)) * Math.abs(c)));
@@ -11329,8 +11356,7 @@ tool({
   }
 });
 tool({
-  name: 'threepoint', rank: 63,
-  read: (text, q) => { const N = '(-?\\d+(?:\\.\\d+)?)\\s*,\\s*(-?\\d+(?:\\.\\d+)?)\\s*,\\s*(-?\\d+(?:\\.\\d+)?)'; const m = new RegExp(`^(?:plane|bedding|contact|surface) through ${N} and ${N} and ${N}$`).exec(q); return m ? { p: [[+m[1], +m[2], +m[3]], [+m[4], +m[5], +m[6]], [+m[7], +m[8], +m[9]]] } : null; },
+  name: 'threepoint',
   topic: () => ['Three-point plane', 2],
   run: a => {
     const [p1, p2v, p3v] = a.p, v1 = vec3.sub(p2v, p1), v2 = vec3.sub(p3v, p1), n = vec3.cross(v1, v2);
@@ -11345,8 +11371,7 @@ tool({
   }
 });
 tool({
-  name: 'intersect', rank: 64,
-  read: (text, q) => { const m = new RegExp(`^(?:line of )?intersection of ${ORI} and ${ORI}$`).exec(q); return m ? { a: [+m[1], +m[2]], b: [+m[3], +m[4]], conv: 'dd' } : null; },
+  name: 'intersect',
   topic: () => ['Plane intersection', 2],
   run: a => {
     const d1 = ddOf(a.a[0], a.conv), d2 = ddOf(a.b[0], a.conv), n1 = conversions.planeToDcos(d1, a.a[1]), n2 = conversions.planeToDcos(d2, a.b[1]), l = vec3.cross(n1, n2);
@@ -11361,11 +11386,7 @@ tool({
   }
 });
 tool({
-  name: 'rake', rank: 65,
-  read: (text, q) => {
-    let m = new RegExp(`^(?:line (?:at|with) )?rake (?:of )?(\\d{1,3}) on ${ORI}$`).exec(q); if (m) return { rake: +m[1], a1: +m[2], a2: +m[3], conv: 'dd' };
-    m = new RegExp(`^rake of (?:lineation |line |the line )?${ORI} on ${ORI}$`).exec(q); return m ? { tr: +m[1], pl: +m[2], a1: +m[3], a2: +m[4], conv: 'dd' } : null;
-  },
+  name: 'rake',
   topic: () => ['Rake', 1],
   run: a => {
     const dd = ddOf(a.a1, a.conv), n = conversions.planeToDcos(dd, a.a2);
@@ -11385,8 +11406,7 @@ tool({
 // bottom-of-hole reference line to the down-hole apex of the ellipse. Other conventions exist (SPEC-skills,
 // open decision 9); the slot will carry them when a second one is wired.
 tool({
-  name: 'core', rank: 66,
-  read: (text, q) => { const m = new RegExp(`^(?:oriented )?core alpha (\\d{1,2}) beta (\\d{1,3}) in (?:a )?hole ${ORI}$`).exec(q); return m ? { alpha: +m[1], beta: +m[2], htr: +m[3], hpl: +m[4] } : null; },
+  name: 'core',
   topic: () => ['Oriented core', 2],
   run: a => {
     const read = ['core', { v: `alpha ${a.alpha}` }, { v: `beta ${a.beta}` }, 'in hole', { v: ori(a.htr, a.hpl) }];
@@ -11404,8 +11424,7 @@ tool({
   }
 });
 tool({
-  name: 'fmean', rank: 67,
-  read: (text, q) => { const m = new RegExp(`^(?:fisher )?mean of ((?:${ORI}(?:,? (?:and )?)?)+)$`).exec(q); if (!m) return null; const items = [...m[1].matchAll(new RegExp(ORI, 'g'))].map(x => [+x[1], +x[2]]); return items.length >= 2 ? { items, kind: 'planes' } : null; },
+  name: 'fmean',
   topic: () => ['Fisher mean', 2],
   run: a => {
     const planes = a.kind === 'planes', dcos = a.items.map(([x, y]) => planes ? conversions.planeToDcos(x, y) : conversions.lineToDcos(x, y));
@@ -11418,6 +11437,54 @@ tool({
       trace: [`${n} ${planes ? 'poles' : 'lines'} as unit vectors`, 'bearing.statistics.fisherStats → resultant, κ, α95', planes ? 'mean pole → plane' : 'mean vector → line'], py: `bearing.fisher_mean(${JSON.stringify(a.items)}, kind="${a.kind}")`
     };
   }
+});
+/* ── what reads them ─────────────────────────────────────────── */
+const PLANE_T = ['plane', 'orientation'];
+noun({ type: 'appdip', words: { apparent: ['apparent dip'] }, words_pt: { apparent: ['mergulho aparente'] } });
+noun({ type: 'section', words: { section: ['section', 'cross section', 'cross-section', 'profile'] }, words_pt: { section: ['seção', 'secao', 'perfil'] } });
+for (const prep of ['', 'at', 'along']) postmod({ prep, heads: ['section'], attr: 'az', quantity: true });   // "a section at 045"
+noun({ type: 'intersection', words: { intersection: ['intersection', 'line of intersection', 'intersection line'] }, words_pt: { intersection: ['interseção', 'intersecao', 'linha de interseção'] } });
+noun({ type: 'rake', words: { rake: ['rake', 'pitch'] }, words_pt: { rake: ['rake', 'caimento'] } });
+postmod({ prep: '', heads: ['rake'], attr: 'angle', quantity: true });            // "rake 30"
+postmod({ prep: 'of', heads: ['rake'], attr: 'line', mod: 'orientation' });       // "rake of 150/40"
+qmod({ head: 'rake', attr: 'angle', dims: ['bare', 'angle'] });                   // "a rake of 30"
+for (const k of ['alpha', 'beta']) { noun({ type: k, words: { [k]: [k] }, words_pt: { [k]: [k] } }); postmod({ prep: '', heads: [k], attr: 'angle', quantity: true }); }
+noun({ type: 'fmean', words: { mean: ['fisher mean', 'mean orientation', 'mean plane', 'mean', 'average'] }, words_pt: { mean: ['média', 'media', 'média de fisher'] } });
+const ori2 = n => oriOf(n);
+// "apparent dip of 000/30 on a section at 045"
+frame({
+  name: 'apparent', label: 'Apparent dip', words: ['calculate', 'compute'], elidable: true, theme: ['appdip'], required: ['theme', 'of', 'on'],
+  roles: { of: { preps: ['of', 'for'], types: PLANE_T }, on: { preps: ['on', 'along', 'in', 'for'], types: ['section'] } }, label_pt: 'Mergulho aparente',
+  bind: c => { const p = c.roles.of[0], o = !p.all && ori2(p), az = c.roles.on[0].attrs && c.roles.on[0].attrs.az; return o && az ? { tool: 'apparent', args: { a1: o[0], a2: o[1], conv: 'dd', az: az.n } } : null; }
+});
+// "plane through 0,0,100 and 100,0,100 and 0,100,0"
+frame({
+  name: 'threepoint', label: 'Three-point plane', words: ['plane through', 'a plane through', 'fit a plane through', 'surface through', 'bedding through', 'contact through', 'plane from'], theme: ['point3'], required: ['theme'], roles: {},
+  words_pt: ['plano por', 'plano pelos pontos'], label_pt: 'Plano por três pontos',
+  bind: c => c.theme.length === 3 ? { tool: 'threepoint', args: { p: c.theme.map(t => t.value.split(',').map(Number)) } } : null
+});
+// "intersection of 090/45 and 270/45"
+frame({
+  name: 'intersect', label: 'Intersection', words: ['where do', 'find the'], elidable: true, theme: ['intersection'], required: ['theme', 'of'], roles: { of: { preps: ['of', 'between'], types: PLANE_T } }, label_pt: 'Interseção',
+  bind: c => { const [a, b] = c.roles.of.map(ori2); return c.roles.of.length === 2 && a && b ? { tool: 'intersect', args: { a, b, conv: 'dd' } } : null; }
+});
+// "line at rake 90 on 150/40", "rake 30 on 120/50", "rake of 150/40 on 150/40"
+frame({
+  name: 'rake', label: 'Rake', words: ['line at', 'line with', 'the line at', 'line at a'], elidable: true, theme: ['rake'], required: ['theme', 'on'], roles: { on: { preps: ['on', 'in', 'within'], types: PLANE_T } }, label_pt: 'Rake',
+  bind: c => { const r = c.theme[0].attrs || {}, o = ori2(c.roles.on[0]); if (!o) return null;
+    if (r.angle) return { tool: 'rake', args: { rake: r.angle.n, a1: o[0], a2: o[1], conv: 'dd' } };
+    const l = r.line && oriOf({ type: 'orientation', value: r.line }); return l ? { tool: 'rake', args: { tr: l[0], pl: l[1], a1: o[0], a2: o[1], conv: 'dd' } } : null; }
+});
+// "core alpha 40 beta 230 in hole 270/60"
+frame({
+  name: 'core', label: 'Oriented core', words: ['core', 'oriented core'], theme: ['alpha'], required: ['theme', 'beta', 'in'],
+  roles: { beta: { preps: [''], types: ['beta'] }, in: { preps: ['in', 'for', 'from'], types: ['hole'] } }, words_pt: ['testemunho', 'testemunho orientado'], label_pt: 'Testemunho orientado',
+  bind: c => { const a = c.theme[0].attrs.angle, b = c.roles.beta[0].attrs.angle, h = oriOf(c.roles.in[0]); return a && b && h ? { tool: 'core', args: { alpha: a.n, beta: b.n, htr: h[0], hpl: h[1] } } : null; }
+});
+// "mean of 120/35, 130/40 and 125/38", "fisher mean of …"
+frame({
+  name: 'fmean', label: 'Fisher mean', words: ['calculate', 'compute'], elidable: true, theme: ['fmean'], required: ['theme', 'of'], roles: { of: { preps: ['of', 'for'], types: PLANE_T } }, label_pt: 'Média de Fisher',
+  bind: c => { const items = c.roles.of.map(ori2); return items.length >= 2 && items.every(Boolean) ? { tool: 'fmean', args: { items, kind: 'planes' } } : null; }
 });
   return {  };
 })();
@@ -18653,7 +18720,7 @@ const __m49 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/dispatch, built from ../auditable/ext/dispatch/src/ by its own build.
 // Source of truth: gentropic/auditable ext/dispatch (local clone: ../auditable). Re-vendor by copying
 // ext/dispatch/index.js here after 'node ext/dispatch/build.js'. golem uses the grammar rung only:
-// createEngine, makeSession, ENGLISH, PORTUGUESE. At auditable 44b79edc.
+// createEngine, makeSession, ENGLISH, PORTUGUESE. At auditable 228451e1.
 
 // ⚠ GENERATED FILE — DO NOT EDIT. Source: src/  Build: @gcu/build src/main.js
 // @gcu/dispatch — Session-trained natural-language → tool-call dispatch: a Snips-shaped resolver (averaged-perceptron intent + CRF-class slot tagger + gazetteers + deterministic per-kind assemblers) that trains IN THE BROWSER from the host session's own vocabulary in under a second. Tools are declarative (ten kinds) and a grammar rung (clause: case-grammar frames over an Earley chart with costed repairs, en + pt-BR) reads controlled commands before the learners see them; no shipped model, no network, explainable per decision — refusals return empty calls so the host degrades into its command palette. Born from an incubator where this beat a 26M finetuned transformer 50/52 to 3/24 on a frozen yardstick.
@@ -19728,6 +19795,11 @@ function buildGrammar(X) {
   rule('PostMods', '', () => []);
   rule('PostMods', 'PostMod PostMods', (m, r) => [m, ...r]);
   for (const p of X.postmodPreps) {
+    if (p === '') {   // a bare modifier: a shaped token or a number right after the noun ("hole 270/60", "rake 30")
+      if (X.postmodQuantity.has('')) rule('PostMod', 'Quantity', q => ({ prep: '', q }));
+      rule('PostMod', 'LIT', t => ({ prep: '', np: { type: t.type, value: t.value } }));
+      continue;
+    }
     if (X.postmodQuantity.has(p)) { rule('PostMod', `PREP:${p} Quantity`, (_, q) => ({ prep: p, q })); rule('PostMod', `COP PREP:${p} Quantity`, (_, __, q) => ({ prep: p, q })); }   // "cu above 1", "cu is above 1"
     else rule('PostMod', `PREP:${p} NP`, (_, n) => ({ prep: p, np: n }));
   }
@@ -19908,8 +19980,8 @@ function createEngine(ont, locale = ENGLISH) {
       if (m.qmod) return X.qmod(m.q, n) ? { attrs: { ...n.attrs, [ont.qmods.find(x => x.head === n.type).attr]: m.q }, generic: false } : null;
       for (const p of ont.postmods) {
         if (p.prep !== m.prep || !p.heads.includes(n.type)) continue;
-        if (p.quantity) return { attrs: { ...n.attrs, [p.attr]: m.q } };
-        if (m.np.type === p.mod) return { attrs: { ...n.attrs, [p.attr]: p.byName ? (m.np.name ?? m.np.ref ?? '?') : m.np.value } };
+        if (p.quantity) { if (!m.q) continue; return { attrs: { ...n.attrs, [p.attr]: m.q } }; }
+        if (m.np && m.np.type === p.mod) return { attrs: { ...n.attrs, [p.attr]: p.byName ? (m.np.name ?? m.np.ref ?? '?') : m.np.value } };
       }
       return null;
     },
@@ -20148,6 +20220,7 @@ function createEngine(ont, locale = ENGLISH) {
     if (n.cmp) pre.push(Object.entries(locale.comps).find(([, c]) => c[0] === n.cmp.sign && !!c[1] === n.cmp.sup)?.[0] ?? '');
     const post = [];
     if (n.name) post.push(n.name);
+    for (const pm of ont.postmods) if (pm.prep === '' && pm.heads.includes(n.type) && n.attrs?.[pm.attr] != null) { const v = n.attrs[pm.attr]; post.push(typeof v === 'object' ? describe(v) : String(v)); }   // "bedding 045/30": a bare modifier is part of the name
     if (n.attrs?.run) post.push(`${P.fromRun} ${n.attrs.run}`);
     if (n.attrs?.length) post.push(describe(n.attrs.length));
     if (n.attrs?.above) post.push(`${P.above} ${describe(n.attrs.above)}`);

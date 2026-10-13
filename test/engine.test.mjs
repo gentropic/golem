@@ -138,7 +138,7 @@ test('the ontology derives from the declarations and is plain JSON', () => {
 // Every query is read by the clause parser. Arithmetic is the one exception by design: it goes to the
 // expression parser. MOVING lists what still reads by a regex rule while the tools move to frames.
 const ARITHMETIC = new Set(['14 * cos(22) + 3^2']);
-const MOVING = new Set(['true thickness of a 14 m intercept, hole 270/60, bedding 045/30']);
+const MOVING = new Set([]);
 test('the clause parser reads every query but arithmetic', () => {
   g.reset();
   for (const [q, rung] of STEPS) {

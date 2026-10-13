@@ -1624,6 +1624,141 @@
       }
     },
     {
+      "type": "hole",
+      "words": {
+        "hole": [
+          "hole",
+          "drill hole",
+          "drillhole",
+          "borehole"
+        ]
+      },
+      "words_pt": {
+        "hole": [
+          "furo",
+          "furo de sonda"
+        ]
+      }
+    },
+    {
+      "type": "plane",
+      "words": {
+        "bedding": [
+          "bedding",
+          "bed",
+          "beds"
+        ],
+        "vein": [
+          "vein"
+        ],
+        "foliation": [
+          "foliation"
+        ],
+        "contact": [
+          "contact"
+        ],
+        "fault": [
+          "fault"
+        ],
+        "plane": [
+          "plane"
+        ],
+        "surface": [
+          "surface"
+        ],
+        "joint": [
+          "joint"
+        ],
+        "cleavage": [
+          "cleavage"
+        ],
+        "shear": [
+          "shear zone",
+          "shear"
+        ]
+      },
+      "generic": [
+        "planes",
+        "measurements",
+        "readings",
+        "structures"
+      ],
+      "words_pt": {
+        "bedding": [
+          "acamamento",
+          "estratificação"
+        ],
+        "vein": [
+          "veio"
+        ],
+        "foliation": [
+          "foliação",
+          "foliacao"
+        ],
+        "contact": [
+          "contato"
+        ],
+        "fault": [
+          "falha"
+        ],
+        "plane": [
+          "plano"
+        ],
+        "joint": [
+          "junta",
+          "fratura"
+        ]
+      },
+      "generic_pt": [
+        "planos",
+        "medidas"
+      ]
+    },
+    {
+      "type": "intercept",
+      "words": {
+        "intercept": [
+          "intercept",
+          "interval",
+          "core length",
+          "downhole length",
+          "drilled length"
+        ]
+      },
+      "generic": [
+        "intercepts",
+        "intervals",
+        "rows",
+        "samples"
+      ],
+      "words_pt": {
+        "intercept": [
+          "intervalo",
+          "intercepto"
+        ]
+      },
+      "generic_pt": [
+        "intervalos",
+        "linhas",
+        "amostras"
+      ]
+    },
+    {
+      "type": "thickness",
+      "words": {
+        "true": [
+          "true thickness",
+          "true width"
+        ]
+      },
+      "words_pt": {
+        "true": [
+          "espessura verdadeira",
+          "espessura real"
+        ]
+      }
+    },
+    {
       "type": "alarm",
       "words": {
         "alarm": [
@@ -1635,6 +1770,114 @@
         "alarm": [
           "alarme",
           "despertador"
+        ]
+      }
+    },
+    {
+      "type": "appdip",
+      "words": {
+        "apparent": [
+          "apparent dip"
+        ]
+      },
+      "words_pt": {
+        "apparent": [
+          "mergulho aparente"
+        ]
+      }
+    },
+    {
+      "type": "section",
+      "words": {
+        "section": [
+          "section",
+          "cross section",
+          "cross-section",
+          "profile"
+        ]
+      },
+      "words_pt": {
+        "section": [
+          "seção",
+          "secao",
+          "perfil"
+        ]
+      }
+    },
+    {
+      "type": "intersection",
+      "words": {
+        "intersection": [
+          "intersection",
+          "line of intersection",
+          "intersection line"
+        ]
+      },
+      "words_pt": {
+        "intersection": [
+          "interseção",
+          "intersecao",
+          "linha de interseção"
+        ]
+      }
+    },
+    {
+      "type": "rake",
+      "words": {
+        "rake": [
+          "rake",
+          "pitch"
+        ]
+      },
+      "words_pt": {
+        "rake": [
+          "rake",
+          "caimento"
+        ]
+      }
+    },
+    {
+      "type": "alpha",
+      "words": {
+        "alpha": [
+          "alpha"
+        ]
+      },
+      "words_pt": {
+        "alpha": [
+          "alpha"
+        ]
+      }
+    },
+    {
+      "type": "beta",
+      "words": {
+        "beta": [
+          "beta"
+        ]
+      },
+      "words_pt": {
+        "beta": [
+          "beta"
+        ]
+      }
+    },
+    {
+      "type": "fmean",
+      "words": {
+        "mean": [
+          "fisher mean",
+          "mean orientation",
+          "mean plane",
+          "mean",
+          "average"
+        ]
+      },
+      "words_pt": {
+        "mean": [
+          "média",
+          "media",
+          "média de fisher"
         ]
       }
     },
@@ -4744,6 +4987,14 @@
       "re": "(?:christmas|xmas|christmas eve|new year|new year's day|new year's eve|easter|easter sunday|good friday|carnival|carnival tuesday|carnival monday|ash wednesday|corpus christi|palm sunday|pentecost|whit sunday|ascension)\\s+\\d{4}"
     },
     {
+      "type": "orientation",
+      "re": "\\d{1,3}\\s*/\\s*\\d{1,2}"
+    },
+    {
+      "type": "point3",
+      "re": "-?\\d+(?:\\.\\d+)?\\s*,\\s*-?\\d+(?:\\.\\d+)?\\s*,\\s*-?\\d+(?:\\.\\d+)?"
+    },
+    {
       "type": "place",
       "re": "(?:utc|gmt)\\s?[+-]\\d{1,2}(?::?\\d{2})?"
     },
@@ -5254,6 +5505,78 @@
   ],
   "postmods": [
     {
+      "prep": "",
+      "heads": [
+        "hole"
+      ],
+      "attr": "ori",
+      "mod": "orientation"
+    },
+    {
+      "prep": "",
+      "heads": [
+        "plane"
+      ],
+      "attr": "ori",
+      "mod": "orientation"
+    },
+    {
+      "prep": "",
+      "heads": [
+        "section"
+      ],
+      "attr": "az",
+      "quantity": true
+    },
+    {
+      "prep": "at",
+      "heads": [
+        "section"
+      ],
+      "attr": "az",
+      "quantity": true
+    },
+    {
+      "prep": "along",
+      "heads": [
+        "section"
+      ],
+      "attr": "az",
+      "quantity": true
+    },
+    {
+      "prep": "",
+      "heads": [
+        "rake"
+      ],
+      "attr": "angle",
+      "quantity": true
+    },
+    {
+      "prep": "of",
+      "heads": [
+        "rake"
+      ],
+      "attr": "line",
+      "mod": "orientation"
+    },
+    {
+      "prep": "",
+      "heads": [
+        "alpha"
+      ],
+      "attr": "angle",
+      "quantity": true
+    },
+    {
+      "prep": "",
+      "heads": [
+        "beta"
+      ],
+      "attr": "angle",
+      "quantity": true
+    },
+    {
       "prep": "from",
       "heads": [
         "roster"
@@ -5276,6 +5599,21 @@
       "attr": "duration",
       "dims": [
         "time"
+      ]
+    },
+    {
+      "head": "intercept",
+      "attr": "length",
+      "dims": [
+        "length"
+      ]
+    },
+    {
+      "head": "rake",
+      "attr": "angle",
+      "dims": [
+        "bare",
+        "angle"
       ]
     },
     {
@@ -5486,6 +5824,93 @@
         "em que dia cai"
       ],
       "label_pt": "Weekday"
+    },
+    {
+      "name": "thickness",
+      "label": "True thickness",
+      "words": [
+        "calculate",
+        "compute",
+        "work out",
+        "find",
+        "get"
+      ],
+      "elidable": true,
+      "theme": [
+        "thickness"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {
+        "of": {
+          "preps": [
+            "of",
+            "for"
+          ],
+          "types": [
+            "intercept",
+            "hole",
+            "plane",
+            "quantity:length"
+          ]
+        },
+        "in": {
+          "preps": [
+            "in",
+            "down",
+            "along",
+            "from",
+            "with"
+          ],
+          "types": [
+            "hole"
+          ]
+        },
+        "through": {
+          "preps": [
+            "through",
+            "across",
+            "against",
+            "with"
+          ],
+          "types": [
+            "plane"
+          ]
+        }
+      },
+      "words_pt": [
+        "calcula",
+        "calcule"
+      ],
+      "label_pt": "Espessura verdadeira"
+    },
+    {
+      "name": "stereonet",
+      "label": "Stereonet",
+      "words": [
+        "plot",
+        "stereonet",
+        "stereonet of",
+        "show",
+        "draw",
+        "plot plane"
+      ],
+      "elidable": true,
+      "theme": [
+        "plane",
+        "orientation"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {},
+      "words_pt": [
+        "estereograma",
+        "plota",
+        "mostra"
+      ],
+      "label_pt": "Estereograma"
     },
     {
       "name": "reformat",
@@ -5870,6 +6295,203 @@
         "coloca"
       ],
       "label_pt": "Alarme"
+    },
+    {
+      "name": "apparent",
+      "label": "Apparent dip",
+      "words": [
+        "calculate",
+        "compute"
+      ],
+      "elidable": true,
+      "theme": [
+        "appdip"
+      ],
+      "required": [
+        "theme",
+        "of",
+        "on"
+      ],
+      "roles": {
+        "of": {
+          "preps": [
+            "of",
+            "for"
+          ],
+          "types": [
+            "plane",
+            "orientation"
+          ]
+        },
+        "on": {
+          "preps": [
+            "on",
+            "along",
+            "in",
+            "for"
+          ],
+          "types": [
+            "section"
+          ]
+        }
+      },
+      "label_pt": "Mergulho aparente"
+    },
+    {
+      "name": "threepoint",
+      "label": "Three-point plane",
+      "words": [
+        "plane through",
+        "a plane through",
+        "fit a plane through",
+        "surface through",
+        "bedding through",
+        "contact through",
+        "plane from"
+      ],
+      "theme": [
+        "point3"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {},
+      "words_pt": [
+        "plano por",
+        "plano pelos pontos"
+      ],
+      "label_pt": "Plano por três pontos"
+    },
+    {
+      "name": "intersect",
+      "label": "Intersection",
+      "words": [
+        "where do",
+        "find the"
+      ],
+      "elidable": true,
+      "theme": [
+        "intersection"
+      ],
+      "required": [
+        "theme",
+        "of"
+      ],
+      "roles": {
+        "of": {
+          "preps": [
+            "of",
+            "between"
+          ],
+          "types": [
+            "plane",
+            "orientation"
+          ]
+        }
+      },
+      "label_pt": "Interseção"
+    },
+    {
+      "name": "rake",
+      "label": "Rake",
+      "words": [
+        "line at",
+        "line with",
+        "the line at",
+        "line at a"
+      ],
+      "elidable": true,
+      "theme": [
+        "rake"
+      ],
+      "required": [
+        "theme",
+        "on"
+      ],
+      "roles": {
+        "on": {
+          "preps": [
+            "on",
+            "in",
+            "within"
+          ],
+          "types": [
+            "plane",
+            "orientation"
+          ]
+        }
+      },
+      "label_pt": "Rake"
+    },
+    {
+      "name": "core",
+      "label": "Oriented core",
+      "words": [
+        "core",
+        "oriented core"
+      ],
+      "theme": [
+        "alpha"
+      ],
+      "required": [
+        "theme",
+        "beta",
+        "in"
+      ],
+      "roles": {
+        "beta": {
+          "preps": [
+            ""
+          ],
+          "types": [
+            "beta"
+          ]
+        },
+        "in": {
+          "preps": [
+            "in",
+            "for",
+            "from"
+          ],
+          "types": [
+            "hole"
+          ]
+        }
+      },
+      "words_pt": [
+        "testemunho",
+        "testemunho orientado"
+      ],
+      "label_pt": "Testemunho orientado"
+    },
+    {
+      "name": "fmean",
+      "label": "Fisher mean",
+      "words": [
+        "calculate",
+        "compute"
+      ],
+      "elidable": true,
+      "theme": [
+        "fmean"
+      ],
+      "required": [
+        "theme",
+        "of"
+      ],
+      "roles": {
+        "of": {
+          "preps": [
+            "of",
+            "for"
+          ],
+          "types": [
+            "plane",
+            "orientation"
+          ]
+        }
+      },
+      "label_pt": "Média de Fisher"
     },
     {
       "name": "declination",
