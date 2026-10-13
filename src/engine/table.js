@@ -1,7 +1,7 @@
 // The open table: a real delimited file typed by @gcu/recon, or the synthetic sample; a histogram; and
 // table questions in controlled English answered through @gcu/sadpan and @gcu/sift (all vendored).
 // Sample data stays labelled as sample data; a file is named on every card that reads it.
-import { S, T, tool, frame, noun, shape, postmod, qmod, compound, condition, fmt } from './core.js';
+import { S, T, tool, frame, amend, noun, shape, postmod, qmod, compound, condition, fmt } from './core.js';
 import { DOCUMENT } from './interchange.js';
 import { series } from '../vendor/sadpan.js';
 import { sniff, detectAnalyte, NULL_SENTINELS } from '../vendor/recon.js';
@@ -157,7 +157,6 @@ const bdlSlot = (a, skipped) => skipped.bdl ? [{ v: `below detection: ${a.bdl ||
 tool({
   name: 'hist', pre: ['table'],
   skill: { group: 'Table', title: 'Histogram', on: '@gcu/sadpan · @gcu/plot', about: 'Any numeric column of the open table. Amend it afterwards with “log scale”.', examples: ['histogram of cu'] },
-  amend: [{ arg: 'log', match: /^(?:in )?(log|linear)(?: scale)?$/, value: m => m[1] === 'log' }],
   topic: a => [`${shown(a.col)} histogram`, 3],
   run: a => {
     const trace = [], c = colOf(a.col); if (!c) return null;
@@ -244,13 +243,6 @@ function aggregate(agg, v, w) {
 tool({
   name: 'query', pre: ['table'],
   skill: { group: 'Table', title: 'Table questions', on: '@gcu/sift · @gcu/sadpan', about: 'Means, medians, percentiles, counts, lists and correlations in controlled English, with where and by.', examples: ['mean cu by lith where au > 0.1', 'how many samples where cu > 0.5 and lith is BRX', 'top 5 rows sorted by au descending', 'check intervals'] },
-  amend: [
-    { arg: 'by', match: /^by (\w+(?: and \w+)?)$/, value: m => m[1].split(' and ') },
-    { arg: 'where', match: /^where (.+)$/ },
-    { arg: 'weight', match: /^weighted by (length|count|samples?)$/, value: m => m[1] === 'length' ? 'length' : 'count' },
-    { arg: 'view', match: /^as a (chart|table)$/ },
-    { arg: 'aggs', match: new RegExp(`^and (${AGGRE})$`), value: (m, a) => a.aggs ? [...a.aggs, aggOf(m[1])] : null }
-  ],
   topic: a => a.kind === 'agg' ? [`${a.cols.map(shown).join(', ')} ${a.aggs.map(aggLabel).join(', ')}`, 2] : [`${a.kind} ${a.cols ? a.cols.map(shown).join(', ') : ''}`.trim(), 2],
   run: a => {
     const trace = [];
@@ -412,3 +404,6 @@ frame({
   words_pt: ['verifica', 'verifique', 'confere'], label_pt: 'Verificar intervalos',
   bind: c => ({ tool: 'query', args: { kind: 'check', ...(c.roles.by ? { by: [c.roles.by[0].value] } : {}) } })
 });
+// "and median": another statistic for the same question
+amend({ tools: ['query'], name: 'addagg', label: 'And', words: [], elidable: true, theme: ['stat'], required: ['theme'], roles: {},
+  bind: (c, a) => a.kind === 'agg' && !a.aggs.includes(c.theme[0].value) ? { args: { ...a, aggs: [...a.aggs, c.theme[0].value] } } : null });

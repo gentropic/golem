@@ -1,7 +1,7 @@
 // The form card: a tool that still needs answers asks for them one at a time; each answer lands in
 // args and is an editable slot, and the result recomputes when any changes. The decision matrix is the
 // first form; the economics formulas use the same helpers.
-import { tool, frame, noun } from './core.js';
+import { tool, frame, amend, noun } from './core.js';
 
 // an open question answered by a typed number (or an offered option); the whole answer must be the number
 export const numberAsk = (prompt, { offer = [], min, max, unit } = {}) => ({
@@ -25,10 +25,6 @@ const slot = (label, key, cur) => ({ v: `${label} ${cur}`, key, alts: [1, 2, 3, 
 tool({
   name: 'decide',
   skill: { group: 'Compute', title: 'Decision matrix', on: 'form card', about: 'Options, criteria, a weight for each criterion and a score for each option on each, asked one at a time; weighted totals, bars, and the smallest single weight change that would change the top option. It reports the highest score and does not say what to do.', examples: ['help me decide between perth, vancouver and santiago', 'compare these options'] },
-  amend: [
-    { arg: '_set', match: /^(?:weight (?:of |for )?)?(.+?) (?:weighs|weight|=|is) ([1-5])$/, value: (m, a) => (a.criteria || []).map(c => c.toLowerCase()).includes(m[1].toLowerCase()) ? { key: 'w:' + a.criteria.find(c => c.toLowerCase() === m[1].toLowerCase()), v: +m[2] } : null },
-    { arg: '_set', match: /^(.+?) (?:on|for) (.+?) (?:=|is|scores|gets) ([1-5])$/, value: (m, a) => { const o = (a.options || []).find(x => x.toLowerCase() === m[1].toLowerCase()), c = (a.criteria || []).find(x => x.toLowerCase() === m[2].toLowerCase()); return o && c ? { key: `s:${o}|${c}`, v: +m[3] } : null; } }
-  ],
   topic: a => ['Decision matrix', 1],
   run: a => {
     if (a._set) { a[a._set.key] = a._set.v; delete a._set; }
@@ -67,3 +63,10 @@ frame({
 });
 noun({ type: 'decision', words: { matrix: ['decision matrix', 'weighted decision', 'these options', 'the options', 'my options', 'options'] }, words_pt: { matrix: ['matriz de decisão', 'essas opções', 'as opções'] } });
 frame({ name: 'decideblank', label: 'Decide', words: ['compare', 'weigh', 'make a'], elidable: true, theme: ['decision'], required: ['theme'], roles: {}, label_pt: 'Decidir', bind: () => ({ tool: 'decide', args: {} }) });
+// "price weighs 3", "perth on price is 4": the names are the matrix's own
+const named = (xs, w) => (xs || []).find(x => x.toLowerCase() === w.trim().toLowerCase());
+amend({ tools: ['decide'], name: 'weigh', label: 'Weight', words: ['weighs', 'weight', 'has weight', 'is weighted'], subject: ['text'], theme: ['quantity:bare'], required: ['theme', 'subject'], roles: {},
+  bind: (c, a) => { const crit = named(a.criteria, c.roles.subject[0].value.replace(/^(?:the )?weight (?:of |for )?/i, '')), v = c.theme[0].n; return crit && v >= 1 && v <= 5 ? { args: { ...a, _set: { key: 'w:' + crit, v } } } : null; } });
+amend({ tools: ['decide'], name: 'score', label: 'Score', words: ['is', 'scores', 'gets', '='], subject: ['text'], theme: ['quantity:bare'], required: ['theme', 'subject'], roles: {},
+  bind: (c, a) => { const m = /^(.+?)\s+(?:on|for)\s+(.+)$/i.exec(c.roles.subject[0].value.trim()), v = c.theme[0].n; if (!m || v < 1 || v > 5) return null;
+    const o = named(a.options, m[1]), k = named(a.criteria, m[2]); return o && k ? { args: { ...a, _set: { key: `s:${o}|${k}`, v } } } : null; } });

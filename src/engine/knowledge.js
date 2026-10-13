@@ -14,10 +14,6 @@ const FIELDS = ['capital', 'population', 'area', 'density'];
 tool({
   name: 'fact',
   skill: { group: 'Knowledge', title: 'Records', on: 'factbook pack', about: 'Lookups, unit changes and filters across records.', examples: ['population density of mongolia in people per square mile', 'landlocked countries by population', 'area of brazil in square miles'] },
-  amend: [
-    { arg: 'unit', match: /^(?:and |now |same (?:but )?)?(?:in|to|as) (.+)$/, when: a => /area|density/.test(a.field) },
-    { arg: 'country', match: /^(?:and|same for|what about|now|and for)(?: the)? (.+)$/, value: m => fbFind(m[1]) ? m[1] : null }
-  ],
   topic: a => [fbFind(a.country)[0] + ' ' + a.field, 2],
   run: a => {
     const r = fbFind(a.country); if (!r) return null;

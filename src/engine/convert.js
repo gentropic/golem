@@ -1,6 +1,6 @@
 // Conversions that need no file format reader: hashes, text encodings both ways, and the open table
 // as CSV, TSV or JSON with a save action. Format readers (xlsx, dm, parquet) are the second pass.
-import { S, tool, frame, noun, fmt } from './core.js';
+import { S, tool, frame, amend, noun, fmt } from './core.js';
 import { writeParquet } from '../vendor/parquet.js';
 
 /* ── SHA-256, synchronous, so a card recomputes without a promise ── */
@@ -55,7 +55,6 @@ tool({
 const ENC = { base64: 'base64', b64: 'base64', hex: 'hex', hexadecimal: 'hex', url: 'url', uri: 'url', percent: 'url', urlencode: 'url', urlencoded: 'url' };
 tool({
   name: 'encode',
-  amend: [{ arg: 'op', match: /^(encode|decode)(?: it| instead)?$/ }],
   topic: a => [`${a.enc} ${a.op}`, 1],
   run: a => {
     const read = [a.enc, { v: a.op, key: 'op', alts: ['encode', 'decode'], cur: a.op }, { v: a.text.length > 40 ? a.text.slice(0, 37) + '…' : a.text }];
@@ -110,7 +109,6 @@ function parquetOut(t) {
 tool({
   name: 'tableExport', pre: ['table'],
   skill: { group: 'Table', title: 'Table as CSV, TSV, JSON or Parquet', on: 'built in · @gcu/parquet', about: 'The open table written out, with what the format cannot hold stated. Copy or save it; Parquet is saved, not copied.', examples: ['the table as json', 'export the table as tsv', 'the table as parquet'] },
-  amend: [{ arg: 'fmt', match: /^(?:as |to |in )?(csv|tsv|json|parquet)(?: instead)?$/ }],
   topic: a => [`Table as ${a.fmt === 'parquet' ? 'Parquet' : a.fmt.toUpperCase()}`, 1],
   run: a => {
     if (a.fmt === 'parquet') return parquetOut(S.table);
@@ -152,3 +150,5 @@ for (const op of ['encode', 'decode']) frame({
   words_pt: op === 'encode' ? ['codifica', 'codifique', 'codificar'] : ['decodifica', 'decodifique', 'decodificar'], label_pt: op === 'encode' ? 'Codificar' : 'Decodificar',
   bind: c => { const e = (c.roles.subject || c.theme || [])[0] || (c.roles.as || [])[0]; return e && payload(c) != null ? { tool: 'encode', args: { enc: e.value, op, text: payload(c) } } : null; }
 });
+// "decode", "encode it"
+for (const op of ['encode', 'decode']) amend({ tools: ['encode'], name: `op${op}`, label: op, words: [op, `${op} it`], theme: [], required: [], roles: {}, bind: (c, a) => ({ args: { ...a, op } }) });

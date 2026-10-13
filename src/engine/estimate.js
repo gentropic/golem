@@ -1,7 +1,7 @@
 // Estimates with ranges: arithmetic over intervals by simulation, units carried through, the seed kept
 // in the plan. "2.7 ± 0.1 t/m3 * 1.35 Mm3", "(120 to 180) * (0.4 to 0.6) / 7". Percentiles are called
 // percentiles: mining and petroleum read P10/P90 the opposite way round.
-import { tool, fmt } from './core.js';
+import { amend, noun, tool, fmt } from './core.js';
 import { U } from './units.js';
 
 const RUNS = 10000, Z95 = 1.6448536269514722;
@@ -129,7 +129,6 @@ export function estimateOf(text) {
 tool({
   name: 'estimate',
   skill: { group: 'Compute', title: 'Estimates with ranges', on: 'own sampler', about: 'Arithmetic over ranges by simulation: "a to b" uniform (or normal, lognormal, as a slot), "a ± b" normal. Units carried through; mean and the 10th, 50th and 90th percentiles; the seed stays in the plan.', examples: ['2.7 ± 0.1 t/m3 * 1.35 Mm3', '(120 to 180) * (0.4 to 0.6) / 7', 'fuel = consumption * trip where consumption is 9 to 11 l per 100 km and trip is 400 to 450 km'] },
-  amend: [{ arg: 'dist', match: /^(?:as |assume |assuming )?(uniform|normal|lognormal)(?: ranges| bounds)?$/ }, { arg: 'pm', match: /^(?:± |plus minus |plus or minus )(?:as |is )(normal|uniform)$/ }],
   topic: a => [a.name ? `Estimate of ${a.name}` : 'Range estimate', 1],
   run: a => {
     const read = ['estimate', { v: a.name ? `${a.name} = ${a.expr}` : a.expr }];
@@ -166,3 +165,6 @@ tool({
     };
   }
 });
+// "uniform", "assume normal"
+noun({ amend: true, type: 'dist', words: { uniform: ['uniform', 'uniform ranges', 'flat'], normal: ['normal', 'normal ranges', 'gaussian'], lognormal: ['lognormal', 'log-normal'] }, words_pt: { uniform: ['uniforme'], normal: ['normal'], lognormal: ['lognormal'] } });
+amend({ tools: ['estimate'], name: 'estdist', label: 'Distribution', words: ['assume', 'assuming', 'use'], elidable: true, theme: ['dist'], required: ['theme'], roles: {}, bind: (c, a) => ({ args: { ...a, dist: c.theme[0].value } }) });

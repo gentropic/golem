@@ -1,7 +1,7 @@
 // Explainers: formal notation parsed and described, one row per piece. Cron schedules, epoch times,
 // chmod modes, URLs and ECMAScript regular expressions. Each member has a recogniser so a bare
 // payload ("what is 1700000000") finds its member; when two accept, the member is a slot.
-import { tool, frame, noun, shape, clock, fmt } from './core.js';
+import { tool, frame, amend, noun, shape, clock, fmt } from './core.js';
 
 const MEMBERS = ['cron', 'time', 'url', 'chmod', 'regex'];
 const DOWN = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -334,7 +334,6 @@ const seedOf = () => Math.floor(Math.random() * 2 ** 31);
 tool({
   name: 'explain',
   skill: { group: 'Compute', title: 'Explainers', on: 'own parsers', about: 'Cron schedules, epoch times, chmod modes, URLs and regular expressions, parsed and described piece by piece. A bare payload finds its own kind.', examples: ['explain cron: 0 9 * * 1-5', 'what is 1700000000', 'chmod 754', 'explain regex: ^\\d{3}-\\d{2}$', 'explain url: https://example.org:8443/a/b?q=1#top'] },
-  amend: [{ arg: 'kind', match: /^as (?:a |an )?(regex|cron|time|epoch|url|chmod)$/, value: m => m[1] === 'epoch' ? 'time' : m[1] }, { arg: 'unit', match: /^(?:in |as )?(seconds|milliseconds|microseconds|nanoseconds|s|ms|us|ns)$/, value: m => ({ seconds: 's', milliseconds: 'ms', microseconds: 'us', nanoseconds: 'ns' })[m[1]] || m[1], when: a => a.kind === 'time' }],
   topic: a => [`Explain ${a.kind}`, 1],
   run: a => {
     if (!RUN[a.kind]) return null;
@@ -365,3 +364,7 @@ frame({
     return t ? explainOf(t.value) : null;   // "explain this: 0 */2 * * *": the notation is what the payload is
   }
 });
+// "as a regex", "in milliseconds"
+noun({ amend: true, type: 'timeunit', words: { s: ['seconds', 'second', 's'], ms: ['milliseconds', 'millisecond', 'ms'], us: ['microseconds', 'microsecond', 'us', 'µs'], ns: ['nanoseconds', 'nanosecond', 'ns'] }, words_pt: { s: ['segundos'], ms: ['milissegundos'] } });
+amend({ tools: ['explain'], name: 'explainas', label: 'Explain as', words: [], elidable: true, theme: ['notation', 'timeunit'], required: [], roles: { as: { preps: ['as', 'in'], types: ['notation', 'timeunit'] } },
+  bind: (c, a) => { const n = [...c.theme, ...(c.roles.as || [])][0]; if (!n) return null; return n.type === 'timeunit' ? { args: { ...a, unit: n.value } } : { args: { ...a, kind: n.value } }; } });

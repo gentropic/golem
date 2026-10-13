@@ -1,7 +1,7 @@
 // The reading ladder: context (amendments, meta-intents), grammar (the clause parser, then the regex
 // rules the declarations carry), taught words (device lexicon rewrites, then grammar again). Plus the
 // tools that talk about the session itself: none, why, export.
-import { S, T, TOOLS, FRAMES, tool, frame, toolByName, runTool, iso } from './core.js';
+import { S, T, TOOLS, FRAMES, tool, frame, amend, noun, toolByName, runTool, iso } from './core.js';
 import { examples, vocab } from './skills.js';
 import { ontology } from './ontology.js';
 import { calcOf } from './calc.js';
@@ -14,15 +14,15 @@ export const norm = s => s.trim().replace(/\s+/g, ' ').replace(/[?.!]+$/, '');
 let clause = null, clauseFor = null;
 // rebuilt whenever what it reads changes: the open table's columns, kept files, saved places, logged activities
 export const clauseEngine = () => { const o = ontology(), key = JSON.stringify(o); if (!clause || clauseFor !== key) { clause = createEngine(o, ENGLISH); clauseFor = key; } return clause; };
-const clauseSession = () => S.clause || (S.clause = makeSession([]));
+const clauseSession = () => makeSession([]);   // no memory of its own: what came before is the cards', read by the context rung
 // The parser's verdict on a text, then the frame's bind(): a frame may answer { tool, args }, or
 // { clarify } when the reading is whole but a value is missing, which becomes a clarify verdict too.
 // Only the first command of a sequence is taken for now; "then" chains are a plan the planner does not build yet.
 // When the grammar finds several readings, each is bound: if exactly one names a tool that takes it, that is the
 // reading ("python" is a verb and a format; only the verb has a tool for "python\n<code>"), and the trace says so.
 const bindOf = cmd => { const f = FRAMES.find(x => x.name === cmd.verb), b = f && f.bind(cmd); return b && !b.clarify ? b : null; };
-function verdictOf(text, session) {
-  let r = clauseEngine().understand(text, session);
+function verdictOf(text, session, opts, engine) {
+  let r = (engine || clauseEngine()).understand(text, session, opts);
   if (r.status === 'ambiguous' && r.alternatives) {
     const bound = r.alternatives.map((cmds, k) => ({ cmds, echo: r.readings[k], b: bindOf(cmds[0]) })).filter(x => x.b);
     const takers = bound.filter((x, i) => bound.findIndex(y => JSON.stringify(y.b) === JSON.stringify(x.b)) === i);   // the same call twice is one reading
@@ -42,7 +42,7 @@ export function clauseRead(text, rung) {
   if (!b) return { verdict: r };
   const res = runTool(b.tool, b.args); if (!res) return { verdict: r };
   res.trace.unshift(`clause: ${r.echo}`, ...r.diag.notes.map(n => `clause: ${n}`));
-  return { tool: b.tool, args: b.args, rung, res };
+  return { tool: b.tool, args: b.args, rung, res, cmd: r.commands[0] };
 }
 const describeVerdict = r => `clause: ${r.status}${r.reasons ? ' — ' + r.reasons.join('; ') : r.readings ? ' — ' + r.readings.join(' | ') : ''}`;
 
@@ -66,19 +66,62 @@ export function grammar(text, q, rung, raw) {
   const c = clauseRead(raw || text, rung); if (c.tool) return c;   // the parser reads what was typed: a payload keeps its line breaks
   return expressionRead(raw || text, rung);
 }
-/* ── rung 1: "why", or an amendment the last card's tool declares ── */
-export function context(q, last) {
-  if (!last) return null;
-  if (/^(why|how|how so|show (me )?(the )?(plan|trace|work|steps))$/.test(q)) return { tool: 'why', args: { ref: last.id }, rung: 'context', amends: last.id, res: T.why({ ref: last.id }) };
-  const d = toolByName(last.tool); if (!d || !d.amend) return null;
-  for (const am of d.amend) {
-    if (am.when && !am.when(last.args)) continue;
-    const m = am.match.exec(q); if (!m) continue;
-    const v = am.value ? am.value(m, last.args) : m[1]; if (v == null) continue;
-    const args = { ...last.args, [am.arg]: v }, res = runTool(last.tool, args);
-    if (res) return { tool: last.tool, args, rung: 'context', amends: last.id, res };
+/* ── the context rung: what amends the last card ── */
+// The clause command behind a card: kept when the card was read, recovered from its words when it was replayed (an
+// amendment from the command it amended). null when the card was not read by the grammar.
+export function commandOf(card) {
+  if (card.cmd !== undefined) return card.cmd;
+  let cmd = null;
+  if (card.amends) { const base = S.cards.find(x => x.id === card.amends), bc = base && commandOf(base); if (bc) { const s = makeSession([]); s.last = bc; const v = verdictOf(card.raw, s, { fragment: true }); if (v.b) cmd = v.r.commands[0]; } }
+  else if (card.rung !== 'none') { const v = verdictOf(card.raw, makeSession([])); if (v.b && v.b.tool === card.tool) cmd = v.r.commands[0]; }
+  Object.defineProperty(card, 'cmd', { value: cmd, writable: true, enumerable: false });
+  return cmd;
+}
+// what an amendment changes: the arguments its reading sets differently from the reading of the card as it stands,
+// laid over the card's own arguments (so a flipped slot or an answered question stays)
+function changed(card, before, after) {
+  const args = JSON.parse(JSON.stringify(card.args));
+  for (const k of new Set([...Object.keys(after), ...Object.keys(before || {})])) {
+    if (JSON.stringify(after[k]) === JSON.stringify((before || {})[k])) continue;
+    if (after[k] === undefined) delete args[k]; else args[k] = after[k];
   }
-  return null;
+  return args;
+}
+// a fragment of the last command: "in feet", "and chile", "log scale", "by lith", "where au > 1", "tomorrow"
+function fragmentRead(raw, last) {
+  const base = commandOf(last); if (!base) return null;
+  const s = makeSession([]); s.last = base;
+  const { r, b } = verdictOf(raw, s, { fragment: true }); if (!b || b.tool !== last.tool) return null;
+  const before = bindOf(base), args = changed(last, before && before.tool === last.tool ? before.args : null, b.args);
+  const res = runTool(last.tool, args); if (!res) return null;
+  res.trace.unshift(`clause: amends #${String(last.id).padStart(2, '0')}: ${r.echo}`);
+  return { tool: last.tool, args, rung: 'context', amends: last.id, res, cmd: r.commands[0] };
+}
+// an amendment frame of the last card's tool: "2 sentences", "trace it", "next passage", "why"
+let amendEngines = {};
+function amendEngine(tool) {
+  const frames = FRAMES.filter(f => f.amends && (f.amends.includes(tool) || f.amends.includes('*'))), o = ontology(frames), key = JSON.stringify(o);
+  if (!amendEngines[tool] || amendEngines[tool].key !== key) amendEngines[tool] = { key, frames, E: createEngine(o, ENGLISH) };
+  return amendEngines[tool];
+}
+function amendRead(raw, last) {
+  const { frames, E } = amendEngine(last.tool);
+  // a leading "and" joins the amendment to the card ("and median"); the tokenizer says where the rest starts
+  const { toks } = E.tokenize(raw, { names: {} }); const text = toks.length > 1 && toks[0].senses.some(x => x.cat === 'CONJ') ? raw.slice(toks[1].s) : raw;
+  const take = cmd => { const f = frames.find(x => x.name === cmd.verb), out = f && f.bind(cmd, last.args, last); return out ? { tool: out.tool || last.tool, args: out.args } : null; };
+  const pick = r => { if (r.status === 'ok') return take(r.commands[0]); if (r.status === 'ambiguous' && r.alternatives) { const all = r.alternatives.map(c => take(c[0])).filter(Boolean); if (all.length === 1) return all[0]; } return null; };
+  // with its verb ("trace it", "assume normal"), or as a fragment of one of the frames ("in milliseconds", "by character")
+  let r = E.understand(text, makeSession([])), hit = pick(r);
+  for (const f of frames) { if (hit) break; const s = makeSession([]); s.last = { verb: f.name, theme: [], roles: {} }; const rf = E.understand(text, s, { fragment: true }); hit = pick(rf); if (hit) r = rf; }
+  if (!hit) return null;
+  const res = runTool(hit.tool, hit.args); if (!res) return null;
+  res.trace.unshift(`clause: amends #${String(last.id).padStart(2, '0')}: ${(r.echo || r.readings[0]).replace(/\.$/, '')}`);
+  return { tool: hit.tool, args: hit.args, rung: 'context', amends: last.id, res, cmd: hit.tool === last.tool ? commandOf(last) : null };
+}
+export function context(q, last, raw) {
+  if (!last) return null;
+  // the tool's own amendments are the more specific reading, so they go first; then the last command with a part changed
+  return amendRead(raw || q, last) || fragmentRead(raw || q, last);
 }
 /* ── rung 3: taught words rewrite the query, then the grammar reads it again ── */
 export function taught(text, q, raw) {
@@ -139,3 +182,6 @@ frame({
   // csv, tsv, json and parquet are the open table as a file; script and notebook are the session as code
   bind: c => { const as = c.roles.as && c.roles.as[0] && c.roles.as[0].value; return ['csv', 'tsv', 'json', 'parquet'].includes(as) ? { tool: 'tableExport', args: { fmt: as } } : ['script', 'notebook'].includes(as) ? { tool: 'export', args: {} } : null; }
 });
+// "why", "show the plan": the steps behind the last card, whatever its tool
+amend({ tools: ['*'], name: 'why', label: 'Why', words: ['why', 'how', 'how so', 'show the plan', 'show me the plan', 'show the trace', 'show the work', 'show me the work', 'what did you do', 'explain that'], theme: [], required: [], roles: {},
+  words_pt: ['por quê', 'por que', 'como', 'mostra o plano'], label_pt: 'Por quê', bind: (c, a, card) => ({ tool: 'why', args: { ref: card.id } }) });

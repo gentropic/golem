@@ -1,7 +1,7 @@
 // The sun by NOAA's solar position equations (after Meeus), and the moon's phase from the mean
 // synodic cycle, labelled with its accuracy. Times are given in the place's zone when the place name
 // has one, else in UTC and the card says so.
-import { tool, frame, noun, fmt, rad, deg, iso } from './core.js';
+import { tool, frame, amend, noun, compound, fmt, rad, deg, iso } from './core.js';
 import { findDate, today, fmtDate, dateWords } from './dates.js';
 import { zonesOf, offsetOf } from './calendar.js';
 import { placeOf } from './places.js';
@@ -28,7 +28,6 @@ export function solar(dayUTC, lat, lon) {
 tool({
   name: 'sun',
   skill: { group: 'Device', title: 'Sun and moon', on: 'NOAA equations, mean lunar cycle', about: 'Sunrise, solar noon, sunset, day length and civil twilight for a place and date (about a minute at mid-latitudes); the moon\'s phase from the mean cycle, to about half a day. Places as coordinates or a saved name.', examples: ['sunrise tomorrow in -19.92, -43.94', 'sunset today at home', 'moon phase on 25 dec'] },
-  amend: [{ arg: 'zone', match: /^(?:in |times in )?(.+?) time$/, value: m => { const z = zonesOf(m[1]); return z.length === 1 ? z[0] : null; } }, { arg: 'date', match: /^(?:on |for )?(today|tomorrow|yesterday|\d{1,2} \w{3,9}(?: \d{4})?|\d{4}-\d{2}-\d{2}|next \w+)$/ }],
   topic: () => ['Sun', 1],
   run: a => {
     const read = [{ v: a.what }, 'on', { v: a.date }, 'at', { v: a.place }], P = a.placeLL || placeOf(a.place);
@@ -52,7 +51,6 @@ const SYNODIC = 29.530588861, NEW0 = Date.UTC(2000, 0, 6, 18, 14);   // a new mo
 const PHASES = ['new moon', 'waxing crescent', 'first quarter', 'waxing gibbous', 'full moon', 'waning gibbous', 'last quarter', 'waning crescent'];
 tool({
   name: 'moon',
-  amend: [{ arg: 'date', match: /^(?:on |for )?(today|tomorrow|yesterday|\d{1,2} \w{3,9}(?: \d{4})?|\d{4}-\d{2}-\d{2}|next \w+)$/ }],
   topic: () => ['Moon', 1],
   run: a => {
     const d = a.date === 'today' ? today() : (findDate(a.date) || {}).d, read = ['moon phase on', { v: a.date }];
@@ -77,3 +75,7 @@ frame({
   name: 'moon', label: 'Moon', words: ['show'], elidable: true, theme: ['moonphase'], required: ['theme'], roles: { on: { preps: ['on', 'for'], types: ['date', 'holiday'] } }, label_pt: 'Lua',
   bind: c => ({ tool: 'moon', args: { date: dayOf(c.roles.on && c.roles.on[0]) } })
 });
+// "perth time": the times in another zone
+noun({ amend: true, type: 'timeword', words: { time: ['time', 'times', 'local time'] }, words_pt: { time: ['hora', 'horário'] } }); compound({ mod: 'place', heads: ['timeword'], attr: 'place' });
+amend({ tools: ['sun'], name: 'sunzone', label: 'Zone', words: [], elidable: true, theme: ['timeword'], required: [], roles: { in: { preps: ['in', 'to', 'for', 'as'], types: ['timeword'] } },
+  bind: (c, a) => { const t = [...c.theme, ...(c.roles.in || [])][0], p = t && t.attrs.place, z = p && zonesOf(p); return z && z.length === 1 ? { args: { ...a, zone: z[0] } } : null; } });

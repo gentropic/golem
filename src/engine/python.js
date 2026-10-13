@@ -2,7 +2,7 @@
 // "running" card carrying a job, the runner (a Web Worker in the page, adder in-process in the tests)
 // answers later, and the card is recomputed from the kept result. Replay reruns the code, which is
 // deterministic: a fresh interpreter each time, no network, no clock, a seeded random.
-import { tool, frame, result, fmt } from './core.js';
+import { tool, frame, amend, result, fmt } from './core.js';
 import { importNotebook } from '../vendor/ipynb.js';
 
 const BUDGET = { steps: 2000000, ms: 5000 };
@@ -23,7 +23,6 @@ const HEAD = /^(?:run|run this|run it|python|py|execute|exec|eval(?:uate)?(?: th
 tool({
   name: 'python',
   skill: { group: 'Compute', title: 'Run and trace Python', on: '@gcu/adder', about: 'Python run on the device by adder, compiled to JavaScript through AIR (tree-walked when tracing, or when the compiler declines a construct): output, the last value, the error with its line. "trace it" adds a table of lines and the variables they changed. No network, no page access, a statement budget; numpy, pandas, scipy, sklearn and matplotlib imports are rewritten to the GCU names (natra, sadpan, scitra, learn, plt) and shown; figures come back as drawings on the card.', examples: ['run this: print(sum(range(10)))', 'run this: import plt; plt.plot([1, 2, 3], [1, 4, 9]); plt.show()', 'trace this: a = 1; b = a * 2; a = a + b'] },
-  amend: [{ arg: 'trace', match: /^(?:trace it|trace|step through it|show the steps)$/, value: () => true }, { arg: 'trace', match: /^(?:no trace|just run it)$/, value: () => false }],
   topic: () => ['Python', 1],
   run: a => {
     const { code, rewrites } = rewriteForGcu(a.code), lines = code.split('\n').length;
@@ -63,3 +62,6 @@ for (const [name, words, words_pt, trace] of [
   words_pt, label_pt: trace ? 'Rastrear' : 'Rodar',
   bind: c => payload(c) ? { tool: 'python', args: { code: payload(c), trace } } : null
 });
+// "trace it", "just run it"
+amend({ tools: ['python'], name: 'pytraceon', label: 'Trace', words: ['trace it', 'trace', 'step through it', 'show the steps', 'show me the steps'], theme: [], required: [], roles: {}, bind: (c, a) => ({ args: { ...a, trace: true } }) });
+amend({ tools: ['python'], name: 'pytraceoff', label: 'Run', words: ['no trace', 'just run it', 'run it', 'without the trace'], theme: [], required: [], roles: {}, bind: (c, a) => ({ args: { ...a, trace: false } }) });

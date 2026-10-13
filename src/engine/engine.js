@@ -36,6 +36,7 @@ import { current, newSession, renameSession, touch } from './sessions.js';
 
 export function addCard(raw, r, ms) {
   const c = { id: ++S.n, raw, tool: r.tool, args: r.args, rung: r.rung, amends: r.amends, res: r.res, ms };
+  if (r.cmd !== undefined) Object.defineProperty(c, 'cmd', { value: r.cmd, writable: true, enumerable: false });   // the clause command, for amendments; not stored
   S.cards.push(c); touch(); startJobs([c], rerun); return c;
 }
 export function rerun(c) {
@@ -83,7 +84,8 @@ export function submit(raw) {
     const ba = clauseRead(raw, 'grammar'); if (ba.tool === 'recipeBatch') return { kind: 'card', card: addCard(raw, ba, performance.now() - t0) };
     const at = recipeAt(m[1]); if (at) return runRecipe(at[0], at[1]);
   }
-  const r = context(q, last) || grammar(text, q, 'grammar', raw) || taught(text, q, raw) || { tool: 'none', args: { q }, rung: 'none', res: T.none({ q }) };
+  // a whole command first; then what amends the last card ("in feet", "2 sentences"); then the words taught on this device
+  const r = grammar(text, q, 'grammar', raw) || context(q, last, raw) || taught(text, q, raw) || { tool: 'none', args: { q }, rung: 'none', res: T.none({ q }) };
   return { kind: 'card', card: addCard(raw, r, performance.now() - t0) };
 }
 

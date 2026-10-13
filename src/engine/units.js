@@ -1,5 +1,5 @@
 // Unit conversion with dimension checks. A small table until @gcu/units stands under it.
-import { tool, frame, fmt } from './core.js';
+import { unit, tool, frame, fmt } from './core.js';
 
 export const U = {};
 export const UNIT_TABLE = [];
@@ -43,7 +43,6 @@ export const dimName = d => DIM[d] || d.split('/').map(x => DIM[x] || x).join(' 
 tool({
   name: 'convert',
   skill: { group: 'Compute', title: 'Unit conversion', on: '@gcu/units', about: 'Grades, lengths, masses, areas, pressures, temperatures. Refuses mismatched dimensions.', examples: ['0.35 oz per short ton in g/t', '2.7 g/cm3 in lb/ft3', '1500 psi in mpa', '5 km in kg'] },
-  amend: [{ arg: 'to', match: /^(?:and |now |same (?:but )?)?(?:in|to|as) (.+)$/ }],
   topic: a => [a.from + ' → ' + a.to, 1],
   run: a => {
     const oz = a.oz || (/ per |\//.test(a.from) ? 'troy' : 'av');
@@ -67,3 +66,5 @@ frame({
   words_pt: ['converter', 'converte', 'converta', 'passar', 'passa'], label_pt: 'Converter',
   bind: c => { const q = c.theme[0], to = c.roles.unit && c.roles.unit[0]; return q && q.type === 'quantity' && to && q.unit !== 'mesh' && to.unit !== 'mesh' ? { tool: 'convert', args: { v: q.n, from: q.unit, to: to.unit } } : null; }
 });
+// long forms the conversion table does not list but parseUnit knows
+for (const [u, dim, words] of [['yd', 'length', ['yard', 'yards']], ['in', 'length', ['inch', 'inches']], ['ft', 'length', ['foot']], ['mi', 'length', ['mile']], ['m', 'length', ['metre', 'meter', 'meters']], ['km', 'length', ['kilometre', 'kilometres', 'kilometer', 'kilometers']]]) unit({ unit: u, dim, words });

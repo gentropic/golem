@@ -15,7 +15,7 @@ function variables() {
   return Object.fromEntries(cols.map(c => [c.name, uniq([c.name.toLowerCase(), ...(c.analyte ? [c.analyte.toLowerCase(), ELEMENT[c.analyte]] : [])].filter(Boolean))]));
 }
 
-export function ontology() {
+export function ontology(only) {
   const units = UNIT_TABLE.map(x => ({ unit: x.name, dim: DIM[x.dim], words: uniq(x.words.map(w => w.toLowerCase())) }));
   for (const w of COMPOUNDS) { const p = parseUnit(w); if (p) units.push({ unit: w, dim: dimName(p.dim), words: [w] }); }
   units.push({ unit: 'oz', dim: 'mass', words: ['oz', 'ounce', 'ounces'] });   // troy or avoirdupois: the tool decides and shows the slot
@@ -49,15 +49,15 @@ export function ontology() {
       // every unit of the chart, by name; the generic words let "what period is …" fail cleanly to the regex reader
       { type: 'chron', words: Object.fromEntries(TIMESCALE.map(u => [u.n, [u.n.toLowerCase()]])), generic: ['period', 'epoch', 'era', 'eon', 'stage', 'series', 'system'],
         words_pt: Object.fromEntries(TIMESCALE.map(u => [u.n, [u.n.toLowerCase()]])), generic_pt: ['período', 'periodo', 'época', 'epoca', 'era', 'éon', 'eon', 'andar', 'idade'] },
-      ...LEXICON.nouns.map(n => typeof n === 'function' ? n() : n).filter(Boolean)
+      ...LEXICON.nouns.map(n => typeof n === 'function' ? n() : n).filter(n => n && (!n.amend || only)).map(({ amend, ...n }) => n)
     ],
     shapes: LEXICON.shapes,
-    fillers: ['golem', 'ok', 'okay', 'did i', 'have i', 'do i', 'did we', 'have we'],
+    fillers: ['golem', 'ok', 'okay', 'did i', 'have i', 'do i', 'did we', 'have we', 'instead', 'what about', 'how about', 'make it', 'make that', 'show it', 'show that', 'show me that', 'give it', 'put it', 'change it to', 'switch to', 'and now', 'now show'],
     units,
     compounds: [{ mod: 'filter', heads: ['country'], attr: 'filter', echo: true }, { mod: 'scale', heads: ['plot'], attr: 'scale', echo: true }, ...LEXICON.compounds],
     postmods: LEXICON.postmods,
     qmods: [{ head: 'timer', attr: 'duration', dims: ['time'] }, ...LEXICON.qmods],   // "a 30 minute timer"
-    verbs: FRAMES.map(({ bind, ...f }) => f),
+    verbs: (only || FRAMES.filter(f => !f.amends)).map(({ bind, tools, amends, ...f }) => f),
     inherit: [],
     echoOrder: ['of', 'unit', 'by', 'scale', 'for', 'as'],
     roleLabels_pt: { of: 'de', unit: 'unidade', by: 'por', scale: 'escala', for: 'duração', as: 'como' },

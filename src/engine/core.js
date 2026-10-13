@@ -34,6 +34,10 @@ export const toolByName = name => TOOLS.find(d => d.name === name);
 //   bind(cmd) → { tool, args } | null     a parsed command (verb, theme, roles) into a tool and its args
 export const FRAMES = [];
 export function frame(f) { FRAMES.push(f); return f; }
+// An amendment frame reads only against the last card, of the tools it names ('*': any): "2 sentences", "trace it".
+//   amend({ tools, name, words, theme, roles, …, bind(cmd, args, card) → { args } | { tool, args } | null })
+// Amendments that change one of a frame's roles need none: "in feet" is the last command with its unit changed.
+export const amend = f => frame({ ...f, amends: f.tools });
 // The words a file contributes beside its frames, gathered into the ontology by ontology():
 //   noun({ type, words, generic, words_pt, generic_pt })   a type of thing; a function returning one is
 //                                                           called each time (a noun that follows the open table)

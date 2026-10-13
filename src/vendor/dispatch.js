@@ -1,7 +1,7 @@
 // ⚠ VENDORED — DO NOT EDIT. @gcu/dispatch, built from ../auditable/ext/dispatch/src/ by its own build.
 // Source of truth: gentropic/auditable ext/dispatch (local clone: ../auditable). Re-vendor by copying
 // ext/dispatch/index.js here after 'node ext/dispatch/build.js'. golem uses the grammar rung only:
-// createEngine, makeSession, ENGLISH, PORTUGUESE. At auditable ff2d3dfe.
+// createEngine, makeSession, ENGLISH, PORTUGUESE. At auditable a15480d8.
 
 // ⚠ GENERATED FILE — DO NOT EDIT. Source: src/  Build: @gcu/build src/main.js
 // @gcu/dispatch — Session-trained natural-language → tool-call dispatch: a Snips-shaped resolver (averaged-perceptron intent + CRF-class slot tagger + gazetteers + deterministic per-kind assemblers) that trains IN THE BROWSER from the host session's own vocabulary in under a second. Tools are declarative (ten kinds) and a grammar rung (clause: case-grammar frames over an Earley chart with costed repairs, en + pt-BR) reads controlled commands before the learners see them; no shipped model, no network, explainable per decision — refusals return empty calls so the host degrades into its command palette. Born from an incubator where this beat a 26M finetuned transformer 50/52 to 3/24 on a frozen yardstick.
@@ -1003,6 +1003,12 @@ function buildGrammar(X) {
     return { kind: 'cmd', verb: null, args: [{ kind: 'np', list: [n] }, ...a], question: true };
   });
   rule('Program', 'Cmd THEN Program', (c, _, p) => [c, ...p]);
+  // a fragment (understand with { fragment: true }): what is left of a command when the rest is the session's last one —
+  // "in feet", "and chile", "log scale", "where au > 1", "again but with 300 m". It is an 'again' the ellipsis completes.
+  const frag = (t, a) => t.length || a.length ? [{ kind: 'again', args: [...t, ...a] }] : null;
+  rule('Fragment', 'Theme PPs', frag);
+  rule('Fragment', 'CONJ Theme PPs', (_, t, a) => frag(t, a));
+  rule('Fragment', 'Cmd', c => c.kind === 'again' ? [c] : null);
   rule('Program', 'Cmd CONJ THEN Program', (c, _, __, p) => [c, ...p]);
   rule('Program', 'Cmd COMMA THEN Program', (c, _, __, p) => [c, ...p]);
   rule('Program', 'Cmd COMMA CONJ THEN Program', (c, _, __, ___, p) => [c, ...p]);
@@ -1345,7 +1351,7 @@ function createEngine(ont, locale = ENGLISH) {
   const COSTS = { skipFunc: 0.5, skipUnk: 0.6, skipContent: 1.5, skipTagged: 2, skipO: 0.5, insPrep: 1, insPrepTagged: 0.5, insDet: 0.5, order: 1, subst1: 0.4, subst2: 1.2, substKnown: 2 };
   const NEAR_POOL = Object.keys(LEX).filter(k => !k.includes(' ') && LEX[k].some(x => ['NOUN', 'VERB', 'UNIT', 'PREP'].includes(x.cat) && !x.exact));
   const CONTENT_CATS = ['NOUN', 'VERB', 'UNIT', 'NUM', 'IDENT', 'PREP'];
-  function makeParser(toks, repair) {
+  function makeParser(toks, repair, start = 'Program') {
     // repair = { budget, tags?, costs? } — tags (from a slot tagger) shape the costs: cheap to skip an O token,
     // dear to skip a role token, cheap to insert a preposition right before a role span
     let opts = {};
@@ -1368,7 +1374,7 @@ function createEngine(ont, locale = ENGLISH) {
         near: (sym, i) => { const [cat, word] = sym.split(':'); return nearFor(i).filter(x => x.v.cat === cat && (!word || x.v.word === word)); },
         fabricate: sym => FAB[sym]?.() ?? null };
     }
-    const C = chart(R, toks, term, 'Program', opts);
+    const C = chart(R, toks, term, start, opts);
     const parse = (sym, i) => C.spans(sym, i).flatMap(j => C.derive(sym, i, j).map(d => ({ node: d.v, end: j, cost: d.cost, repairs: d.repairs })));
     parse.chart = C;
     return parse;
@@ -1561,9 +1567,13 @@ function createEngine(ont, locale = ENGLISH) {
   function ellipsis(c, session, problems) {
     if (!session.last) { problems.add('nothing to repeat yet'); return null; }
     const L = session.last; const F = VERBS[L.verb];
-    const themeNP = c.args.find(a => a.kind === 'np');
-    const args = [{ kind: 'np', list: themeNP ? themeNP.list : L.theme }];
-    const overridden = new Set();
+    let themeNP = c.args.find(a => a.kind === 'np');
+    const overridden = new Set(), moved = [];
+    if (themeNP && !themeNP.list.every(v => F.theme.some(t => typeOk(t, v)))) {
+      const fits = Object.entries(F.roles).filter(([, r]) => themeNP.list.every(v => r.types.some(t => typeOk(t, v))));
+      if (fits.length === 1) { const [k, r] = fits[0]; moved.push({ kind: 'pp', prep: r.preps[0], canon: [r.preps[0]], val: themeNP.list }); overridden.add(k); themeNP = null; }
+    }
+    const args = [{ kind: 'np', list: themeNP ? themeNP.list : L.theme }, ...moved];
     for (const a of c.args.filter(a => a.kind === 'pp')) {
       const fits = Object.entries(F.roles).filter(([, r]) => (a.canon.includes('*') || r.preps.some(p => a.canon.includes(p))) && a.val.every(v => r.types.some(t => typeOk(t, v))));
       if (!fits.length && !themeNP && a.val.every(v => F.theme.some(t => typeOk(t, v)))) { args[0] = { kind: 'np', list: a.val }; continue; }
@@ -1627,7 +1637,7 @@ function createEngine(ont, locale = ENGLISH) {
     }
     return out.sort((a, b) => (a.j - a.from) - (b.j - b.from) || a.i - b.i);
   }
-  function textRead(toks, text, session, diag, opts) {
+  function textRead(toks, text, session, diag, opts, start = 'Program') {
     let fallback = null;
     for (const spans of textCands(toks)) {
       let tt = toks;
@@ -1642,7 +1652,7 @@ function createEngine(ont, locale = ENGLISH) {
         tt = [...tt.slice(0, i), { word: '«text»', senses: [{ cat: 'TEXT', text: t }], s: s0, e }, ...tt.slice(j)];
       }
       if (empty) continue;
-      const full = makeParser(tt)('Program', 0).filter(r => r.end === tt.length).map(r => ({ ...r, repairs: [] }));
+      const full = makeParser(tt, null, start)(start, 0).filter(r => r.end === tt.length).map(r => ({ ...r, repairs: [] }));
       if (!full.length) continue;
       const inside = new Set(spans.flatMap(({ from, j }) => toks.slice(from, j)).flatMap(x => [x.repaired, x.word]).filter(Boolean));
       const d2 = { ...diag, notes: diag.notes.filter(n => ![...inside].some(w => n.startsWith(`read "${w}" as`) || n.startsWith(`"${w}" could be`))), unknown: diag.unknown.filter(w => !inside.has(w)), repairs: [] };
@@ -1660,18 +1670,19 @@ function createEngine(ont, locale = ENGLISH) {
     const diag = { notes, unknown, coverage: null, parses: 0, repairs: [] };
     if (!toks.length) return { status: 'reject', reasons: ['nothing to parse'], diag };
     const isQ = toks[0].senses.some(s => s.cat === 'QWORD'), isUnk = toks[0].senses.every(s => s.cat === 'UNK');
-    const parse = makeParser(toks);
-    const strictFull = isUnk ? [] : parse('Program', 0).filter(r => r.end === toks.length).map(r => ({ ...r, repairs: [] }));
+    const start = opts.fragment ? 'Fragment' : 'Program';
+    const parse = makeParser(toks, null, start);
+    const strictFull = isUnk && !opts.fragment ? [] : parse(start, 0).filter(r => r.end === toks.length).map(r => ({ ...r, repairs: [] }));
     diag.parses = strictFull.length;
     let result = strictFull.length ? semantic(strictFull, toks, session, diag, opts) : null;
     if ((!result || result.status !== 'ok') && (TEXT_THEME.size || TEXT_PREPS.size || TEXT_SUBJECT.size || BARE.length)) {   // a free-text slot, before any repair
-      const t = textRead(toks, text, session, diag, opts);
+      const t = textRead(toks, text, session, diag, opts, start);
       if (t && (t.status === 'ok' || !result)) return t;
     }
     if ((!result || result.status === 'reject') && opts.repair?.budget) {
       // error-correcting pass: candidate derivations by ascending repair cost; the first tier that survives binding wins
-      const P2 = makeParser(toks, { ...opts.repair, names: session.names }); const C2 = P2.chart;
-      const all = P2('Program', 0).flatMap(r => { let c = r.cost; const extra = []; for (let k = r.end; k < toks.length; k++) { c += C2.skipCost(k); extra.push({ op: 'skip', at: k, word: toks[k].word }); } return c <= opts.repair.budget && c > 0 ? [{ ...r, cost: c, repairs: [...r.repairs, ...extra] }] : []; });
+      const P2 = makeParser(toks, { ...opts.repair, names: session.names }, start); const C2 = P2.chart;
+      const all = P2(start, 0).flatMap(r => { let c = r.cost; const extra = []; for (let k = r.end; k < toks.length; k++) { c += C2.skipCost(k); extra.push({ op: 'skip', at: k, word: toks[k].word }); } return c <= opts.repair.budget && c > 0 ? [{ ...r, cost: c, repairs: [...r.repairs, ...extra] }] : []; });
       for (const cost of [...new Set(all.map(r => r.cost))].sort((a, b) => a - b)) {
         const d2 = { ...diag, repairs: [], repairCost: cost };
         const r2 = semantic(all.filter(r => r.cost === cost), toks, session, d2, opts);

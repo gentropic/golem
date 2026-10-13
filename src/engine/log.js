@@ -1,7 +1,7 @@
 // The log: a device table of things done, written from cards and asked about in plain words.
 // Rows belong to the device, like notes; a card writes its row once (by id), undo removes it, and
 // "open the log" makes it the open table so every table question works on it.
-import { S, tool, frame, noun, fmt, iso } from './core.js';
+import { S, tool, frame, amend, noun, fmt, iso } from './core.js';
 import { parseUnit, dimName } from './units.js';
 import { findDate, today, fmtDate, dateWords } from './dates.js';
 
@@ -50,7 +50,6 @@ export function readLog(text) {
 tool({
   name: 'logAdd',
   skill: { group: 'Device', title: 'Log', on: 'device table', about: 'Log what you did with a quantity and a date, ask totals and means by week or month, and open the log as a table. Rows stay on this device.', examples: ['log 30 min run', 'log 5 km run yesterday', 'log weight 78.4 kg', 'how many km did i run this month', 'mean weight by week', 'open the log'] },
-  amend: [{ arg: 'value', match: /^(?:that was|make it|correct(?:ion)?:?|actually) (\d+(?:\.\d+)?)(?: ?([a-zµ%°][\w%°/³²]*))?$/, value: (m, a) => { if (m[2]) a.unit = m[2]; return +m[1]; } }, { arg: 'date', match: /^(?:that was |it was )?(?:on )?(yesterday|today|\d{4}-\d{2}-\d{2}|\d{1,2} \w{3,9}(?: \d{4})?|last \w+)$/, value: m => { const d = findDate(m[1], { back: true }); return d ? iso(d.d) : null; } }],
   topic: a => [`Log: ${a.activity}`, 1],
   undo: a => { const t = logTable(); t.rows = t.rows.filter(r => r.id !== a.id); },
   run: a => {
@@ -81,7 +80,6 @@ function readPeriod(s) {
 }
 tool({
   name: 'logQuery',
-  amend: [{ arg: 'by', match: /^by (week|month|day|activity)$/ }, { arg: 'period', match: /^(this|last) (week|month|year)$/, value: m => ({ kind: 'period', which: m[1], unit: m[2] }) }],
   topic: a => [`Log: ${a.activity}`, 1],
   run: a => {
     const all = rows().filter(r => same(r.activity, a.activity) && inPeriod(r.date, a.period));
@@ -133,3 +131,10 @@ for (const [name, words, agg] of [['logSum', ['how many', 'how much', 'total', '
     return { tool: 'logQuery', args: { agg: a, activity: act.value, unit: u ? u.unit : null, period, by: c.roles.by ? c.roles.by[0].value : null } };
   }
 });
+// "that was 6 km", "make it 30 min", "that was yesterday"
+amend({ tools: ['logAdd'], name: 'logfix', label: 'Correct', words: ['that was', 'make it', 'correction', 'actually', 'it was'], elidable: true, theme: ['quantity:*', 'quantity:bare', 'date'], required: ['theme'], roles: { on: { preps: ['on'], types: ['date'] } },
+  bind: (c, a) => {
+    const q = c.theme.find(n => n.type === 'quantity'), d = [...c.theme, ...(c.roles.on || [])].find(n => n.type === 'date');
+    if (d) { const f = findDate(dateWords(d), { back: true }); return f ? { args: { ...a, date: iso(f.d) } } : null; }
+    return q ? { args: { ...a, value: q.n, ...(q.unit ? { unit: q.unit } : {}) } } : null;
+  } });

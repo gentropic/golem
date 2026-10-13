@@ -14,7 +14,6 @@ const consts = s => { const out = {}; if (!s) return out; let m; if ((m = new Re
 tool({
   name: 'apply', pre: ['table'],
   skill: { group: 'Table', title: 'Field compute over a table', on: '@gcu/bearing · sift', about: 'A single-value skill on every row: true thickness of each intercept from from/to and the hole and plane columns, or apparent dip of each plane on a section. Constants fill what no column holds ("with hole 270/60"); rows that cannot be filled are listed.', examples: ['true thickness of every intercept with hole 270/60, bedding 045/30', 'apparent dip of each plane on a section at 090'] },
-  amend: [{ arg: 'constText', match: /^with (.+)$/, value: (m, a) => { a.consts = consts(m[1]); return m[1]; }, when: a => a.skill === 'thickness' }, { arg: 'where', match: /^where (.+)$/ }, { arg: 'az', match: /^(?:on a )?section (?:at|of) (\d{1,3})$/, value: m => +m[1], when: a => a.skill === 'apparent' }],
   topic: a => [a.skill === 'thickness' ? 'True thickness of intercepts' : 'Apparent dips', 2],
   run: a => {
     const T = S.table, R = T.roles, read = [a.skill === 'thickness' ? 'true thickness of every intercept' : 'apparent dip of every plane', ...(a.hole ? ['in', { v: a.hole }] : [])], c = a.consts || {};

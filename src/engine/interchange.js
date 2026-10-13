@@ -137,7 +137,6 @@ const sniff = body => /^\s*[[{]/.test(body) ? (/"type"\s*:\s*"(Feature|FeatureCo
 tool({
   name: 'convertText',
   skill: { group: 'Compute', title: 'YAML, JSON, WKT and GeoJSON', on: '@gcu/yaml · wkt · dxf', about: 'JSON to YAML and back (the strict YAML subset, where every string is quoted), WKT to GeoJSON and back, and DXF drawings to GeoJSON or WKT from your files. What does not carry over is said.', examples: ['json to yaml: {"hole": "DH-12", "depth": 240.5}', 'wkt to geojson: POINT (30 10)', 'convert to wkt: {"type": "LineString", "coordinates": [[0, 0], [10, 5]]}'] },
-  amend: [{ arg: 'to', match: /^(?:as |to |in )?(json|yaml|wkt|geojson)(?: instead)?$/ }],
   topic: a => [`${LABEL[a.from]} to ${LABEL[a.to]}`, 1],
   run: a => {
     const short = a.text.length > 40 ? a.text.slice(0, 37).replace(/\s+/g, ' ') + '…' : a.text.replace(/\s+/g, ' ');
@@ -152,7 +151,6 @@ tool({
 const fileNamed = name => Object.values(S.files).find(f => f.name.toLowerCase() === name.toLowerCase());
 tool({
   name: 'convertFile',
-  amend: [{ arg: 'to', match: /^(?:as |to |in )?(json|yaml|wkt|geojson)(?: instead)?$/ }],
   topic: a => [a.file.name, 2],
   run: a => {
     const from = kindOfName(a.file.name), targets = TARGETS[from] || [], to = a.to || targets[0], f = S.files[a.file.hash];

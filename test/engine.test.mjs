@@ -122,7 +122,7 @@ test('declarations drive the catalog, the names and the amendments', () => {
   assert.equal(rows.filter(r => r.live).length, 41);
   for (const name of Object.keys(g.T)) assert.ok(g.toolByName(name), `a declaration for ${name}`);
   assert.deepEqual(g.tagOf({ tool: 'hist', args: { col: 'au' } }), ['Au histogram', 3]);
-  assert.ok(g.toolByName('convert').amend.length === 1 && g.toolByName('fact').amend.length === 2);
+  assert.ok(g.FRAMES.some(f => f.amends && f.amends.includes('extract')) && g.FRAMES.some(f => f.amends && f.amends.includes('*')), 'amendments are frames, scoped to their tools');
 });
 
 test('the ontology derives from the declarations and is plain JSON', () => {

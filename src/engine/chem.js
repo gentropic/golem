@@ -59,7 +59,6 @@ const sameCase = (text, q, m, i) => { const at = q.indexOf(m[i], m.index); retur
 tool({
   name: 'chem',
   skill: { group: 'Compute', title: 'Molar mass and conversion factors', on: 'IUPAC weights (data file)', about: 'Molar mass of a formula with the breakdown; element-to-oxide factors and the reverse; how much of an element a formula holds; the periodic table by symbol, name or number. A mineral name is not read: give the formula.', examples: ['molar mass of CuFeS2', 'fe to fe2o3', 'convert 45.2% fe2o3 to fe', 'how much cu in CuFeS2', 'atomic mass of fe', 'element 26'] },
-  amend: [{ arg: 'to', match: /^(?:as |to )?([A-Za-z]+\d*(?:[A-Za-z]+\d*)*)$/, when: a => a.ask === 'factor' && a.to === 'oxide', value: m => m[1] }],
   topic: a => [a.ask === 'element' ? 'Periodic table' : a.ask === 'mass' ? 'Molar mass' : 'Conversion factor', 1],
   run: a => {
     const refuse = (read, text, why) => ({ read, body: [{ t: 'note', kind: 'err', text }, SRC], trace: [why] });
@@ -110,7 +109,7 @@ shape({ type: 'formula', re: String.raw`(?=[^a-z]*[A-Z][^A-Z]*[A-Z0-9])[A-Z(][A-
 // lowercase: only runs of real element symbols with counts, so an unknown word is not a formula: fe2o3, cuo, h2o
 const SYMS = ELEMENTS.map(e => e[1].toLowerCase()).sort((a, b) => b.length - a.length).join('|');
 // with a count, or short (cuo, nacl): longer plain words spelled in symbols ("python" is P Y Th O N) stay words
-shape({ type: 'formula', re: `(?=[a-z.]*\\d|[a-z]{2,5}(?![a-z\\d]))(?:(?:${SYMS})\\d*(?:\\.\\d+)?){2,}` });
+shape({ type: 'formula', re: `(?=[a-z.]*\\d|[a-z]{2,4}(?![a-z\\d]))(?:(?:${SYMS})\\d*(?:\\.\\d+)?){2,}` });
 // symbols that are English words (in, as, at, no, be, he, so) and single letters stay out; the names cover them
 // and symbols that are units (cm, mg, pa, cd, pt, ga): "9 cm" is a length, not curium
 const PLAIN = new Set(['in', 'as', 'at', 'no', 'be', 'he', 'so', 'is', 'am', 'pm', 'or', 'es', 'md', 'ga', ...UNIT_TABLE.flatMap(u => u.words.map(w => w.toLowerCase()))]);

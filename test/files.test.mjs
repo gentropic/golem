@@ -87,7 +87,7 @@ test('the parser learns the table nouns: a histogram of a column it never heard 
 test('amendments on a table question: by, where, weighting, another aggregate', () => {
   g.reset(); g.openFile('holes.csv', CSV);
   ask('mean cu');
-  let c = ask('by litho'); assert.equal(c.rung, 'context'); assert.deepEqual(c.args.by, ['litho']);
+  let c = ask('by litho'); assert.equal(c.rung, 'context'); assert.deepEqual(c.args.by.map(x => x.toLowerCase()), ['litho']);
   c = ask('where fe > 12'); assert.equal(c.rung, 'context'); assert.equal(c.args.where, 'fe > 12');
   c = ask('weighted by count'); assert.equal(c.args.weight, 'count');
   c = ask('and median'); assert.deepEqual(c.args.aggs, ['mean', 'median']);

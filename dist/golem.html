@@ -381,6 +381,10 @@ const toolByName = name => TOOLS.find(d => d.name === name);
 //   bind(cmd) → { tool, args } | null     a parsed command (verb, theme, roles) into a tool and its args
 const FRAMES = [];
 function frame(f) { FRAMES.push(f); return f; }
+// An amendment frame reads only against the last card, of the tools it names ('*': any): "2 sentences", "trace it".
+//   amend({ tools, name, words, theme, roles, …, bind(cmd, args, card) → { args } | { tool, args } | null })
+// Amendments that change one of a frame's roles need none: "in feet" is the last command with its unit changed.
+const amend = f => frame({ ...f, amends: f.tools });
 // The words a file contributes beside its frames, gathered into the ontology by ontology():
 //   noun({ type, words, generic, words_pt, generic_pt })   a type of thing; a function returning one is
 //                                                           called each time (a noun that follows the open table)
@@ -458,12 +462,12 @@ const p3 = x => String(Math.round(x) % 360).padStart(3, '0');
 const p2 = x => String(Math.round(x)).padStart(2, '0');
 // a quantity node from the parser as a number in a base unit, given the unit's factor
 const qty = (node, f) => node && node.type === 'quantity' ? node.n * f(node.unit) : null;
-  return { S, T, TOOLS, tool, toolByName, FRAMES, frame, LEXICON, noun, shape, postmod, unit, qmod, compound, CONDITIONS, condition, setRunner, onJobDone, result, clearResults, startJobs, settle, runTool, clock, fmt, iso, rad, deg, p3, p2, qty };
+  return { S, T, TOOLS, tool, toolByName, FRAMES, frame, amend, LEXICON, noun, shape, postmod, unit, qmod, compound, CONDITIONS, condition, setRunner, onJobDone, result, clearResults, startJobs, settle, runTool, clock, fmt, iso, rad, deg, p3, p2, qty };
 })();
 
 /* ==== src/engine/units.js ==== */
 const __m1 = (() => {
-const { tool, frame, fmt } = __m0;
+const { unit, tool, frame, fmt } = __m0;
 // Unit conversion with dimension checks. A small table until @gcu/units stands under it.
 
 const U = {};
@@ -508,7 +512,6 @@ const dimName = d => DIM[d] || d.split('/').map(x => DIM[x] || x).join(' per ');
 tool({
   name: 'convert',
   skill: { group: 'Compute', title: 'Unit conversion', on: '@gcu/units', about: 'Grades, lengths, masses, areas, pressures, temperatures. Refuses mismatched dimensions.', examples: ['0.35 oz per short ton in g/t', '2.7 g/cm3 in lb/ft3', '1500 psi in mpa', '5 km in kg'] },
-  amend: [{ arg: 'to', match: /^(?:and |now |same (?:but )?)?(?:in|to|as) (.+)$/ }],
   topic: a => [a.from + ' → ' + a.to, 1],
   run: a => {
     const oz = a.oz || (/ per |\//.test(a.from) ? 'troy' : 'av');
@@ -532,6 +535,8 @@ frame({
   words_pt: ['converter', 'converte', 'converta', 'passar', 'passa'], label_pt: 'Converter',
   bind: c => { const q = c.theme[0], to = c.roles.unit && c.roles.unit[0]; return q && q.type === 'quantity' && to && q.unit !== 'mesh' && to.unit !== 'mesh' ? { tool: 'convert', args: { v: q.n, from: q.unit, to: to.unit } } : null; }
 });
+// long forms the conversion table does not list but parseUnit knows
+for (const [u, dim, words] of [['yd', 'length', ['yard', 'yards']], ['in', 'length', ['inch', 'inches']], ['ft', 'length', ['foot']], ['mi', 'length', ['mile']], ['m', 'length', ['metre', 'meter', 'meters']], ['km', 'length', ['kilometre', 'kilometres', 'kilometer', 'kilometers']]]) unit({ unit: u, dim, words });
   return { U, UNIT_TABLE, DIM, COMPOUNDS, parseUnit, dimName };
 })();
 
@@ -7806,7 +7811,6 @@ const sniff = body => /^\s*[[{]/.test(body) ? (/"type"\s*:\s*"(Feature|FeatureCo
 tool({
   name: 'convertText',
   skill: { group: 'Compute', title: 'YAML, JSON, WKT and GeoJSON', on: '@gcu/yaml · wkt · dxf', about: 'JSON to YAML and back (the strict YAML subset, where every string is quoted), WKT to GeoJSON and back, and DXF drawings to GeoJSON or WKT from your files. What does not carry over is said.', examples: ['json to yaml: {"hole": "DH-12", "depth": 240.5}', 'wkt to geojson: POINT (30 10)', 'convert to wkt: {"type": "LineString", "coordinates": [[0, 0], [10, 5]]}'] },
-  amend: [{ arg: 'to', match: /^(?:as |to |in )?(json|yaml|wkt|geojson)(?: instead)?$/ }],
   topic: a => [`${LABEL[a.from]} to ${LABEL[a.to]}`, 1],
   run: a => {
     const short = a.text.length > 40 ? a.text.slice(0, 37).replace(/\s+/g, ' ') + '…' : a.text.replace(/\s+/g, ' ');
@@ -7821,7 +7825,6 @@ tool({
 const fileNamed = name => Object.values(S.files).find(f => f.name.toLowerCase() === name.toLowerCase());
 tool({
   name: 'convertFile',
-  amend: [{ arg: 'to', match: /^(?:as |to |in )?(json|yaml|wkt|geojson)(?: instead)?$/ }],
   topic: a => [a.file.name, 2],
   run: a => {
     const from = kindOfName(a.file.name), targets = TARGETS[from] || [], to = a.to || targets[0], f = S.files[a.file.hash];
@@ -10756,7 +10759,7 @@ function _wrap(n) { return n && PARENS.has(n.op) ? '(' + _str(n) + ')' : _str(n)
 
 /* ==== src/engine/table.js ==== */
 const __m13 = (() => {
-const { S, T, tool, frame, noun, shape, postmod, qmod, compound, condition, fmt } = __m0;
+const { S, T, tool, frame, amend, noun, shape, postmod, qmod, compound, condition, fmt } = __m0;
 const { DOCUMENT } = __m9;
 const { series } = __m10;
 const { sniff, detectAnalyte, NULL_SENTINELS } = __m11;
@@ -10915,7 +10918,6 @@ const bdlSlot = (a, skipped) => skipped.bdl ? [{ v: `below detection: ${a.bdl ||
 tool({
   name: 'hist', pre: ['table'],
   skill: { group: 'Table', title: 'Histogram', on: '@gcu/sadpan · @gcu/plot', about: 'Any numeric column of the open table. Amend it afterwards with “log scale”.', examples: ['histogram of cu'] },
-  amend: [{ arg: 'log', match: /^(?:in )?(log|linear)(?: scale)?$/, value: m => m[1] === 'log' }],
   topic: a => [`${shown(a.col)} histogram`, 3],
   run: a => {
     const trace = [], c = colOf(a.col); if (!c) return null;
@@ -11002,13 +11004,6 @@ function aggregate(agg, v, w) {
 tool({
   name: 'query', pre: ['table'],
   skill: { group: 'Table', title: 'Table questions', on: '@gcu/sift · @gcu/sadpan', about: 'Means, medians, percentiles, counts, lists and correlations in controlled English, with where and by.', examples: ['mean cu by lith where au > 0.1', 'how many samples where cu > 0.5 and lith is BRX', 'top 5 rows sorted by au descending', 'check intervals'] },
-  amend: [
-    { arg: 'by', match: /^by (\w+(?: and \w+)?)$/, value: m => m[1].split(' and ') },
-    { arg: 'where', match: /^where (.+)$/ },
-    { arg: 'weight', match: /^weighted by (length|count|samples?)$/, value: m => m[1] === 'length' ? 'length' : 'count' },
-    { arg: 'view', match: /^as a (chart|table)$/ },
-    { arg: 'aggs', match: new RegExp(`^and (${AGGRE})$`), value: (m, a) => a.aggs ? [...a.aggs, aggOf(m[1])] : null }
-  ],
   topic: a => a.kind === 'agg' ? [`${a.cols.map(shown).join(', ')} ${a.aggs.map(aggLabel).join(', ')}`, 2] : [`${a.kind} ${a.cols ? a.cols.map(shown).join(', ') : ''}`.trim(), 2],
   run: a => {
     const trace = [];
@@ -11170,6 +11165,9 @@ frame({
   words_pt: ['verifica', 'verifique', 'confere'], label_pt: 'Verificar intervalos',
   bind: c => ({ tool: 'query', args: { kind: 'check', ...(c.roles.by ? { by: [c.roles.by[0].value] } : {}) } })
 });
+// "and median": another statistic for the same question
+amend({ tools: ['query'], name: 'addagg', label: 'And', words: [], elidable: true, theme: ['stat'], required: ['theme'], roles: {},
+  bind: (c, a) => a.kind === 'agg' && !a.aggs.includes(c.theme[0].value) ? { args: { ...a, aggs: [...a.aggs, c.theme[0].value] } } : null });
   return { makeData, sampleTable, ELEMENT, parseDelimited, tableFromText, openTable, colOf, stats, whereToSift };
 })();
 
@@ -11191,10 +11189,6 @@ const FIELDS = ['capital', 'population', 'area', 'density'];
 tool({
   name: 'fact',
   skill: { group: 'Knowledge', title: 'Records', on: 'factbook pack', about: 'Lookups, unit changes and filters across records.', examples: ['population density of mongolia in people per square mile', 'landlocked countries by population', 'area of brazil in square miles'] },
-  amend: [
-    { arg: 'unit', match: /^(?:and |now |same (?:but )?)?(?:in|to|as) (.+)$/, when: a => /area|density/.test(a.field) },
-    { arg: 'country', match: /^(?:and|same for|what about|now|and for)(?: the)? (.+)$/, value: m => fbFind(m[1]) ? m[1] : null }
-  ],
   topic: a => [fbFind(a.country)[0] + ' ' + a.field, 2],
   run: a => {
     const r = fbFind(a.country); if (!r) return null;
@@ -12701,7 +12695,7 @@ frame({
 
 /* ==== src/engine/explain.js ==== */
 const __m23 = (() => {
-const { tool, frame, noun, shape, clock, fmt } = __m0;
+const { tool, frame, amend, noun, shape, clock, fmt } = __m0;
 // Explainers: formal notation parsed and described, one row per piece. Cron schedules, epoch times,
 // chmod modes, URLs and ECMAScript regular expressions. Each member has a recogniser so a bare
 // payload ("what is 1700000000") finds its member; when two accept, the member is a slot.
@@ -13037,7 +13031,6 @@ const seedOf = () => Math.floor(Math.random() * 2 ** 31);
 tool({
   name: 'explain',
   skill: { group: 'Compute', title: 'Explainers', on: 'own parsers', about: 'Cron schedules, epoch times, chmod modes, URLs and regular expressions, parsed and described piece by piece. A bare payload finds its own kind.', examples: ['explain cron: 0 9 * * 1-5', 'what is 1700000000', 'chmod 754', 'explain regex: ^\\d{3}-\\d{2}$', 'explain url: https://example.org:8443/a/b?q=1#top'] },
-  amend: [{ arg: 'kind', match: /^as (?:a |an )?(regex|cron|time|epoch|url|chmod)$/, value: m => m[1] === 'epoch' ? 'time' : m[1] }, { arg: 'unit', match: /^(?:in |as )?(seconds|milliseconds|microseconds|nanoseconds|s|ms|us|ns)$/, value: m => ({ seconds: 's', milliseconds: 'ms', microseconds: 'us', nanoseconds: 'ns' })[m[1]] || m[1], when: a => a.kind === 'time' }],
   topic: a => [`Explain ${a.kind}`, 1],
   run: a => {
     if (!RUN[a.kind]) return null;
@@ -13068,6 +13061,10 @@ frame({
     return t ? explainOf(t.value) : null;   // "explain this: 0 */2 * * *": the notation is what the payload is
   }
 });
+// "as a regex", "in milliseconds"
+noun({ amend: true, type: 'timeunit', words: { s: ['seconds', 'second', 's'], ms: ['milliseconds', 'millisecond', 'ms'], us: ['microseconds', 'microsecond', 'us', 'µs'], ns: ['nanoseconds', 'nanosecond', 'ns'] }, words_pt: { s: ['segundos'], ms: ['milissegundos'] } });
+amend({ tools: ['explain'], name: 'explainas', label: 'Explain as', words: [], elidable: true, theme: ['notation', 'timeunit'], required: [], roles: { as: { preps: ['as', 'in'], types: ['notation', 'timeunit'] } },
+  bind: (c, a) => { const n = [...c.theme, ...(c.roles.as || [])][0]; if (!n) return null; return n.type === 'timeunit' ? { args: { ...a, unit: n.value } } : { args: { ...a, kind: n.value } }; } });
   return {  };
 })();
 
@@ -13082,7 +13079,7 @@ const e=["BOOLEAN","INT32","INT64","INT96","FLOAT","DOUBLE","BYTE_ARRAY","FIXED_
 
 /* ==== src/engine/convert.js ==== */
 const __m25 = (() => {
-const { S, tool, frame, noun, fmt } = __m0;
+const { S, tool, frame, amend, noun, fmt } = __m0;
 const { writeParquet } = __m24;
 // Conversions that need no file format reader: hashes, text encodings both ways, and the open table
 // as CSV, TSV or JSON with a save action. Format readers (xlsx, dm, parquet) are the second pass.
@@ -13139,7 +13136,6 @@ tool({
 const ENC = { base64: 'base64', b64: 'base64', hex: 'hex', hexadecimal: 'hex', url: 'url', uri: 'url', percent: 'url', urlencode: 'url', urlencoded: 'url' };
 tool({
   name: 'encode',
-  amend: [{ arg: 'op', match: /^(encode|decode)(?: it| instead)?$/ }],
   topic: a => [`${a.enc} ${a.op}`, 1],
   run: a => {
     const read = [a.enc, { v: a.op, key: 'op', alts: ['encode', 'decode'], cur: a.op }, { v: a.text.length > 40 ? a.text.slice(0, 37) + '…' : a.text }];
@@ -13194,7 +13190,6 @@ function parquetOut(t) {
 tool({
   name: 'tableExport', pre: ['table'],
   skill: { group: 'Table', title: 'Table as CSV, TSV, JSON or Parquet', on: 'built in · @gcu/parquet', about: 'The open table written out, with what the format cannot hold stated. Copy or save it; Parquet is saved, not copied.', examples: ['the table as json', 'export the table as tsv', 'the table as parquet'] },
-  amend: [{ arg: 'fmt', match: /^(?:as |to |in )?(csv|tsv|json|parquet)(?: instead)?$/ }],
   topic: a => [`Table as ${a.fmt === 'parquet' ? 'Parquet' : a.fmt.toUpperCase()}`, 1],
   run: a => {
     if (a.fmt === 'parquet') return parquetOut(S.table);
@@ -13236,6 +13231,8 @@ for (const op of ['encode', 'decode']) frame({
   words_pt: op === 'encode' ? ['codifica', 'codifique', 'codificar'] : ['decodifica', 'decodifique', 'decodificar'], label_pt: op === 'encode' ? 'Codificar' : 'Decodificar',
   bind: c => { const e = (c.roles.subject || c.theme || [])[0] || (c.roles.as || [])[0]; return e && payload(c) != null ? { tool: 'encode', args: { enc: e.value, op, text: payload(c) } } : null; }
 });
+// "decode", "encode it"
+for (const op of ['encode', 'decode']) amend({ tools: ['encode'], name: `op${op}`, label: op, words: [op, `${op} it`], theme: [], required: [], roles: {}, bind: (c, a) => ({ args: { ...a, op } }) });
   return { sha256, tableText };
 })();
 
@@ -13598,7 +13595,7 @@ function brazilMunicipalities() {
 
 /* ==== src/engine/calendar.js ==== */
 const __m27 = (() => {
-const { S, tool, frame, noun, shape, postmod, unit, clock, iso } = __m0;
+const { S, tool, frame, amend, noun, shape, postmod, unit, clock, iso } = __m0;
 const { findDate, findTime, today, day0, fmtDate, dateWords } = __m3;
 const { isWorkingDay, addWorkingDays, brazilCalendar, federalHolidays } = __m26;
 // Working days and rosters over @gcu/plan's calendar engine (vendored), and time zones through Intl.
@@ -13616,7 +13613,6 @@ const DATE = '(.+?)';
 tool({
   name: 'workdays',
   skill: { group: 'Compute', title: 'Working days and rosters', on: '@gcu/plan', about: 'Working days until a date or between two, N working days from a date, whether a day is a working day, and on/off rosters. The calendar is a slot: Brazil\'s federal holidays or weekdays only.', examples: ['working days until 20 dec', 'is 21 apr 2027 a working day', '15 working days from monday', '14 on 14 off from 6 oct, am i off at christmas'] },
-  amend: [{ arg: 'cal', match: /^(?:in |with |using )?(?:the )?(brazil(?:ian)?|weekdays?(?: only)?|no holidays)(?: calendar| holidays)?$/, value: m => /^brazil/.test(m[1]) ? 'brazil' : 'weekdays' }],
   topic: () => ['Working days', 1],
   run: a => {
     const dateOf = s => s === 'today' ? today() : (findDate(s) || {}).d;
@@ -13701,7 +13697,6 @@ const refuseZone = (read, name, zones) => ({ read, body: [{ t: 'note', kind: 'er
 tool({
   name: 'zone',
   skill: { group: 'Compute', title: 'Time zones', on: 'Intl', about: 'A time in one place as it reads in another, with the offsets used and a note when the clocks change nearby. Cities by their IANA names, plus common aliases.', examples: ['9am sao paulo in perth', 'what time is it in vancouver', '14:30 utc to my time', 'overlap of 9 to 17 in belo horizonte and perth'] },
-  amend: [{ arg: 'date', match: /^(?:on |for )?(tomorrow|today|next \w+|\d{1,2} \w{3,9}(?: \d{4})?|\d{4}-\d{2}-\d{2})$/ }],
   topic: () => ['Time zones', 1],
   run: a => {
     const toZ = zonesOf(a.to), to = a.toZone || toZ[0], read = [];
@@ -13824,12 +13819,16 @@ frame({
     return { tool: 'roster', args: q.value === 'next' ? { ...base, date: 'today', next: true } : { ...base, date: on || 'today' } };
   }
 });
+// "with the brazilian calendar", "weekdays only"
+noun({ amend: true, type: 'calkind', words: { brazil: ['brazil', 'brazilian', 'the brazilian calendar', 'brazilian calendar', 'brazil calendar', 'brazilian holidays'], weekdays: ['weekdays', 'weekdays only', 'weekday calendar', 'no holidays'] }, words_pt: { brazil: ['calendário brasileiro'], weekdays: ['dias de semana', 'sem feriados'] } });
+amend({ tools: ['workdays'], name: 'workcal', label: 'Calendar', words: [], elidable: true, theme: ['calkind'], required: [], roles: { with: { preps: ['with', 'in', 'using', 'on'], types: ['calkind'] } },
+  bind: (c, a) => { const k = [...c.theme, ...(c.roles.with || [])][0]; return k ? { args: { ...a, cal: k.value } } : null; } });
   return { zonesOf, offsetOf, instantOf };
 })();
 
 /* ==== src/engine/estimate.js ==== */
 const __m28 = (() => {
-const { tool, fmt } = __m0;
+const { amend, noun, tool, fmt } = __m0;
 const { U } = __m1;
 // Estimates with ranges: arithmetic over intervals by simulation, units carried through, the seed kept
 // in the plan. "2.7 ± 0.1 t/m3 * 1.35 Mm3", "(120 to 180) * (0.4 to 0.6) / 7". Percentiles are called
@@ -13960,7 +13959,6 @@ function estimateOf(text) {
 tool({
   name: 'estimate',
   skill: { group: 'Compute', title: 'Estimates with ranges', on: 'own sampler', about: 'Arithmetic over ranges by simulation: "a to b" uniform (or normal, lognormal, as a slot), "a ± b" normal. Units carried through; mean and the 10th, 50th and 90th percentiles; the seed stays in the plan.', examples: ['2.7 ± 0.1 t/m3 * 1.35 Mm3', '(120 to 180) * (0.4 to 0.6) / 7', 'fuel = consumption * trip where consumption is 9 to 11 l per 100 km and trip is 400 to 450 km'] },
-  amend: [{ arg: 'dist', match: /^(?:as |assume |assuming )?(uniform|normal|lognormal)(?: ranges| bounds)?$/ }, { arg: 'pm', match: /^(?:± |plus minus |plus or minus )(?:as |is )(normal|uniform)$/ }],
   topic: a => [a.name ? `Estimate of ${a.name}` : 'Range estimate', 1],
   run: a => {
     const read = ['estimate', { v: a.name ? `${a.name} = ${a.expr}` : a.expr }];
@@ -13997,6 +13995,9 @@ tool({
     };
   }
 });
+// "uniform", "assume normal"
+noun({ amend: true, type: 'dist', words: { uniform: ['uniform', 'uniform ranges', 'flat'], normal: ['normal', 'normal ranges', 'gaussian'], lognormal: ['lognormal', 'log-normal'] }, words_pt: { uniform: ['uniforme'], normal: ['normal'], lognormal: ['lognormal'] } });
+amend({ tools: ['estimate'], name: 'estdist', label: 'Distribution', words: ['assume', 'assuming', 'use'], elidable: true, theme: ['dist'], required: ['theme'], roles: {}, bind: (c, a) => ({ args: { ...a, dist: c.theme[0].value } }) });
   return { unitWord, estimateOf };
 })();
 
@@ -14108,7 +14109,6 @@ const sameCase = (text, q, m, i) => { const at = q.indexOf(m[i], m.index); retur
 tool({
   name: 'chem',
   skill: { group: 'Compute', title: 'Molar mass and conversion factors', on: 'IUPAC weights (data file)', about: 'Molar mass of a formula with the breakdown; element-to-oxide factors and the reverse; how much of an element a formula holds; the periodic table by symbol, name or number. A mineral name is not read: give the formula.', examples: ['molar mass of CuFeS2', 'fe to fe2o3', 'convert 45.2% fe2o3 to fe', 'how much cu in CuFeS2', 'atomic mass of fe', 'element 26'] },
-  amend: [{ arg: 'to', match: /^(?:as |to )?([A-Za-z]+\d*(?:[A-Za-z]+\d*)*)$/, when: a => a.ask === 'factor' && a.to === 'oxide', value: m => m[1] }],
   topic: a => [a.ask === 'element' ? 'Periodic table' : a.ask === 'mass' ? 'Molar mass' : 'Conversion factor', 1],
   run: a => {
     const refuse = (read, text, why) => ({ read, body: [{ t: 'note', kind: 'err', text }, SRC], trace: [why] });
@@ -14159,7 +14159,7 @@ shape({ type: 'formula', re: String.raw`(?=[^a-z]*[A-Z][^A-Z]*[A-Z0-9])[A-Z(][A-
 // lowercase: only runs of real element symbols with counts, so an unknown word is not a formula: fe2o3, cuo, h2o
 const SYMS = ELEMENTS.map(e => e[1].toLowerCase()).sort((a, b) => b.length - a.length).join('|');
 // with a count, or short (cuo, nacl): longer plain words spelled in symbols ("python" is P Y Th O N) stay words
-shape({ type: 'formula', re: `(?=[a-z.]*\\d|[a-z]{2,5}(?![a-z\\d]))(?:(?:${SYMS})\\d*(?:\\.\\d+)?){2,}` });
+shape({ type: 'formula', re: `(?=[a-z.]*\\d|[a-z]{2,4}(?![a-z\\d]))(?:(?:${SYMS})\\d*(?:\\.\\d+)?){2,}` });
 // symbols that are English words (in, as, at, no, be, he, so) and single letters stay out; the names cover them
 // and symbols that are units (cm, mg, pa, cd, pt, ga): "9 cm" is a length, not curium
 const PLAIN = new Set(['in', 'as', 'at', 'no', 'be', 'he', 'so', 'is', 'am', 'pm', 'or', 'es', 'md', 'ga', ...UNIT_TABLE.flatMap(u => u.words.map(w => w.toLowerCase()))]);
@@ -14204,7 +14204,7 @@ frame({
 
 /* ==== src/engine/text.js ==== */
 const __m31 = (() => {
-const { tool, frame, fmt } = __m0;
+const { tool, frame, amend, noun, qmod, fmt } = __m0;
 // Text tools over a pasted payload: counts and readability, extracted key sentences, and a diff.
 // The payload is what follows the first colon, or every line after the first of a multi-line input;
 // it is never read as a command. Nothing here rewrites text.
@@ -14237,7 +14237,6 @@ const quote = s => `“${s.length > 160 ? s.slice(0, 157) + '…' : s}”`;
 tool({
   name: 'wordcount',
   skill: { group: 'Compute', title: 'Text tools', on: 'own algorithms', about: 'Word count and readability (Flesch, English only, labelled estimates), the key sentences of a text in their original order (TextRank, nothing rewritten), and a diff of two blocks by line, word or character (Myers). The text follows a colon or the first line.', examples: ['word count: the quick brown fox jumps over the lazy dog. it was not amused.', 'summarise this: …', 'diff these: a\\n---\\nb'] },
-  amend: [{ arg: 'lang', match: /^(?:in |it is |it's |this is )?(english|portuguese|spanish|french|german|other)$/, value: m => ({ english: 'en', portuguese: 'pt', spanish: 'es', french: 'fr', german: 'de', other: 'other' })[m[1]] }],
   topic: () => ['Text', .5],
   run: a => {
     const ws = words(a.text), ss = sentences(a.text), paras = a.text.split(/\n\s*\n/).filter(x => x.trim()).length, chars = a.text.length, nospace = a.text.replace(/\s/g, '').length;
@@ -14268,7 +14267,6 @@ function textrank(ss) {
 }
 tool({
   name: 'extract',
-  amend: [{ arg: 'n', match: /^(\d+) sentences?$/, value: m => +m[1] }, { arg: 'n', match: /^shorter$/, value: (m, a) => Math.max(1, a.n - 1) }, { arg: 'n', match: /^longer$/, value: (m, a) => a.n + 1 }],
   topic: () => ['Key sentences', 1],
   run: a => {
     const ss = sentences(a.text), read = ['extract', { v: `${a.n} sentence${a.n === 1 ? '' : 's'}` }, 'of', { v: `${ss.length}` }];
@@ -14303,7 +14301,6 @@ const UNITS = ['line', 'word', 'character'];
 const split = (s, unit) => unit === 'line' ? s.split(/\r?\n/) : unit === 'word' ? s.split(/(\s+)/).filter(x => x !== '') : [...s];
 tool({
   name: 'diff',
-  amend: [{ arg: 'unit', match: /^(?:by |per )?(lines?|words?|characters?|chars?|letters?)$/, value: m => /^l/.test(m[1]) ? 'line' : /^w/.test(m[1]) ? 'word' : 'character' }],
   topic: () => ['Diff', 1],
   run: a => {
     if (a.noSep) return { read: ['diff'], body: [{ t: 'note', kind: 'err', text: 'Put a line of three dashes (---) between the two blocks.' }], trace: ['no separator'] };
@@ -14337,12 +14334,23 @@ frame({
     return { tool: 'diff', args: parts.length === 2 ? { a: parts[0].trim(), b: parts[1].trim(), unit: /\n/.test(parts[0].trim()) || /\n/.test(parts[1].trim()) ? 'line' : 'word' } : { noSep: true } };
   }
 });
+/* ── amendments: "portuguese", "2 sentences", "shorter", "by word" ── */
+noun({ amend: true, type: 'language', words: { en: ['english'], pt: ['portuguese'], es: ['spanish'], fr: ['french'], de: ['german'], other: ['other', 'another language'] }, words_pt: { en: ['inglês', 'ingles'], pt: ['português', 'portugues'], es: ['espanhol'], fr: ['francês'], de: ['alemão'] } });
+amend({ tools: ['wordcount'], name: 'lang', label: 'Language', words: ["it's", 'it is', 'this is'], elidable: true, theme: ['language'], required: [], roles: { in: { preps: ['in'], types: ['language'] } },
+  bind: (c, a) => { const l = [...c.theme, ...(c.roles.in || [])][0]; return l ? { args: { ...a, lang: l.value } } : null; } });
+noun({ amend: true, type: 'sentences', words: {}, generic: ['sentences', 'sentence'], generic_pt: ['frases', 'frase'] }); qmod({ head: 'sentences', attr: 'n', dims: ['bare'] });
+noun({ amend: true, type: 'lengthword', words: { shorter: ['shorter', 'fewer', 'less'], longer: ['longer', 'more'] }, words_pt: { shorter: ['mais curto', 'menos'], longer: ['mais longo', 'mais'] } });
+amend({ tools: ['extract'], name: 'extractn', label: 'Sentences', words: [], elidable: true, theme: ['sentences', 'lengthword'], required: ['theme'], roles: {},
+  bind: (c, a) => { const t = c.theme[0]; if (t.type === 'sentences') return t.attrs.n ? { args: { ...a, n: t.attrs.n.n } } : null; return { args: { ...a, n: t.value === 'shorter' ? Math.max(1, a.n - 1) : a.n + 1 } }; } });
+noun({ amend: true, type: 'diffunit', words: { line: ['lines', 'line'], word: ['words', 'word'], character: ['characters', 'character', 'chars', 'letters'] }, words_pt: { line: ['linhas'], word: ['palavras'], character: ['caracteres'] } });
+amend({ tools: ['diff'], name: 'diffunit', label: 'Diff by', words: [], elidable: true, theme: ['diffunit'], required: [], roles: { by: { preps: ['by', 'per'], types: ['diffunit'] } },
+  bind: (c, a) => { const u = [...c.theme, ...(c.roles.by || [])][0]; return u ? { args: { ...a, unit: u.value } } : null; } });
   return { payloadOf, words, sentences, syllables, textrank, myers };
 })();
 
 /* ==== src/engine/forms.js ==== */
 const __m32 = (() => {
-const { tool, frame, noun } = __m0;
+const { tool, frame, amend, noun } = __m0;
 // The form card: a tool that still needs answers asks for them one at a time; each answer lands in
 // args and is an editable slot, and the result recomputes when any changes. The decision matrix is the
 // first form; the economics formulas use the same helpers.
@@ -14369,10 +14377,6 @@ const slot = (label, key, cur) => ({ v: `${label} ${cur}`, key, alts: [1, 2, 3, 
 tool({
   name: 'decide',
   skill: { group: 'Compute', title: 'Decision matrix', on: 'form card', about: 'Options, criteria, a weight for each criterion and a score for each option on each, asked one at a time; weighted totals, bars, and the smallest single weight change that would change the top option. It reports the highest score and does not say what to do.', examples: ['help me decide between perth, vancouver and santiago', 'compare these options'] },
-  amend: [
-    { arg: '_set', match: /^(?:weight (?:of |for )?)?(.+?) (?:weighs|weight|=|is) ([1-5])$/, value: (m, a) => (a.criteria || []).map(c => c.toLowerCase()).includes(m[1].toLowerCase()) ? { key: 'w:' + a.criteria.find(c => c.toLowerCase() === m[1].toLowerCase()), v: +m[2] } : null },
-    { arg: '_set', match: /^(.+?) (?:on|for) (.+?) (?:=|is|scores|gets) ([1-5])$/, value: (m, a) => { const o = (a.options || []).find(x => x.toLowerCase() === m[1].toLowerCase()), c = (a.criteria || []).find(x => x.toLowerCase() === m[2].toLowerCase()); return o && c ? { key: `s:${o}|${c}`, v: +m[3] } : null; } }
-  ],
   topic: a => ['Decision matrix', 1],
   run: a => {
     if (a._set) { a[a._set.key] = a._set.v; delete a._set; }
@@ -14411,6 +14415,13 @@ frame({
 });
 noun({ type: 'decision', words: { matrix: ['decision matrix', 'weighted decision', 'these options', 'the options', 'my options', 'options'] }, words_pt: { matrix: ['matriz de decisão', 'essas opções', 'as opções'] } });
 frame({ name: 'decideblank', label: 'Decide', words: ['compare', 'weigh', 'make a'], elidable: true, theme: ['decision'], required: ['theme'], roles: {}, label_pt: 'Decidir', bind: () => ({ tool: 'decide', args: {} }) });
+// "price weighs 3", "perth on price is 4": the names are the matrix's own
+const named = (xs, w) => (xs || []).find(x => x.toLowerCase() === w.trim().toLowerCase());
+amend({ tools: ['decide'], name: 'weigh', label: 'Weight', words: ['weighs', 'weight', 'has weight', 'is weighted'], subject: ['text'], theme: ['quantity:bare'], required: ['theme', 'subject'], roles: {},
+  bind: (c, a) => { const crit = named(a.criteria, c.roles.subject[0].value.replace(/^(?:the )?weight (?:of |for )?/i, '')), v = c.theme[0].n; return crit && v >= 1 && v <= 5 ? { args: { ...a, _set: { key: 'w:' + crit, v } } } : null; } });
+amend({ tools: ['decide'], name: 'score', label: 'Score', words: ['is', 'scores', 'gets', '='], subject: ['text'], theme: ['quantity:bare'], required: ['theme', 'subject'], roles: {},
+  bind: (c, a) => { const m = /^(.+?)\s+(?:on|for)\s+(.+)$/i.exec(c.roles.subject[0].value.trim()), v = c.theme[0].n; if (!m || v < 1 || v > 5) return null;
+    const o = named(a.options, m[1]), k = named(a.criteria, m[2]); return o && k ? { args: { ...a, _set: { key: `s:${o}|${k}`, v } } } : null; } });
   return { numberAsk, listAsk, listOf, firstNeed };
 })();
 
@@ -14583,7 +14594,7 @@ frame({
 
 /* ==== src/engine/log.js ==== */
 const __m34 = (() => {
-const { S, tool, frame, noun, fmt, iso } = __m0;
+const { S, tool, frame, amend, noun, fmt, iso } = __m0;
 const { parseUnit, dimName } = __m1;
 const { findDate, today, fmtDate, dateWords } = __m3;
 // The log: a device table of things done, written from cards and asked about in plain words.
@@ -14635,7 +14646,6 @@ function readLog(text) {
 tool({
   name: 'logAdd',
   skill: { group: 'Device', title: 'Log', on: 'device table', about: 'Log what you did with a quantity and a date, ask totals and means by week or month, and open the log as a table. Rows stay on this device.', examples: ['log 30 min run', 'log 5 km run yesterday', 'log weight 78.4 kg', 'how many km did i run this month', 'mean weight by week', 'open the log'] },
-  amend: [{ arg: 'value', match: /^(?:that was|make it|correct(?:ion)?:?|actually) (\d+(?:\.\d+)?)(?: ?([a-zµ%°][\w%°/³²]*))?$/, value: (m, a) => { if (m[2]) a.unit = m[2]; return +m[1]; } }, { arg: 'date', match: /^(?:that was |it was )?(?:on )?(yesterday|today|\d{4}-\d{2}-\d{2}|\d{1,2} \w{3,9}(?: \d{4})?|last \w+)$/, value: m => { const d = findDate(m[1], { back: true }); return d ? iso(d.d) : null; } }],
   topic: a => [`Log: ${a.activity}`, 1],
   undo: a => { const t = logTable(); t.rows = t.rows.filter(r => r.id !== a.id); },
   run: a => {
@@ -14666,7 +14676,6 @@ function readPeriod(s) {
 }
 tool({
   name: 'logQuery',
-  amend: [{ arg: 'by', match: /^by (week|month|day|activity)$/ }, { arg: 'period', match: /^(this|last) (week|month|year)$/, value: m => ({ kind: 'period', which: m[1], unit: m[2] }) }],
   topic: a => [`Log: ${a.activity}`, 1],
   run: a => {
     const all = rows().filter(r => same(r.activity, a.activity) && inPeriod(r.date, a.period));
@@ -14718,12 +14727,19 @@ for (const [name, words, agg] of [['logSum', ['how many', 'how much', 'total', '
     return { tool: 'logQuery', args: { agg: a, activity: act.value, unit: u ? u.unit : null, period, by: c.roles.by ? c.roles.by[0].value : null } };
   }
 });
+// "that was 6 km", "make it 30 min", "that was yesterday"
+amend({ tools: ['logAdd'], name: 'logfix', label: 'Correct', words: ['that was', 'make it', 'correction', 'actually', 'it was'], elidable: true, theme: ['quantity:*', 'quantity:bare', 'date'], required: ['theme'], roles: { on: { preps: ['on'], types: ['date'] } },
+  bind: (c, a) => {
+    const q = c.theme.find(n => n.type === 'quantity'), d = [...c.theme, ...(c.roles.on || [])].find(n => n.type === 'date');
+    if (d) { const f = findDate(dateWords(d), { back: true }); return f ? { args: { ...a, date: iso(f.d) } } : null; }
+    return q ? { args: { ...a, value: q.n, ...(q.unit ? { unit: q.unit } : {}) } } : null;
+  } });
   return { LOG_COLS, logTable, readLog };
 })();
 
 /* ==== src/engine/places.js ==== */
 const __m35 = (() => {
-const { S, tool, frame, noun, shape, fmt, rad, deg } = __m0;
+const { S, tool, frame, amend, noun, shape, postmod, fmt, rad, deg } = __m0;
 // Places, distance and UTM. A place is coordinates in the request or a name saved on this device
 // ("home is -19.92, -43.94"); there is no gazetteer and device location is off, so an unknown name is
 // a question, not a guess. Distance is Vincenty's inverse on WGS84; UTM is the Krüger series.
@@ -14830,7 +14846,6 @@ function fromUTM(zone, hemisphere, easting, northing) {
 }
 tool({
   name: 'utm',
-  amend: [{ arg: 'zoneForced', match: /^(?:in )?zone (\d{1,2})$/, value: m => +m[1], when: a => a.place }, { arg: 'band', match: /^(?:band|south|north)\b.*?([c-hj-np-x])?$/i, value: m => m[1] ? m[1].toUpperCase() : null, when: a => a.easting != null }],
   topic: () => ['UTM', 1],
   run: a => {
     if (a.place) {
@@ -14879,12 +14894,18 @@ frame({
   name: 'fromutm', label: 'From UTM', words: ['utm', 'convert utm'], elidable: true, theme: ['utmcoord'], required: ['theme'], roles: { to: { preps: ['to', 'in', 'as', 'into'], types: ['geographic'] } }, label_pt: 'De UTM',
   bind: c => { const m = /^(\d{1,2})\s?([c-hj-np-x])?\s+(?:e\s?)?(\d+(?:\.\d+)?)\s+(?:n\s?)?(\d+(?:\.\d+)?)$/i.exec(c.theme[0].value.trim()); return m ? { tool: 'utm', args: { zone: +m[1], band: m[2] ? m[2].toUpperCase() : null, easting: +m[3], northing: +m[4] } } : null; }
 });
+// "zone 23", "band k"
+noun({ amend: true, type: 'utmzone', words: {}, generic: ['zone', 'utm zone'], generic_pt: ['zona', 'fuso'] }); postmod({ prep: '', heads: ['utmzone'], attr: 'n', quantity: true });
+amend({ tools: ['utm'], name: 'utmzone', label: 'Zone', words: [], elidable: true, theme: ['utmzone'], required: ['theme'], roles: {}, bind: (c, a) => a.place && c.theme[0].attrs.n ? { args: { ...a, zoneForced: c.theme[0].attrs.n.n } } : null });
+noun({ amend: true, type: 'utmband', words: {}, generic: ['band', 'latitude band'], generic_pt: ['banda'] }); postmod({ prep: '', heads: ['utmband'], attr: 'letter', mod: 'bandletter' });
+shape({ type: 'bandletter', re: '[c-hj-np-x]' });
+amend({ tools: ['utm'], name: 'utmband', label: 'Band', words: [], elidable: true, theme: ['utmband'], required: ['theme'], roles: {}, bind: (c, a) => a.easting != null && c.theme[0].attrs.letter ? { args: { ...a, band: c.theme[0].attrs.letter.toUpperCase() } } : null });
   return { placesTable, placeOf, vincenty, utmZone, bandOf, toUTM, fromUTM };
 })();
 
 /* ==== src/engine/sky.js ==== */
 const __m36 = (() => {
-const { tool, frame, noun, fmt, rad, deg, iso } = __m0;
+const { tool, frame, amend, noun, compound, fmt, rad, deg, iso } = __m0;
 const { findDate, today, fmtDate, dateWords } = __m3;
 const { zonesOf, offsetOf } = __m27;
 const { placeOf } = __m35;
@@ -14914,7 +14935,6 @@ function solar(dayUTC, lat, lon) {
 tool({
   name: 'sun',
   skill: { group: 'Device', title: 'Sun and moon', on: 'NOAA equations, mean lunar cycle', about: 'Sunrise, solar noon, sunset, day length and civil twilight for a place and date (about a minute at mid-latitudes); the moon\'s phase from the mean cycle, to about half a day. Places as coordinates or a saved name.', examples: ['sunrise tomorrow in -19.92, -43.94', 'sunset today at home', 'moon phase on 25 dec'] },
-  amend: [{ arg: 'zone', match: /^(?:in |times in )?(.+?) time$/, value: m => { const z = zonesOf(m[1]); return z.length === 1 ? z[0] : null; } }, { arg: 'date', match: /^(?:on |for )?(today|tomorrow|yesterday|\d{1,2} \w{3,9}(?: \d{4})?|\d{4}-\d{2}-\d{2}|next \w+)$/ }],
   topic: () => ['Sun', 1],
   run: a => {
     const read = [{ v: a.what }, 'on', { v: a.date }, 'at', { v: a.place }], P = a.placeLL || placeOf(a.place);
@@ -14938,7 +14958,6 @@ const SYNODIC = 29.530588861, NEW0 = Date.UTC(2000, 0, 6, 18, 14);   // a new mo
 const PHASES = ['new moon', 'waxing crescent', 'first quarter', 'waxing gibbous', 'full moon', 'waning gibbous', 'last quarter', 'waning crescent'];
 tool({
   name: 'moon',
-  amend: [{ arg: 'date', match: /^(?:on |for )?(today|tomorrow|yesterday|\d{1,2} \w{3,9}(?: \d{4})?|\d{4}-\d{2}-\d{2}|next \w+)$/ }],
   topic: () => ['Moon', 1],
   run: a => {
     const d = a.date === 'today' ? today() : (findDate(a.date) || {}).d, read = ['moon phase on', { v: a.date }];
@@ -14963,6 +14982,10 @@ frame({
   name: 'moon', label: 'Moon', words: ['show'], elidable: true, theme: ['moonphase'], required: ['theme'], roles: { on: { preps: ['on', 'for'], types: ['date', 'holiday'] } }, label_pt: 'Lua',
   bind: c => ({ tool: 'moon', args: { date: dayOf(c.roles.on && c.roles.on[0]) } })
 });
+// "perth time": the times in another zone
+noun({ amend: true, type: 'timeword', words: { time: ['time', 'times', 'local time'] }, words_pt: { time: ['hora', 'horário'] } }); compound({ mod: 'place', heads: ['timeword'], attr: 'place' });
+amend({ tools: ['sun'], name: 'sunzone', label: 'Zone', words: [], elidable: true, theme: ['timeword'], required: [], roles: { in: { preps: ['in', 'to', 'for', 'as'], types: ['timeword'] } },
+  bind: (c, a) => { const t = [...c.theme, ...(c.roles.in || [])][0], p = t && t.attrs.place, z = p && zonesOf(p); return z && z.length === 1 ? { args: { ...a, zone: z[0] } } : null; } });
   return { solar };
 })();
 
@@ -14984,7 +15007,6 @@ const consts = s => { const out = {}; if (!s) return out; let m; if ((m = new Re
 tool({
   name: 'apply', pre: ['table'],
   skill: { group: 'Table', title: 'Field compute over a table', on: '@gcu/bearing · sift', about: 'A single-value skill on every row: true thickness of each intercept from from/to and the hole and plane columns, or apparent dip of each plane on a section. Constants fill what no column holds ("with hole 270/60"); rows that cannot be filled are listed.', examples: ['true thickness of every intercept with hole 270/60, bedding 045/30', 'apparent dip of each plane on a section at 090'] },
-  amend: [{ arg: 'constText', match: /^with (.+)$/, value: (m, a) => { a.consts = consts(m[1]); return m[1]; }, when: a => a.skill === 'thickness' }, { arg: 'where', match: /^where (.+)$/ }, { arg: 'az', match: /^(?:on a )?section (?:at|of) (\d{1,3})$/, value: m => +m[1], when: a => a.skill === 'apparent' }],
   topic: a => [a.skill === 'thickness' ? 'True thickness of intercepts' : 'Apparent dips', 2],
   run: a => {
     const T = S.table, R = T.roles, read = [a.skill === 'thickness' ? 'true thickness of every intercept' : 'apparent dip of every plane', ...(a.hole ? ['in', { v: a.hole }] : [])], c = a.consts || {};
@@ -15585,7 +15607,7 @@ function exportNotebook(cells, opts = {}) {
 
 /* ==== src/engine/python.js ==== */
 const __m39 = (() => {
-const { tool, frame, result, fmt } = __m0;
+const { tool, frame, amend, result, fmt } = __m0;
 const { importNotebook } = __m38;
 // Run and trace Python with adder, on the device. The tool itself stays synchronous: a first run returns a
 // "running" card carrying a job, the runner (a Web Worker in the page, adder in-process in the tests)
@@ -15610,7 +15632,6 @@ const HEAD = /^(?:run|run this|run it|python|py|execute|exec|eval(?:uate)?(?: th
 tool({
   name: 'python',
   skill: { group: 'Compute', title: 'Run and trace Python', on: '@gcu/adder', about: 'Python run on the device by adder, compiled to JavaScript through AIR (tree-walked when tracing, or when the compiler declines a construct): output, the last value, the error with its line. "trace it" adds a table of lines and the variables they changed. No network, no page access, a statement budget; numpy, pandas, scipy, sklearn and matplotlib imports are rewritten to the GCU names (natra, sadpan, scitra, learn, plt) and shown; figures come back as drawings on the card.', examples: ['run this: print(sum(range(10)))', 'run this: import plt; plt.plot([1, 2, 3], [1, 4, 9]); plt.show()', 'trace this: a = 1; b = a * 2; a = a + b'] },
-  amend: [{ arg: 'trace', match: /^(?:trace it|trace|step through it|show the steps)$/, value: () => true }, { arg: 'trace', match: /^(?:no trace|just run it)$/, value: () => false }],
   topic: () => ['Python', 1],
   run: a => {
     const { code, rewrites } = rewriteForGcu(a.code), lines = code.split('\n').length;
@@ -15650,6 +15671,9 @@ for (const [name, words, words_pt, trace] of [
   words_pt, label_pt: trace ? 'Rastrear' : 'Rodar',
   bind: c => payload(c) ? { tool: 'python', args: { code: payload(c), trace } } : null
 });
+// "trace it", "just run it"
+amend({ tools: ['python'], name: 'pytraceon', label: 'Trace', words: ['trace it', 'trace', 'step through it', 'show the steps', 'show me the steps'], theme: [], required: [], roles: {}, bind: (c, a) => ({ args: { ...a, trace: true } }) });
+amend({ tools: ['python'], name: 'pytraceoff', label: 'Run', words: ['no trace', 'just run it', 'run it', 'without the trace'], theme: [], required: [], roles: {}, bind: (c, a) => ({ args: { ...a, trace: false } }) });
   return { rewriteForGcu };
 })();
 
@@ -16931,7 +16955,7 @@ const Librarian = {
 
 /* ==== src/engine/docs.js ==== */
 const __m41 = (() => {
-const { S, tool, frame, noun, postmod } = __m0;
+const { S, tool, frame, amend, noun, postmod } = __m0;
 const { Librarian } = __m40;
 // Search my documents (A7). Markdown, plain text and HTML opened with the paperclip are kept on the device,
 // cut into passages (by heading, then by paragraph) and indexed by @gcu/librarian. A search returns
@@ -17020,7 +17044,6 @@ const SEARCH = [
 tool({
   name: 'docSearch',
   skill: { group: 'Knowledge', title: 'Search my documents', on: '@gcu/librarian', about: 'Markdown, text and HTML files you open are kept on this device and searched by word, with near spellings. Passages come back as written, with the matched words marked and where they are.', examples: ['find resurvey in my documents', 'where did i write about the collar check', 'docs: core loss'] },
-  amend: [{ arg: 'limit', match: /^(?:show )?more(?: results)?$/, value: () => 15 }],
   topic: a => [a.query, 1],
   run: a => {
     const read = ['find', { v: a.query }, 'in my documents'], c = index();
@@ -17044,7 +17067,6 @@ tool({
 /* ── one passage, whole ─────────────────────────────────────── */
 tool({
   name: 'docPassage',
-  amend: [{ arg: 'n', match: /^(next|previous|back)(?: passage| one)?$/, value: (m, a) => a.n + (m[1] === 'next' ? 1 : -1) }],
   topic: a => [a.file.name, 1],
   run: a => {
     const f = S.files[a.file.hash], read = ['passage', { v: String(a.n) }, 'of', { v: a.file.name }];
@@ -17078,6 +17100,11 @@ frame({
   name: 'docpassage', label: 'Passage', words: ['show', 'open', 'read'], elidable: true, theme: ['passage'], required: ['theme', 'of'], roles: { of: { preps: ['of', 'in', 'from'], types: ['file'] } }, label_pt: 'Trecho',
   bind: c => { const n = c.theme[0].attrs && c.theme[0].attrs.n, f = Object.values(S.files).find(x => isDoc(x) && x.name === c.roles.of[0].value); return n && f ? { tool: 'docPassage', args: { file: { name: f.name, hash: f.hash }, n: n.n } } : null; }
 });
+// "more", "next passage", "previous"
+noun({ amend: true, type: 'moreword', words: { more: ['more', 'more results', 'show more', 'the rest'] }, words_pt: { more: ['mais', 'mais resultados'] } });
+amend({ tools: ['docSearch'], name: 'docmore', label: 'More', words: [], elidable: true, theme: ['moreword'], required: ['theme'], roles: {}, bind: (c, a) => ({ args: { ...a, limit: 15 } }) });
+noun({ amend: true, type: 'step', words: { next: ['next', 'next passage', 'next one', 'the next one'], previous: ['previous', 'previous passage', 'back', 'the previous one', 'previous one'] }, words_pt: { next: ['próximo', 'proximo'], previous: ['anterior'] } });
+amend({ tools: ['docPassage'], name: 'docstep', label: 'Passage', words: [], elidable: true, theme: ['step'], required: ['theme'], roles: {}, bind: (c, a) => ({ args: { ...a, n: a.n + (c.theme[0].value === 'next' ? 1 : -1) } }) });
   return { DOCTEXT, passages };
 })();
 
@@ -18945,7 +18972,7 @@ function variables() {
   return Object.fromEntries(cols.map(c => [c.name, uniq([c.name.toLowerCase(), ...(c.analyte ? [c.analyte.toLowerCase(), ELEMENT[c.analyte]] : [])].filter(Boolean))]));
 }
 
-function ontology() {
+function ontology(only) {
   const units = UNIT_TABLE.map(x => ({ unit: x.name, dim: DIM[x.dim], words: uniq(x.words.map(w => w.toLowerCase())) }));
   for (const w of COMPOUNDS) { const p = parseUnit(w); if (p) units.push({ unit: w, dim: dimName(p.dim), words: [w] }); }
   units.push({ unit: 'oz', dim: 'mass', words: ['oz', 'ounce', 'ounces'] });   // troy or avoirdupois: the tool decides and shows the slot
@@ -18979,15 +19006,15 @@ function ontology() {
       // every unit of the chart, by name; the generic words let "what period is …" fail cleanly to the regex reader
       { type: 'chron', words: Object.fromEntries(TIMESCALE.map(u => [u.n, [u.n.toLowerCase()]])), generic: ['period', 'epoch', 'era', 'eon', 'stage', 'series', 'system'],
         words_pt: Object.fromEntries(TIMESCALE.map(u => [u.n, [u.n.toLowerCase()]])), generic_pt: ['período', 'periodo', 'época', 'epoca', 'era', 'éon', 'eon', 'andar', 'idade'] },
-      ...LEXICON.nouns.map(n => typeof n === 'function' ? n() : n).filter(Boolean)
+      ...LEXICON.nouns.map(n => typeof n === 'function' ? n() : n).filter(n => n && (!n.amend || only)).map(({ amend, ...n }) => n)
     ],
     shapes: LEXICON.shapes,
-    fillers: ['golem', 'ok', 'okay', 'did i', 'have i', 'do i', 'did we', 'have we'],
+    fillers: ['golem', 'ok', 'okay', 'did i', 'have i', 'do i', 'did we', 'have we', 'instead', 'what about', 'how about', 'make it', 'make that', 'show it', 'show that', 'show me that', 'give it', 'put it', 'change it to', 'switch to', 'and now', 'now show'],
     units,
     compounds: [{ mod: 'filter', heads: ['country'], attr: 'filter', echo: true }, { mod: 'scale', heads: ['plot'], attr: 'scale', echo: true }, ...LEXICON.compounds],
     postmods: LEXICON.postmods,
     qmods: [{ head: 'timer', attr: 'duration', dims: ['time'] }, ...LEXICON.qmods],   // "a 30 minute timer"
-    verbs: FRAMES.map(({ bind, ...f }) => f),
+    verbs: (only || FRAMES.filter(f => !f.amends)).map(({ bind, tools, amends, ...f }) => f),
     inherit: [],
     echoOrder: ['of', 'unit', 'by', 'scale', 'for', 'as'],
     roleLabels_pt: { of: 'de', unit: 'unidade', by: 'por', scale: 'escala', for: 'duração', as: 'como' },
@@ -19002,7 +19029,7 @@ const __m49 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/dispatch, built from ../auditable/ext/dispatch/src/ by its own build.
 // Source of truth: gentropic/auditable ext/dispatch (local clone: ../auditable). Re-vendor by copying
 // ext/dispatch/index.js here after 'node ext/dispatch/build.js'. golem uses the grammar rung only:
-// createEngine, makeSession, ENGLISH, PORTUGUESE. At auditable ff2d3dfe.
+// createEngine, makeSession, ENGLISH, PORTUGUESE. At auditable a15480d8.
 
 // ⚠ GENERATED FILE — DO NOT EDIT. Source: src/  Build: @gcu/build src/main.js
 // @gcu/dispatch — Session-trained natural-language → tool-call dispatch: a Snips-shaped resolver (averaged-perceptron intent + CRF-class slot tagger + gazetteers + deterministic per-kind assemblers) that trains IN THE BROWSER from the host session's own vocabulary in under a second. Tools are declarative (ten kinds) and a grammar rung (clause: case-grammar frames over an Earley chart with costed repairs, en + pt-BR) reads controlled commands before the learners see them; no shipped model, no network, explainable per decision — refusals return empty calls so the host degrades into its command palette. Born from an incubator where this beat a 26M finetuned transformer 50/52 to 3/24 on a frozen yardstick.
@@ -20004,6 +20031,12 @@ function buildGrammar(X) {
     return { kind: 'cmd', verb: null, args: [{ kind: 'np', list: [n] }, ...a], question: true };
   });
   rule('Program', 'Cmd THEN Program', (c, _, p) => [c, ...p]);
+  // a fragment (understand with { fragment: true }): what is left of a command when the rest is the session's last one —
+  // "in feet", "and chile", "log scale", "where au > 1", "again but with 300 m". It is an 'again' the ellipsis completes.
+  const frag = (t, a) => t.length || a.length ? [{ kind: 'again', args: [...t, ...a] }] : null;
+  rule('Fragment', 'Theme PPs', frag);
+  rule('Fragment', 'CONJ Theme PPs', (_, t, a) => frag(t, a));
+  rule('Fragment', 'Cmd', c => c.kind === 'again' ? [c] : null);
   rule('Program', 'Cmd CONJ THEN Program', (c, _, __, p) => [c, ...p]);
   rule('Program', 'Cmd COMMA THEN Program', (c, _, __, p) => [c, ...p]);
   rule('Program', 'Cmd COMMA CONJ THEN Program', (c, _, __, ___, p) => [c, ...p]);
@@ -20346,7 +20379,7 @@ function createEngine(ont, locale = ENGLISH) {
   const COSTS = { skipFunc: 0.5, skipUnk: 0.6, skipContent: 1.5, skipTagged: 2, skipO: 0.5, insPrep: 1, insPrepTagged: 0.5, insDet: 0.5, order: 1, subst1: 0.4, subst2: 1.2, substKnown: 2 };
   const NEAR_POOL = Object.keys(LEX).filter(k => !k.includes(' ') && LEX[k].some(x => ['NOUN', 'VERB', 'UNIT', 'PREP'].includes(x.cat) && !x.exact));
   const CONTENT_CATS = ['NOUN', 'VERB', 'UNIT', 'NUM', 'IDENT', 'PREP'];
-  function makeParser(toks, repair) {
+  function makeParser(toks, repair, start = 'Program') {
     // repair = { budget, tags?, costs? } — tags (from a slot tagger) shape the costs: cheap to skip an O token,
     // dear to skip a role token, cheap to insert a preposition right before a role span
     let opts = {};
@@ -20369,7 +20402,7 @@ function createEngine(ont, locale = ENGLISH) {
         near: (sym, i) => { const [cat, word] = sym.split(':'); return nearFor(i).filter(x => x.v.cat === cat && (!word || x.v.word === word)); },
         fabricate: sym => FAB[sym]?.() ?? null };
     }
-    const C = chart(R, toks, term, 'Program', opts);
+    const C = chart(R, toks, term, start, opts);
     const parse = (sym, i) => C.spans(sym, i).flatMap(j => C.derive(sym, i, j).map(d => ({ node: d.v, end: j, cost: d.cost, repairs: d.repairs })));
     parse.chart = C;
     return parse;
@@ -20562,9 +20595,13 @@ function createEngine(ont, locale = ENGLISH) {
   function ellipsis(c, session, problems) {
     if (!session.last) { problems.add('nothing to repeat yet'); return null; }
     const L = session.last; const F = VERBS[L.verb];
-    const themeNP = c.args.find(a => a.kind === 'np');
-    const args = [{ kind: 'np', list: themeNP ? themeNP.list : L.theme }];
-    const overridden = new Set();
+    let themeNP = c.args.find(a => a.kind === 'np');
+    const overridden = new Set(), moved = [];
+    if (themeNP && !themeNP.list.every(v => F.theme.some(t => typeOk(t, v)))) {
+      const fits = Object.entries(F.roles).filter(([, r]) => themeNP.list.every(v => r.types.some(t => typeOk(t, v))));
+      if (fits.length === 1) { const [k, r] = fits[0]; moved.push({ kind: 'pp', prep: r.preps[0], canon: [r.preps[0]], val: themeNP.list }); overridden.add(k); themeNP = null; }
+    }
+    const args = [{ kind: 'np', list: themeNP ? themeNP.list : L.theme }, ...moved];
     for (const a of c.args.filter(a => a.kind === 'pp')) {
       const fits = Object.entries(F.roles).filter(([, r]) => (a.canon.includes('*') || r.preps.some(p => a.canon.includes(p))) && a.val.every(v => r.types.some(t => typeOk(t, v))));
       if (!fits.length && !themeNP && a.val.every(v => F.theme.some(t => typeOk(t, v)))) { args[0] = { kind: 'np', list: a.val }; continue; }
@@ -20628,7 +20665,7 @@ function createEngine(ont, locale = ENGLISH) {
     }
     return out.sort((a, b) => (a.j - a.from) - (b.j - b.from) || a.i - b.i);
   }
-  function textRead(toks, text, session, diag, opts) {
+  function textRead(toks, text, session, diag, opts, start = 'Program') {
     let fallback = null;
     for (const spans of textCands(toks)) {
       let tt = toks;
@@ -20643,7 +20680,7 @@ function createEngine(ont, locale = ENGLISH) {
         tt = [...tt.slice(0, i), { word: '«text»', senses: [{ cat: 'TEXT', text: t }], s: s0, e }, ...tt.slice(j)];
       }
       if (empty) continue;
-      const full = makeParser(tt)('Program', 0).filter(r => r.end === tt.length).map(r => ({ ...r, repairs: [] }));
+      const full = makeParser(tt, null, start)(start, 0).filter(r => r.end === tt.length).map(r => ({ ...r, repairs: [] }));
       if (!full.length) continue;
       const inside = new Set(spans.flatMap(({ from, j }) => toks.slice(from, j)).flatMap(x => [x.repaired, x.word]).filter(Boolean));
       const d2 = { ...diag, notes: diag.notes.filter(n => ![...inside].some(w => n.startsWith(`read "${w}" as`) || n.startsWith(`"${w}" could be`))), unknown: diag.unknown.filter(w => !inside.has(w)), repairs: [] };
@@ -20661,18 +20698,19 @@ function createEngine(ont, locale = ENGLISH) {
     const diag = { notes, unknown, coverage: null, parses: 0, repairs: [] };
     if (!toks.length) return { status: 'reject', reasons: ['nothing to parse'], diag };
     const isQ = toks[0].senses.some(s => s.cat === 'QWORD'), isUnk = toks[0].senses.every(s => s.cat === 'UNK');
-    const parse = makeParser(toks);
-    const strictFull = isUnk ? [] : parse('Program', 0).filter(r => r.end === toks.length).map(r => ({ ...r, repairs: [] }));
+    const start = opts.fragment ? 'Fragment' : 'Program';
+    const parse = makeParser(toks, null, start);
+    const strictFull = isUnk && !opts.fragment ? [] : parse(start, 0).filter(r => r.end === toks.length).map(r => ({ ...r, repairs: [] }));
     diag.parses = strictFull.length;
     let result = strictFull.length ? semantic(strictFull, toks, session, diag, opts) : null;
     if ((!result || result.status !== 'ok') && (TEXT_THEME.size || TEXT_PREPS.size || TEXT_SUBJECT.size || BARE.length)) {   // a free-text slot, before any repair
-      const t = textRead(toks, text, session, diag, opts);
+      const t = textRead(toks, text, session, diag, opts, start);
       if (t && (t.status === 'ok' || !result)) return t;
     }
     if ((!result || result.status === 'reject') && opts.repair?.budget) {
       // error-correcting pass: candidate derivations by ascending repair cost; the first tier that survives binding wins
-      const P2 = makeParser(toks, { ...opts.repair, names: session.names }); const C2 = P2.chart;
-      const all = P2('Program', 0).flatMap(r => { let c = r.cost; const extra = []; for (let k = r.end; k < toks.length; k++) { c += C2.skipCost(k); extra.push({ op: 'skip', at: k, word: toks[k].word }); } return c <= opts.repair.budget && c > 0 ? [{ ...r, cost: c, repairs: [...r.repairs, ...extra] }] : []; });
+      const P2 = makeParser(toks, { ...opts.repair, names: session.names }, start); const C2 = P2.chart;
+      const all = P2(start, 0).flatMap(r => { let c = r.cost; const extra = []; for (let k = r.end; k < toks.length; k++) { c += C2.skipCost(k); extra.push({ op: 'skip', at: k, word: toks[k].word }); } return c <= opts.repair.budget && c > 0 ? [{ ...r, cost: c, repairs: [...r.repairs, ...extra] }] : []; });
       for (const cost of [...new Set(all.map(r => r.cost))].sort((a, b) => a - b)) {
         const d2 = { ...diag, repairs: [], repairCost: cost };
         const r2 = semantic(all.filter(r => r.cost === cost), toks, session, d2, opts);
@@ -20973,7 +21011,7 @@ const PORTUGUESE = {
 
 /* ==== src/engine/reading.js ==== */
 const __m50 = (() => {
-const { S, T, TOOLS, FRAMES, tool, frame, toolByName, runTool, iso } = __m0;
+const { S, T, TOOLS, FRAMES, tool, frame, amend, noun, toolByName, runTool, iso } = __m0;
 const { examples, vocab } = __m47;
 const { ontology } = __m48;
 const { calcOf } = __m2;
@@ -20989,15 +21027,15 @@ const norm = s => s.trim().replace(/\s+/g, ' ').replace(/[?.!]+$/, '');
 let clause = null, clauseFor = null;
 // rebuilt whenever what it reads changes: the open table's columns, kept files, saved places, logged activities
 const clauseEngine = () => { const o = ontology(), key = JSON.stringify(o); if (!clause || clauseFor !== key) { clause = createEngine(o, ENGLISH); clauseFor = key; } return clause; };
-const clauseSession = () => S.clause || (S.clause = makeSession([]));
+const clauseSession = () => makeSession([]);   // no memory of its own: what came before is the cards', read by the context rung
 // The parser's verdict on a text, then the frame's bind(): a frame may answer { tool, args }, or
 // { clarify } when the reading is whole but a value is missing, which becomes a clarify verdict too.
 // Only the first command of a sequence is taken for now; "then" chains are a plan the planner does not build yet.
 // When the grammar finds several readings, each is bound: if exactly one names a tool that takes it, that is the
 // reading ("python" is a verb and a format; only the verb has a tool for "python\n<code>"), and the trace says so.
 const bindOf = cmd => { const f = FRAMES.find(x => x.name === cmd.verb), b = f && f.bind(cmd); return b && !b.clarify ? b : null; };
-function verdictOf(text, session) {
-  let r = clauseEngine().understand(text, session);
+function verdictOf(text, session, opts, engine) {
+  let r = (engine || clauseEngine()).understand(text, session, opts);
   if (r.status === 'ambiguous' && r.alternatives) {
     const bound = r.alternatives.map((cmds, k) => ({ cmds, echo: r.readings[k], b: bindOf(cmds[0]) })).filter(x => x.b);
     const takers = bound.filter((x, i) => bound.findIndex(y => JSON.stringify(y.b) === JSON.stringify(x.b)) === i);   // the same call twice is one reading
@@ -21017,7 +21055,7 @@ function clauseRead(text, rung) {
   if (!b) return { verdict: r };
   const res = runTool(b.tool, b.args); if (!res) return { verdict: r };
   res.trace.unshift(`clause: ${r.echo}`, ...r.diag.notes.map(n => `clause: ${n}`));
-  return { tool: b.tool, args: b.args, rung, res };
+  return { tool: b.tool, args: b.args, rung, res, cmd: r.commands[0] };
 }
 const describeVerdict = r => `clause: ${r.status}${r.reasons ? ' — ' + r.reasons.join('; ') : r.readings ? ' — ' + r.readings.join(' | ') : ''}`;
 
@@ -21041,19 +21079,62 @@ function grammar(text, q, rung, raw) {
   const c = clauseRead(raw || text, rung); if (c.tool) return c;   // the parser reads what was typed: a payload keeps its line breaks
   return expressionRead(raw || text, rung);
 }
-/* ── rung 1: "why", or an amendment the last card's tool declares ── */
-function context(q, last) {
-  if (!last) return null;
-  if (/^(why|how|how so|show (me )?(the )?(plan|trace|work|steps))$/.test(q)) return { tool: 'why', args: { ref: last.id }, rung: 'context', amends: last.id, res: T.why({ ref: last.id }) };
-  const d = toolByName(last.tool); if (!d || !d.amend) return null;
-  for (const am of d.amend) {
-    if (am.when && !am.when(last.args)) continue;
-    const m = am.match.exec(q); if (!m) continue;
-    const v = am.value ? am.value(m, last.args) : m[1]; if (v == null) continue;
-    const args = { ...last.args, [am.arg]: v }, res = runTool(last.tool, args);
-    if (res) return { tool: last.tool, args, rung: 'context', amends: last.id, res };
+/* ── the context rung: what amends the last card ── */
+// The clause command behind a card: kept when the card was read, recovered from its words when it was replayed (an
+// amendment from the command it amended). null when the card was not read by the grammar.
+function commandOf(card) {
+  if (card.cmd !== undefined) return card.cmd;
+  let cmd = null;
+  if (card.amends) { const base = S.cards.find(x => x.id === card.amends), bc = base && commandOf(base); if (bc) { const s = makeSession([]); s.last = bc; const v = verdictOf(card.raw, s, { fragment: true }); if (v.b) cmd = v.r.commands[0]; } }
+  else if (card.rung !== 'none') { const v = verdictOf(card.raw, makeSession([])); if (v.b && v.b.tool === card.tool) cmd = v.r.commands[0]; }
+  Object.defineProperty(card, 'cmd', { value: cmd, writable: true, enumerable: false });
+  return cmd;
+}
+// what an amendment changes: the arguments its reading sets differently from the reading of the card as it stands,
+// laid over the card's own arguments (so a flipped slot or an answered question stays)
+function changed(card, before, after) {
+  const args = JSON.parse(JSON.stringify(card.args));
+  for (const k of new Set([...Object.keys(after), ...Object.keys(before || {})])) {
+    if (JSON.stringify(after[k]) === JSON.stringify((before || {})[k])) continue;
+    if (after[k] === undefined) delete args[k]; else args[k] = after[k];
   }
-  return null;
+  return args;
+}
+// a fragment of the last command: "in feet", "and chile", "log scale", "by lith", "where au > 1", "tomorrow"
+function fragmentRead(raw, last) {
+  const base = commandOf(last); if (!base) return null;
+  const s = makeSession([]); s.last = base;
+  const { r, b } = verdictOf(raw, s, { fragment: true }); if (!b || b.tool !== last.tool) return null;
+  const before = bindOf(base), args = changed(last, before && before.tool === last.tool ? before.args : null, b.args);
+  const res = runTool(last.tool, args); if (!res) return null;
+  res.trace.unshift(`clause: amends #${String(last.id).padStart(2, '0')}: ${r.echo}`);
+  return { tool: last.tool, args, rung: 'context', amends: last.id, res, cmd: r.commands[0] };
+}
+// an amendment frame of the last card's tool: "2 sentences", "trace it", "next passage", "why"
+let amendEngines = {};
+function amendEngine(tool) {
+  const frames = FRAMES.filter(f => f.amends && (f.amends.includes(tool) || f.amends.includes('*'))), o = ontology(frames), key = JSON.stringify(o);
+  if (!amendEngines[tool] || amendEngines[tool].key !== key) amendEngines[tool] = { key, frames, E: createEngine(o, ENGLISH) };
+  return amendEngines[tool];
+}
+function amendRead(raw, last) {
+  const { frames, E } = amendEngine(last.tool);
+  // a leading "and" joins the amendment to the card ("and median"); the tokenizer says where the rest starts
+  const { toks } = E.tokenize(raw, { names: {} }); const text = toks.length > 1 && toks[0].senses.some(x => x.cat === 'CONJ') ? raw.slice(toks[1].s) : raw;
+  const take = cmd => { const f = frames.find(x => x.name === cmd.verb), out = f && f.bind(cmd, last.args, last); return out ? { tool: out.tool || last.tool, args: out.args } : null; };
+  const pick = r => { if (r.status === 'ok') return take(r.commands[0]); if (r.status === 'ambiguous' && r.alternatives) { const all = r.alternatives.map(c => take(c[0])).filter(Boolean); if (all.length === 1) return all[0]; } return null; };
+  // with its verb ("trace it", "assume normal"), or as a fragment of one of the frames ("in milliseconds", "by character")
+  let r = E.understand(text, makeSession([])), hit = pick(r);
+  for (const f of frames) { if (hit) break; const s = makeSession([]); s.last = { verb: f.name, theme: [], roles: {} }; const rf = E.understand(text, s, { fragment: true }); hit = pick(rf); if (hit) r = rf; }
+  if (!hit) return null;
+  const res = runTool(hit.tool, hit.args); if (!res) return null;
+  res.trace.unshift(`clause: amends #${String(last.id).padStart(2, '0')}: ${(r.echo || r.readings[0]).replace(/\.$/, '')}`);
+  return { tool: hit.tool, args: hit.args, rung: 'context', amends: last.id, res, cmd: hit.tool === last.tool ? commandOf(last) : null };
+}
+function context(q, last, raw) {
+  if (!last) return null;
+  // the tool's own amendments are the more specific reading, so they go first; then the last command with a part changed
+  return amendRead(raw || q, last) || fragmentRead(raw || q, last);
 }
 /* ── rung 3: taught words rewrite the query, then the grammar reads it again ── */
 function taught(text, q, raw) {
@@ -21114,7 +21195,10 @@ frame({
   // csv, tsv, json and parquet are the open table as a file; script and notebook are the session as code
   bind: c => { const as = c.roles.as && c.roles.as[0] && c.roles.as[0].value; return ['csv', 'tsv', 'json', 'parquet'].includes(as) ? { tool: 'tableExport', args: { fmt: as } } : ['script', 'notebook'].includes(as) ? { tool: 'export', args: {} } : null; }
 });
-  return { norm, clauseEngine, clauseRead, grammar, context, taught };
+// "why", "show the plan": the steps behind the last card, whatever its tool
+amend({ tools: ['*'], name: 'why', label: 'Why', words: ['why', 'how', 'how so', 'show the plan', 'show me the plan', 'show the trace', 'show the work', 'show me the work', 'what did you do', 'explain that'], theme: [], required: [], roles: {},
+  words_pt: ['por quê', 'por que', 'como', 'mostra o plano'], label_pt: 'Por quê', bind: (c, a, card) => ({ tool: 'why', args: { ref: card.id } }) });
+  return { norm, clauseEngine, clauseRead, grammar, commandOf, context, taught };
 })();
 
 /* ==== src/engine/sessions.js ==== */
@@ -21222,6 +21306,7 @@ const { current, newSession, renameSession, touch } = __m51;
 
 function addCard(raw, r, ms) {
   const c = { id: ++S.n, raw, tool: r.tool, args: r.args, rung: r.rung, amends: r.amends, res: r.res, ms };
+  if (r.cmd !== undefined) Object.defineProperty(c, 'cmd', { value: r.cmd, writable: true, enumerable: false });   // the clause command, for amendments; not stored
   S.cards.push(c); touch(); startJobs([c], rerun); return c;
 }
 function rerun(c) {
@@ -21269,7 +21354,8 @@ function submit(raw) {
     const ba = clauseRead(raw, 'grammar'); if (ba.tool === 'recipeBatch') return { kind: 'card', card: addCard(raw, ba, performance.now() - t0) };
     const at = recipeAt(m[1]); if (at) return runRecipe(at[0], at[1]);
   }
-  const r = context(q, last) || grammar(text, q, 'grammar', raw) || taught(text, q, raw) || { tool: 'none', args: { q }, rung: 'none', res: T.none({ q }) };
+  // a whole command first; then what amends the last card ("in feet", "2 sentences"); then the words taught on this device
+  const r = grammar(text, q, 'grammar', raw) || context(q, last, raw) || taught(text, q, raw) || { tool: 'none', args: { q }, rung: 'none', res: T.none({ q }) };
   return { kind: 'card', card: addCard(raw, r, performance.now() - t0) };
 }
 

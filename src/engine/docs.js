@@ -2,7 +2,7 @@
 // cut into passages (by heading, then by paragraph) and indexed by @gcu/librarian. A search returns
 // passages verbatim with the matched words marked; golem never rewrites them. The index is derived
 // from the kept files, so it is rebuilt, never stored, and a session replays against what the device holds.
-import { S, tool, frame, noun, postmod } from './core.js';
+import { S, tool, frame, amend, noun, postmod } from './core.js';
 import { Librarian } from '../vendor/librarian.js';
 
 export const DOCTEXT = /\.(md|markdown|txt|html?)$/i;
@@ -87,7 +87,6 @@ const SEARCH = [
 tool({
   name: 'docSearch',
   skill: { group: 'Knowledge', title: 'Search my documents', on: '@gcu/librarian', about: 'Markdown, text and HTML files you open are kept on this device and searched by word, with near spellings. Passages come back as written, with the matched words marked and where they are.', examples: ['find resurvey in my documents', 'where did i write about the collar check', 'docs: core loss'] },
-  amend: [{ arg: 'limit', match: /^(?:show )?more(?: results)?$/, value: () => 15 }],
   topic: a => [a.query, 1],
   run: a => {
     const read = ['find', { v: a.query }, 'in my documents'], c = index();
@@ -111,7 +110,6 @@ tool({
 /* ── one passage, whole ─────────────────────────────────────── */
 tool({
   name: 'docPassage',
-  amend: [{ arg: 'n', match: /^(next|previous|back)(?: passage| one)?$/, value: (m, a) => a.n + (m[1] === 'next' ? 1 : -1) }],
   topic: a => [a.file.name, 1],
   run: a => {
     const f = S.files[a.file.hash], read = ['passage', { v: String(a.n) }, 'of', { v: a.file.name }];
@@ -145,3 +143,8 @@ frame({
   name: 'docpassage', label: 'Passage', words: ['show', 'open', 'read'], elidable: true, theme: ['passage'], required: ['theme', 'of'], roles: { of: { preps: ['of', 'in', 'from'], types: ['file'] } }, label_pt: 'Trecho',
   bind: c => { const n = c.theme[0].attrs && c.theme[0].attrs.n, f = Object.values(S.files).find(x => isDoc(x) && x.name === c.roles.of[0].value); return n && f ? { tool: 'docPassage', args: { file: { name: f.name, hash: f.hash }, n: n.n } } : null; }
 });
+// "more", "next passage", "previous"
+noun({ amend: true, type: 'moreword', words: { more: ['more', 'more results', 'show more', 'the rest'] }, words_pt: { more: ['mais', 'mais resultados'] } });
+amend({ tools: ['docSearch'], name: 'docmore', label: 'More', words: [], elidable: true, theme: ['moreword'], required: ['theme'], roles: {}, bind: (c, a) => ({ args: { ...a, limit: 15 } }) });
+noun({ amend: true, type: 'step', words: { next: ['next', 'next passage', 'next one', 'the next one'], previous: ['previous', 'previous passage', 'back', 'the previous one', 'previous one'] }, words_pt: { next: ['próximo', 'proximo'], previous: ['anterior'] } });
+amend({ tools: ['docPassage'], name: 'docstep', label: 'Passage', words: [], elidable: true, theme: ['step'], required: ['theme'], roles: {}, bind: (c, a) => ({ args: { ...a, n: a.n + (c.theme[0].value === 'next' ? 1 : -1) } }) });

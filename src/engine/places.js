@@ -1,7 +1,7 @@
 // Places, distance and UTM. A place is coordinates in the request or a name saved on this device
 // ("home is -19.92, -43.94"); there is no gazetteer and device location is off, so an unknown name is
 // a question, not a guess. Distance is Vincenty's inverse on WGS84; UTM is the Krüger series.
-import { S, tool, frame, noun, shape, fmt, rad, deg } from './core.js';
+import { S, tool, frame, amend, noun, shape, postmod, fmt, rad, deg } from './core.js';
 
 const WGS84 = { a: 6378137, f: 1 / 298.257223563 };
 WGS84.b = WGS84.a * (1 - WGS84.f); WGS84.e2 = WGS84.f * (2 - WGS84.f); WGS84.e = Math.sqrt(WGS84.e2);
@@ -105,7 +105,6 @@ export function fromUTM(zone, hemisphere, easting, northing) {
 }
 tool({
   name: 'utm',
-  amend: [{ arg: 'zoneForced', match: /^(?:in )?zone (\d{1,2})$/, value: m => +m[1], when: a => a.place }, { arg: 'band', match: /^(?:band|south|north)\b.*?([c-hj-np-x])?$/i, value: m => m[1] ? m[1].toUpperCase() : null, when: a => a.easting != null }],
   topic: () => ['UTM', 1],
   run: a => {
     if (a.place) {
@@ -154,3 +153,9 @@ frame({
   name: 'fromutm', label: 'From UTM', words: ['utm', 'convert utm'], elidable: true, theme: ['utmcoord'], required: ['theme'], roles: { to: { preps: ['to', 'in', 'as', 'into'], types: ['geographic'] } }, label_pt: 'De UTM',
   bind: c => { const m = /^(\d{1,2})\s?([c-hj-np-x])?\s+(?:e\s?)?(\d+(?:\.\d+)?)\s+(?:n\s?)?(\d+(?:\.\d+)?)$/i.exec(c.theme[0].value.trim()); return m ? { tool: 'utm', args: { zone: +m[1], band: m[2] ? m[2].toUpperCase() : null, easting: +m[3], northing: +m[4] } } : null; }
 });
+// "zone 23", "band k"
+noun({ amend: true, type: 'utmzone', words: {}, generic: ['zone', 'utm zone'], generic_pt: ['zona', 'fuso'] }); postmod({ prep: '', heads: ['utmzone'], attr: 'n', quantity: true });
+amend({ tools: ['utm'], name: 'utmzone', label: 'Zone', words: [], elidable: true, theme: ['utmzone'], required: ['theme'], roles: {}, bind: (c, a) => a.place && c.theme[0].attrs.n ? { args: { ...a, zoneForced: c.theme[0].attrs.n.n } } : null });
+noun({ amend: true, type: 'utmband', words: {}, generic: ['band', 'latitude band'], generic_pt: ['banda'] }); postmod({ prep: '', heads: ['utmband'], attr: 'letter', mod: 'bandletter' });
+shape({ type: 'bandletter', re: '[c-hj-np-x]' });
+amend({ tools: ['utm'], name: 'utmband', label: 'Band', words: [], elidable: true, theme: ['utmband'], required: ['theme'], roles: {}, bind: (c, a) => a.easting != null && c.theme[0].attrs.letter ? { args: { ...a, band: c.theme[0].attrs.letter.toUpperCase() } } : null });

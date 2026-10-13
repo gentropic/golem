@@ -1,7 +1,7 @@
 // Text tools over a pasted payload: counts and readability, extracted key sentences, and a diff.
 // The payload is what follows the first colon, or every line after the first of a multi-line input;
 // it is never read as a command. Nothing here rewrites text.
-import { tool, frame, fmt } from './core.js';
+import { tool, frame, amend, noun, qmod, fmt } from './core.js';
 
 // head: the command; body: the payload, from the raw input so lines and case survive
 export function payloadOf(raw) {
@@ -31,7 +31,6 @@ const quote = s => `“${s.length > 160 ? s.slice(0, 157) + '…' : s}”`;
 tool({
   name: 'wordcount',
   skill: { group: 'Compute', title: 'Text tools', on: 'own algorithms', about: 'Word count and readability (Flesch, English only, labelled estimates), the key sentences of a text in their original order (TextRank, nothing rewritten), and a diff of two blocks by line, word or character (Myers). The text follows a colon or the first line.', examples: ['word count: the quick brown fox jumps over the lazy dog. it was not amused.', 'summarise this: …', 'diff these: a\\n---\\nb'] },
-  amend: [{ arg: 'lang', match: /^(?:in |it is |it's |this is )?(english|portuguese|spanish|french|german|other)$/, value: m => ({ english: 'en', portuguese: 'pt', spanish: 'es', french: 'fr', german: 'de', other: 'other' })[m[1]] }],
   topic: () => ['Text', .5],
   run: a => {
     const ws = words(a.text), ss = sentences(a.text), paras = a.text.split(/\n\s*\n/).filter(x => x.trim()).length, chars = a.text.length, nospace = a.text.replace(/\s/g, '').length;
@@ -62,7 +61,6 @@ export function textrank(ss) {
 }
 tool({
   name: 'extract',
-  amend: [{ arg: 'n', match: /^(\d+) sentences?$/, value: m => +m[1] }, { arg: 'n', match: /^shorter$/, value: (m, a) => Math.max(1, a.n - 1) }, { arg: 'n', match: /^longer$/, value: (m, a) => a.n + 1 }],
   topic: () => ['Key sentences', 1],
   run: a => {
     const ss = sentences(a.text), read = ['extract', { v: `${a.n} sentence${a.n === 1 ? '' : 's'}` }, 'of', { v: `${ss.length}` }];
@@ -97,7 +95,6 @@ const UNITS = ['line', 'word', 'character'];
 const split = (s, unit) => unit === 'line' ? s.split(/\r?\n/) : unit === 'word' ? s.split(/(\s+)/).filter(x => x !== '') : [...s];
 tool({
   name: 'diff',
-  amend: [{ arg: 'unit', match: /^(?:by |per )?(lines?|words?|characters?|chars?|letters?)$/, value: m => /^l/.test(m[1]) ? 'line' : /^w/.test(m[1]) ? 'word' : 'character' }],
   topic: () => ['Diff', 1],
   run: a => {
     if (a.noSep) return { read: ['diff'], body: [{ t: 'note', kind: 'err', text: 'Put a line of three dashes (---) between the two blocks.' }], trace: ['no separator'] };
@@ -131,3 +128,14 @@ frame({
     return { tool: 'diff', args: parts.length === 2 ? { a: parts[0].trim(), b: parts[1].trim(), unit: /\n/.test(parts[0].trim()) || /\n/.test(parts[1].trim()) ? 'line' : 'word' } : { noSep: true } };
   }
 });
+/* ── amendments: "portuguese", "2 sentences", "shorter", "by word" ── */
+noun({ amend: true, type: 'language', words: { en: ['english'], pt: ['portuguese'], es: ['spanish'], fr: ['french'], de: ['german'], other: ['other', 'another language'] }, words_pt: { en: ['inglês', 'ingles'], pt: ['português', 'portugues'], es: ['espanhol'], fr: ['francês'], de: ['alemão'] } });
+amend({ tools: ['wordcount'], name: 'lang', label: 'Language', words: ["it's", 'it is', 'this is'], elidable: true, theme: ['language'], required: [], roles: { in: { preps: ['in'], types: ['language'] } },
+  bind: (c, a) => { const l = [...c.theme, ...(c.roles.in || [])][0]; return l ? { args: { ...a, lang: l.value } } : null; } });
+noun({ amend: true, type: 'sentences', words: {}, generic: ['sentences', 'sentence'], generic_pt: ['frases', 'frase'] }); qmod({ head: 'sentences', attr: 'n', dims: ['bare'] });
+noun({ amend: true, type: 'lengthword', words: { shorter: ['shorter', 'fewer', 'less'], longer: ['longer', 'more'] }, words_pt: { shorter: ['mais curto', 'menos'], longer: ['mais longo', 'mais'] } });
+amend({ tools: ['extract'], name: 'extractn', label: 'Sentences', words: [], elidable: true, theme: ['sentences', 'lengthword'], required: ['theme'], roles: {},
+  bind: (c, a) => { const t = c.theme[0]; if (t.type === 'sentences') return t.attrs.n ? { args: { ...a, n: t.attrs.n.n } } : null; return { args: { ...a, n: t.value === 'shorter' ? Math.max(1, a.n - 1) : a.n + 1 } }; } });
+noun({ amend: true, type: 'diffunit', words: { line: ['lines', 'line'], word: ['words', 'word'], character: ['characters', 'character', 'chars', 'letters'] }, words_pt: { line: ['linhas'], word: ['palavras'], character: ['caracteres'] } });
+amend({ tools: ['diff'], name: 'diffunit', label: 'Diff by', words: [], elidable: true, theme: ['diffunit'], required: [], roles: { by: { preps: ['by', 'per'], types: ['diffunit'] } },
+  bind: (c, a) => { const u = [...c.theme, ...(c.roles.by || [])][0]; return u ? { args: { ...a, unit: u.value } } : null; } });

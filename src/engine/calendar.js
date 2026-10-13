@@ -1,6 +1,6 @@
 // Working days and rosters over @gcu/plan's calendar engine (vendored), and time zones through Intl.
 // The calendar is a slot and is always shown: Brazil's federal holidays, or weekdays only.
-import { S, tool, frame, noun, shape, postmod, unit, clock, iso } from './core.js';
+import { S, tool, frame, amend, noun, shape, postmod, unit, clock, iso } from './core.js';
 import { findDate, findTime, today, day0, fmtDate, dateWords } from './dates.js';
 import { isWorkingDay, addWorkingDays, brazilCalendar, federalHolidays } from '../vendor/plan-calendar.js';
 
@@ -16,7 +16,6 @@ const DATE = '(.+?)';
 tool({
   name: 'workdays',
   skill: { group: 'Compute', title: 'Working days and rosters', on: '@gcu/plan', about: 'Working days until a date or between two, N working days from a date, whether a day is a working day, and on/off rosters. The calendar is a slot: Brazil\'s federal holidays or weekdays only.', examples: ['working days until 20 dec', 'is 21 apr 2027 a working day', '15 working days from monday', '14 on 14 off from 6 oct, am i off at christmas'] },
-  amend: [{ arg: 'cal', match: /^(?:in |with |using )?(?:the )?(brazil(?:ian)?|weekdays?(?: only)?|no holidays)(?: calendar| holidays)?$/, value: m => /^brazil/.test(m[1]) ? 'brazil' : 'weekdays' }],
   topic: () => ['Working days', 1],
   run: a => {
     const dateOf = s => s === 'today' ? today() : (findDate(s) || {}).d;
@@ -101,7 +100,6 @@ const refuseZone = (read, name, zones) => ({ read, body: [{ t: 'note', kind: 'er
 tool({
   name: 'zone',
   skill: { group: 'Compute', title: 'Time zones', on: 'Intl', about: 'A time in one place as it reads in another, with the offsets used and a note when the clocks change nearby. Cities by their IANA names, plus common aliases.', examples: ['9am sao paulo in perth', 'what time is it in vancouver', '14:30 utc to my time', 'overlap of 9 to 17 in belo horizonte and perth'] },
-  amend: [{ arg: 'date', match: /^(?:on |for )?(tomorrow|today|next \w+|\d{1,2} \w{3,9}(?: \d{4})?|\d{4}-\d{2}-\d{2})$/ }],
   topic: () => ['Time zones', 1],
   run: a => {
     const toZ = zonesOf(a.to), to = a.toZone || toZ[0], read = [];
@@ -224,3 +222,7 @@ frame({
     return { tool: 'roster', args: q.value === 'next' ? { ...base, date: 'today', next: true } : { ...base, date: on || 'today' } };
   }
 });
+// "with the brazilian calendar", "weekdays only"
+noun({ amend: true, type: 'calkind', words: { brazil: ['brazil', 'brazilian', 'the brazilian calendar', 'brazilian calendar', 'brazil calendar', 'brazilian holidays'], weekdays: ['weekdays', 'weekdays only', 'weekday calendar', 'no holidays'] }, words_pt: { brazil: ['calendário brasileiro'], weekdays: ['dias de semana', 'sem feriados'] } });
+amend({ tools: ['workdays'], name: 'workcal', label: 'Calendar', words: [], elidable: true, theme: ['calkind'], required: [], roles: { with: { preps: ['with', 'in', 'using', 'on'], types: ['calkind'] } },
+  bind: (c, a) => { const k = [...c.theme, ...(c.roles.with || [])][0]; return k ? { args: { ...a, cal: k.value } } : null; } });
