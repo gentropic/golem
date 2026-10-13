@@ -115,18 +115,20 @@ function evaluate(n, r, a, ctx) {
 const pct = (sorted, p) => { const k = (sorted.length - 1) * p, lo = Math.floor(k), hi = Math.ceil(k); return sorted[lo] + (sorted[hi] - sorted[lo]) * (k - lo); };
 
 const seedOf = () => Math.floor(Math.random() * 2 ** 31);
+// a ranged expression ("(120 to 180) * 0.5", "x = a * b where a is 9 to 11"): the estimate language's front, a recogniser
+export function estimateOf(text) {
+  const m = /^(?:estimate |range of )?(.+?)(?:\s+(?:where|if|with|given)\s+(.+))?$/i.exec(text.trim()); if (!m) return null;
+  let expr = m[1], name = null, vars = null;
+  const eq = /^([a-zA-Z_]\w*)\s*=\s*(.+)$/.exec(expr); if (eq) { name = eq[1]; expr = eq[2]; }
+  if (m[2]) { vars = {}; for (const part of m[2].split(/\s+and\s+(?=(?:the\s+)?\w+\s+is\s)/i)) { const v = /^(?:the\s+)?([a-zA-Z_]\w*)\s+is\s+(.+)$/i.exec(part.trim()); if (!v) return null; vars[v[1]] = v[2]; } }
+  if (!RANGE_RE.test(expr) && !(vars && Object.values(vars).some(v => RANGE_RE.test(v)))) return null;
+  if (!/^[\w\s.()^*\/+\-−±×÷%°µ²³…–=]+$/.test(expr)) return null;
+  return { expr, ...(name ? { name } : {}), ...(vars ? { vars } : {}), seed: seedOf() };
+}
+
 tool({
-  name: 'estimate', rank: 105,
+  name: 'estimate',
   skill: { group: 'Compute', title: 'Estimates with ranges', on: 'own sampler', about: 'Arithmetic over ranges by simulation: "a to b" uniform (or normal, lognormal, as a slot), "a ± b" normal. Units carried through; mean and the 10th, 50th and 90th percentiles; the seed stays in the plan.', examples: ['2.7 ± 0.1 t/m3 * 1.35 Mm3', '(120 to 180) * (0.4 to 0.6) / 7', 'fuel = consumption * trip where consumption is 9 to 11 l per 100 km and trip is 400 to 450 km'] },
-  read: text => {
-    const m = /^(?:estimate |range of |what is |what's )?(.+?)(?:\s+(?:where|if|with|given)\s+(.+))?$/i.exec(text.trim()); if (!m) return null;
-    let expr = m[1], name = null, vars = null;
-    const eq = /^([a-zA-Z_]\w*)\s*=\s*(.+)$/.exec(expr); if (eq) { name = eq[1]; expr = eq[2]; }
-    if (m[2]) { vars = {}; for (const part of m[2].split(/\s+and\s+(?=(?:the\s+)?\w+\s+is\s)/i)) { const v = /^(?:the\s+)?([a-zA-Z_]\w*)\s+is\s+(.+)$/i.exec(part.trim()); if (!v) return null; vars[v[1]] = v[2]; } }
-    if (!RANGE_RE.test(expr) && !(vars && Object.values(vars).some(v => RANGE_RE.test(v)))) return null;
-    if (!/^[\w\s.()^*\/+\-−±×÷%°µ²³…–=]+$/.test(expr)) return null;
-    return { expr, ...(name ? { name } : {}), ...(vars ? { vars } : {}), seed: seedOf() };
-  },
   amend: [{ arg: 'dist', match: /^(?:as |assume |assuming )?(uniform|normal|lognormal)(?: ranges| bounds)?$/ }, { arg: 'pm', match: /^(?:± |plus minus |plus or minus )(?:as |is )(normal|uniform)$/ }],
   topic: a => [a.name ? `Estimate of ${a.name}` : 'Range estimate', 1],
   run: a => {

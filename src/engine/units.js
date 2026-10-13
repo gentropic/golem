@@ -41,9 +41,8 @@ export function parseUnit(s, oz) {
 export const dimName = d => DIM[d] || d.split('/').map(x => DIM[x] || x).join(' per ');
 
 tool({
-  name: 'convert', rank: 100,
+  name: 'convert',
   skill: { group: 'Compute', title: 'Unit conversion', on: '@gcu/units', about: 'Grades, lengths, masses, areas, pressures, temperatures. Refuses mismatched dimensions.', examples: ['0.35 oz per short ton in g/t', '2.7 g/cm3 in lb/ft3', '1500 psi in mpa', '5 km in kg'] },
-  read: (text, q) => { const m = /^(?:convert )?(-?[\d.,]*\d) ?(.+?) (?:in|to|as|into) (.+)$/.exec(q); return m ? { v: parseFloat(m[1].replace(/,/g, '')), from: m[2], to: m[3] } : null; },
   amend: [{ arg: 'to', match: /^(?:and |now |same (?:but )?)?(?:in|to|as) (.+)$/ }],
   topic: a => [a.from + ' → ' + a.to, 1],
   run: a => {

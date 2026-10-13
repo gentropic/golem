@@ -7544,6 +7544,14 @@
     {
       "prep": "",
       "heads": [
+        "timer"
+      ],
+      "attr": "duration",
+      "quantity": true
+    },
+    {
+      "prep": "",
+      "heads": [
         "section"
       ],
       "attr": "az",
@@ -7848,6 +7856,32 @@
         "passa"
       ],
       "label_pt": "Converter"
+    },
+    {
+      "name": "calc",
+      "label": "Calculate",
+      "words": [
+        "calculate",
+        "compute",
+        "evaluate",
+        "work out",
+        "eval",
+        "calc"
+      ],
+      "theme": [
+        "text"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {},
+      "words_pt": [
+        "calcula",
+        "calcule",
+        "quanto é",
+        "avalia"
+      ],
+      "label_pt": "Calcular"
     },
     {
       "name": "daysUntil",

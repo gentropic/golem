@@ -4,6 +4,8 @@
 import { S, T, TOOLS, FRAMES, tool, frame, toolByName, runTool, iso } from './core.js';
 import { examples, vocab } from './skills.js';
 import { ontology } from './ontology.js';
+import { calcOf } from './calc.js';
+import { estimateOf } from './estimate.js';
 import { createEngine, makeSession, ENGLISH } from '../vendor/dispatch.js';
 
 export const norm = s => s.trim().replace(/\s+/g, ' ').replace(/[?.!]+$/, '');
@@ -44,15 +46,25 @@ export function clauseRead(text, rung) {
 }
 const describeVerdict = r => `clause: ${r.status}${r.reasons ? ' — ' + r.reasons.join('; ') : r.readings ? ' — ' + r.readings.join(' | ') : ''}`;
 
-/* ── rung 2, second half: the regex rules the declarations carry, by rank ── */
-const readers = () => TOOLS.filter(d => d.read).sort((a, b) => a.rank - b.rank);
-export function grammar(text, q, rung, raw) {
-  const c = clauseRead(raw || text, rung); if (c.tool) return c;   // the parser reads what was typed: a payload keeps its line breaks
-  for (const d of readers()) {
-    const args = d.read(text, q, raw); if (!args) continue;
-    const res = runTool(d.name, args); if (res) return { tool: d.name, args, rung, res };
+/* ── rung 2, second half: expressions, read by their own parsers (dispatch SPEC: arithmetic stays outside the grammar) ── */
+// The words in front ("please", "what is", "calculate") are found by the clause tokenizer, never by a pattern: the
+// expression starts at the first token the lexicon does not know as a filler, a question word or a calculating verb.
+function expressionOf(raw) {
+  const { toks } = clauseEngine().tokenize(raw, { names: {} });
+  let k = 0; while (k < toks.length && toks[k].senses.some(s => s.cat === 'WHCOP' || s.cat === 'COLON' || (s.cat === 'VERB' && s.verb === 'calc'))) k++;
+  return k < toks.length ? raw.slice(toks[k].s, toks[toks.length - 1].e).trim() : null;   // to the last word kept: trailing fillers ("for me") and punctuation go
+}
+function expressionRead(raw, rung) {
+  const x = expressionOf(raw); if (!x) return null;
+  for (const [tool, args] of [['calc', calcOf(x)], ['estimate', estimateOf(x)]]) {
+    if (!args) continue;
+    const res = runTool(tool, args); if (res) { res.trace.unshift(`expression: "${x}"`); return { tool, args, rung, res }; }
   }
   return null;
+}
+export function grammar(text, q, rung, raw) {
+  const c = clauseRead(raw || text, rung); if (c.tool) return c;   // the parser reads what was typed: a payload keeps its line breaks
+  return expressionRead(raw || text, rung);
 }
 /* ── rung 1: "why", or an amendment the last card's tool declares ── */
 export function context(q, last) {

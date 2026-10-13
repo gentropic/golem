@@ -1,5 +1,5 @@
 // Device hand-offs: calendar event, timer, alarm. Simulated in the mock; on Android they become intents.
-import { tool, frame, noun, fmt, iso } from './core.js';
+import { tool, frame, noun, postmod, fmt, iso } from './core.js';
 import { findDate, findTime, today, fmtDate, dateWords } from './dates.js';
 import { parseUnit } from './units.js';
 
@@ -33,14 +33,8 @@ tool({
   }
 });
 tool({
-  name: 'timer', rank: 30,
+  name: 'timer',
   skill: { group: 'Device', title: 'Timer and alarm', on: 'lead-acid intent', about: 'Handed to the Clock app.', examples: ['set a timer for 5 min', 'set an alarm for 6:15'] },
-  read: (text, q) => {
-    let m = /^(?:set |start )?(?:a )?(?:timer|countdown) (?:for |of )?(\d+(?:\.\d+)?) ?(s|sec|secs|seconds?|m|min|mins|minutes?|h|hr|hours?)$/.exec(q);
-    if (m) return { sec: Math.round(m[1] * (m[2][0] === 's' ? 1 : m[2][0] === 'm' ? 60 : 3600)) };
-    m = /^(?:set |start )?(?:a )?(?:timer|countdown) (?:for |of )?(half an hour|an hour|a minute|a quarter(?: of an)? hour|quarter of an hour)$/.exec(q);
-    return m ? { sec: /half/.test(m[1]) ? 1800 : /quarter/.test(m[1]) ? 900 : /hour/.test(m[1]) ? 3600 : 60 } : null;
-  },
   topic: () => ['Timer', 1],
   run: a => {
     if (!a.end) a.end = Date.now() + a.sec * 1000;
@@ -95,3 +89,4 @@ frame({
   roles: { at: { preps: ['at', 'for'], types: ['clock'] } }, words_pt: ['me acorda', 'me acorde', 'põe', 'coloca'], label_pt: 'Alarme',
   bind: c => { const t = c.roles.at && c.roles.at[0]; return t && t.h < 24 ? { tool: 'alarm', args: { h: t.h, mi: t.mi } } : null; }
 });
+postmod({ prep: '', heads: ['timer'], attr: 'duration', quantity: true });   // "countdown 90 seconds"

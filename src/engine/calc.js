@@ -1,5 +1,5 @@
 // Arithmetic by recursive descent. No eval, no Function. Trigonometry in degrees.
-import { tool, fmt, rad, deg } from './core.js';
+import { tool, frame, fmt, rad, deg } from './core.js';
 
 const FN = { sqrt: Math.sqrt, abs: Math.abs, exp: Math.exp, ln: Math.log, log: Math.log10, sin: x => Math.sin(rad(x)), cos: x => Math.cos(rad(x)), tan: x => Math.tan(rad(x)), asin: x => deg(Math.asin(x)), acos: x => deg(Math.acos(x)), atan: x => deg(Math.atan(x)) };
 export function calc(src) {
@@ -30,13 +30,20 @@ export function calc(src) {
   return v;
 }
 tool({
-  name: 'calc', rank: 110,
+  name: 'calc',
   skill: { group: 'Compute', title: 'Arithmetic', on: '@gcu/expr', about: 'Parsed and evaluated, never eval. Trigonometry in degrees.', examples: ['14 * cos(22) + 3^2', 'sqrt(2) * 84'] },
-  read: (text, q) => { const m = /^(?:what is |what's |calc(?:ulate)? |compute )?([-+*/^().,\d\sa-z×÷]+)$/.exec(q); return m && /\d/.test(m[1]) ? { x: m[1].trim() } : null; },
   topic: () => ['Arithmetic', .5],
   run: a => {
     let v; try { v = calc(a.x); } catch (e) { return null; }
     if (typeof v !== 'number' || isNaN(v)) return null;
     return { read: ['evaluate', { v: a.x }, 'trig in degrees'], value: v, body: [{ t: 'big', v: fmt(v, 10) }], trace: [`expr.parse("${a.x}")`, `evaluate → ${v}`], py: a.x.replace(/\^/g, '**') };
   }
+});
+// an expression: what the arithmetic parser accepts, with at least one operator or function (a bare number is not a sum)
+export const calcOf = x => { const s = x.trim(); if (!/\d/.test(s) || !/[-+*/^×÷(]/.test(s.replace(/^-/, ''))) return null; try { const v = calc(s); return typeof v === 'number' && !isNaN(v) ? { x: s } : null; } catch (e) { return null; } };
+// "calculate 14 * cos(22)", "please compute (2 + 3) / 4": the expression is the text after the verb
+frame({
+  name: 'calc', label: 'Calculate', words: ['calculate', 'compute', 'evaluate', 'work out', 'eval', 'calc'], theme: ['text'], required: ['theme'], roles: {},
+  words_pt: ['calcula', 'calcule', 'quanto é', 'avalia'], label_pt: 'Calcular',
+  bind: c => { const a = calcOf(c.theme[0].value); return a ? { tool: 'calc', args: a } : null; }
 });

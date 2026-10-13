@@ -1,7 +1,7 @@
 // ⚠ VENDORED — DO NOT EDIT. @gcu/dispatch, built from ../auditable/ext/dispatch/src/ by its own build.
 // Source of truth: gentropic/auditable ext/dispatch (local clone: ../auditable). Re-vendor by copying
 // ext/dispatch/index.js here after 'node ext/dispatch/build.js'. golem uses the grammar rung only:
-// createEngine, makeSession, ENGLISH, PORTUGUESE. At auditable 3a5c438c.
+// createEngine, makeSession, ENGLISH, PORTUGUESE. At auditable ff2d3dfe.
 
 // ⚠ GENERATED FILE — DO NOT EDIT. Source: src/  Build: @gcu/build src/main.js
 // @gcu/dispatch — Session-trained natural-language → tool-call dispatch: a Snips-shaped resolver (averaged-perceptron intent + CRF-class slot tagger + gazetteers + deterministic per-kind assemblers) that trains IN THE BROWSER from the host session's own vocabulary in under a second. Tools are declarative (ten kinds) and a grammar rung (clause: case-grammar frames over an Earley chart with costed repairs, en + pt-BR) reads controlled commands before the learners see them; no shipped model, no network, explainable per decision — refusals return empty calls so the host degrades into its command palette. Born from an incubator where this beat a 26M finetuned transformer 50/52 to 3/24 on a frozen yardstick.
@@ -1138,6 +1138,7 @@ function buildGrammar(X) {
 
   rule('Quantity', 'NUM', t => ({ type: 'quantity', n: t.n, unit: null, dim: 'bare' }));
   rule('Quantity', 'NUM UNIT', (t, u) => ({ type: 'quantity', n: t.n, unit: u.unit, dim: u.dim }));
+  rule('Quantity', 'DET UNIT', (d, u) => X.indefinite.includes(d.word) ? { type: 'quantity', n: 1, unit: u.unit, dim: u.dim } : null);   // "an hour", "um minuto"
   return R;
 }
 
@@ -1158,7 +1159,7 @@ const ENGLISH = {
   // closed questions the grammar reads as commands with the verb left out: a wh-word, a copula, the fused forms
   DEMO: 'this|these|it|that|them|the following|the following text|the text|the two|both',   // before a colon: "summarise this: …"
   WH: 'what|which', COP: 'is|are|was|were', WHCOP: "what is|what's|whats|what are|which is|which are|how much is|how many are",
-  TRAIL: 'please|thanks|thank you|pls|plz|cheers',   // politeness that closes a sentence, trimmed from the end of a free text
+  TRAIL: 'please|thanks|thank you|pls|plz|cheers|for me|for us',   // politeness that closes a sentence, trimmed from the end of a free text
   FILLER: "please|now|just|kindly|go|ahead|me|us|hey|hi|hello|yo|thanks|thank you|cheers|pls|plz|so|um|uh|er|erm|hmm|well|oh|alright|can you|could you|would you|will you|i want you to|i need you to|i want to|i need|i'd like|i would like|give me|tell me|for me|let us|lets",
   // identity for every English preposition except the comparisons, which share a canon with their words
   preps: { '>': ['above'], 'greater than': ['above'], 'more than': ['above'], '<': ['below'], 'less than': ['below'], '>=': ['atleast'], '≥': ['atleast'], 'at least': ['atleast'],
@@ -1171,6 +1172,10 @@ const ENGLISH = {
     today: { rel: 0 }, tonight: { rel: 0 }, tomorrow: { rel: 1 }, yesterday: { rel: -1 } },
   months: { january: 1, jan: 1, february: 2, feb: 2, march: 3, mar: 3, april: 4, apr: 4, may: 5, june: 6, jun: 6, july: 7, jul: 7, august: 8, aug: 8, september: 9, sep: 9, sept: 9, october: 10, oct: 10, november: 11, nov: 11, december: 12, dec: 12 },
   clocks: { noon: [12, 0], midday: [12, 0], midnight: [0, 0] },
+  // number words, and the fractions people say before a unit
+  numbers: { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19,
+    twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90, hundred: 100, 'a hundred': 100, dozen: 12, 'a dozen': 12, 'a couple of': 2, 'a few': 3,
+    'half an': 0.5, 'half a': 0.5, half: 0.5, 'a quarter of an': 0.25, 'a quarter of a': 0.25, 'quarter of an': 0.25, 'quarter of a': 0.25, 'three quarters of an': 0.75, 'three quarters of a': 0.75, 'an hour and a half': 1.5 },
   AMPM: "am|pm|a.m.|p.m.|o'clock",
   indefinite: ['a', 'an'], newRef: ['new'], firstRef: ['first'],
   phr: { new: 'new', last: 'last', every: 'every', except: 'except', fromRun: 'from run', above: 'above', below: 'below', atleast: 'at least', atmost: 'at most', equals: 'equal to', then: 'Then', assuming: 'assuming', of: 'of', hole: '___', than: 'than' },
@@ -1224,6 +1229,7 @@ function createEngine(ont, locale = ENGLISH) {
   for (const [w, m] of Object.entries(locale.months ?? {})) add(w, 'MONTH', { m });
   for (const [w, c] of Object.entries(locale.clocks ?? {})) add(w, 'CLOCK', { h: c[0], mi: c[1] });
   if (locale.AMPM) add(locale.AMPM, 'AMPM');
+  for (const [w, n] of Object.entries(locale.numbers ?? {})) add(w, 'NUM', { n });   // number words: "ninety", "half an", "a quarter of an"
   const L = k => `${k}_${locale.code}`;   // ontology synonym column for this locale, falling back to the default column
   const col = (o, k) => o[L(k)] ?? o[k];
   // a frame may take a subject before its verb ("pop means population"): it binds as the role 'subject'
@@ -1248,6 +1254,7 @@ function createEngine(ont, locale = ENGLISH) {
   const X = {
     headFirst: !!locale.headFirst,
     nextDay: locale.THEN.split('|').includes('next'),
+    indefinite: locale.indefinite ?? [],
     subject: ont.verbs.some(v => v.subject),   // some frame takes a subject before its verb
     // a role with no marker ("decode hex 676f", "9am sao paulo in perth"): only things of the types such roles take
     bareTypes: new Set(ont.verbs.flatMap(v => Object.values(v.roles ?? {}).filter(r => r.preps.includes('')).flatMap(r => r.types))),   // "next friday" where the bank has the word
@@ -1922,7 +1929,7 @@ const PORTUGUESE = {
   QWORD: 'por que|porque|como|qual|quais|quando|quem|é|são|será|pode|poderia|deveria|dá',
   DEMO: 'isto|isso|este|esta|estes|estas|o seguinte|o seguinte texto|o texto|os dois|ambos',   // antes dos dois-pontos: "resume isto: …"
   WH: 'qual|quais|que', COP: 'é|são|sao|era|foi|eram|foram', WHCOP: 'qual é|qual e|quais são|quais sao|o que é|o que e|quanto é|quanto e|quanto dá|quanto da|quanto são|quanto sao',
-  TRAIL: 'por favor|obrigado|obrigada|valeu|pfv|pf',   // cortesia que fecha a frase, cortada do fim de um texto livre
+  TRAIL: 'por favor|obrigado|obrigada|valeu|pfv|pf|pra mim|para mim',   // cortesia que fecha a frase, cortada do fim de um texto livre
   FILLER: 'por favor|agora|só|me|favor|pra mim|então|ei|oi|olá|valeu|obrigado|obrigada|beleza|aí|tá|dá pra|dá para|você pode|pode|consegue|queria que você|quero que você|vamos|bora|hum|bom|me diz|me fala|me dá|preciso de|eu preciso de|gostaria de|eu queria',
   preps: {   // surface → canonical set; polysemy is resolved by types downstream
     com: ['with'], usando: ['using'], por: ['by'], em: ['in', 'on'], no: ['in', 'on'], na: ['in', 'on'], nos: ['in', 'on'], nas: ['in', 'on'],
@@ -1936,6 +1943,8 @@ const PORTUGUESE = {
     hoje: { rel: 0 }, 'amanhã': { rel: 1 }, amanha: { rel: 1 }, ontem: { rel: -1 } },
   months: { janeiro: 1, fevereiro: 2, 'março': 3, marco: 3, abril: 4, maio: 5, junho: 6, julho: 7, agosto: 8, setembro: 9, outubro: 10, novembro: 11, dezembro: 12 },
   clocks: { 'meio-dia': [12, 0], 'meia-noite': [0, 0] },
+  numbers: { dois: 2, duas: 2, três: 3, tres: 3, quatro: 4, cinco: 5, seis: 6, sete: 7, oito: 8, nove: 9, dez: 10, onze: 11, doze: 12, quinze: 15, vinte: 20, trinta: 30, quarenta: 40, cinquenta: 50, sessenta: 60, noventa: 90, cem: 100,
+    meia: 0.5, meio: 0.5, 'um quarto de': 0.25, 'uma dúzia de': 12 },
   indefinite: ['um', 'uma', 'uns', 'umas'], newRef: ['novo', 'nova'], firstRef: ['primeiro', 'primeira'],
   phr: { new: 'novo', last: 'último', every: 'todo', except: 'exceto', fromRun: 'da rodada', above: 'acima de', below: 'abaixo de', atleast: 'pelo menos', atmost: 'no máximo', equals: 'igual a', then: 'Depois', assuming: 'assumindo', of: 'de', hole: '___', than: 'que' },
   stem: w => { let x = w.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
