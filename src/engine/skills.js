@@ -32,4 +32,6 @@ export const examples = () => skills().flatMap(s => s.examples);
 let VOCAB = null;
 export const vocab = () => VOCAB || (VOCAB = new Set(examples().filter(e => !/ means /.test(e)).join(' ').toLowerCase().split(/[^a-z]+/).filter(w => w.length > 3)));
 // the example chips in the dock
+// the welcome of an empty session: one line of what, one query that shows it
+export const STARTERS = [['Convert a grade', '0.35 oz per short ton in g/t'], ['True thickness', 'true thickness of a 14 m intercept, hole 270/60, bedding 045/30'], ['Look at a table (sample data)', 'open assays.csv'], ['Run some Python', 'run this: sum(x * x for x in range(10))'], ['Set a reminder', 'remind me to send the samples to the lab on friday at 9'], ['What can you do?', 'what can you do']];
 export const SUGGESTIONS = ['pop means population', 'histogram of cu', 'log scale', 'population density of mongolia in people per square mile', 'and chile', 'set a timer for 5 min', 'what is a skiplist', 'why', 'export as script', 'undo'];

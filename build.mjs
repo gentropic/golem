@@ -143,8 +143,8 @@ if (process.argv[1] && posix(process.argv[1]).endsWith('/build.mjs')) {
   if (!shell.includes('/*__FONTS__*/')) throw new Error('build: src/shell/index.html needs a /*__FONTS__*/ marker inside a <style>');
   const js = bundle('shell/main.js').replace("/*__PY_WORKER__*/''", () => JSON.stringify(pyWorkerSource()).replace(/</g, '\\u003c'));
   if (!js.includes('self.onmessage')) throw new Error('build: the Python worker was not embedded (marker missing in src/shell/main.js)');
-  // the shell file starts with <title> and <style>; everything from the first <div class="wrap"> on is the body
-  const cut = shell.indexOf('<div class="wrap">');
+  // the shell file starts with <title> and <style>; everything after the <!--__BODY__--> marker is the body
+  const cut = shell.indexOf("<!--__BODY__-->"); if (cut < 0) throw new Error("build: src/shell/index.html needs a <!--__BODY__--> marker");
   const head = shell.slice(0, cut).replace('/*__FONTS__*/', fontFaces());
   const out = `<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n${head}</head>\n<body>\n${shell.slice(cut)}\n<script>\n'use strict';\n${js}</script>\n</body>\n</html>\n`;
   mkdirSync(join(root, 'dist'), { recursive: true });

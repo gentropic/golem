@@ -70,13 +70,14 @@ function blockHtml(b) {
 /* ── a card ── */
 export function cardEl(c) {
   const el = document.createElement('article');
-  el.className = 'card'; el.dataset.id = c.id;
+  el.className = 'card'; el.dataset.id = c.id; el.dataset.rung = c.rung;
   const r = c.res, read = r.read.map(x => typeof x === 'string' ? escHtml(x) : x.alts ? `<button class="slot" type="button" data-act="slot" data-key="${x.key}" title="Tap to change this reading">${escHtml(x.v)}</button>` : `<span class="slot">${escHtml(x.v)}</span>`).join(' ');
   const ask = r.ask ? `<div class="note">${escHtml(r.ask.prompt)}</div>${r.ask.options.length ? `<div class="opts">${r.ask.options.map((o, i) => `<button class="btn" type="button" data-act="answer" data-i="${i}">${escHtml(o.label)}</button>`).join('')}${r.ask.parse ? '<span class="sub">or type it</span>' : ''}</div>` : ''}` : '';
-  el.innerHTML = `<div class="chead"><span>#${pad(c.id)}</span><span class="rung ${c.rung}">${RUNG[c.rung]}</span>${c.amends ? `<span>from #${pad(c.amends)}</span>` : ''}<span class="ms">${c.ms < 10 ? c.ms.toFixed(1) : Math.round(c.ms)} ms</span></div>
-    <div class="q">${escHtml(c.raw)}</div>${read ? `<div class="read"><span class="lbl">read as</span> ${read}</div>` : ''}
+  el.innerHTML = `<div class="q">${escHtml(c.raw)}</div>
+    <div class="reply"><div class="chead"><span class="rung ${c.rung}">${RUNG[c.rung]}</span><span>#${pad(c.id)}</span>${c.amends ? `<span>from #${pad(c.amends)}</span>` : ''}<span class="ms">${c.ms < 10 ? c.ms.toFixed(1) : Math.round(c.ms)} ms</span></div>
+    ${read ? `<div class="read"><span class="lbl">read as</span> ${read}</div>` : ''}
     <div class="ans">${r.body.map(blockHtml).join('')}${ask}</div>
-    <details class="trace"><summary>plan · ${r.trace.length} step${r.trace.length === 1 ? '' : 's'}</summary><ol>${r.trace.map(t => `<li>${escHtml(t)}</li>`).join('')}</ol></details>`;
+    <details class="trace"><summary>plan · ${r.trace.length} step${r.trace.length === 1 ? '' : 's'}</summary><ol>${r.trace.map(t => `<li>${escHtml(t)}</li>`).join('')}</ol></details></div>`;
   const figs = r.body.filter(b => b.t === 'figure');
   el.querySelectorAll('canvas[data-fig]').forEach((cv, i) => { try { drawFigure(cv, figs[i]); } catch (e) { cv.replaceWith(Object.assign(document.createElement('div'), { className: 'note err', textContent: `The figure could not be drawn: ${e.message}` })); } });
   return el;

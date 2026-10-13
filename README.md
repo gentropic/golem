@@ -87,10 +87,10 @@ src/engine/                  no DOM, no storage: everything that reads and compu
   index.js                   the surface Node tests import
 src/vendor/                  copies, never edited here: @gcu/dispatch (the parser), @gcu/bearing, @gcu/sadpan, @gcu/recon, @gcu/sift, @gcu/wmm, @gcu/units (tables only), @gcu/plan (calendar and holidays only), @gcu/sheet, @gcu/dm, @gcu/ipynb (its substitution table), @gcu/adder, @gcu/natra with @gcu/atra and alpack, @gcu/scitra, @gcu/line, @gcu/learn (with @gcu/mimic-io), @gcu/plot and their adder bridges (inside the Python worker only, assembled by `pyWorkerSource()` in build.mjs), the lead-acid shim
 src/shell/                   the browser: markup, rendering, wiring, storage
-  index.html                 markup, Switchboard tokens, styles, bench notes
+  index.html                 markup, Switchboard tokens, styles, the about page
   fonts/                     Barlow and Space Mono (OFL), embedded by the build
   render.js                  blocks and plots to markup
-  main.js                    tabs, drawer, storage, the sleep switch
+  main.js                    sidebar (a drawer when narrow), views, theme, storage, the sleep switch
 test/engine.test.mjs         engine tests, Node only
 test/files.test.mjs          a real CSV: recon typing, table questions, table nouns, replay (fixture in test/fixtures/)
 test/structure.test.mjs      the structural geometry and declination checks from the skills spec

@@ -5,18 +5,20 @@ import { submit, flipSlot, answer, seedExamples, openFile, openBinary } from '..
 import { BINARY } from '../engine/formats.js';
 import { setRunner, onJobDone } from '../engine/core.js';
 import { sessions, current, newSession, openSession, renameSession, deleteSession, searchHistory, serialize, hydrate, onChange } from '../engine/sessions.js';
-import { skills, PACKS, SUGGESTIONS } from '../engine/skills.js';
+import { skills, PACKS, STARTERS } from '../engine/skills.js';
 import { shell } from '../vendor/leadacid.js';
 import { escHtml, pad, cardEl } from './render.js';
 
 const $ = id => document.getElementById(id);
-const KEY = 'golem.mock.v2';
+const KEY = 'golem.mock.v2', THEME = 'golem.theme';
+const narrow = () => window.matchMedia('(max-width: 860px)').matches;
 let awake = true, statusT;
 
 function status(msg) { $('status').textContent = msg; clearTimeout(statusT); statusT = setTimeout(() => { $('status').textContent = ''; }, 5000); }
 function showTab(t) {
-  ['ask', 'skills', 'packs'].forEach(k => { $('v-' + k).hidden = k !== t; });
+  ['ask', 'skills', 'packs', 'about'].forEach(k => { $('v-' + k).hidden = k !== t; });
   document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === t));
+  document.querySelectorAll('.navbtn[data-tab]').forEach(b => b.setAttribute('aria-current', b.dataset.tab === t));
 }
 function tick() {
   document.querySelectorAll('[data-end]').forEach(el => {
@@ -31,10 +33,11 @@ function renderBar() { $('sname').textContent = current().name; }
 function renderStream(focus) {
   $('stream').innerHTML = '';
   S.cards.forEach(c => $('stream').appendChild(cardEl(c)));
-  $('exlbl').hidden = !current().example; tick(); renderBar(); renderPacks(); showTab('ask');
+  $('exlbl').hidden = !current().example; welcome(); tick(); renderBar(); renderPacks(); showTab('ask');
   const el = focus && $('stream').querySelector(`[data-id="${focus}"]`);
-  if (el) el.scrollIntoView({ block: 'start' }); else $('v-ask').scrollTop = 0;
+  if (el) el.scrollIntoView({ block: 'start' }); else $('v-ask').scrollTop = S.cards.length > 1 ? $('v-ask').scrollHeight : 0;
 }
+function welcome() { $('welcome').hidden = S.cards.length > 0; }
 function replaceCard(c) { const old = $('stream').querySelector(`[data-id="${c.id}"]`); if (old) old.replaceWith(cardEl(c)); }
 function run(raw) {
   if (!awake) { status('Asleep. Tap wake at the top right.'); return; }
@@ -47,16 +50,16 @@ function show(o) {
     case 'drawer': openDrawer(); break;
     case 'rename': status(`Session named “${o.name}”.`); break;
     case 'answered': replaceCard(o.card); status(`Answered #${pad(o.card.id)}: ${o.label}`); break;
-    case 'undo': { const el = $('stream').querySelector(`[data-id="${o.card.id}"]`); if (el) el.remove(); status(`Removed #${pad(o.card.id)}: ${o.card.raw}`); break; }
+    case 'undo': { const el = $('stream').querySelector(`[data-id="${o.card.id}"]`); if (el) el.remove(); welcome(); status(`Removed #${pad(o.card.id)}: ${o.card.raw}`); break; }
     case 'nothing': status(o.msg); break;
-    case 'card': { const el = cardEl(o.card); $('stream').appendChild(el); showTab('ask'); el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); break; }
+    case 'card': { const el = cardEl(o.card); $('stream').appendChild(el); welcome(); showTab('ask'); el.scrollIntoView({ block: 'start', behavior: 'smooth' }); break; }
   }
   tick(); renderPacks();
 }
 
 /* ── catalog and packs ── */
 function renderSkills() {
-  const rows = skills(), live = rows.filter(s => s.live).length; let h = `<div class="sub">${live} skills run in this mock. ${rows.length - live} more are planned from packages that already exist or are named here. Tap an example to run it.</div>`, g = '';
+  const rows = skills(), live = rows.filter(s => s.live).length; let h = `<h1 class="vhead">Skills</h1><div class="sub">${live} skills run in this mock. ${rows.length - live} more are planned from packages that already exist or are named here. Tap an example to run it.</div>`, g = '';
   rows.forEach(s => {
     if (s.group !== g) { h += `<div class="lbl">${escHtml(s.group)}</div>`; g = s.group; }
     h += `<div class="item"><h3>${escHtml(s.title)} <span class="tag ${s.live ? 'live' : 'plan'}">${s.live ? 'in mock' : 'planned'}</span></h3><p>${escHtml(s.about)}</p><div class="from">${escHtml(s.on)}</div>${s.examples.length ? `<div class="opts">${s.examples.map(x => `<button class="chip" type="button" data-q="${escHtml(x)}" style="white-space:normal;text-align:left">${escHtml(x)}</button>`).join('')}</div>` : ''}</div>`;
@@ -65,7 +68,7 @@ function renderSkills() {
 }
 function renderPacks() {
   const lab = { live: 'in mock', samp: 'sample in mock', plan: 'not wired' };
-  let h = '<div class="sub">golem knows what its installed packs hold. These are the gcu-library entries plus packs worth adding.</div><div class="lbl">Library</div>';
+  let h = '<h1 class="vhead">Packs and this device</h1><div class="sub">golem knows what its installed packs hold. These are the gcu-library entries plus packs worth adding.</div><div class="lbl">Library</div>';
   PACKS.forEach(([id, name, meta, st, d]) => { h += `<div class="item"><h3>${escHtml(name)} <span class="tag ${st}">${lab[st]}</span></h3><p>${escHtml(d)}</p><div class="from">${escHtml(id)} · ${escHtml(meta)}</div></div>`; });
   const al = Object.entries(S.aliases);
   h += `<div class="lbl">On this device</div><div class="item"><h3>Taught words</h3><p>${al.length ? al.map(([k, v]) => `${escHtml(k)} → ${escHtml(v)}`).join('<br>') : 'None yet. Try “pop means population”.'}</p></div><div class="item"><h3>Notes</h3><p>${S.facts.length ? S.facts.map(escHtml).join('<br>') : 'None yet. Try “remember that …”.'}</p></div><div class="item"><h3>Open table</h3><p>${S.table ? `${escHtml(S.table.name)} · ${S.table.rows.length} rows · ${S.table.source === 'sample' ? 'sample data' : 'from your files'}` : 'None.'}</p></div><div class="item"><h3>Files on this device</h3><p>${Object.values(S.files).length ? Object.values(S.files).map(f => `${escHtml(f.name)} · ${(f.size / 1024).toFixed(0)} kB`).join('<br>') : 'None yet. Tap the paperclip to open a CSV.'}</p></div>`;
@@ -79,22 +82,36 @@ function renderDrawer() {
   const q = $('hq').value.trim(); let h;
   if (q) {
     const hits = searchHistory(q);
-    h = `<div class="lbl">${hits.length} match${hits.length === 1 ? '' : 'es'} in history</div>` + hits.slice(0, 40).map(({ session: s, card: c }) => `<div class="srow"><button class="open" type="button" data-s="${s.id}" data-c="${c.id}" style="font:13px var(--mono)">&gt; ${escHtml(c.raw)}</button><div class="meta"><span>${escHtml(s.name)}</span></div></div>`).join('');
+    h = `<div class="lbl">${hits.length} match${hits.length === 1 ? '' : 'es'} in history</div>` + hits.slice(0, 40).map(({ session: s, card: c }) => `<div class="srow"><button class="open hit" type="button" data-s="${s.id}" data-c="${c.id}">&gt; ${escHtml(c.raw)}</button><div class="meta"><span>${escHtml(s.name)}</span></div></div>`).join('');
   } else {
-    const cur = current();
-    h = '<div class="lbl">Sessions</div>' + [...sessions()].sort((x, y) => y.updated - x.updated || y.id - x.id).map(s => `<div class="srow" aria-current="${s === cur}">${ren === s.id ? `<input class="ren" data-id="${s.id}" value="${escHtml(s.name)}" aria-label="Session name. Leave empty to name it automatically.">` : `<button class="open" type="button" data-s="${s.id}">${escHtml(s.name)}</button>`}<div class="meta"><span>${s.cards.length} card${s.cards.length === 1 ? '' : 's'} · ${when(s.updated)}</span>${s.auto ? '<span class="tag plan">auto name</span>' : ''}${s.example ? '<span class="tag samp">example</span>' : ''}<button class="link" type="button" data-ren="${s.id}">rename</button><button class="link" type="button" data-del="${s.id}">${del === s.id ? 'confirm delete' : 'delete'}</button></div></div>`).join('');
+    const cur = current(), day = 864e5, today = new Date().setHours(0, 0, 0, 0), age = t => t >= today ? 'Today' : t >= today - 6 * day ? 'This week' : 'Earlier';
+    let g = ''; h = '';
+    [...sessions()].sort((x, y) => y.updated - x.updated || y.id - x.id).forEach(s => {
+      if (age(s.updated) !== g) { g = age(s.updated); h += `<div class="lbl">${g}</div>`; }
+      const name = ren === s.id ? `<input class="ren" data-id="${s.id}" value="${escHtml(s.name)}" aria-label="Session name. Leave empty to name it automatically.">` : `<button class="open" type="button" data-s="${s.id}" title="${escHtml(s.name)}">${escHtml(s.name)}</button>`;
+      h += `<div class="srow" aria-current="${s === cur}">${name}<div class="meta"><span>${s.cards.length} card${s.cards.length === 1 ? '' : 's'} · ${when(s.updated)}</span>${s.example ? '<span class="tag samp">example</span>' : ''}<span class="acts"><button class="link" type="button" data-ren="${s.id}">rename</button><button class="link" type="button" data-del="${s.id}">${del === s.id ? 'confirm delete' : 'delete'}</button></span></div></div>`;
+    });
   }
   $('dlist').innerHTML = h;
   const i = $('dlist').querySelector('.ren'); if (i) { i.focus(); i.select(); }
 }
-function openDrawer() { ren = del = null; $('hq').value = ''; renderDrawer(); $('drawer').hidden = false; $('scrim').hidden = false; }
-function closeDrawer() { $('drawer').hidden = true; $('scrim').hidden = true; }
+// on a wide screen the sidebar is always there; on a narrow one it slides over the stream
+function openDrawer() { ren = del = null; renderDrawer(); if (narrow()) $('app').classList.add('nav'); else $('hq').focus(); }
+function closeDrawer() { $('app').classList.remove('nav'); }
 function commitName(inp) { ren = null; renameSession(+inp.dataset.id, inp.value); renderDrawer(); }
 
 /* ── storage ── */
 function persist() { try { localStorage.setItem(KEY, JSON.stringify(serialize())); } catch (e) { /* storage is optional */ } }
 function restore() { try { return hydrate(JSON.parse(localStorage.getItem(KEY))); } catch (e) { return false; } }
-onChange(() => { renderBar(); persist(); });
+onChange(() => { renderBar(); persist(); if (!$('hq').value.trim() && ren == null) renderDrawer(); });
+
+/* ── theme: auto follows the system; a choice is kept on this device ── */
+const THEMES = ['auto', 'light', 'dark'];
+let theme = 'auto';
+function applyTheme(t) { if (t === 'auto') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = t; $('theme-k').textContent = t; }
+try { const t = localStorage.getItem(THEME); if (THEMES.includes(t)) theme = t; } catch (e) { /* storage is optional */ }
+applyTheme(theme);
+$('theme').addEventListener('click', () => { theme = THEMES[(THEMES.indexOf(theme) + 1) % 3]; applyTheme(theme); try { localStorage.setItem(THEME, theme); } catch (e) { /* storage is optional */ } });
 
 /* ── wiring ── */
 /* ── Python: adder in a fresh Web Worker per run, built from the page itself; no network ── */
@@ -124,8 +141,9 @@ $('file').addEventListener('change', e => {
   e.target.value = '';
 });
 document.querySelector('.tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) showTab(b.dataset.tab); });
+document.querySelector('.sfoot').addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (b) { showTab(b.dataset.tab); closeDrawer(); } });
+$('starts').addEventListener('click', e => { const b = e.target.closest('[data-q]'); if (b) run(b.dataset.q); });
 $('v-skills').addEventListener('click', e => { const b = e.target.closest('[data-q]'); if (b) run(b.dataset.q); });
-$('sugg').addEventListener('click', e => { const b = e.target.closest('[data-q]'); if (b) run(b.dataset.q); });
 $('stream').addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if (!b) return;
   const c = S.cards.find(x => x.id === +b.closest('.card').dataset.id), act = b.dataset.act;
@@ -145,7 +163,7 @@ $('stream').addEventListener('click', e => {
   tick(); renderPacks();
 });
 $('power').addEventListener('click', () => {
-  awake = !awake; $('phone').classList.toggle('asleep', !awake); $('st-on').textContent = awake ? 'awake' : 'asleep'; $('q').disabled = !awake;
+  awake = !awake; $('app').classList.toggle('asleep', !awake); $('st-on').textContent = awake ? 'awake' : 'asleep'; $('q').disabled = !awake;
   $('power').textContent = awake ? 'sleep' : 'wake'; $('power').setAttribute('aria-pressed', String(!awake));
   status(awake ? 'Awake.' : 'Asleep. Nothing runs until you wake it.');
 });
@@ -153,14 +171,14 @@ $('menu').addEventListener('click', openDrawer);
 $('sname').addEventListener('click', openDrawer);
 $('dclose').addEventListener('click', closeDrawer);
 $('scrim').addEventListener('click', closeDrawer);
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('drawer').hidden) closeDrawer(); });
-$('newsess').addEventListener('click', () => { newSession(); renderStream(); closeDrawer(); status('New session.'); $('q').focus(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
+$('newsess').addEventListener('click', () => { newSession(); renderStream(); renderDrawer(); closeDrawer(); status('New session.'); $('q').focus(); });
 $('hq').addEventListener('input', renderDrawer);
 $('dlist').addEventListener('keydown', e => { if (e.target.classList.contains('ren') && e.key === 'Enter') commitName(e.target); });
 $('dlist').addEventListener('focusout', e => { if (e.target.classList.contains('ren') && ren != null) commitName(e.target); });
 $('dlist').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
-  if (b.dataset.s) { openSession(+b.dataset.s); renderStream(b.dataset.c); closeDrawer(); }
+  if (b.dataset.s) { openSession(+b.dataset.s); renderStream(b.dataset.c); renderDrawer(); closeDrawer(); }
   else if (b.dataset.ren) { ren = +b.dataset.ren; del = null; renderDrawer(); }
   else if (b.dataset.del) {
     const id = +b.dataset.del;
@@ -168,11 +186,11 @@ $('dlist').addEventListener('click', e => {
     deleteSession(id); del = null; renderStream(); renderDrawer();
   }
 });
-$('sugg').innerHTML = SUGGESTIONS.map(x => `<button class="chip" type="button" data-q="${escHtml(x)}">${escHtml(x)}</button>`).join('');
+$('starts').innerHTML = STARTERS.map(([t, q]) => `<button class="start" type="button" data-q="${escHtml(q)}"><b>${escHtml(t)}</b><span>${escHtml(q)}</span></button>`).join('');
 
 /* ── start: restore saved sessions, or seed two examples ── */
 renderSkills();
 if (shell.present) $('st-where').textContent = 'in the lead-acid shell';
 if (!restore()) seedExamples();
-renderStream();
+renderStream(); renderDrawer();
 $('status').textContent = '';

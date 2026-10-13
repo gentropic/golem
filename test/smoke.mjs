@@ -77,7 +77,7 @@ console.log(`${nameOk ? 'ok  ' : 'FAIL'} session auto-name: ${name}`);
 await page.reload(); await page.waitForSelector('#stream .card');
 const kept = await page.locator('#stream .card').count();
 console.log(`${kept === 22 ? 'ok  ' : 'FAIL'} session replays after reload: ${kept} cards`);
-const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+const overflow = await page.evaluate(() => Math.max(...[document.documentElement, document.getElementById('v-ask')].map(e => e.scrollWidth - e.clientWidth)));
 console.log(`${overflow <= 0 ? 'ok  ' : 'FAIL'} no horizontal overflow at 420 px`);
 // a real file through the picker, then a table question on it
 await page.setInputFiles('#file', join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'holes.csv'));

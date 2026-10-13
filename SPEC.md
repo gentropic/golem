@@ -302,7 +302,7 @@ Default to the user-confirms route: the app then requests no dangerous permissio
 - **Dashed slot** = an ambiguous reading the user can flip. Solid slot = an unambiguous one.
 - **Dock:** status line, a row of example chips, the input.
 - **Tabs:** Ask, Skills (catalog; examples run on tap), Packs (library, plus device state: taught words, notes, open table).
-- **Menu drawer:** new session, session list with rename and two-step delete, history search.
+- **Sessions sidebar:** new session, session list grouped by age, rename and two-step delete, history search. On a wide screen it stays beside the conversation; on a narrow one it is a drawer over it.
 - **The off switch.** The top-right control reads *sleep*. Tapping it puts golem to sleep: input disabled, nothing runs, the control reads *wake*. Plain words, no theatre.
 
 ---
@@ -318,7 +318,7 @@ Default to the user-confirms route: the app then requests no dangerous permissio
 
 ## 12. The mock today
 
-`dist/golem.html` is a working mock: a phone-shaped app plus bench notes. `npm test` drives it through 27 queries.
+`dist/golem.html` is a working mock: an app with a session sidebar and a centred conversation on wide screens, and the handset layout (drawer, stream, composer, tabs) on narrow ones. `npm test` drives it through 27 queries.
 
 **Real, computed in the page:** unit conversion with dimension checks; arithmetic by recursive descent (no `eval`); dates; true thickness and the equal-area stereonet; histogram; the Strunk checker (15 patterns from rules 11 to 13 of the 1918 edition); every reading, amendment, taught word, note, session, name and replay.
 

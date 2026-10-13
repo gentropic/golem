@@ -1,8 +1,8 @@
 <title>GCU golem</title>
 <style>
 /*__FONTS__*/
-/* Layout: one handset running the instrument on the left, the bench notes beside it; stacks on narrow screens.
-   Tokens are @gcu/switchboard 1.3 (equipment gray / basalt). Barlow speaks to people, Space Mono is the machine. */
+/* Layout: an app. Wide screens get a session sidebar and a centred conversation; narrow screens get the handset:
+   a drawer, the stream, the composer and tabs. Tokens are @gcu/switchboard 1.3 (equipment gray / basalt). Barlow speaks to people, Space Mono is the machine. */
 :root{
   --sw-bg-deep:#C2C1BE;--sw-bg:#D2D1CE;--sw-bg-raised:#E4E3E1;--sw-bg-bright:#EDECEB;
   --sw-text:#232322;--sw-text-mid:#504F4C;--sw-text-soft:#5A5856;
@@ -36,222 +36,281 @@
 
 *{box-sizing:border-box}
 [hidden]{display:none!important}
-body{background:var(--au-surface-deep);color:var(--au-fg);font:15px/1.45 var(--sans);margin:0}
-button,input{font:inherit;color:inherit}
+html,body{height:100%}
+body{background:var(--au-surface);color:var(--au-fg);font:15px/1.5 var(--sans);margin:0;overflow:hidden}
+button,input,textarea{font:inherit;color:inherit}
 button{cursor:pointer}
 :focus-visible{outline:2px solid var(--au-action);outline-offset:1px}
-.wrap{max-width:1120px;margin:0 auto;padding-inline:16px;padding-block:20px 40px;display:grid;gap:18px}
-.mast{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 16px}
-.mast h1{font:700 26px/1 var(--sans);letter-spacing:.02em;margin:0;text-transform:lowercase}
-.mast p{margin:0;color:var(--au-fg-muted);max-width:62ch}
-.bench{display:grid;grid-template-columns:minmax(0,410px) minmax(0,1fr);gap:22px;align-items:start}
-@media (max-width:860px){.bench{grid-template-columns:minmax(0,1fr)}}
+::selection{background:var(--au-action-soft)}
 
-/* handset */
-.phone{position:relative;background:var(--au-surface);border:1px solid var(--au-rule);border-radius:6px;height:min(800px,88vh);min-height:520px;
-  display:grid;grid-template-rows:auto minmax(0,1fr) auto auto;overflow:hidden}
-.bar{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--au-surface-raised);border-bottom:1px solid var(--au-border)}
-.power{background:var(--au-surface-bright);border:1px solid var(--au-border);border-radius:var(--r);padding:2px 10px;min-height:34px;
-  font:600 13px/1.2 var(--sans);color:var(--au-success);transition:color var(--dur) var(--ease)}
-.asleep .power{color:var(--au-fg-soft)}
-.brand{font:700 15px var(--mono);letter-spacing:.04em}
-.steps{margin:0;padding-left:20px;font:12.5px/1.6 var(--mono)}
-.fig{margin:8px 0}.fig canvas{display:block;width:100%;height:auto;border-radius:var(--r);border:1px solid var(--au-rule)}.fig figcaption{font:12px var(--mono);color:var(--au-fg-muted);margin-top:4px}
-.hbars{display:grid;grid-template-columns:auto 1fr auto;gap:4px 8px;align-items:center;margin:6px 0;font:12px var(--mono)} .hbars .hb{display:contents} .hbars .hk{color:var(--au-fg-muted);white-space:nowrap;max-width:9em;overflow:hidden;text-overflow:ellipsis} .hbars .hbar{height:10px;background:var(--au-surface-bright);border-radius:2px;overflow:hidden} .hbars .hbar i{display:block;height:100%;background:var(--au-info)} .hbars .hv{text-align:right}
-.attach{background:var(--au-surface-bright);border:1px solid var(--au-border);border-radius:var(--r);min-height:34px;padding:0 8px;cursor:pointer;margin-right:6px} .plain{margin:0;padding-left:18px} .marked{color:var(--au-fg)}
-.stat{font:11px var(--mono);color:var(--au-fg-muted);line-height:1.3}
-.icon{background:var(--au-surface-bright);border:1px solid var(--au-border);border-radius:var(--r);width:38px;height:34px;display:grid;place-items:center;flex:none;padding:0}
-.icon svg{stroke:var(--au-fg);stroke-width:2;stroke-linecap:square}
+/* the frame: sidebar | main */
+.app{display:grid;grid-template-columns:272px minmax(0,1fr);height:100vh;height:100dvh}
+.side{background:var(--au-surface-deep);border-right:1px solid var(--au-border);display:grid;grid-template-rows:auto auto auto minmax(0,1fr) auto;gap:10px;padding:12px 10px 10px;min-width:0;overflow:hidden}
+.main{display:grid;grid-template-rows:auto minmax(0,1fr) auto auto;min-width:0;min-height:0;position:relative}
+.scrim{display:none}
+.tabs{display:none}
+.only-narrow{display:none!important}
+@media (max-width:860px){
+  .app{grid-template-columns:minmax(0,1fr)}
+  .side{position:fixed;inset:0 auto 0 0;width:min(320px,86vw);z-index:21;transform:translateX(-102%);visibility:hidden;transition:transform var(--dur) var(--ease),visibility 0s linear var(--dur);border-right-color:var(--au-rule)}
+  .app.nav .side{transform:none;visibility:visible;transition:transform var(--dur) var(--ease)}
+  .app.nav .scrim{display:block;position:fixed;inset:0;background:var(--au-surface-deep);opacity:.72;z-index:20}
+  .tabs{display:grid}
+  .only-narrow{display:revert!important}
+  .only-wide{display:none!important}
+}
+
+/* sidebar */
+.brandrow{display:flex;align-items:center;gap:8px;padding:2px 4px 4px;min-height:36px}
+.brand{font:700 18px/1 var(--mono);letter-spacing:.02em;text-transform:lowercase}
+.brand i{display:inline-block;width:9px;height:9px;background:var(--au-action);margin-right:8px;vertical-align:1px}
+.brandrow .grow{flex:1}
+.newbtn{display:flex;align-items:center;gap:8px;width:100%;background:var(--au-surface-raised);border:1px solid var(--au-border);border-radius:6px;padding:8px 10px;font:600 14px var(--sans);text-align:left}
+.newbtn:hover{border-color:var(--au-rule);background:var(--au-surface-bright)}
+.newbtn svg,.navbtn svg,.ibtn svg{stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.side input{width:100%;background:var(--au-surface);border:1px solid var(--au-border);border-radius:6px;padding:7px 10px;font:13px var(--mono)}
+.dlist{overflow-y:auto;display:grid;gap:1px;align-content:start;margin-inline:-4px;padding-inline:4px;scrollbar-width:thin}
+.dlist .lbl{padding:12px 8px 4px}
+.dlist .lbl:first-child{padding-top:2px}
+.srow{border-radius:6px;padding:6px 8px;display:grid;gap:1px;min-width:0}
+.srow:hover{background:var(--au-surface)}
+.srow[aria-current="true"]{background:var(--au-surface-raised);box-shadow:inset 2px 0 0 var(--au-selected)}
+.srow .open{background:none;border:0;padding:0;text-align:left;font:500 14px/1.35 var(--sans);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.srow .open.hit{white-space:normal;font:13px/1.4 var(--mono);overflow-wrap:anywhere}
+.srow .meta{font:11px var(--mono);color:var(--au-fg-soft);display:flex;gap:2px 10px;flex-wrap:wrap;align-items:center}
+.srow .acts{display:none;gap:10px}
+.srow:hover .acts,.srow[aria-current="true"] .acts,.srow:focus-within .acts{display:inline-flex}
+@media (hover:none){.srow .acts{display:inline-flex}}
+.srow .ren{width:100%;font:500 14px var(--sans);padding:3px 6px}
+.sfoot{display:grid;gap:2px;border-top:1px solid var(--au-border);padding-top:8px}
+.navbtn{display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;border-radius:6px;padding:7px 8px;font:500 14px var(--sans);color:var(--au-fg-muted);text-align:left}
+.navbtn:hover{background:var(--au-surface);color:var(--au-fg)}
+.navbtn[aria-current="true"]{background:var(--au-surface-raised);color:var(--au-fg)}
+.navbtn .k{margin-left:auto;font:11px var(--mono);color:var(--au-fg-soft)}
+
+/* top bar */
+.top{display:flex;align-items:center;gap:10px;padding:8px 16px;min-height:54px;border-bottom:1px solid var(--au-border-soft)}
+.ibtn{background:none;border:1px solid transparent;border-radius:6px;width:36px;height:36px;display:grid;place-items:center;flex:none;padding:0;color:var(--au-fg-muted)}
+.ibtn:hover{background:var(--au-surface-raised);border-color:var(--au-border);color:var(--au-fg)}
 .ttl{min-width:0;flex:1;display:grid}
 .ttl>*{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.sbtn{background:none;border:0;padding:0;text-align:left;letter-spacing:0;font:700 14px var(--sans)}
-.scrim{position:absolute;inset:0;background:var(--au-surface-deep);opacity:.72;z-index:10}
-.drawer{position:absolute;inset:0 12% 0 0;z-index:11;background:var(--au-surface-raised);border-right:1px solid var(--au-rule);padding:10px;display:grid;gap:10px;grid-template-rows:auto auto auto minmax(0,1fr) auto;overflow:hidden}
-.drawer input{width:100%;background:var(--au-surface-bright);border:1px solid var(--au-rule);border-radius:var(--r);padding:8px 10px;font:13px var(--mono)}
-.dlist{overflow-y:auto;display:grid;gap:6px;align-content:start}
-.srow{border:1px solid var(--au-border);border-left:4px solid var(--au-border);border-radius:var(--r);background:var(--au-surface-bright);padding:7px 9px;display:grid;gap:4px;min-width:0}
-.srow[aria-current="true"]{border-left-color:var(--au-selected)}
-.srow .open{background:none;border:0;padding:0;text-align:left;font:600 14px var(--sans);overflow-wrap:anywhere}
-.srow .meta{font:11px var(--mono);color:var(--au-fg-soft);display:flex;gap:4px 10px;flex-wrap:wrap;align-items:center}
-.srow .link{font-size:11px}
+.sbtn{background:none;border:0;padding:0;text-align:left;font:600 15px/1.3 var(--sans)}
+.stat{font:11px/1.4 var(--mono);color:var(--au-fg-soft)}
 .stat b{color:var(--au-success);font-weight:700}
+.power{display:flex;align-items:center;gap:7px;background:var(--au-surface-raised);border:1px solid var(--au-border);border-radius:999px;padding:4px 12px 4px 10px;min-height:32px;font:600 13px/1.2 var(--sans);color:var(--au-fg-muted)}
+.power::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--au-success)}
+.asleep .power::before{background:var(--au-fg-soft)}
 .asleep .stat b{color:var(--au-fg-soft)}
-.view{overflow-y:auto;padding:10px;display:grid;gap:10px;align-content:start}
+
+/* views: one centred column */
+.view{overflow-y:auto;min-height:0;padding:24px max(16px,calc((100% - 780px) / 2)) 32px;display:grid;gap:12px;align-content:start}
 .asleep .view,.asleep .dock{opacity:.45}
 .lbl{font:700 10.5px var(--mono);letter-spacing:.09em;text-transform:uppercase;color:var(--au-fg-soft)}
-.rowhead{display:flex;justify-content:space-between;align-items:center;gap:8px}
-.link{background:none;border:0;padding:2px 0;color:var(--au-info);font:12px var(--mono);text-decoration:underline}
+.link{background:none;border:0;padding:2px 0;color:var(--au-info);font:11px var(--mono);text-decoration:underline}
+.vhead{font:600 22px/1.25 var(--sans);margin:4px 0 0}
+#stream{display:grid;gap:30px}
 
-/* readout card */
-.card{background:var(--au-surface-raised);border:1px solid var(--au-border);border-radius:var(--r);min-width:0}
-.card>*{padding-inline:10px}
-.chead{display:flex;align-items:center;gap:8px;padding-block:5px;border-bottom:1px solid var(--au-border-soft);font:11px var(--mono);color:var(--au-fg-soft)}
+/* welcome: an empty session */
+.welcome{display:grid;gap:18px;justify-items:center;text-align:center;padding:min(12vh,96px) 0 12px}
+.welcome .mark{font:700 34px/1 var(--mono);letter-spacing:.02em}
+.welcome .mark i{display:inline-block;width:16px;height:16px;background:var(--au-action);margin-right:12px;vertical-align:2px}
+.welcome p{margin:0;color:var(--au-fg-muted);max-width:46ch}
+.starts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;width:100%;max-width:640px;text-align:left;margin-top:6px}
+@media (max-width:520px){.starts{grid-template-columns:minmax(0,1fr)}}
+.start{background:var(--au-surface-raised);border:1px solid var(--au-border);border-radius:8px;padding:10px 12px;display:grid;gap:3px;text-align:left;min-width:0}
+.start:hover{border-color:var(--au-rule);background:var(--au-surface-bright)}
+.start b{font:600 13px var(--sans);color:var(--au-fg-muted)}
+.start span{font:12.5px/1.4 var(--mono);overflow-wrap:anywhere}
+
+/* a turn: the query, then golem's readout */
+.card{display:grid;gap:10px;min-width:0;--rc:var(--au-info)}
+.card[data-rung="context"]{--rc:var(--au-selected)} .card[data-rung="taught"]{--rc:var(--au-success)} .card[data-rung="none"]{--rc:var(--au-error)}
+.q{justify-self:end;max-width:min(88%,600px);background:var(--au-surface-raised);border:1px solid var(--au-border);border-radius:12px 12px 3px 12px;padding:8px 13px;font:14px/1.45 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere}
+.reply{border-left:2px solid var(--rc);padding:0 0 0 14px;display:grid;gap:6px;min-width:0}
+.chead{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;font:11px var(--mono);color:var(--au-fg-soft)}
 .chead .ms{margin-left:auto}
 .rung{font:700 10px var(--mono);letter-spacing:.07em;text-transform:uppercase;padding:1px 6px;border-radius:2px;border:1px solid currentColor}
 .rung.grammar{color:var(--au-info);background:var(--au-info-soft)}
 .rung.context{color:var(--au-selected);background:var(--au-selected-soft)}
 .rung.taught{color:var(--au-success);background:var(--au-success-soft)}
 .rung.none{color:var(--au-error);background:var(--au-error-soft)}
-.q{font:13px/1.4 var(--mono);padding-block:7px 3px;overflow-wrap:anywhere}
-.q::before{content:"> ";color:var(--au-fg-soft)}
-.read{display:flex;flex-wrap:wrap;align-items:center;gap:4px 5px;padding-block:3px 6px;font-size:13px;color:var(--au-fg-muted)}
-.slot{font:12px var(--mono);background:var(--au-surface-bright);border:1px solid var(--au-border);border-radius:2px;padding:1px 6px;color:var(--au-fg)}
+.read{display:flex;flex-wrap:wrap;align-items:center;gap:4px 5px;font-size:13.5px;color:var(--au-fg-muted)}
+.read .lbl{margin-right:2px}
+.slot{font:12px var(--mono);background:var(--au-surface-raised);border:1px solid var(--au-border);border-radius:2px;padding:1px 6px;color:var(--au-fg)}
 button.slot{border-style:dashed;border-color:var(--au-action);color:var(--au-action)}
 button.slot::after{content:" \21C4"}
-.ans{padding-block:4px 9px;display:grid;gap:8px;min-width:0}
-.big{font:700 24px/1.15 var(--mono);overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
-.big small{font:400 13px var(--mono);color:var(--au-fg-muted)}
-.sub{font-size:13px;color:var(--au-fg-muted)}
+.ans{padding-block:4px 2px;display:grid;gap:9px;min-width:0}
+.big{font:700 28px/1.15 var(--mono);overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.big small{font:400 14px var(--mono);color:var(--au-fg-muted)}
+.sub{font-size:14px;color:var(--au-fg-muted)}
+.marked{color:var(--au-fg)}
 .src{font:11px var(--mono);color:var(--au-fg-soft)}
-.note{font-size:13px;border-left:3px solid var(--au-warn);background:var(--au-warn-soft);padding:6px 8px;border-radius:0 2px 2px 0}
+.note{font-size:14px;border-left:3px solid var(--au-warn);background:var(--au-warn-soft);padding:7px 10px;border-radius:0 3px 3px 0}
 .note.err{border-color:var(--au-error);background:var(--au-error-soft)}
 .note.ok{border-color:var(--au-success);background:var(--au-success-soft)}
 .opts{display:flex;flex-wrap:wrap;gap:6px}
-.btn{background:var(--au-surface-bright);border:1px solid var(--au-border);border-radius:var(--r);padding:6px 10px;font:600 13px var(--sans);min-height:34px}
+.btn{background:var(--au-surface-raised);border:1px solid var(--au-border);border-radius:var(--r);padding:6px 11px;font:600 13px var(--sans);min-height:34px;text-decoration:none;display:inline-flex;align-items:center}
+.btn:hover{border-color:var(--au-rule)}
 .btn.go{background:var(--au-action);border-color:var(--au-action);color:var(--au-surface-bright)}
-.kv{display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 12px;font-size:13px;margin:0}
-.kv dt{font:11px/1.9 var(--mono);color:var(--au-fg-soft);text-transform:uppercase;letter-spacing:.05em}
+.chip{flex:none;max-width:100%;background:none;border:1px solid var(--au-border);border-radius:999px;padding:4px 11px;font:12px var(--mono);text-align:left;overflow-wrap:anywhere}
+.chip:hover{background:var(--au-surface-raised);border-color:var(--au-rule)}
+.kv{display:grid;grid-template-columns:auto minmax(0,1fr);gap:3px 14px;font-size:14px;margin:0}
+.kv dt{font:11px/2 var(--mono);color:var(--au-fg-soft);text-transform:uppercase;letter-spacing:.05em}
 .kv dd{margin:0;overflow-wrap:anywhere}
-.tbl{overflow-x:auto}
+.kv code{font:12.5px var(--mono)}
+.plain{margin:0;padding-left:18px}
+.steps{margin:0;padding-left:20px;font:12.5px/1.6 var(--mono)}
+.tbl{overflow-x:auto;border:1px solid var(--au-border-soft);border-radius:var(--r)}
 table{border-collapse:collapse;width:100%;font-size:13px}
-th{font:700 10.5px var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--au-fg-soft);text-align:left}
-th,td{padding:4px 8px 4px 0;border-bottom:1px solid var(--au-border-soft);vertical-align:top}
+th{font:700 10.5px var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--au-fg-soft);text-align:left;background:var(--au-surface-raised)}
+th,td{padding:5px 10px;border-bottom:1px solid var(--au-border-soft);vertical-align:top}
+tr:last-child td{border-bottom:0}
 td.n,th.n{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
-details.trace{border-top:1px solid var(--au-border-soft);padding-block:5px}
-details.trace summary{font:11px var(--mono);color:var(--au-fg-soft);cursor:pointer}
+details.trace summary{font:11px var(--mono);color:var(--au-fg-soft);cursor:pointer;width:max-content}
+details.trace summary:hover{color:var(--au-fg-muted)}
 details.trace ol{margin:6px 0 2px;padding-left:20px;font:12px/1.5 var(--mono);color:var(--au-fg-muted);overflow-wrap:anywhere}
-pre{margin:0;font:12px/1.5 var(--mono);background:var(--au-surface-deep);border:1px solid var(--au-border-soft);border-radius:2px;padding:8px;overflow-x:auto}
+pre{margin:0;font:12.5px/1.5 var(--mono);background:var(--au-surface-deep);border:1px solid var(--au-border-soft);border-radius:var(--r);padding:9px 11px;overflow-x:auto}
 mark{background:var(--au-warn-soft);color:var(--au-fg);border-bottom:2px solid var(--au-warn);padding:0 1px}
 svg{max-width:100%;height:auto;display:block}
 svg text{font:10px var(--mono);fill:var(--au-fg-muted)}
 .ax{stroke:var(--au-rule);fill:none} .grid{stroke:var(--au-border-soft);fill:none}
 .barfill{fill:var(--au-info)} .pt{fill:var(--au-action)} .ln{stroke:var(--au-info);fill:none;stroke-width:1.6}
-.ln2{stroke:var(--au-action);fill:none;stroke-dasharray:4 3} .pole{fill:var(--au-info)} .netbg{fill:var(--au-surface-bright);stroke:var(--au-rule)}
+.ln2{stroke:var(--au-action);fill:none;stroke-dasharray:4 3} .pole{fill:var(--au-info)} .netbg{fill:var(--au-surface-raised);stroke:var(--au-rule)}
+.fig{margin:4px 0}.fig canvas{display:block;width:100%;max-width:560px;height:auto;border-radius:var(--r);border:1px solid var(--au-rule)}.fig figcaption{font:12px var(--mono);color:var(--au-fg-muted);margin-top:4px}
+.hbars{display:grid;grid-template-columns:auto 1fr auto;gap:4px 8px;align-items:center;margin:2px 0;font:12px var(--mono);max-width:560px} .hbars .hb{display:contents} .hbars .hk{color:var(--au-fg-muted);white-space:nowrap;max-width:9em;overflow:hidden;text-overflow:ellipsis} .hbars .hbar{height:10px;background:var(--au-surface-raised);border-radius:2px;overflow:hidden} .hbars .hbar i{display:block;height:100%;background:var(--au-info)} .hbars .hv{text-align:right}
 
-/* dock */
-.dock{border-top:1px solid var(--au-border);background:var(--au-surface-raised);padding:7px 10px 9px;display:grid;gap:6px;min-width:0}
-#status{font:11px var(--mono);color:var(--au-fg-muted);min-height:15px}
-.sugg{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:thin}
-.chip{flex:none;background:var(--au-surface-bright);border:1px solid var(--au-border);border-radius:2px;padding:4px 8px;font:12px var(--mono);white-space:nowrap}
-.ask{display:flex;gap:6px}
-.ask textarea{flex:1;min-width:0;background:var(--au-surface-bright);color:inherit;border:1px solid var(--au-rule);border-radius:var(--r);padding:9px 10px;font:14px/1.3 var(--mono);resize:none;max-height:40vh;overflow:auto}
-.tabs{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--au-border);background:var(--au-surface-raised)}
+/* the composer */
+.dock{padding:6px max(16px,calc((100% - 780px) / 2)) 10px;display:grid;gap:6px;min-width:0}
+.composer{background:var(--au-surface-raised);border:1px solid var(--au-rule);border-radius:12px;padding:10px 8px 8px 14px;display:grid;gap:4px;transition:border-color var(--dur) var(--ease)}
+.composer:focus-within{border-color:var(--au-action)}
+.composer textarea{width:100%;background:none;border:0;outline:0;padding:2px 4px 2px 0;font:15px/1.45 var(--mono);resize:none;max-height:40vh;overflow:auto;min-height:24px}
+.composer textarea::placeholder{color:var(--au-fg-soft)}
+.crow{display:flex;align-items:center;gap:6px}
+.crow .grow{flex:1;font:11px var(--mono);color:var(--au-fg-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.send{width:34px;height:34px;border-radius:8px;border:0;background:var(--au-action);color:var(--au-surface-bright);display:grid;place-items:center;padding:0;flex:none}
+.send svg{stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+#status{font:11px var(--mono);color:var(--au-fg-muted);min-height:15px;text-align:center}
+#status:empty::before{content:attr(data-hint);color:var(--au-fg-soft)}
+.tabs{grid-template-columns:repeat(3,1fr);border-top:1px solid var(--au-border);background:var(--au-surface-raised);padding-bottom:env(safe-area-inset-bottom)}
 .tabs button{background:none;border:0;border-top:3px solid transparent;padding:9px 4px 10px;font:700 11px var(--mono);letter-spacing:.09em;text-transform:uppercase;color:var(--au-fg-soft)}
 .tabs button[aria-selected="true"]{color:var(--au-fg);border-top-color:var(--au-action)}
+@media (max-width:860px){
+  .top{padding:6px 10px;min-height:50px}
+  .view{padding:16px 12px 24px}
+  #stream{gap:22px}
+  .dock{padding:6px 10px 8px}
+  .big{font-size:24px}
+  .welcome{padding-top:min(5vh,32px)}
+  #status:empty::before{content:none}
+}
 
-/* catalog rows */
+/* skills, packs, about */
 .grp{display:grid;gap:6px}
-.item{background:var(--au-surface-raised);border:1px solid var(--au-border);border-radius:var(--r);padding:8px 10px;display:grid;gap:4px;min-width:0}
-.item h3{margin:0;font:600 14px var(--sans);display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.item{background:var(--au-surface-raised);border:1px solid var(--au-border);border-radius:8px;padding:10px 12px;display:grid;gap:5px;min-width:0}
+.item h3{margin:0;font:600 15px var(--sans);display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .tag{font:700 9.5px var(--mono);letter-spacing:.07em;text-transform:uppercase;padding:1px 5px;border-radius:2px;border:1px solid currentColor}
 .tag.live{color:var(--au-success)} .tag.plan{color:var(--au-fg-soft)} .tag.samp{color:var(--au-info)}
-.item p{margin:0;font-size:13px;color:var(--au-fg-muted)}
+.item p{margin:0;font-size:14px;color:var(--au-fg-muted)}
 .item .from{font:11px var(--mono);color:var(--au-fg-soft)}
-
-/* bench notes */
-.notes{display:grid;gap:22px;min-width:0}
+.view > .lbl{margin-top:10px}
+.notes{display:grid;gap:26px;min-width:0}
 .notes section{display:grid;gap:8px;min-width:0}
 .notes h2{margin:0;font:700 12px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--au-fg-muted);border-bottom:1px solid var(--au-rule);padding-bottom:5px}
-.notes p{margin:0;max-width:66ch}
-.notes ol,.notes ul{margin:0;padding-left:20px;display:grid;gap:5px;max-width:66ch}
-.notes code{font:12.5px var(--mono);background:var(--au-surface);padding:0 3px;border-radius:2px;overflow-wrap:anywhere}
+.notes p{margin:0}
+.notes ol,.notes ul{margin:0;padding-left:20px;display:grid;gap:5px}
+.notes code{font:12.5px var(--mono);background:var(--au-surface-raised);padding:0 3px;border-radius:2px;overflow-wrap:anywhere}
 .notes .rung{margin-right:4px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
+<!--__BODY__-->
+<div class="app" id="app">
+  <div class="scrim" id="scrim"></div>
+  <aside class="side" id="drawer" aria-label="Sessions and history">
+    <div class="brandrow"><span class="brand"><i aria-hidden="true"></i>golem</span><span class="grow"></span><button class="ibtn only-narrow" id="dclose" type="button" aria-label="Close the sidebar"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M4 4l10 10M14 4L4 14"/></svg></button></div>
+    <button class="newbtn" id="newsess" type="button"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v12M2 8h12"/></svg>New session</button>
+    <input id="hq" type="search" placeholder="Search every session" aria-label="Search history">
+    <div class="dlist" id="dlist"></div>
+    <nav class="sfoot" aria-label="golem">
+      <button class="navbtn only-wide" type="button" data-tab="skills"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12M2 8h12M2 13h7"/></svg>Skills</button>
+      <button class="navbtn only-wide" type="button" data-tab="packs"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 5l6-3 6 3-6 3-6-3zM2 5v6l6 3 6-3V5M8 8v6"/></svg>Packs and this device</button>
+      <button class="navbtn" type="button" data-tab="about"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M8 7v4M8 4.6v.1"/></svg>How golem reads</button>
+      <button class="navbtn" id="theme" type="button"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M8 2a6 6 0 0 0 0 12z" fill="currentColor"/></svg>Theme<span class="k" id="theme-k">auto</span></button>
+    </nav>
+  </aside>
 
-<div class="wrap">
-  <header class="mast">
-    <h1>golem</h1>
-    <p>A working mock of the GCU assistant. Nothing here calls a model: every answer comes from a parse you can see and a tool that computes.</p>
-  </header>
+  <main class="main" id="phone">
+    <header class="top">
+      <button class="ibtn only-narrow" id="menu" type="button" aria-label="Sessions and history"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M2 4h14M2 9h14M2 14h14"/></svg></button>
+      <div class="ttl"><button class="sbtn" id="sname" type="button" title="Sessions and history">New session</button><span class="stat">golem · <b id="st-on">awake</b> · <span id="st-where">offline</span> · 0 requests</span></div>
+      <button class="power" id="power" type="button" title="Put golem to sleep or wake it" aria-pressed="false">sleep</button>
+    </header>
 
-  <main class="bench">
-    <section class="phone" id="phone" aria-label="golem app mock">
-      <div class="bar">
-        <button class="icon" id="menu" type="button" aria-label="Sessions and history"><svg width="18" height="14" viewBox="0 0 18 14" aria-hidden="true"><path d="M1 2h16M1 7h16M1 12h16"/></svg></button>
-        <div class="ttl"><button class="sbtn" id="sname" type="button" title="Sessions and history">New session</button><span class="stat">golem · <b id="st-on">awake</b> · <span id="st-where">offline</span> · 0 requests</span></div>
-        <button class="power" id="power" title="Put golem to sleep or wake it" aria-pressed="false">sleep</button>
+    <div class="view" id="v-ask">
+      <div class="welcome" id="welcome" hidden>
+        <div class="mark"><i aria-hidden="true"></i>golem</div>
+        <p>Ask, compute, or act. Nothing here calls a model: every answer is a reading you can check and a tool that computes. If I cannot read something, I say so.</p>
+        <div class="starts" id="starts"></div>
       </div>
-      <div class="scrim" id="scrim" hidden></div>
-      <aside class="drawer" id="drawer" hidden aria-label="Sessions and history">
-        <div class="rowhead"><span class="brand">golem</span><button class="link" id="dclose" type="button">close</button></div>
-        <button class="btn go" id="newsess" type="button">New session</button>
-        <input id="hq" type="search" placeholder="search every session" aria-label="Search history">
-        <div class="dlist" id="dlist"></div>
-        <div class="src">A session is stored as its plan. Opening one replays it and gets the same answers.</div>
-      </aside>
-
-      <div class="view" id="v-ask">
-        <div class="lbl" id="exlbl" hidden>Example session</div>
-        <div id="stream" style="display:grid;gap:10px"></div>
+      <div class="lbl" id="exlbl" hidden>Example session</div>
+      <div id="stream"></div>
+    </div>
+    <div class="view" id="v-skills" hidden></div>
+    <div class="view" id="v-packs" hidden></div>
+    <div class="view" id="v-about" hidden>
+      <h1 class="vhead">How golem reads</h1>
+      <div class="notes">
+        <section>
+          <h2>A query, rung by rung</h2>
+          <p>Each answer shows which rung read the query and what it was read as. Dashed slots are ambiguous readings: tap one to flip it and the answer recomputes. The line down the left of an answer has the rung's colour.</p>
+          <ol>
+            <li><span class="rung context">context</span> An open question from golem, or an amendment of the last answer: <code>in feet</code>, <code>log scale</code>, <code>and chile</code>, <code>why</code>, <code>undo</code>.</li>
+            <li><span class="rung grammar">grammar</span> The controlled-English parse: the clause grammar of <code>@gcu/dispatch</code>, then rules for free text, dates and orientations.</li>
+            <li><span class="rung taught">taught</span> Phrases you taught on this device: <code>dens means density</code>.</li>
+            <li>The dispatch CRF, for loose phrasing. Not wired yet.</li>
+            <li><span class="rung none">no reading</span> It stops, shows the nearest skills, and offers to learn the word it did not know.</li>
+          </ol>
+          <p>Open <b>plan</b> under an answer to see every step that produced it.</p>
+        </section>
+        <section>
+          <h2>Sessions, history and names</h2>
+          <p>A session is saved as its plan: the list of tool calls and their arguments. Opening one replays the plan, so history costs a few hundred bytes and old answers stay reproducible. The search box in the sidebar looks through every session.</p>
+          <p>Names are computed. Each answer contributes a label from its tool and subject, weighted by how much work the tool does: a table question outweighs a unit conversion. The name updates as the session grows and stops when you name it yourself: <code>name this session friday lab run</code>.</p>
+          <p>A session can be saved as a recipe and run again on other tables or columns: <code>save this as a recipe called cu check</code>, then <code>run cu check for au</code>.</p>
+        </section>
+        <section>
+          <h2>Files</h2>
+          <p>The paperclip opens tables (CSV, TSV, xlsx, Parquet, Datamine .dm), drawings and geometry (DXF, WKT, GeoJSON, YAML) and documents (Markdown, text, HTML). Files stay on this device. Documents are searched by word: <code>find resurvey in my documents</code>.</p>
+        </section>
+        <section>
+          <h2>Hand-offs on Android</h2>
+          <p>In the lead-acid shell, golem fills in an event, a timer or a message and hands it to the app you already use; that app asks you to confirm. Nothing goes through a Google API or the network. In a browser the hand-off is simulated.</p>
+        </section>
+        <section>
+          <h2>What is real here</h2>
+          <ul>
+            <li>Computed in the page: units, arithmetic, dates, structure and the stereonet, tables and plots, conversions, document search, Python in a worker, all parsing, teaching and amendments.</li>
+            <li>Sample data is labelled as sample: <code>assays.csv</code> is synthetic, and the country figures are a rounded sample.</li>
+            <li>Out of scope by design: prose nobody authored a path to, such as essays, open translation, summaries in its own words and small talk. golem says it has no reading.</li>
+          </ul>
+        </section>
       </div>
-      <div class="view" id="v-skills" hidden></div>
-      <div class="view" id="v-packs" hidden></div>
+    </div>
 
-      <div class="dock">
-        <div id="status" aria-live="polite"></div>
-        <div class="sugg" id="sugg"></div>
-        <form class="ask" id="f" autocomplete="off">
-          <button class="attach" id="attach" type="button" title="Open a CSV or TSV from your files" aria-label="Open a file">📎</button><input type="file" id="file" accept=".csv,.tsv,.txt,.md,.markdown,.html,.htm,.xlsx,.xlsm,.dm,.parquet,.dxf,.yaml,.yml,.wkt,.geojson,text/csv,text/tab-separated-values,text/plain" hidden>
-          <textarea id="q" rows="1" placeholder="ask, compute, or act" aria-label="Query" enterkeyhint="go"></textarea>
-          <button class="btn go" type="submit">Run</button>
-        </form>
-      </div>
-      <nav class="tabs" role="tablist">
-        <button role="tab" data-tab="ask" aria-selected="true">Ask</button>
-        <button role="tab" data-tab="skills" aria-selected="false">Skills</button>
-        <button role="tab" data-tab="packs" aria-selected="false">Packs</button>
-      </nav>
-    </section>
-
-    <aside class="notes">
-      <section>
-        <h2>How a query is read</h2>
-        <p>Each card shows which rung read the query and what it was read as. Dashed slots are ambiguous readings: tap one to flip it and the answer recomputes.</p>
-        <ol>
-          <li><span class="rung context">context</span> An open question from golem, or an amendment of the last card: <code>in feet</code>, <code>log scale</code>, <code>and chile</code>, <code>why</code>, <code>undo</code>.</li>
-          <li><span class="rung grammar">grammar</span> The controlled-English parse (clause). In this mock it is a rule table.</li>
-          <li><span class="rung taught">taught</span> Phrases you taught on this device: <code>dens means density</code>.</li>
-          <li>The dispatch CRF, for loose phrasing. Not in this mock.</li>
-          <li><span class="rung none">no reading</span> It stops, shows the nearest skills, and offers to learn the word it did not know.</li>
-        </ol>
-      </section>
-
-      <section>
-        <h2>Sessions, history and names</h2>
-        <p>The menu button holds every session and a search across all of them. A session is saved as its plan: the list of tool calls and their arguments. Opening one replays the plan, so history costs a few hundred bytes and old answers stay reproducible.</p>
-        <p>Names are computed. Each card contributes a label from its tool and subject, weighted by how much work the tool does: a variogram outweighs a unit conversion. The name is the top one or two labels, prefixed with the table when one is open. It updates as the session grows and stops when you name it yourself: <code>name this session friday lab run</code>.</p>
-      </section>
-
-      <section>
-        <h2>Calendar and other Android hand-offs</h2>
-        <p>Adding to the calendar needs no Google API and no network. Android apps hand an event to whatever calendar app the user has, and that app syncs it through the user's own account.</p>
-        <div class="tbl"><table>
-          <tr><th>Action</th><th>Mechanism</th><th>Permission</th></tr>
-          <tr><td>Event, user confirms</td><td><code>Intent.ACTION_INSERT</code> on <code>CalendarContract.Events</code></td><td>none</td></tr>
-          <tr><td>Event, silent</td><td><code>CalendarContract</code> provider insert</td><td><code>WRITE_CALENDAR</code> (runtime prompt)</td></tr>
-          <tr><td>Timer, alarm</td><td><code>AlarmClock.ACTION_SET_TIMER</code> / <code>ACTION_SET_ALARM</code></td><td><code>SET_ALARM</code> (install-time)</td></tr>
-          <tr><td>Show on map</td><td><code>ACTION_VIEW</code> with a <code>geo:</code> URI</td><td>none</td></tr>
-          <tr><td>Dial, message, email</td><td><code>ACTION_DIAL</code>, <code>ACTION_SENDTO</code></td><td>none</td></tr>
-          <tr><td>New contact</td><td><code>ContactsContract.Intents.Insert</code></td><td>none</td></tr>
-          <tr><td>Share a result</td><td><code>ACTION_SEND</code></td><td>none</td></tr>
-        </table></div>
-        <p>The confirm-in-the-other-app route is the better default: golem fills the fields, the user presses save, and the app asks for no permissions. lead-acid's shim today has fetch, push streams, keep-awake, publish, share, attest and files. Hand-offs need one new native route that starts an intent from a small allowlist.</p>
-      </section>
-
-      <section>
-        <h2>What is real in this mock</h2>
-        <ul>
-          <li>Computed in the page: units, arithmetic, dates, true thickness and the stereonet, the histogram, the Strunk check, all parsing, teaching and amendments.</li>
-          <li>Sample data: <code>assays.csv</code> is synthetic. The Factbook figures are a rounded 14-country sample. The ODS entry points to a section and does not show the passage.</li>
-          <li>Simulated: the device hand-offs. The timer counts down in the page.</li>
-        </ul>
-      </section>
-
-      <section>
-        <h2>Out of scope by design</h2>
-        <p>Prose nobody authored a path to: essays, open translation, summaries in its own words, common-sense chat. golem says it has no reading. Everything else grows by adding tools and packs.</p>
-      </section>
-    </aside>
+    <div class="dock">
+      <form class="composer" id="f" autocomplete="off">
+        <textarea id="q" rows="1" placeholder="Ask, compute, or act" aria-label="Query" enterkeyhint="go"></textarea>
+        <div class="crow">
+          <button class="ibtn" id="attach" type="button" title="Open a file: a table, a drawing or a document" aria-label="Open a file"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M15 8.5l-6 6a3.5 3.5 0 0 1-5-5l6.5-6.5a2.3 2.3 0 0 1 3.3 3.3L7.4 12.6a1.1 1.1 0 0 1-1.6-1.6L11.5 5.3"/></svg></button><input type="file" id="file" accept=".csv,.tsv,.txt,.md,.markdown,.html,.htm,.xlsx,.xlsm,.dm,.parquet,.dxf,.yaml,.yml,.wkt,.geojson,text/csv,text/tab-separated-values,text/plain" hidden>
+          <span class="grow"><span class="only-wide">Enter runs · Shift+Enter for a new line</span></span>
+          <button class="send" id="send" type="submit" aria-label="Run" title="Run"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 13V3M3.5 7.5L8 3l4.5 4.5"/></svg></button>
+        </div>
+      </form>
+      <div id="status" aria-live="polite" data-hint="No model runs here. golem reads what you type, or says it cannot."></div>
+    </div>
+    <nav class="tabs" role="tablist">
+      <button role="tab" data-tab="ask" aria-selected="true">Ask</button>
+      <button role="tab" data-tab="skills" aria-selected="false">Skills</button>
+      <button role="tab" data-tab="packs" aria-selected="false">Packs</button>
+    </nav>
   </main>
 </div>
