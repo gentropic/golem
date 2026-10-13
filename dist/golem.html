@@ -59,6 +59,11 @@ button{cursor:pointer}
 .scrim{display:none}
 .tabs{display:none}
 .only-narrow{display:none!important}
+@media (min-width:861px){
+  .app.folded{grid-template-columns:minmax(0,1fr)}
+  .app.folded .side{display:none}
+  .app.folded #menu,.app.folded #newtop{display:grid!important}
+}
 @media (max-width:860px){
   .app{grid-template-columns:minmax(0,1fr)}
   .side{position:fixed;inset:0 auto 0 0;width:min(320px,86vw);z-index:21;transform:translateX(-102%);visibility:hidden;transition:transform var(--dur) var(--ease),visibility 0s linear var(--dur);border-right-color:var(--au-rule)}
@@ -75,6 +80,7 @@ button{cursor:pointer}
 .brand i{display:inline-block;width:9px;height:9px;background:var(--au-action);margin-right:8px;vertical-align:1px}
 .brandrow .grow{flex:1}
 .newbtn{display:flex;align-items:center;gap:8px;width:100%;background:var(--au-surface-raised);border:1px solid var(--au-border);border-radius:6px;padding:8px 10px;font:600 14px var(--sans);text-align:left}
+.newbtn .k{margin-left:auto;font:400 11px var(--mono);color:var(--au-fg-soft)}
 .newbtn:hover{border-color:var(--au-rule);background:var(--au-surface-bright)}
 .newbtn svg,.navbtn svg,.ibtn svg{stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
 .side input{width:100%;background:var(--au-surface);border:1px solid var(--au-border);border-radius:6px;padding:7px 10px;font:13px var(--mono)}
@@ -237,9 +243,9 @@ svg text{font:10px var(--mono);fill:var(--au-fg-muted)}
 <div class="app" id="app">
   <div class="scrim" id="scrim"></div>
   <aside class="side" id="drawer" aria-label="Sessions and history">
-    <div class="brandrow"><span class="brand"><i aria-hidden="true"></i>golem</span><span class="grow"></span><button class="ibtn only-narrow" id="dclose" type="button" aria-label="Close the sidebar"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M4 4l10 10M14 4L4 14"/></svg></button></div>
-    <button class="newbtn" id="newsess" type="button"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v12M2 8h12"/></svg>New session</button>
-    <input id="hq" type="search" placeholder="Search every session" aria-label="Search history">
+    <div class="brandrow"><span class="brand"><i aria-hidden="true"></i>golem</span><span class="grow"></span><button class="ibtn only-wide" id="fold" type="button" aria-label="Hide the sidebar" title="Hide the sidebar (Ctrl+B)"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect x="2" y="3" width="14" height="12" rx="2"/><path d="M7 3v12M12 7l-2 2 2 2"/></svg></button><button class="ibtn only-narrow" id="dclose" type="button" aria-label="Close the sidebar"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M4 4l10 10M14 4L4 14"/></svg></button></div>
+    <button class="newbtn" id="newsess" type="button"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v12M2 8h12"/></svg>New session<span class="k only-wide">Ctrl+Shift+O</span></button>
+    <input id="hq" type="search" placeholder="Search every session" aria-label="Search history" title="Search every session (Ctrl+K)">
     <div class="dlist" id="dlist"></div>
     <nav class="sfoot" aria-label="golem">
       <button class="navbtn only-wide" type="button" data-tab="skills"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12M2 8h12M2 13h7"/></svg>Skills</button>
@@ -251,8 +257,9 @@ svg text{font:10px var(--mono);fill:var(--au-fg-muted)}
 
   <main class="main" id="phone">
     <header class="top">
-      <button class="ibtn only-narrow" id="menu" type="button" aria-label="Sessions and history"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M2 4h14M2 9h14M2 14h14"/></svg></button>
+      <button class="ibtn only-narrow" id="menu" type="button" aria-label="Sessions and history" title="Show the sidebar (Ctrl+B)"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M2 4h14M2 9h14M2 14h14"/></svg></button>
       <div class="ttl"><button class="sbtn" id="sname" type="button" title="Sessions and history">New session</button><span class="stat">golem · <b id="st-on">awake</b> · <span id="st-where">offline</span> · 0 requests</span></div>
+      <button class="ibtn only-narrow" id="newtop" type="button" aria-label="New session" title="New session (Ctrl+Shift+O)"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M9 3v12M3 9h12"/></svg></button>
       <button class="power" id="power" type="button" title="Put golem to sleep or wake it" aria-pressed="false">sleep</button>
     </header>
 
@@ -289,6 +296,14 @@ svg text{font:10px var(--mono);fill:var(--au-fg-muted)}
           <p>A session can be saved as a recipe and run again on other tables or columns: <code>save this as a recipe called cu check</code>, then <code>run cu check for au</code>.</p>
         </section>
         <section>
+          <h2>Keys</h2>
+          <ul>
+            <li><code>Enter</code> runs, <code>Shift+Enter</code> starts a new line, <code>↑</code> and <code>↓</code> on an empty line step through this session's queries.</li>
+            <li><code>/</code> or <code>Esc</code> puts the cursor in the box.</li>
+            <li><code>Ctrl+Shift+O</code> starts a new session, <code>Ctrl+K</code> searches every session (<code>Enter</code> opens the first), <code>Ctrl+B</code> shows or hides the sidebar. On a Mac, Cmd works for Ctrl.</li>
+          </ul>
+        </section>
+        <section>
           <h2>Files</h2>
           <p>The paperclip opens tables (CSV, TSV, xlsx, Parquet, Datamine .dm), drawings and geometry (DXF, WKT, GeoJSON, YAML) and documents (Markdown, text, HTML). Files stay on this device. Documents are searched by word: <code>find resurvey in my documents</code>.</p>
         </section>
@@ -312,7 +327,7 @@ svg text{font:10px var(--mono);fill:var(--au-fg-muted)}
         <textarea id="q" rows="1" placeholder="Ask, compute, or act" aria-label="Query" enterkeyhint="go"></textarea>
         <div class="crow">
           <button class="ibtn" id="attach" type="button" title="Open a file: a table, a drawing or a document" aria-label="Open a file"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M15 8.5l-6 6a3.5 3.5 0 0 1-5-5l6.5-6.5a2.3 2.3 0 0 1 3.3 3.3L7.4 12.6a1.1 1.1 0 0 1-1.6-1.6L11.5 5.3"/></svg></button><input type="file" id="file" accept=".csv,.tsv,.txt,.md,.markdown,.html,.htm,.xlsx,.xlsm,.dm,.parquet,.dxf,.yaml,.yml,.wkt,.geojson,text/csv,text/tab-separated-values,text/plain" hidden>
-          <span class="grow"><span class="only-wide">Enter runs · Shift+Enter for a new line</span></span>
+          <span class="grow"><span class="only-wide">Enter runs · Shift+Enter for a new line · ↑ for earlier queries</span></span>
           <button class="send" id="send" type="submit" aria-label="Run" title="Run"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 13V3M3.5 7.5L8 3l4.5 4.5"/></svg></button>
         </div>
       </form>
@@ -21282,7 +21297,7 @@ const { escHtml, pad, cardEl } = __m54;
 // the DOM or the browser lives here or in render.js; the engine never does.
 
 const $ = id => document.getElementById(id);
-const KEY = 'golem.mock.v2', THEME = 'golem.theme';
+const KEY = 'golem.mock.v2', THEME = 'golem.theme', FOLD = 'golem.side';
 const narrow = () => window.matchMedia('(max-width: 860px)').matches;
 let awake = true, statusT;
 
@@ -21310,7 +21325,13 @@ function renderStream(focus) {
   if (el) el.scrollIntoView({ block: 'start' }); else $('v-ask').scrollTop = S.cards.length > 1 ? $('v-ask').scrollHeight : 0;
 }
 function welcome() { $('welcome').hidden = S.cards.length > 0; }
-function replaceCard(c) { const old = $('stream').querySelector(`[data-id="${c.id}"]`); if (old) old.replaceWith(cardEl(c)); }
+function replaceCard(c, focusKey) {
+  const old = $('stream').querySelector(`[data-id="${c.id}"]`); if (!old) return;
+  const open = !!old.querySelector('details.trace[open]'), fresh = cardEl(c);
+  old.dataset.rung = fresh.dataset.rung; old.replaceChildren(...fresh.childNodes);
+  if (open) old.querySelector('details.trace').open = true;
+  if (focusKey) { const s = old.querySelector(`.slot[data-key="${focusKey}"]`); if (s) s.focus({ preventScroll: true }); }
+}
 function run(raw) {
   if (!awake) { status('Asleep. Tap wake at the top right.'); return; }
   show(submit(raw));
@@ -21368,8 +21389,11 @@ function renderDrawer() {
   const i = $('dlist').querySelector('.ren'); if (i) { i.focus(); i.select(); }
 }
 // on a wide screen the sidebar is always there; on a narrow one it slides over the stream
-function openDrawer() { ren = del = null; renderDrawer(); if (narrow()) $('app').classList.add('nav'); else $('hq').focus(); }
+function openDrawer() { ren = del = null; renderDrawer(); if (narrow()) $('app').classList.add('nav'); else { fold(false); $('hq').focus(); } }
 function closeDrawer() { $('app').classList.remove('nav'); }
+function fold(on) { $('app').classList.toggle('folded', on); try { localStorage.setItem(FOLD, on ? 'folded' : 'open'); } catch (e) { /* storage is optional */ } }
+function toggleSide() { if (narrow()) { if ($('app').classList.contains('nav')) closeDrawer(); else openDrawer(); } else fold(!$('app').classList.contains('folded')); }
+try { if (localStorage.getItem(FOLD) === 'folded') $('app').classList.add('folded'); } catch (e) { /* storage is optional */ }
 function commitName(inp) { ren = null; renameSession(+inp.dataset.id, inp.value); renderDrawer(); }
 
 /* ── storage ── */
@@ -21402,7 +21426,28 @@ onJobDone(c => { replaceCard(c); });
 $('f').addEventListener('submit', e => { e.preventDefault(); const v = $('q').value; $('q').value = ''; grow(); run(v); });
 function grow() { const q = $('q'); q.style.height = 'auto'; q.style.height = Math.min(q.scrollHeight, window.innerHeight * 0.4) + 'px'; }
 $('q').addEventListener('input', grow);
-$('q').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('f').requestSubmit(); } });
+let recall = -1;
+$('q').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); recall = -1; $('f').requestSubmit(); return; }
+  const q = $('q'), past = S.cards.map(c => c.raw);
+  if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey && past.length && (q.value === '' || recall >= 0) && !q.value.includes('\n')) {
+    const i = e.key === 'ArrowUp' ? (recall < 0 ? past.length - 1 : Math.max(0, recall - 1)) : recall < 0 ? -1 : recall + 1;
+    if (e.key === 'ArrowDown' && recall < 0) return;
+    e.preventDefault(); recall = i < past.length ? i : -1; q.value = recall < 0 ? '' : past[recall]; grow();
+    q.setSelectionRange(q.value.length, q.value.length);
+  }
+});
+$('q').addEventListener('input', () => { recall = -1; });
+function newBlank() { newSession(); renderStream(); renderDrawer(); closeDrawer(); status('New session.'); $('q').focus(); }
+const typing = el => el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
+document.addEventListener('keydown', e => {
+  const mod = e.ctrlKey || e.metaKey, k = e.key.toLowerCase();
+  if (e.key === 'Escape') { if ($('app').classList.contains('nav')) closeDrawer(); else if (document.activeElement === $('hq') && $('hq').value) { $('hq').value = ''; renderDrawer(); } else if (document.activeElement !== $('q')) $('q').focus(); return; }
+  if (mod && e.shiftKey && k === 'o') { e.preventDefault(); newBlank(); return; }
+  if (mod && !e.shiftKey && k === 'k') { e.preventDefault(); openDrawer(); $('hq').focus(); $('hq').select(); return; }
+  if (mod && !e.shiftKey && (k === 'b' || e.key === '\\')) { e.preventDefault(); toggleSide(); return; }
+  if (!mod && !e.altKey && e.key === '/' && !typing(document.activeElement)) { e.preventDefault(); showTab('ask'); $('q').focus(); }
+});
 // a file from the picker (the lead-acid shell routes <input type=file> to the system picker): text in, a card out
 $('attach').addEventListener('click', () => { if (awake) $('file').click(); });
 $('file').addEventListener('change', e => {
@@ -21421,7 +21466,7 @@ $('stream').addEventListener('click', e => {
   const c = S.cards.find(x => x.id === +b.closest('.card').dataset.id), act = b.dataset.act;
   if (act === 'run') return run(b.dataset.q);
   if (!awake) return status('Asleep. Tap wake at the top right.');
-  if (act === 'slot') { flipSlot(c, b.dataset.key); replaceCard(c); }
+  if (act === 'slot') { flipSlot(c, b.dataset.key); replaceCard(c, b.dataset.key); }
   else if (act === 'answer') { answer(c, +b.dataset.i); replaceCard(c); }
   else if (act === 'handoff') { const n = document.createElement('div'); n.className = 'note ok'; n.textContent = b.dataset.msg; b.replaceWith(n); }
   else if (act === 'save' && c.res.file) {
@@ -21443,9 +21488,11 @@ $('menu').addEventListener('click', openDrawer);
 $('sname').addEventListener('click', openDrawer);
 $('dclose').addEventListener('click', closeDrawer);
 $('scrim').addEventListener('click', closeDrawer);
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
-$('newsess').addEventListener('click', () => { newSession(); renderStream(); renderDrawer(); closeDrawer(); status('New session.'); $('q').focus(); });
+$('newsess').addEventListener('click', newBlank);
+$('newtop').addEventListener('click', newBlank);
+$('fold').addEventListener('click', () => fold(true));
 $('hq').addEventListener('input', renderDrawer);
+$('hq').addEventListener('keydown', e => { if (e.key === 'Enter') { const b = $('dlist').querySelector('.open[data-s]'); if (b) { e.preventDefault(); b.click(); } } });
 $('dlist').addEventListener('keydown', e => { if (e.target.classList.contains('ren') && e.key === 'Enter') commitName(e.target); });
 $('dlist').addEventListener('focusout', e => { if (e.target.classList.contains('ren') && ren != null) commitName(e.target); });
 $('dlist').addEventListener('click', e => {

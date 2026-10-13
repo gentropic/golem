@@ -147,6 +147,30 @@ const rec = await page.evaluate(() => ({ cards: [...document.querySelectorAll('#
 const recOk = rec.cards.length === 2 && /histogram of au/i.test(rec.cards[1]);
 console.log(`${recOk ? 'ok  ' : 'FAIL'} a recipe saved and run for au opens a session of its own${recOk ? '' : ': ' + rec.cards.length + ' cards, ' + rec.cards.map(t => t.slice(0, 60)).join(' | ')}`);
 if (!recOk) failed++;
+// the shell: a flipped slot recomputes in the same element and keeps focus; up recalls; keys; the sidebar folds
+await page.fill('#q', '0.35 oz per short ton in g/t'); await page.press('#q', 'Enter'); await page.waitForTimeout(80);
+await page.evaluate(() => { [...document.querySelectorAll('#stream .card')].pop().__kept = true; });
+const before = await page.evaluate(() => [...document.querySelectorAll('#stream .card')].pop().querySelector('.ans').textContent);
+await page.click('#stream .card:last-child button.slot'); await page.waitForTimeout(60);
+const flip = await page.evaluate(() => { const c = [...document.querySelectorAll('#stream .card')].pop(); return { kept: !!c.__kept, ans: c.querySelector('.ans').textContent, focus: document.activeElement.classList.contains('slot') }; });
+const flipOk = flip.kept && flip.ans !== before && flip.focus;
+console.log(`${flipOk ? 'ok  ' : 'FAIL'} a flipped slot recomputes in place and keeps focus${flipOk ? '' : ': ' + JSON.stringify(flip).slice(0, 200)}`);
+if (!flipOk) failed++;
+await page.focus('#q'); await page.press('#q', 'ArrowUp');
+const recalled = await page.inputValue('#q');
+console.log(`${recalled === '0.35 oz per short ton in g/t' ? 'ok  ' : 'FAIL'} up recalls the last query: ${recalled}`);
+if (recalled !== '0.35 oz per short ton in g/t') failed++;
+await page.fill('#q', ''); await page.keyboard.press('Control+Shift+O'); await page.waitForTimeout(60);
+const blank = await page.evaluate(() => ({ cards: document.querySelectorAll('#stream .card').length, welcome: !document.getElementById('welcome').hidden }));
+console.log(`${!blank.cards && blank.welcome ? 'ok  ' : 'FAIL'} Ctrl+Shift+O opens a new session on the welcome`);
+if (blank.cards || !blank.welcome) failed++;
+await page.setViewportSize({ width: 1280, height: 800 }); await page.waitForTimeout(60);
+const side = () => page.evaluate(() => getComputedStyle(document.getElementById('drawer')).display !== 'none' && document.getElementById('drawer').getBoundingClientRect().width > 0);
+const shown = await side(); await page.keyboard.press('Control+b'); await page.waitForTimeout(60);
+const hidden = !(await side()); await page.keyboard.press('Control+b'); await page.waitForTimeout(60);
+const back = await side();
+console.log(`${shown && hidden && back ? 'ok  ' : 'FAIL'} Ctrl+B hides and shows the sidebar on a wide screen`);
+if (!(shown && hidden && back)) failed++;
 errors.forEach(e => console.log('FAIL ' + e));
 await browser.close();
 if (failed || !nameOk || kept !== 22 || overflow > 0 || errors.length) { console.log('\nsmoke test failed'); process.exit(1); }

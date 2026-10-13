@@ -10,7 +10,7 @@ import { shell } from '../vendor/leadacid.js';
 import { escHtml, pad, cardEl } from './render.js';
 
 const $ = id => document.getElementById(id);
-const KEY = 'golem.mock.v2', THEME = 'golem.theme';
+const KEY = 'golem.mock.v2', THEME = 'golem.theme', FOLD = 'golem.side';
 const narrow = () => window.matchMedia('(max-width: 860px)').matches;
 let awake = true, statusT;
 
@@ -38,7 +38,13 @@ function renderStream(focus) {
   if (el) el.scrollIntoView({ block: 'start' }); else $('v-ask').scrollTop = S.cards.length > 1 ? $('v-ask').scrollHeight : 0;
 }
 function welcome() { $('welcome').hidden = S.cards.length > 0; }
-function replaceCard(c) { const old = $('stream').querySelector(`[data-id="${c.id}"]`); if (old) old.replaceWith(cardEl(c)); }
+function replaceCard(c, focusKey) {
+  const old = $('stream').querySelector(`[data-id="${c.id}"]`); if (!old) return;
+  const open = !!old.querySelector('details.trace[open]'), fresh = cardEl(c);
+  old.dataset.rung = fresh.dataset.rung; old.replaceChildren(...fresh.childNodes);
+  if (open) old.querySelector('details.trace').open = true;
+  if (focusKey) { const s = old.querySelector(`.slot[data-key="${focusKey}"]`); if (s) s.focus({ preventScroll: true }); }
+}
 function run(raw) {
   if (!awake) { status('Asleep. Tap wake at the top right.'); return; }
   show(submit(raw));
@@ -96,8 +102,11 @@ function renderDrawer() {
   const i = $('dlist').querySelector('.ren'); if (i) { i.focus(); i.select(); }
 }
 // on a wide screen the sidebar is always there; on a narrow one it slides over the stream
-function openDrawer() { ren = del = null; renderDrawer(); if (narrow()) $('app').classList.add('nav'); else $('hq').focus(); }
+function openDrawer() { ren = del = null; renderDrawer(); if (narrow()) $('app').classList.add('nav'); else { fold(false); $('hq').focus(); } }
 function closeDrawer() { $('app').classList.remove('nav'); }
+function fold(on) { $('app').classList.toggle('folded', on); try { localStorage.setItem(FOLD, on ? 'folded' : 'open'); } catch (e) { /* storage is optional */ } }
+function toggleSide() { if (narrow()) { if ($('app').classList.contains('nav')) closeDrawer(); else openDrawer(); } else fold(!$('app').classList.contains('folded')); }
+try { if (localStorage.getItem(FOLD) === 'folded') $('app').classList.add('folded'); } catch (e) { /* storage is optional */ }
 function commitName(inp) { ren = null; renameSession(+inp.dataset.id, inp.value); renderDrawer(); }
 
 /* ── storage ── */
@@ -130,7 +139,28 @@ onJobDone(c => { replaceCard(c); });
 $('f').addEventListener('submit', e => { e.preventDefault(); const v = $('q').value; $('q').value = ''; grow(); run(v); });
 function grow() { const q = $('q'); q.style.height = 'auto'; q.style.height = Math.min(q.scrollHeight, window.innerHeight * 0.4) + 'px'; }
 $('q').addEventListener('input', grow);
-$('q').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('f').requestSubmit(); } });
+let recall = -1;
+$('q').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); recall = -1; $('f').requestSubmit(); return; }
+  const q = $('q'), past = S.cards.map(c => c.raw);
+  if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey && past.length && (q.value === '' || recall >= 0) && !q.value.includes('\n')) {
+    const i = e.key === 'ArrowUp' ? (recall < 0 ? past.length - 1 : Math.max(0, recall - 1)) : recall < 0 ? -1 : recall + 1;
+    if (e.key === 'ArrowDown' && recall < 0) return;
+    e.preventDefault(); recall = i < past.length ? i : -1; q.value = recall < 0 ? '' : past[recall]; grow();
+    q.setSelectionRange(q.value.length, q.value.length);
+  }
+});
+$('q').addEventListener('input', () => { recall = -1; });
+function newBlank() { newSession(); renderStream(); renderDrawer(); closeDrawer(); status('New session.'); $('q').focus(); }
+const typing = el => el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
+document.addEventListener('keydown', e => {
+  const mod = e.ctrlKey || e.metaKey, k = e.key.toLowerCase();
+  if (e.key === 'Escape') { if ($('app').classList.contains('nav')) closeDrawer(); else if (document.activeElement === $('hq') && $('hq').value) { $('hq').value = ''; renderDrawer(); } else if (document.activeElement !== $('q')) $('q').focus(); return; }
+  if (mod && e.shiftKey && k === 'o') { e.preventDefault(); newBlank(); return; }
+  if (mod && !e.shiftKey && k === 'k') { e.preventDefault(); openDrawer(); $('hq').focus(); $('hq').select(); return; }
+  if (mod && !e.shiftKey && (k === 'b' || e.key === '\\')) { e.preventDefault(); toggleSide(); return; }
+  if (!mod && !e.altKey && e.key === '/' && !typing(document.activeElement)) { e.preventDefault(); showTab('ask'); $('q').focus(); }
+});
 // a file from the picker (the lead-acid shell routes <input type=file> to the system picker): text in, a card out
 $('attach').addEventListener('click', () => { if (awake) $('file').click(); });
 $('file').addEventListener('change', e => {
@@ -149,7 +179,7 @@ $('stream').addEventListener('click', e => {
   const c = S.cards.find(x => x.id === +b.closest('.card').dataset.id), act = b.dataset.act;
   if (act === 'run') return run(b.dataset.q);
   if (!awake) return status('Asleep. Tap wake at the top right.');
-  if (act === 'slot') { flipSlot(c, b.dataset.key); replaceCard(c); }
+  if (act === 'slot') { flipSlot(c, b.dataset.key); replaceCard(c, b.dataset.key); }
   else if (act === 'answer') { answer(c, +b.dataset.i); replaceCard(c); }
   else if (act === 'handoff') { const n = document.createElement('div'); n.className = 'note ok'; n.textContent = b.dataset.msg; b.replaceWith(n); }
   else if (act === 'save' && c.res.file) {
@@ -171,9 +201,11 @@ $('menu').addEventListener('click', openDrawer);
 $('sname').addEventListener('click', openDrawer);
 $('dclose').addEventListener('click', closeDrawer);
 $('scrim').addEventListener('click', closeDrawer);
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
-$('newsess').addEventListener('click', () => { newSession(); renderStream(); renderDrawer(); closeDrawer(); status('New session.'); $('q').focus(); });
+$('newsess').addEventListener('click', newBlank);
+$('newtop').addEventListener('click', newBlank);
+$('fold').addEventListener('click', () => fold(true));
 $('hq').addEventListener('input', renderDrawer);
+$('hq').addEventListener('keydown', e => { if (e.key === 'Enter') { const b = $('dlist').querySelector('.open[data-s]'); if (b) { e.preventDefault(); b.click(); } } });
 $('dlist').addEventListener('keydown', e => { if (e.target.classList.contains('ren') && e.key === 'Enter') commitName(e.target); });
 $('dlist').addEventListener('focusout', e => { if (e.target.classList.contains('ren') && ren != null) commitName(e.target); });
 $('dlist').addEventListener('click', e => {
