@@ -363,7 +363,8 @@
       "generic": [
         "table",
         "csv",
-        "data"
+        "data",
+        "file"
       ],
       "words_pt": {
         "assays.csv": [
@@ -7895,7 +7896,9 @@
       "label": "Convert",
       "words": [
         "convert",
-        "change"
+        "change",
+        "express",
+        "put"
       ],
       "elidable": true,
       "theme": [
@@ -8745,9 +8748,7 @@
       "theme": [
         "text"
       ],
-      "required": [
-        "theme"
-      ],
+      "required": [],
       "roles": {
         "on": {
           "preps": [
@@ -8773,6 +8774,14 @@
           ],
           "types": [
             "quantity:time"
+          ]
+        },
+        "to": {
+          "preps": [
+            "to"
+          ],
+          "types": [
+            "text"
           ]
         }
       },

@@ -70,11 +70,11 @@ tool({
 // "remind me to send the samples to the lab on friday at 9": the title as typed, then a date, a time, a length
 frame({
   name: 'event', label: 'Event', words: ['remind me to', 'remind me', 'schedule', 'add an event', 'add event', 'new event', 'create an event', 'put on my calendar', 'book'],
-  theme: ['text'], required: ['theme'],
-  roles: { on: { preps: ['on', 'for'], types: ['date', 'holiday'] }, at: { preps: ['at'], types: ['clock'] }, for: { preps: ['for'], types: ['quantity:time'] } },
+  theme: ['text'], required: [],
+  roles: { on: { preps: ['on', 'for'], types: ['date', 'holiday'] }, at: { preps: ['at'], types: ['clock'] }, for: { preps: ['for'], types: ['quantity:time'] }, to: { preps: ['to'], types: ['text'] } },   // to: "remind me on friday at 9 to send the samples"
   words_pt: ['me lembra de', 'me lembre de', 'me lembra', 'agenda', 'agende', 'marca', 'marque', 'novo evento'], label_pt: 'Evento',
   bind: c => {
-    const title = c.theme[0] && c.theme[0].value, on = c.roles.on && c.roles.on[0], at = c.roles.at && c.roles.at[0], du = c.roles.for && c.roles.for[0];
+    const title = (c.theme[0] || (c.roles.to || [])[0] || {}).value, on = c.roles.on && c.roles.on[0], at = c.roles.at && c.roles.at[0], du = c.roles.for && c.roles.for[0];
     if (!title) return null;
     if (!on && !at) return { clarify: 'when? Say "on friday", "tomorrow" or "at 9"' };
     const d = on ? findDate(dateWords(on)) : null; if (on && !d) return null;
