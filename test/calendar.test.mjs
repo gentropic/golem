@@ -32,7 +32,7 @@ test('working days until 20 dec from 8 Oct 2026, with the holidays named; N work
   assert.equal(card('15 working days from monday').res.value, '2026-11-03');
   assert.equal(card('1 working day from friday').res.value, '2026-10-13', 'Fri 9 Oct → Tue 13 Oct, over the weekend and the holiday');
   assert.equal(card('next working day').res.value, '2026-10-09');
-  assert.ok(g.textOf(card('working days until yesterdayish')).includes('cannot read'));
+  assert.equal(card('working days until yesterdayish').rung, 'none', 'a word that is not a date is no reading');
   assert.equal(card('working days between 1 oct and 20 dec').res.value, 53, 'the start is read backwards when it lands after the end');
   assert.equal(card('when is easter 2027').res.value, '2027-03-28');
   assert.equal(card('when is carnival 2027').res.value, '2027-02-09');
@@ -66,7 +66,7 @@ test('9am sao paulo in perth is 20:00 the same day; now in a zone; aliases, offs
   const now = card('what time is it in vancouver');
   assert.equal(now.res.value, '06:00', 'Thu 8 Oct 2026 10:00 BRT is 13:00 UTC, 06:00 PDT');
   assert.equal(card('noon utc+8 in utc').res.value, '04:00');
-  assert.ok(g.textOf(card('9am atlantis in perth')).includes('do not know'));
+  assert.equal(card('9am atlantis in perth').rung, 'none', 'a place no zone is called is no reading');
   unpin();
 });
 

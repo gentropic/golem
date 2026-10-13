@@ -19,6 +19,7 @@ export function ontology() {
   for (const w of COMPOUNDS) { const p = parseUnit(w); if (p) units.push({ unit: w, dim: dimName(p.dim), words: [w] }); }
   units.push({ unit: 'oz', dim: 'mass', words: ['oz', 'ounce', 'ounces'] });   // troy or avoirdupois: the tool decides and shows the slot
   units.push({ unit: 'people per square mile', dim: 'population density', words: ['people per square mile', 'per square mile'], words_pt: ['pessoas por milha quadrada', 'por milha quadrada'] });
+  units.push(...LEXICON.units);
   units.push({ unit: 'people per km2', dim: 'population density', words: ['people per km2', 'people per square kilometre', 'people per square km', 'per km2'], words_pt: ['pessoas por km2', 'habitantes por km2', 'por km2'] });
   const terms = {}; for (const k of Object.keys(ODS)) terms[k] = [k]; for (const [a, k] of Object.entries(ODSA)) terms[k].push(a);
   return {
@@ -52,7 +53,7 @@ export function ontology() {
     units,
     compounds: [{ mod: 'filter', heads: ['country'], attr: 'filter', echo: true }, { mod: 'scale', heads: ['plot'], attr: 'scale', echo: true }],
     postmods: LEXICON.postmods,
-    qmods: [{ head: 'timer', attr: 'duration', dims: ['time'] }],   // "a 30 minute timer"
+    qmods: [{ head: 'timer', attr: 'duration', dims: ['time'] }, ...LEXICON.qmods],   // "a 30 minute timer"
     verbs: FRAMES.map(({ bind, ...f }) => f),
     inherit: [],
     echoOrder: ['of', 'unit', 'by', 'scale', 'for', 'as'],

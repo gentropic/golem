@@ -1,7 +1,7 @@
 // Working days and rosters over @gcu/plan's calendar engine (vendored), and time zones through Intl.
 // The calendar is a slot and is always shown: Brazil's federal holidays, or weekdays only.
-import { S, tool, clock, iso } from './core.js';
-import { findDate, findTime, today, day0, fmtDate } from './dates.js';
+import { S, tool, frame, noun, shape, postmod, unit, clock, iso } from './core.js';
+import { findDate, findTime, today, day0, fmtDate, dateWords } from './dates.js';
 import { isWorkingDay, addWorkingDays, brazilCalendar, federalHolidays } from '../vendor/plan-calendar.js';
 
 const CALS = ['brazil', 'weekdays'], CAL_LABEL = { brazil: 'Brazil, federal holidays', weekdays: 'weekdays only' };
@@ -14,18 +14,8 @@ const DATE = '(.+?)';
 
 /* ── working days ───────────────────────────────────────────── */
 tool({
-  name: 'workdays', rank: 85,
+  name: 'workdays',
   skill: { group: 'Compute', title: 'Working days and rosters', on: '@gcu/plan', about: 'Working days until a date or between two, N working days from a date, whether a day is a working day, and on/off rosters. The calendar is a slot: Brazil\'s federal holidays or weekdays only.', examples: ['working days until 20 dec', 'is 21 apr 2027 a working day', '15 working days from monday', '14 on 14 off from 6 oct, am i off at christmas'] },
-  read: (text, q) => {
-    let m;
-    if ((m = new RegExp(`^(?:how many )?(?:working|business) days (?:until|till|to|before|left until) ${DATE}$`).exec(q))) return { ask: 'until', to: m[1] };
-    if ((m = new RegExp(`^(?:how many )?(?:working|business) days (?:between|from) ${DATE} (?:and|to|until|till) ${DATE}$`).exec(q))) return { ask: 'between', from: m[1], to: m[2] };
-    if ((m = new RegExp(`^(?:is|was|will) ${DATE} (?:be )?a (?:working|business|work) ?day$`).exec(q))) return { ask: 'is', date: m[1] };
-    if ((m = new RegExp(`^(\\d+) (?:working|business) days? (?:from|after) ${DATE}$`).exec(q))) return { ask: 'add', n: +m[1], from: m[2] };
-    if ((m = new RegExp(`^(\\d+) (?:working|business) days? (?:before|back from) ${DATE}$`).exec(q))) return { ask: 'add', n: -m[1], from: m[2] };
-    if ((m = /^(?:what is |when is )?(?:the )?next (?:working|business) day(?: after (.+))?$/.exec(q))) return { ask: 'add', n: 1, from: m[1] || 'today' };
-    return null;
-  },
   amend: [{ arg: 'cal', match: /^(?:in |with |using )?(?:the )?(brazil(?:ian)?|weekdays?(?: only)?|no holidays)(?: calendar| holidays)?$/, value: m => /^brazil/.test(m[1]) ? 'brazil' : 'weekdays' }],
   topic: () => ['Working days', 1],
   run: a => {
@@ -56,14 +46,7 @@ tool({
 /* ── rosters: X on, Y off, from a start date ────────────────── */
 const lastRoster = () => { for (let i = S.cards.length - 1; i >= 0; i--) if (S.cards[i].tool === 'roster' && S.cards[i].args.on) return S.cards[i].args; return null; };
 tool({
-  name: 'roster', rank: 86,
-  read: (text, q) => {
-    let m = /^(\d+) on,? (\d+) off(?:,? (?:starting|from|since) (.+?))?(?:[,;]? (?:am i|will i be|are we) (off|on|working|at work)(?: (?:on|at) (.+))?)?$/.exec(q);
-    if (m) return { on: +m[1], off: +m[2], start: m[3] || 'today', ...(m[4] ? { date: m[5] || 'today' } : {}) };
-    m = /^(?:am i|will i be|are we) (?:off|on|working|at work)(?: (?:on|at) (.+))?$/.exec(q); if (m) { const r = lastRoster(); return r ? { ...r, date: m[1] || 'today' } : { noRoster: true }; }
-    m = /^(?:when is (?:the |my )?)?next (?:swing|change|changeover|days? off|days? on)$/.exec(q); if (m) { const r = lastRoster(); return r ? { ...r, date: 'today', next: true } : { noRoster: true }; }
-    return null;
-  },
+  name: 'roster',
   topic: () => ['Roster', 1],
   run: a => {
     if (a.noRoster) return { read: ['roster'], body: [{ t: 'note', kind: 'err', text: 'No roster in this session. Say it first: "14 on 14 off from 6 oct".' }], trace: ['no roster card to read from'] };
@@ -116,15 +99,8 @@ const zoneSlot = (key, name, zones, cur) => zones.length > 1 ? { v: zoneName(cur
 const refuseZone = (read, name, zones) => ({ read, body: [{ t: 'note', kind: 'err', text: zones.length ? `"${name}" could be ${zones.map(zoneName).join(' or ')}.` : `I do not know a time zone called "${name}". Try a city from the IANA list, like "sao paulo" or "perth", or an offset like "utc+8".` }], trace: ['zone: no match'] });
 
 tool({
-  name: 'zone', rank: 87,
+  name: 'zone',
   skill: { group: 'Compute', title: 'Time zones', on: 'Intl', about: 'A time in one place as it reads in another, with the offsets used and a note when the clocks change nearby. Cities by their IANA names, plus common aliases.', examples: ['9am sao paulo in perth', 'what time is it in vancouver', '14:30 utc to my time', 'overlap of 9 to 17 in belo horizonte and perth'] },
-  read: (text, q) => {
-    let m;
-    if ((m = /^(?:what time is it|what is the time|current time|time now|now)(?: now)? in (.+)$/.exec(q))) return { to: m[1] };
-    if ((m = new RegExp(`^(?:what is |what's )?(\\d{1,2}(?::\\d{2})? ?(?:am|pm)?|noon|midnight)(?: (?:on|of) (.+?))?(?: (?:in|at|from))? ${PLACE} (?:in|to|at|for|as) ${PLACE}$`).exec(q))) return { time: m[1], ...(m[2] ? { date: m[2] } : {}), from: m[3], to: m[4] };
-    if ((m = new RegExp(`^(?:what is |what's )?${PLACE} (\\d{1,2}(?::\\d{2})? ?(?:am|pm)?|noon|midnight)(?: (?:on|of) (.+?))? (?:in|to|at|for|as) ${PLACE}$`).exec(q))) return { time: m[2], ...(m[3] ? { date: m[3] } : {}), from: m[1], to: m[4] };
-    return null;
-  },
   amend: [{ arg: 'date', match: /^(?:on |for )?(tomorrow|today|next \w+|\d{1,2} \w{3,9}(?: \d{4})?|\d{4}-\d{2}-\d{2})$/ }],
   topic: () => ['Time zones', 1],
   run: a => {
@@ -148,8 +124,7 @@ tool({
   }
 });
 tool({
-  name: 'overlap', rank: 88,
-  read: (text, q) => { const m = new RegExp(`^(?:working )?(?:overlap|common hours|shared hours) (?:of|for|between) (\\d{1,2}(?::\\d{2})?) ?(?:to|-|–) ?(\\d{1,2}(?::\\d{2})?) (?:in|between|for) (.+)$`).exec(q); if (!m) return null; const places = m[3].split(/,\s*|\s+and\s+/).filter(Boolean); return places.length >= 2 ? { from: m[1], to: m[2], places } : null; },
+  name: 'overlap',
   topic: () => ['Time zones', 1],
   run: a => {
     const zs = a.places.map(p => ({ name: p, zones: zonesOf(p) })), bad = zs.find(z => z.zones.length !== 1);
@@ -163,5 +138,89 @@ tool({
     const rows = windows.map(w => [zoneName(w.zone), best ? `${wall(w.zone, best.s).text} to ${wall(w.zone, best.e).text} (${fmtOffset(offsetOf(w.zone, best.s))})` : `${a.from} to ${a.to} local (${fmtOffset(offsetOf(w.zone, w.s))})`]);
     const hours = best ? (best.e - best.s) / 36e5 : 0;
     return { read, value: hours, body: [{ t: 'big', v: best ? `${hours % 1 ? hours.toFixed(1) : hours} h` : 'None', unit: best ? `in common each day, ${a.from} to ${a.to} local in each place` : `no hour is ${a.from} to ${a.to} in all of them` }, { t: 'kv', rows }, { t: 'sub', text: `Computed for ${fmtDate(day)}; it moves when any of these places changes its clocks.` }], trace: windows.map(w => `${w.zone}: ${new Date(w.s).toISOString()} to ${new Date(w.e).toISOString()}`).concat(best ? [`intersection: ${new Date(best.s).toISOString()} to ${new Date(best.e).toISOString()}`] : ['empty intersection']), py: `# intersect the UTC windows of ${zs.map(z => z.zones[0]).join(', ')}` };
+  }
+});
+/* ── what reads them ─────────────────────────────────────────── */
+const DATE_T = ['date', 'holiday'];
+const hm = t => `${t.h}:${String(t.mi).padStart(2, '0')}`;
+// working days: "working days until 20 dec", "working days between 1 dec and 20 dec", "15 working days from monday",
+// "is 21 apr 2027 a working day", "the next working day after 24 dec"
+unit({ unit: 'working days', dim: 'workday', words: ['working days', 'working day', 'business days', 'business day', 'workdays', 'workday'] });
+noun({ type: 'daykind', words: { working: ['a working day', 'a business day', 'a work day', 'a workday', 'working day', 'business day'] }, words_pt: { working: ['dia útil', 'dia util', 'um dia útil', 'um dia util'] } });
+noun({ type: 'nextwork', words: { next: ['next working day', 'next business day'] }, words_pt: { next: ['próximo dia útil', 'proximo dia util'] } });
+frame({
+  name: 'workcount', label: 'Working days', words: ['working days', 'business days', 'how many working days', 'how many business days', 'workdays'], theme: [], required: [],
+  roles: { until: { preps: ['until', 'till', 'to', 'before'], types: DATE_T }, from: { preps: ['from', 'between', 'since'], types: DATE_T } },
+  words_pt: ['dias úteis', 'dias uteis', 'quantos dias úteis', 'quantos dias uteis'], label_pt: 'Dias úteis',
+  bind: c => {
+    const u = (c.roles.until || []).map(dateWords), f = (c.roles.from || []).map(dateWords);
+    if (f.length === 2 && !u.length) return { tool: 'workdays', args: { ask: 'between', from: f[0], to: f[1] } };
+    if (f.length === 1 && u.length === 1) return { tool: 'workdays', args: { ask: 'between', from: f[0], to: u[0] } };
+    return u.length === 1 && !f.length ? { tool: 'workdays', args: { ask: 'until', to: u[0] } } : null;
+  }
+});
+frame({
+  name: 'workadd', label: 'Working days', words: [], elidable: true, theme: ['quantity:workday'], required: ['theme'],
+  roles: { from: { preps: ['from', 'after'], types: DATE_T }, before: { preps: ['before'], types: DATE_T } }, label_pt: 'Dias úteis',
+  bind: c => { const q = c.theme[0], f = c.roles.from && c.roles.from[0], b = c.roles.before && c.roles.before[0]; if (!q || q.unit !== 'working days' || !Number.isInteger(q.n) || (f && b)) return null;
+    return { tool: 'workdays', args: { ask: 'add', n: b ? -q.n : q.n, from: dateWords(f || b) || 'today' } }; }
+});
+frame({
+  name: 'isworkday', label: 'Working day?', words: ['is', 'was', 'will'], theme: DATE_T, required: ['theme', 'as'], roles: { as: { preps: [''], types: ['daykind'] } },
+  words_pt: ['é', 'e', 'foi', 'será'], label_pt: 'Dia útil?',
+  bind: c => dateWords(c.theme[0]) ? { tool: 'workdays', args: { ask: 'is', date: dateWords(c.theme[0]) } } : null
+});
+frame({
+  name: 'nextworkday', label: 'Next working day', words: [], elidable: true, theme: ['nextwork'], required: ['theme'], roles: { after: { preps: ['after', 'from'], types: DATE_T } }, label_pt: 'Próximo dia útil',
+  bind: c => ({ tool: 'workdays', args: { ask: 'add', n: 1, from: dateWords(c.roles.after && c.roles.after[0]) || 'today' } })
+});
+// time zones: "9am sao paulo in perth", "14:30 utc to my time", "what time is it in vancouver"; a place is an IANA city,
+// an alias, "here", or a place saved on this device
+noun(() => {
+  const names = [...new Set([...ZONES.filter(z => !/^Etc\//.test(z) && z.includes('/')).map(cityOf), ...Object.keys(ALIAS), ...HERE.filter(w => w !== 'me'), 'home', ...(S.tables.places ? S.tables.places.rows.map(r => r.name) : [])])];
+  const words = Object.fromEntries(names.map(n => [n, [n]]));
+  return { type: 'place', exact: true, words, generic: ['place'], words_pt: words, generic_pt: ['lugar'] };
+});
+shape({ type: 'place', re: String.raw`(?:utc|gmt)\s?[+-]\d{1,2}(?::?\d{2})?` });   // "utc+8", "gmt-3"
+frame({
+  name: 'zone', label: 'Time in', words: [], elidable: true, theme: ['clock'], required: ['theme', 'to'],
+  roles: { from: { preps: ['', 'from', 'at'], types: ['place'] }, to: { preps: ['in', 'to', 'for', 'as'], types: ['place'] }, on: { preps: ['on'], types: DATE_T } }, label_pt: 'Hora em',
+  bind: c => {
+    let from = (c.roles.from || []).map(p => p.value), to = (c.roles.to || []).map(p => p.value);
+    if (!from.length && to.length === 2) { from = [to[0]]; to = [to[1]]; }
+    if (from.length !== 1 || to.length !== 1) return null;
+    const d = c.roles.on && dateWords(c.roles.on[0]);
+    return { tool: 'zone', args: { time: hm(c.theme[0]), from: from[0], to: to[0], ...(d ? { date: d } : {}) } };
+  }
+});
+frame({
+  name: 'timenow', label: 'Time now', words: ['what time is it', 'what is the time', "what's the time", 'current time', 'time now', 'local time', 'time'], theme: [], required: ['in'],
+  roles: { in: { preps: ['in', 'at'], types: ['place'] } }, words_pt: ['que horas são', 'que horas sao', 'hora atual', 'horas'], label_pt: 'Hora agora',
+  bind: c => ({ tool: 'zone', args: { to: c.roles.in[0].value } })
+});
+// "overlap of 9 to 17 in belo horizonte and perth"
+frame({
+  name: 'overlap', label: 'Overlap', words: ['overlap', 'working overlap', 'common hours', 'shared hours', 'hours in common'], theme: [], required: ['of', 'to', 'in'],
+  roles: { of: { preps: ['of', 'for', 'between', 'from'], types: ['clock'] }, to: { preps: ['to', 'until', 'till'], types: ['clock'] }, in: { preps: ['in', 'between', 'for', 'across'], types: ['place'] } },
+  words_pt: ['sobreposição', 'sobreposicao', 'horas em comum'], label_pt: 'Sobreposição',
+  bind: c => c.roles.in.length >= 2 ? { tool: 'overlap', args: { from: hm(c.roles.of[0]), to: hm(c.roles.to[0]), places: c.roles.in.map(p => p.value) } } : null
+});
+// rosters: "14 on 14 off from 6 oct", "…, am i off at christmas", "am i off on 21 oct", "when is my next swing"
+shape({ type: 'roster', re: String.raw`\d{1,2}\s*(?:on|x|/)\s*,?\s*\d{1,2}(?:\s*off)?` });
+postmod({ prep: 'from', heads: ['roster'], attr: 'start', mod: 'date' });
+postmod({ prep: 'since', heads: ['roster'], attr: 'start', mod: 'date' });
+noun({ type: 'rosterq', words: { day: ['am i off', 'am i on', 'am i working', 'am i at work', 'will i be off', 'will i be on', 'will i be working', 'are we off', 'are we on', 'off or on'], next: ['next swing', 'my next swing', 'next change', 'next changeover', 'next days off', 'next day off', 'next days on'] },
+  words_pt: { day: ['estou de folga', 'estou trabalhando', 'vou estar de folga', 'vou trabalhar'], next: ['próxima troca', 'proxima troca', 'próxima folga', 'proxima folga'] } });
+frame({
+  name: 'roster', label: 'Roster', words: ['when is', 'roster'], elidable: true, theme: ['roster', 'rosterq'], required: ['theme'],
+  roles: { on: { preps: ['on', 'at', 'for'], types: ['date', 'holiday'] } }, words_pt: ['escala'], label_pt: 'Escala',
+  bind: c => {
+    const r = c.theme.find(t => t.type === 'roster'), q = c.theme.find(t => t.type === 'rosterq'), on = c.roles.on && dateWords(c.roles.on[0]);
+    if (c.theme.length > 2 || (on && !q && r)) return null;
+    let base;
+    if (r) { const m = /^(\d+)\s*(?:on|x|\/)\s*,?\s*(\d+)/i.exec(r.value); if (!m) return null; base = { on: +m[1], off: +m[2], start: r.attrs.start || 'today' }; }
+    else { base = lastRoster(); if (!base) return { tool: 'roster', args: { noRoster: true } }; }
+    if (!q) return { tool: 'roster', args: base };
+    return { tool: 'roster', args: q.value === 'next' ? { ...base, date: 'today', next: true } : { ...base, date: on || 'today' } };
   }
 });

@@ -1,7 +1,7 @@
 // ⚠ VENDORED — DO NOT EDIT. @gcu/dispatch, built from ../auditable/ext/dispatch/src/ by its own build.
 // Source of truth: gentropic/auditable ext/dispatch (local clone: ../auditable). Re-vendor by copying
 // ext/dispatch/index.js here after 'node ext/dispatch/build.js'. golem uses the grammar rung only:
-// createEngine, makeSession, ENGLISH, PORTUGUESE. At auditable ea0a7666.
+// createEngine, makeSession, ENGLISH, PORTUGUESE. At auditable 44b79edc.
 
 // ⚠ GENERATED FILE — DO NOT EDIT. Source: src/  Build: @gcu/build src/main.js
 // @gcu/dispatch — Session-trained natural-language → tool-call dispatch: a Snips-shaped resolver (averaged-perceptron intent + CRF-class slot tagger + gazetteers + deterministic per-kind assemblers) that trains IN THE BROWSER from the host session's own vocabulary in under a second. Tools are declarative (ten kinds) and a grammar rung (clause: case-grammar frames over an Earley chart with costed repairs, en + pt-BR) reads controlled commands before the learners see them; no shipped model, no network, explainable per decision — refusals return empty calls so the host degrades into its command palette. Born from an incubator where this beat a 26M finetuned transformer 50/52 to 3/24 on a frozen yardstick.
@@ -1030,7 +1030,8 @@ function buildGrammar(X) {
   rule('PP', 'DEMO COLON NPList', (_, __, l) => ({ kind: 'pp', prep: ':', canon: [':'], val: l }));             // "summarise this: …", "diff these: …"
   rule('PP', 'PREP:of DEMO COLON NPList', (_, __, ___, l) => ({ kind: 'pp', prep: ':', canon: [':'], val: l }));   // "word count of this: …"
   rule('PP', 'Date', d => ({ kind: 'pp', prep: '', canon: ['on'], val: [d] }));
-  if (X.bareText) rule('PP', 'TEXT', t => ({ kind: 'pp', prep: '', canon: [''], val: [{ type: 'text', value: t.text, generic: false, attrs: {} }] }));   // a bare text role                   // a bare date is a time argument: "call him tomorrow"
+  const bareOk = n => X.bareTypes.has(n.type) || (n.type === 'quantity' && (X.bareTypes.has('quantity:*') || X.bareTypes.has(`quantity:${n.dim}`)));
+  if (X.bareTypes.size) rule('PP', 'NP', n => bareOk(n) ? { kind: 'pp', prep: '', canon: [''], val: [n] } : null);   // a role with no marker, of a type a frame declares one for                   // a bare date is a time argument: "call him tomorrow"
 
   rule('NPList', 'NP NPTail', (n, t) => [n, ...t]);
   rule('NPTail', '', () => []);
@@ -1050,7 +1051,11 @@ function buildGrammar(X) {
   rule('NP', 'Quantity', q => q);
   rule('NP', 'UNIT', u => ({ type: 'unit', unit: u.unit, dim: u.dim, generic: false, attrs: {} }));   // "in miles": a unit as a thing
   rule('NP', 'TEXT', t => ({ type: 'text', value: t.text, generic: false, attrs: {} }));            // a free-text span (the engine cuts it)
-  rule('NP', 'LIT', t => ({ type: t.type, value: t.value, generic: false, attrs: {} }));            // a token shape the ontology declares (270/60, DH-03)
+  rule('NP', 'LIT PostMods', (t, pm) => {   // a token shape the ontology declares (270/60, DH-03), with its modifiers ("14 on 14 off from 6 oct")
+    const n = { type: t.type, value: t.value, generic: false, attrs: {} };
+    for (const m of pm) { const r = X.postmod(n, m); if (!r) return null; Object.assign(n, r); }
+    return n;
+  });
   rule('NP', 'Date', d => d);
   rule('NP', 'Clock', c => c);
   rule('NP', 'DET Quantity Head', (_, q, h) => X.qmod(q, h));
@@ -1141,7 +1146,7 @@ const ENGLISH = {
   code: 'en', headFirst: false,
   DET: 'the|a|an|this|that|my|our', REF: 'last|previous|latest|current|first|new',
   QUANT: 'all|every|each', EXCEPT: 'except|excluding|minus', CONJ: 'and|or|plus', COMMA: ',',
-  PREP: 'with|using|by|per|in|on|for|from|to|at|as|above|below|over|under|of|into|without|against|where|>|<|>=|<=|=|≥|≤|greater than|more than|less than|at least|at most|equal to|equals',
+  PREP: 'with|using|by|per|in|on|for|from|to|at|as|above|below|over|under|of|into|without|against|where|until|till|after|before|since|between|across|through|during|within|around|near|>|<|>=|<=|=|≥|≤|greater than|more than|less than|at least|at most|equal to|equals',
   THEN: 'then|afterwards|next', BUT: 'but', PRON: 'it|them|those', AGAIN: 'again|rerun|redo|repeat|same',
   QWORD: 'why|how|what|when|who|is|are|does|do|should|can|could|would',
   // closed questions the grammar reads as commands with the verb left out: a wh-word, a copula, the fused forms
@@ -1218,16 +1223,17 @@ function createEngine(ont, locale = ENGLISH) {
   for (const v of ont.verbs) add(col(v, 'words').join('|'), 'VERB', { verb: v.name });
   const NOUNS = Object.fromEntries(ont.nouns.map(n => [n.type, n]));
   for (const n of ont.nouns) {
-    for (const [value, words] of Object.entries(col(n, 'words') ?? {})) add(words.join('|'), 'NOUN', { type: n.type, value });
+    // exact: proper names (places, files) are matched as written, never a typo repair's or a stem's target
+    for (const [value, words] of Object.entries(col(n, 'words') ?? {})) add(words.join('|'), 'NOUN', { type: n.type, value, ...(n.exact ? { exact: true } : {}) });
     if (col(n, 'generic')) add(col(n, 'generic').join('|'), 'NOUN', { type: n.type, value: null, generic: true });
   }
   for (const u of ont.units) add(col(u, 'words').join('|'), 'UNIT', { dim: u.dim, unit: u.unit });
   for (const w of col(ont, 'fillers') ?? []) if (!LEX[w]) add(w, 'FILLER');   // host words that carry nothing ("golem" in "hey golem")
   const MULTI = Object.keys(LEX).filter(k => k.includes(' ')).map(k => k.split(' ')).sort((a, b) => b.length - a.length);
   const SINGLE = Object.keys(LEX).filter(k => !k.includes(' '));
-  const CONTENT = new Set(Object.keys(LEX).filter(k => LEX[k].some(s => ['NOUN', 'VERB', 'UNIT'].includes(s.cat))));
+  const CONTENT = new Set(Object.keys(LEX).filter(k => LEX[k].some(s => ['NOUN', 'VERB', 'UNIT'].includes(s.cat) && !s.exact)));
   const STEMS = {};   // stem → senses of content words, so inflected forms nobody listed still resolve
-  for (const k of CONTENT) if (!k.includes(' ')) (STEMS[locale.stem(k)] ??= []).push(...LEX[k].filter(s => ['NOUN', 'VERB', 'UNIT'].includes(s.cat)).map(s => ({ ...s, lexeme: k })));
+  for (const k of CONTENT) if (!k.includes(' ')) (STEMS[locale.stem(k)] ??= []).push(...LEX[k].filter(s => ['NOUN', 'VERB', 'UNIT'].includes(s.cat) && !s.exact).map(s => ({ ...s, lexeme: k })));
   const NEEDS_ID = new Set(ont.nouns.filter(n => n.needsId).map(n => n.type));
 
   // ---- type-driven helpers used inside the grammar ----
@@ -1235,7 +1241,8 @@ function createEngine(ont, locale = ENGLISH) {
     headFirst: !!locale.headFirst,
     nextDay: locale.THEN.split('|').includes('next'),
     subject: ont.verbs.some(v => v.subject),   // some frame takes a subject before its verb
-    bareText: ont.verbs.some(v => Object.values(v.roles ?? {}).some(r => r.types.includes('text') && r.preps.includes(''))),   // a text with no marker   // "next friday" where the bank has the word
+    // a role with no marker ("decode hex 676f", "9am sao paulo in perth"): only things of the types such roles take
+    bareTypes: new Set(ont.verbs.flatMap(v => Object.values(v.roles ?? {}).filter(r => r.preps.includes('')).flatMap(r => r.types))),   // "next friday" where the bank has the word
     identTypes: new Set(ont.nouns.filter(n => n.ident).map(n => n.type)),
     postmodPreps: [...new Set(ont.postmods.map(p => p.prep))],
     postmodQuantity: new Set(ont.postmods.filter(p => p.quantity).map(p => p.prep)),
@@ -1266,7 +1273,7 @@ function createEngine(ont, locale = ENGLISH) {
   // payload), comparison signs stand alone, a number may carry a sign and thousands separators, and a colon
   // inside a word (09:30) stays in it
   const PIECE = /\r?\n\s*|:(?=\s|$)|[,?!]|[<>]=?|[=≤≥]|-?\d{1,3}(?:,\d{3})+(?:\.\d+)?(?![\d,])|(?:[^\s,?!<>=≤≥:]|:(?!\s|$))+/g;
-  const SHAPES = (ont.shapes ?? []).map(x => ({ type: x.type, re: new RegExp(`^(?:${x.re})$`, 'i') }));
+  const SHAPES = (ont.shapes ?? []).map(x => ({ type: x.type, re: new RegExp(`^(?:${x.re})$`, 'i'), at: new RegExp(`(?:${x.re})`, 'iy') }));
   // shapes the grammar knows itself: clock times (09:30, 9pm, 9h30) and ISO dates
   const clockOf = w => { let m = /^(\d{1,2}):(\d{2})(am|pm)?$/.exec(w) || /^(\d{1,2})()(am|pm)$/.exec(w) || /^(\d{1,2})h(\d{2})?()$/.exec(w); if (!m) return null;
     let h = +m[1]; const mi = m[2] ? +m[2] : 0; if (m[3] === 'pm' && h < 12) h += 12; if (m[3] === 'am' && h === 12) h = 0; return h <= 24 && mi < 60 && (!m[3] || +m[1] <= 12) ? { cat: 'CLOCK', h, mi } : null; };
@@ -1278,6 +1285,10 @@ function createEngine(ont, locale = ENGLISH) {
     const toks = []; const notes = []; const unknown = [];
     const at = (t, a, b) => Object.assign(t, { s: raw[a].s, e: raw[b - 1].e });
     for (let i = 0; i < raw.length;) {
+      let span = null;   // a shape over several pieces, ending where a piece ends
+      for (const sh of SHAPES) { sh.at.lastIndex = raw[i].s; const m = sh.at.exec(text); if (!m) continue; const end = raw[i].s + m[0].length, k = raw.findIndex((r, x) => x > i && r.e === end); if (k > i && (!span || k > span.k)) span = { k, type: sh.type }; }
+      if (span) { const types = SHAPES.filter(sh => { sh.at.lastIndex = raw[i].s; const m = sh.at.exec(text); return m && raw[i].s + m[0].length === raw[span.k].e; }).map(sh => sh.type);
+        toks.push(at({ word: text.slice(raw[i].s, raw[span.k].e).toLowerCase(), senses: types.map(type => ({ cat: 'LIT', type, value: text.slice(raw[i].s, raw[span.k].e) })) }, i, span.k + 1)); i = span.k + 1; continue; }
       let hit = null;
       let mwPlural = false;
       for (const mw of MULTI) if (mw.every((w, k) => raw[i + k]?.w === w || (k === mw.length - 1 && raw[i + k] && locale.stem(raw[i + k].w) === locale.stem(w) && LEX[mw.join(' ')].some(x => x.cat === 'NOUN')))) { hit = mw; mwPlural = locale.plural(raw[i + mw.length - 1].w); break; }
@@ -1312,7 +1323,7 @@ function createEngine(ont, locale = ENGLISH) {
   const FAB = { PREP: () => ({ cat: 'PREP', word: '∅', canon: ['*'] }), DET: () => ({ cat: 'DET', word: '∅' }), LATE: () => ({ cat: 'LATE' }) };
   // repair costs — a dozen numbers, calibrated by calib.mjs against the mutation benchmark
   const COSTS = { skipFunc: 0.5, skipUnk: 0.6, skipContent: 1.5, skipTagged: 2, skipO: 0.5, insPrep: 1, insPrepTagged: 0.5, insDet: 0.5, order: 1, subst1: 0.4, subst2: 1.2, substKnown: 2 };
-  const NEAR_POOL = Object.keys(LEX).filter(k => !k.includes(' ') && LEX[k].some(x => ['NOUN', 'VERB', 'UNIT', 'PREP'].includes(x.cat)));
+  const NEAR_POOL = Object.keys(LEX).filter(k => !k.includes(' ') && LEX[k].some(x => ['NOUN', 'VERB', 'UNIT', 'PREP'].includes(x.cat) && !x.exact));
   const CONTENT_CATS = ['NOUN', 'VERB', 'UNIT', 'NUM', 'IDENT', 'PREP'];
   function makeParser(toks, repair) {
     // repair = { budget, tags?, costs? } — tags (from a slot tagger) shape the costs: cheap to skip an O token,
@@ -1326,7 +1337,7 @@ function createEngine(ont, locale = ENGLISH) {
         if (nearCache.has(i)) return nearCache.get(i);
         const w = toks[i].word; const out = [];
         if (w.length >= 2 && !/^\d/.test(w)) {
-          for (const k of NEAR_POOL) { if (Math.abs(k.length - w.length) > 2) continue; const d = dl(w, k); if (d >= 1 && d <= 2 && (d === 1 || w.length >= 5)) for (const s of LEX[k]) if (CONTENT_CATS.includes(s.cat)) out.push({ v: { ...s, word: k }, cost: (d === 1 ? K.subst1 : K.subst2) * (toks[i].senses.every(x => x.cat === 'UNK') ? 1 : K.substKnown), to: k }); }
+          for (const k of NEAR_POOL) { if (Math.abs(k.length - w.length) > 2) continue; const d = dl(w, k); if (d >= 1 && d <= 2 && (d === 1 || w.length >= 5)) for (const s of LEX[k]) if (CONTENT_CATS.includes(s.cat) && !s.exact) out.push({ v: { ...s, word: k }, cost: (d === 1 ? K.subst1 : K.subst2) * (toks[i].senses.every(x => x.cat === 'UNK') ? 1 : K.substKnown), to: k }); }
           for (const [name, type] of Object.entries(repair.names ?? {})) { const d = dl(w, name); if (d === 1) out.push({ v: { cat: 'IDENT', name, type, word: name }, cost: K.subst1, to: name }); }
         }
         nearCache.set(i, out); return out;
@@ -1549,6 +1560,9 @@ function createEngine(ont, locale = ENGLISH) {
   // The words inside are never repaired, stemmed or looked up: the span becomes one TEXT token before parsing.
   const TEXT_THEME = new Set(ont.verbs.filter(v => (v.theme ?? []).includes('text')).map(v => v.name));
   const TEXT_PREPS = new Set(ont.verbs.flatMap(v => Object.values(v.roles ?? {}).filter(r => r.types.includes('text')).flatMap(r => r.preps)));
+  const TEXT_PREP_FRAMES = {};   // prep → the frames with a text role on it
+  for (const v of ont.verbs) for (const r of Object.values(v.roles ?? {})) if (r.types.includes('text')) for (const p of r.preps) (TEXT_PREP_FRAMES[p] ??= []).push(v);
+  const MAX_TEXT_CANDS = 160;   // a bound on the strict parses tried with free text, for input nothing reads
   const esc = w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const TRAIL = new RegExp(`(?:[\\s,;]*(?:${(locale.TRAIL ?? 'please').split('|').map(esc).join('|')})\\b|[\\s.?!]+)+$`, 'i');   // what closes a sentence, not a text
   // a bare text role opens after the verb of its frame, or after a noun of that frame's theme type
@@ -1565,16 +1579,18 @@ function createEngine(ont, locale = ENGLISH) {
       cands.push([subj], ...one.filter(s => s.i > v).map(s => [subj, s]));
     }
     const len = c => c.reduce((n, s) => n + s.j - s.from, 0);
-    return cands.sort((a, b) => len(a) - len(b) || a[0].i - b[0].i);
+    return cands.sort((a, b) => len(a) - len(b) || a[0].i - b[0].i).slice(0, MAX_TEXT_CANDS);
   }
   function textSpans(toks) {
     const out = [];
+    const said = new Set(toks.flatMap(t => t.senses.filter(s => s.cat === 'VERB').map(s => s.verb)));
+    const meant = p => (TEXT_PREP_FRAMES[p] ?? []).some(v => v.elidable || said.has(v.name));
     for (let i = 1; i <= toks.length; i++) {
       let open = null, lead = 0;
       for (const sn of toks[i - 1].senses) {
         if (sn.cat === 'VERB' && TEXT_THEME.has(sn.verb)) { open ??= 'verb'; if (i + 1 < toks.length && (col(VERBS[sn.verb], 'lead') ?? []).includes(toks[i].word)) lead = 1; }
-        else if (sn.cat === 'PREP' && sn.canon.some(c => TEXT_PREPS.has(c))) open ??= 'prep';
-        else if (sn.cat === 'COLON' && TEXT_PREPS.has(':')) open = 'colon';
+        else if (sn.cat === 'PREP' && sn.canon.some(c => TEXT_PREPS.has(c) && meant(c))) open ??= 'prep';
+        else if (sn.cat === 'COLON' && TEXT_PREPS.has(':') && meant(':')) open = 'colon';
         if ((sn.cat === 'VERB' && BARE_VERBS.has(sn.verb)) || (sn.cat === 'NOUN' && BARE_TYPES.has(sn.type))) open ??= 'bare';
       }
       if (!open || (i === toks.length && open !== 'colon')) continue;
@@ -1881,7 +1897,7 @@ const PORTUGUESE = {
   DET: 'o|a|os|as|um|uma|uns|umas|este|esta|esse|essa|meu|minha|nosso|nossa',
   REF: 'último|última|ultimo|ultima|últimos|últimas|anterior|atual|primeiro|primeira|novo|nova',
   QUANT: 'todos|todas|todo|toda|cada', EXCEPT: 'exceto|menos|excluindo|tirando|fora', CONJ: 'e|ou|mais', COMMA: ',',
-  PREP: 'com|usando|por|em|no|na|nos|nas|para|pra|pro|de|do|da|dos|das|a|ao|à|às|até|como|acima de|abaixo de|sem|contra|dentro de|sobre|onde|>|<|>=|<=|=|≥|≤|maior que|menor que|pelo menos|no mínimo|no minimo|no máximo|no maximo|igual a',
+  PREP: 'com|usando|por|em|no|na|nos|nas|para|pra|pro|de|do|da|dos|das|a|ao|à|às|até|como|acima de|abaixo de|sem|contra|dentro de|sobre|onde|depois de|antes de|desde|entre|durante|através de|atraves de|perto de|>|<|>=|<=|=|≥|≤|maior que|menor que|pelo menos|no mínimo|no minimo|no máximo|no maximo|igual a',
   THEN: 'depois|então|em seguida|aí', BUT: 'mas|porém|só que', PRON: 'isso|isto|ele|ela|eles|elas',
   AGAIN: 'de novo|novamente|repete|repetir|refaz|refazer|mesmo|mesma|igual|outra vez',
   QWORD: 'por que|porque|como|qual|quais|quando|quem|é|são|será|pode|poderia|deveria|dá',
@@ -1893,7 +1909,7 @@ const PORTUGUESE = {
     com: ['with'], usando: ['using'], por: ['by'], em: ['in', 'on'], no: ['in', 'on'], na: ['in', 'on'], nos: ['in', 'on'], nas: ['in', 'on'],
     para: ['for', 'to', 'into'], pra: ['for', 'to', 'into'], pro: ['for', 'to', 'into'], de: ['of', 'from'], do: ['of', 'from'], da: ['of', 'from'], dos: ['of', 'from'], das: ['of', 'from'],
     a: ['to', 'at'], ao: ['to', 'at'], 'à': ['to', 'at'], 'até': ['to'], como: ['as'], 'acima de': ['above', 'over'], 'abaixo de': ['below', 'under'],
-    sem: ['without'], contra: ['against'], 'dentro de': ['into'], sobre: ['on'], 'às': ['at', 'to'], onde: ['where'],
+    sem: ['without'], contra: ['against'], 'dentro de': ['into'], sobre: ['on'], 'às': ['at', 'to'], onde: ['where'], 'depois de': ['after'], 'antes de': ['before'], desde: ['since', 'from'], entre: ['between'], durante: ['during'], 'através de': ['through'], 'atraves de': ['through'], 'perto de': ['near'],
     '>': ['above'], 'maior que': ['above'], '<': ['below'], 'menor que': ['below'], '>=': ['atleast'], '≥': ['atleast'], 'pelo menos': ['atleast'], 'no mínimo': ['atleast'], 'no minimo': ['atleast'],
     '<=': ['atmost'], '≤': ['atmost'], 'no máximo': ['atmost'], 'no maximo': ['atmost'], '=': ['equals'], 'igual a': ['equals'],
   },

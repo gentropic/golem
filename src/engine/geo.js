@@ -1,8 +1,8 @@
 // Magnetic declination from @gcu/wmm (vendored WMM2025), and bearings between magnetic and true north.
 // A place is coordinates in the request; device location stays off (SPEC-skills 0.7).
-import { tool, clock, fmt, iso, p3 } from './core.js';
+import { tool, frame, noun, qmod, clock, fmt, iso, p3 } from './core.js';
 import { field, MODEL, VALID_FROM, VALID_TO } from '../vendor/wmm.js';
-import { findDate, fmtDate } from './dates.js';
+import { findDate, fmtDate, dateWords } from './dates.js';
 
 const LL = '(-?\\d{1,2}(?:\\.\\d+)?)\\s*,\\s*(-?\\d{1,3}(?:\\.\\d+)?)';
 const whereNote = { t: 'note', kind: 'err', text: 'Where? Give coordinates, as in "declination at -19.92, -43.94". Device location stays off.' };
@@ -12,13 +12,8 @@ const dirWord = x => x < 0 ? 'west' : 'east';
 const SRC = f => ({ t: 'src', text: `@gcu/wmm · vendored · ${MODEL}, valid ${VALID_FROM} to ${VALID_TO}${f.valid ? '' : ' · outside the validity window'}` });
 
 tool({
-  name: 'declination', rank: 68,
+  name: 'declination',
   skill: { group: 'Field', title: 'Magnetic declination', on: '@gcu/wmm', about: 'The World Magnetic Model at a place and date, and magnetic to true bearings.', examples: ['declination at -19.92, -43.94', '045 magnetic to true at -19.92, -43.94'] },
-  read: (text, q) => {
-    if (/^(?:magnetic )?declination(?: here)?$/.test(q)) return { here: true };
-    const m = new RegExp(`^(?:magnetic )?declination (?:at|for|in) ${LL}(?: on (.+))?$`).exec(q); if (!m) return null;
-    const args = { lat: +m[1], lon: +m[2] }; if (m[3]) { const d = findDate(m[3]); if (!d) return null; args.date = iso(d.d); } return args;
-  },
   topic: () => ['Declination', 2],
   run: a => {
     if (a.here) return { read: ['declination', { v: 'here' }], body: [whereNote], trace: ['no place: device location is off and no coordinates were given'] };
@@ -34,11 +29,7 @@ tool({
   }
 });
 tool({
-  name: 'bearing', rank: 69,
-  read: (text, q) => {
-    const m = new RegExp(`^(\\d{1,3}(?:\\.\\d+)?) (magnetic|true|grid) to (magnetic|true|grid)(?: at ${LL}(?: on (.+))?)?$`).exec(q); if (!m) return null;
-    const args = { v: +m[1], from: m[2], to: m[3] }; if (m[4]) { args.lat = +m[4]; args.lon = +m[5]; } if (m[6]) { const d = findDate(m[6]); if (!d) return null; args.date = iso(d.d); } return args;
-  },
+  name: 'bearing',
   topic: () => ['Declination', 1],
   run: a => {
     const read = [{ v: p3(a.v) }, a.from, 'to', a.to];
@@ -52,4 +43,21 @@ tool({
       trace: [`wmm.field(${a.lat}, ${a.lon}, ${fmt(f.year, 6)}) → declination ${fmt(f.decl, 5)}°`, `${a.v} ${a.from === 'magnetic' ? '+' : '−'} ${fmt(f.decl, 5)} = ${fmt(out, 5)}`], py: `wmm.to_${a.to}(${a.v}, ${a.lat}, ${a.lon}, "${iso(d)}")`
     };
   }
+});
+/* ── what reads them: "declination at -19.92, -43.94", "045 magnetic to true at -19.92, -43.94" ── */
+const llOf = n => { const m = n && n.type === 'coords' && /^(-?[\d.]+)\s*,\s*(-?[\d.]+)$/.exec(n.value); return m ? { lat: +m[1], lon: +m[2] } : null; };
+const dateArg = n => { if (!n) return {}; const d = findDate(dateWords(n)); return d ? { date: iso(d.d) } : null; };
+frame({
+  name: 'declination', label: 'Declination', words: ['declination', 'magnetic declination'], theme: [], required: [],
+  roles: { at: { preps: ['at', 'for', 'in', ''], types: ['coords', 'place'] }, on: { preps: ['on', 'for'], types: ['date', 'holiday'] } },
+  words_pt: ['declinação', 'declinacao', 'declinação magnética'], label_pt: 'Declinação',
+  bind: c => { const at = c.roles.at && c.roles.at[0]; if (!at || at.value === 'here') return { tool: 'declination', args: { here: true } }; const ll = llOf(at), d = dateArg(c.roles.on && c.roles.on[0]); return ll && d ? { tool: 'declination', args: { ...ll, ...d } } : null; }
+});
+noun({ type: 'north', words: { magnetic: ['magnetic', 'magnetic north'], true: ['true', 'true north'], grid: ['grid', 'grid north'] }, words_pt: { magnetic: ['magnético', 'magnetico'], true: ['verdadeiro'], grid: ['quadrícula', 'quadricula'] } });
+qmod({ head: 'north', attr: 'bearing', dims: ['bare', 'angle'] });   // "045 magnetic"
+frame({
+  name: 'bearing', label: 'Bearing', words: ['convert'], elidable: true, theme: ['north'], required: ['theme', 'to'],
+  roles: { to: { preps: ['to', 'into', 'as'], types: ['north'] }, at: { preps: ['at', 'for', 'in'], types: ['coords'] }, on: { preps: ['on'], types: ['date', 'holiday'] } }, label_pt: 'Rumo',
+  bind: c => { const b = c.theme[0].attrs && c.theme[0].attrs.bearing; if (!b) return null; const ll = llOf(c.roles.at && c.roles.at[0]), d = dateArg(c.roles.on && c.roles.on[0]); if (!d) return null;
+    return { tool: 'bearing', args: { v: b.n, from: c.theme[0].value, to: c.roles.to[0].value, ...(ll || {}), ...d } }; }
 });

@@ -1530,6 +1530,145 @@
       ]
     },
     {
+      "type": "holiday",
+      "words": {
+        "christmas": [
+          "christmas"
+        ],
+        "christmas day": [
+          "christmas day"
+        ],
+        "xmas": [
+          "xmas"
+        ],
+        "christmas eve": [
+          "christmas eve"
+        ],
+        "new year's day": [
+          "new year's day"
+        ],
+        "new year": [
+          "new year"
+        ],
+        "new years day": [
+          "new years day"
+        ],
+        "new year's eve": [
+          "new year's eve"
+        ],
+        "new years eve": [
+          "new years eve"
+        ],
+        "easter": [
+          "easter"
+        ],
+        "easter sunday": [
+          "easter sunday"
+        ],
+        "good friday": [
+          "good friday"
+        ],
+        "carnival": [
+          "carnival"
+        ],
+        "carnival tuesday": [
+          "carnival tuesday"
+        ],
+        "carnival monday": [
+          "carnival monday"
+        ],
+        "ash wednesday": [
+          "ash wednesday"
+        ],
+        "corpus christi": [
+          "corpus christi"
+        ],
+        "palm sunday": [
+          "palm sunday"
+        ],
+        "pentecost": [
+          "pentecost"
+        ],
+        "whit sunday": [
+          "whit sunday"
+        ],
+        "ascension": [
+          "ascension"
+        ]
+      },
+      "words_pt": {
+        "christmas": [
+          "natal"
+        ],
+        "christmas eve": [
+          "véspera de natal",
+          "vespera de natal"
+        ],
+        "new year": [
+          "ano novo",
+          "réveillon"
+        ],
+        "easter": [
+          "páscoa",
+          "pascoa"
+        ],
+        "carnival": [
+          "carnaval"
+        ],
+        "good friday": [
+          "sexta-feira santa"
+        ],
+        "corpus christi": [
+          "corpus christi"
+        ]
+      }
+    },
+    {
+      "type": "alarm",
+      "words": {
+        "alarm": [
+          "alarm",
+          "wake-up alarm"
+        ]
+      },
+      "words_pt": {
+        "alarm": [
+          "alarme",
+          "despertador"
+        ]
+      }
+    },
+    {
+      "type": "north",
+      "words": {
+        "magnetic": [
+          "magnetic",
+          "magnetic north"
+        ],
+        "true": [
+          "true",
+          "true north"
+        ],
+        "grid": [
+          "grid",
+          "grid north"
+        ]
+      },
+      "words_pt": {
+        "magnetic": [
+          "magnético",
+          "magnetico"
+        ],
+        "true": [
+          "verdadeiro"
+        ],
+        "grid": [
+          "quadrícula",
+          "quadricula"
+        ]
+      }
+    },
+    {
       "type": "encoding",
       "words": {
         "base64": [
@@ -1570,9 +1709,3057 @@
         "codificação",
         "codificacao"
       ]
+    },
+    {
+      "type": "daykind",
+      "words": {
+        "working": [
+          "a working day",
+          "a business day",
+          "a work day",
+          "a workday",
+          "working day",
+          "business day"
+        ]
+      },
+      "words_pt": {
+        "working": [
+          "dia útil",
+          "dia util",
+          "um dia útil",
+          "um dia util"
+        ]
+      }
+    },
+    {
+      "type": "nextwork",
+      "words": {
+        "next": [
+          "next working day",
+          "next business day"
+        ]
+      },
+      "words_pt": {
+        "next": [
+          "próximo dia útil",
+          "proximo dia util"
+        ]
+      }
+    },
+    {
+      "type": "place",
+      "exact": true,
+      "words": {
+        "abidjan": [
+          "abidjan"
+        ],
+        "accra": [
+          "accra"
+        ],
+        "addis ababa": [
+          "addis ababa"
+        ],
+        "algiers": [
+          "algiers"
+        ],
+        "asmera": [
+          "asmera"
+        ],
+        "bamako": [
+          "bamako"
+        ],
+        "bangui": [
+          "bangui"
+        ],
+        "banjul": [
+          "banjul"
+        ],
+        "bissau": [
+          "bissau"
+        ],
+        "blantyre": [
+          "blantyre"
+        ],
+        "brazzaville": [
+          "brazzaville"
+        ],
+        "bujumbura": [
+          "bujumbura"
+        ],
+        "cairo": [
+          "cairo"
+        ],
+        "casablanca": [
+          "casablanca"
+        ],
+        "ceuta": [
+          "ceuta"
+        ],
+        "conakry": [
+          "conakry"
+        ],
+        "dakar": [
+          "dakar"
+        ],
+        "dar es salaam": [
+          "dar es salaam"
+        ],
+        "djibouti": [
+          "djibouti"
+        ],
+        "douala": [
+          "douala"
+        ],
+        "el aaiun": [
+          "el aaiun"
+        ],
+        "freetown": [
+          "freetown"
+        ],
+        "gaborone": [
+          "gaborone"
+        ],
+        "harare": [
+          "harare"
+        ],
+        "johannesburg": [
+          "johannesburg"
+        ],
+        "juba": [
+          "juba"
+        ],
+        "kampala": [
+          "kampala"
+        ],
+        "khartoum": [
+          "khartoum"
+        ],
+        "kigali": [
+          "kigali"
+        ],
+        "kinshasa": [
+          "kinshasa"
+        ],
+        "lagos": [
+          "lagos"
+        ],
+        "libreville": [
+          "libreville"
+        ],
+        "lome": [
+          "lome"
+        ],
+        "luanda": [
+          "luanda"
+        ],
+        "lubumbashi": [
+          "lubumbashi"
+        ],
+        "lusaka": [
+          "lusaka"
+        ],
+        "malabo": [
+          "malabo"
+        ],
+        "maputo": [
+          "maputo"
+        ],
+        "maseru": [
+          "maseru"
+        ],
+        "mbabane": [
+          "mbabane"
+        ],
+        "mogadishu": [
+          "mogadishu"
+        ],
+        "monrovia": [
+          "monrovia"
+        ],
+        "nairobi": [
+          "nairobi"
+        ],
+        "ndjamena": [
+          "ndjamena"
+        ],
+        "niamey": [
+          "niamey"
+        ],
+        "nouakchott": [
+          "nouakchott"
+        ],
+        "ouagadougou": [
+          "ouagadougou"
+        ],
+        "porto-novo": [
+          "porto-novo"
+        ],
+        "sao tome": [
+          "sao tome"
+        ],
+        "tripoli": [
+          "tripoli"
+        ],
+        "tunis": [
+          "tunis"
+        ],
+        "windhoek": [
+          "windhoek"
+        ],
+        "adak": [
+          "adak"
+        ],
+        "anchorage": [
+          "anchorage"
+        ],
+        "anguilla": [
+          "anguilla"
+        ],
+        "antigua": [
+          "antigua"
+        ],
+        "araguaina": [
+          "araguaina"
+        ],
+        "la rioja": [
+          "la rioja"
+        ],
+        "rio gallegos": [
+          "rio gallegos"
+        ],
+        "salta": [
+          "salta"
+        ],
+        "san juan": [
+          "san juan"
+        ],
+        "san luis": [
+          "san luis"
+        ],
+        "tucuman": [
+          "tucuman"
+        ],
+        "ushuaia": [
+          "ushuaia"
+        ],
+        "aruba": [
+          "aruba"
+        ],
+        "asuncion": [
+          "asuncion"
+        ],
+        "bahia": [
+          "bahia"
+        ],
+        "bahia banderas": [
+          "bahia banderas"
+        ],
+        "barbados": [
+          "barbados"
+        ],
+        "belem": [
+          "belem"
+        ],
+        "belize": [
+          "belize"
+        ],
+        "blanc-sablon": [
+          "blanc-sablon"
+        ],
+        "boa vista": [
+          "boa vista"
+        ],
+        "bogota": [
+          "bogota"
+        ],
+        "boise": [
+          "boise"
+        ],
+        "buenos aires": [
+          "buenos aires"
+        ],
+        "cambridge bay": [
+          "cambridge bay"
+        ],
+        "campo grande": [
+          "campo grande"
+        ],
+        "cancun": [
+          "cancun"
+        ],
+        "caracas": [
+          "caracas"
+        ],
+        "catamarca": [
+          "catamarca"
+        ],
+        "cayenne": [
+          "cayenne"
+        ],
+        "cayman": [
+          "cayman"
+        ],
+        "chicago": [
+          "chicago"
+        ],
+        "chihuahua": [
+          "chihuahua"
+        ],
+        "ciudad juarez": [
+          "ciudad juarez"
+        ],
+        "coral harbour": [
+          "coral harbour"
+        ],
+        "cordoba": [
+          "cordoba"
+        ],
+        "costa rica": [
+          "costa rica"
+        ],
+        "coyhaique": [
+          "coyhaique"
+        ],
+        "creston": [
+          "creston"
+        ],
+        "cuiaba": [
+          "cuiaba"
+        ],
+        "curacao": [
+          "curacao"
+        ],
+        "danmarkshavn": [
+          "danmarkshavn"
+        ],
+        "dawson": [
+          "dawson"
+        ],
+        "dawson creek": [
+          "dawson creek"
+        ],
+        "denver": [
+          "denver"
+        ],
+        "detroit": [
+          "detroit"
+        ],
+        "dominica": [
+          "dominica"
+        ],
+        "edmonton": [
+          "edmonton"
+        ],
+        "eirunepe": [
+          "eirunepe"
+        ],
+        "el salvador": [
+          "el salvador"
+        ],
+        "fort nelson": [
+          "fort nelson"
+        ],
+        "fortaleza": [
+          "fortaleza"
+        ],
+        "glace bay": [
+          "glace bay"
+        ],
+        "godthab": [
+          "godthab"
+        ],
+        "goose bay": [
+          "goose bay"
+        ],
+        "grand turk": [
+          "grand turk"
+        ],
+        "grenada": [
+          "grenada"
+        ],
+        "guadeloupe": [
+          "guadeloupe"
+        ],
+        "guatemala": [
+          "guatemala"
+        ],
+        "guayaquil": [
+          "guayaquil"
+        ],
+        "guyana": [
+          "guyana"
+        ],
+        "halifax": [
+          "halifax"
+        ],
+        "havana": [
+          "havana"
+        ],
+        "hermosillo": [
+          "hermosillo"
+        ],
+        "knox": [
+          "knox"
+        ],
+        "marengo": [
+          "marengo"
+        ],
+        "petersburg": [
+          "petersburg"
+        ],
+        "tell city": [
+          "tell city"
+        ],
+        "vevay": [
+          "vevay"
+        ],
+        "vincennes": [
+          "vincennes"
+        ],
+        "winamac": [
+          "winamac"
+        ],
+        "indianapolis": [
+          "indianapolis"
+        ],
+        "inuvik": [
+          "inuvik"
+        ],
+        "iqaluit": [
+          "iqaluit"
+        ],
+        "jamaica": [
+          "jamaica"
+        ],
+        "jujuy": [
+          "jujuy"
+        ],
+        "juneau": [
+          "juneau"
+        ],
+        "monticello": [
+          "monticello"
+        ],
+        "kralendijk": [
+          "kralendijk"
+        ],
+        "la paz": [
+          "la paz"
+        ],
+        "lima": [
+          "lima"
+        ],
+        "los angeles": [
+          "los angeles"
+        ],
+        "louisville": [
+          "louisville"
+        ],
+        "lower princes": [
+          "lower princes"
+        ],
+        "maceio": [
+          "maceio"
+        ],
+        "managua": [
+          "managua"
+        ],
+        "manaus": [
+          "manaus"
+        ],
+        "marigot": [
+          "marigot"
+        ],
+        "martinique": [
+          "martinique"
+        ],
+        "matamoros": [
+          "matamoros"
+        ],
+        "mazatlan": [
+          "mazatlan"
+        ],
+        "mendoza": [
+          "mendoza"
+        ],
+        "menominee": [
+          "menominee"
+        ],
+        "merida": [
+          "merida"
+        ],
+        "metlakatla": [
+          "metlakatla"
+        ],
+        "mexico city": [
+          "mexico city"
+        ],
+        "miquelon": [
+          "miquelon"
+        ],
+        "moncton": [
+          "moncton"
+        ],
+        "monterrey": [
+          "monterrey"
+        ],
+        "montevideo": [
+          "montevideo"
+        ],
+        "montserrat": [
+          "montserrat"
+        ],
+        "nassau": [
+          "nassau"
+        ],
+        "new york": [
+          "new york"
+        ],
+        "nome": [
+          "nome"
+        ],
+        "noronha": [
+          "noronha"
+        ],
+        "beulah": [
+          "beulah"
+        ],
+        "center": [
+          "center"
+        ],
+        "new salem": [
+          "new salem"
+        ],
+        "ojinaga": [
+          "ojinaga"
+        ],
+        "panama": [
+          "panama"
+        ],
+        "paramaribo": [
+          "paramaribo"
+        ],
+        "phoenix": [
+          "phoenix"
+        ],
+        "port-au-prince": [
+          "port-au-prince"
+        ],
+        "port of spain": [
+          "port of spain"
+        ],
+        "porto velho": [
+          "porto velho"
+        ],
+        "puerto rico": [
+          "puerto rico"
+        ],
+        "punta arenas": [
+          "punta arenas"
+        ],
+        "rankin inlet": [
+          "rankin inlet"
+        ],
+        "recife": [
+          "recife"
+        ],
+        "regina": [
+          "regina"
+        ],
+        "resolute": [
+          "resolute"
+        ],
+        "rio branco": [
+          "rio branco"
+        ],
+        "santarem": [
+          "santarem"
+        ],
+        "santiago": [
+          "santiago"
+        ],
+        "santo domingo": [
+          "santo domingo"
+        ],
+        "sao paulo": [
+          "sao paulo"
+        ],
+        "scoresbysund": [
+          "scoresbysund"
+        ],
+        "sitka": [
+          "sitka"
+        ],
+        "st barthelemy": [
+          "st barthelemy"
+        ],
+        "st johns": [
+          "st johns"
+        ],
+        "st kitts": [
+          "st kitts"
+        ],
+        "st lucia": [
+          "st lucia"
+        ],
+        "st thomas": [
+          "st thomas"
+        ],
+        "st vincent": [
+          "st vincent"
+        ],
+        "swift current": [
+          "swift current"
+        ],
+        "tegucigalpa": [
+          "tegucigalpa"
+        ],
+        "thule": [
+          "thule"
+        ],
+        "tijuana": [
+          "tijuana"
+        ],
+        "toronto": [
+          "toronto"
+        ],
+        "tortola": [
+          "tortola"
+        ],
+        "vancouver": [
+          "vancouver"
+        ],
+        "whitehorse": [
+          "whitehorse"
+        ],
+        "winnipeg": [
+          "winnipeg"
+        ],
+        "yakutat": [
+          "yakutat"
+        ],
+        "casey": [
+          "casey"
+        ],
+        "davis": [
+          "davis"
+        ],
+        "dumontdurville": [
+          "dumontdurville"
+        ],
+        "macquarie": [
+          "macquarie"
+        ],
+        "mawson": [
+          "mawson"
+        ],
+        "mcmurdo": [
+          "mcmurdo"
+        ],
+        "palmer": [
+          "palmer"
+        ],
+        "rothera": [
+          "rothera"
+        ],
+        "syowa": [
+          "syowa"
+        ],
+        "troll": [
+          "troll"
+        ],
+        "vostok": [
+          "vostok"
+        ],
+        "longyearbyen": [
+          "longyearbyen"
+        ],
+        "aden": [
+          "aden"
+        ],
+        "almaty": [
+          "almaty"
+        ],
+        "amman": [
+          "amman"
+        ],
+        "anadyr": [
+          "anadyr"
+        ],
+        "aqtau": [
+          "aqtau"
+        ],
+        "aqtobe": [
+          "aqtobe"
+        ],
+        "ashgabat": [
+          "ashgabat"
+        ],
+        "atyrau": [
+          "atyrau"
+        ],
+        "baghdad": [
+          "baghdad"
+        ],
+        "bahrain": [
+          "bahrain"
+        ],
+        "baku": [
+          "baku"
+        ],
+        "bangkok": [
+          "bangkok"
+        ],
+        "barnaul": [
+          "barnaul"
+        ],
+        "beirut": [
+          "beirut"
+        ],
+        "bishkek": [
+          "bishkek"
+        ],
+        "brunei": [
+          "brunei"
+        ],
+        "calcutta": [
+          "calcutta"
+        ],
+        "chita": [
+          "chita"
+        ],
+        "colombo": [
+          "colombo"
+        ],
+        "damascus": [
+          "damascus"
+        ],
+        "dhaka": [
+          "dhaka"
+        ],
+        "dili": [
+          "dili"
+        ],
+        "dubai": [
+          "dubai"
+        ],
+        "dushanbe": [
+          "dushanbe"
+        ],
+        "famagusta": [
+          "famagusta"
+        ],
+        "gaza": [
+          "gaza"
+        ],
+        "hebron": [
+          "hebron"
+        ],
+        "hong kong": [
+          "hong kong"
+        ],
+        "hovd": [
+          "hovd"
+        ],
+        "irkutsk": [
+          "irkutsk"
+        ],
+        "jakarta": [
+          "jakarta"
+        ],
+        "jayapura": [
+          "jayapura"
+        ],
+        "jerusalem": [
+          "jerusalem"
+        ],
+        "kabul": [
+          "kabul"
+        ],
+        "kamchatka": [
+          "kamchatka"
+        ],
+        "karachi": [
+          "karachi"
+        ],
+        "katmandu": [
+          "katmandu"
+        ],
+        "khandyga": [
+          "khandyga"
+        ],
+        "krasnoyarsk": [
+          "krasnoyarsk"
+        ],
+        "kuala lumpur": [
+          "kuala lumpur"
+        ],
+        "kuching": [
+          "kuching"
+        ],
+        "kuwait": [
+          "kuwait"
+        ],
+        "macau": [
+          "macau"
+        ],
+        "magadan": [
+          "magadan"
+        ],
+        "makassar": [
+          "makassar"
+        ],
+        "manila": [
+          "manila"
+        ],
+        "muscat": [
+          "muscat"
+        ],
+        "nicosia": [
+          "nicosia"
+        ],
+        "novokuznetsk": [
+          "novokuznetsk"
+        ],
+        "novosibirsk": [
+          "novosibirsk"
+        ],
+        "omsk": [
+          "omsk"
+        ],
+        "oral": [
+          "oral"
+        ],
+        "phnom penh": [
+          "phnom penh"
+        ],
+        "pontianak": [
+          "pontianak"
+        ],
+        "pyongyang": [
+          "pyongyang"
+        ],
+        "qatar": [
+          "qatar"
+        ],
+        "qostanay": [
+          "qostanay"
+        ],
+        "qyzylorda": [
+          "qyzylorda"
+        ],
+        "rangoon": [
+          "rangoon"
+        ],
+        "riyadh": [
+          "riyadh"
+        ],
+        "saigon": [
+          "saigon"
+        ],
+        "sakhalin": [
+          "sakhalin"
+        ],
+        "samarkand": [
+          "samarkand"
+        ],
+        "seoul": [
+          "seoul"
+        ],
+        "shanghai": [
+          "shanghai"
+        ],
+        "singapore": [
+          "singapore"
+        ],
+        "srednekolymsk": [
+          "srednekolymsk"
+        ],
+        "taipei": [
+          "taipei"
+        ],
+        "tashkent": [
+          "tashkent"
+        ],
+        "tbilisi": [
+          "tbilisi"
+        ],
+        "tehran": [
+          "tehran"
+        ],
+        "thimphu": [
+          "thimphu"
+        ],
+        "tokyo": [
+          "tokyo"
+        ],
+        "tomsk": [
+          "tomsk"
+        ],
+        "ulaanbaatar": [
+          "ulaanbaatar"
+        ],
+        "urumqi": [
+          "urumqi"
+        ],
+        "ust-nera": [
+          "ust-nera"
+        ],
+        "vientiane": [
+          "vientiane"
+        ],
+        "vladivostok": [
+          "vladivostok"
+        ],
+        "yakutsk": [
+          "yakutsk"
+        ],
+        "yekaterinburg": [
+          "yekaterinburg"
+        ],
+        "yerevan": [
+          "yerevan"
+        ],
+        "azores": [
+          "azores"
+        ],
+        "bermuda": [
+          "bermuda"
+        ],
+        "canary": [
+          "canary"
+        ],
+        "cape verde": [
+          "cape verde"
+        ],
+        "faeroe": [
+          "faeroe"
+        ],
+        "madeira": [
+          "madeira"
+        ],
+        "reykjavik": [
+          "reykjavik"
+        ],
+        "south georgia": [
+          "south georgia"
+        ],
+        "st helena": [
+          "st helena"
+        ],
+        "stanley": [
+          "stanley"
+        ],
+        "adelaide": [
+          "adelaide"
+        ],
+        "brisbane": [
+          "brisbane"
+        ],
+        "broken hill": [
+          "broken hill"
+        ],
+        "darwin": [
+          "darwin"
+        ],
+        "eucla": [
+          "eucla"
+        ],
+        "hobart": [
+          "hobart"
+        ],
+        "lindeman": [
+          "lindeman"
+        ],
+        "lord howe": [
+          "lord howe"
+        ],
+        "melbourne": [
+          "melbourne"
+        ],
+        "perth": [
+          "perth"
+        ],
+        "sydney": [
+          "sydney"
+        ],
+        "amsterdam": [
+          "amsterdam"
+        ],
+        "andorra": [
+          "andorra"
+        ],
+        "astrakhan": [
+          "astrakhan"
+        ],
+        "athens": [
+          "athens"
+        ],
+        "belgrade": [
+          "belgrade"
+        ],
+        "berlin": [
+          "berlin"
+        ],
+        "bratislava": [
+          "bratislava"
+        ],
+        "brussels": [
+          "brussels"
+        ],
+        "bucharest": [
+          "bucharest"
+        ],
+        "budapest": [
+          "budapest"
+        ],
+        "busingen": [
+          "busingen"
+        ],
+        "chisinau": [
+          "chisinau"
+        ],
+        "copenhagen": [
+          "copenhagen"
+        ],
+        "dublin": [
+          "dublin"
+        ],
+        "gibraltar": [
+          "gibraltar"
+        ],
+        "guernsey": [
+          "guernsey"
+        ],
+        "helsinki": [
+          "helsinki"
+        ],
+        "isle of man": [
+          "isle of man"
+        ],
+        "istanbul": [
+          "istanbul"
+        ],
+        "jersey": [
+          "jersey"
+        ],
+        "kaliningrad": [
+          "kaliningrad"
+        ],
+        "kiev": [
+          "kiev"
+        ],
+        "kirov": [
+          "kirov"
+        ],
+        "lisbon": [
+          "lisbon"
+        ],
+        "ljubljana": [
+          "ljubljana"
+        ],
+        "london": [
+          "london"
+        ],
+        "luxembourg": [
+          "luxembourg"
+        ],
+        "madrid": [
+          "madrid"
+        ],
+        "malta": [
+          "malta"
+        ],
+        "mariehamn": [
+          "mariehamn"
+        ],
+        "minsk": [
+          "minsk"
+        ],
+        "monaco": [
+          "monaco"
+        ],
+        "moscow": [
+          "moscow"
+        ],
+        "oslo": [
+          "oslo"
+        ],
+        "paris": [
+          "paris"
+        ],
+        "podgorica": [
+          "podgorica"
+        ],
+        "prague": [
+          "prague"
+        ],
+        "riga": [
+          "riga"
+        ],
+        "rome": [
+          "rome"
+        ],
+        "samara": [
+          "samara"
+        ],
+        "san marino": [
+          "san marino"
+        ],
+        "sarajevo": [
+          "sarajevo"
+        ],
+        "saratov": [
+          "saratov"
+        ],
+        "simferopol": [
+          "simferopol"
+        ],
+        "skopje": [
+          "skopje"
+        ],
+        "sofia": [
+          "sofia"
+        ],
+        "stockholm": [
+          "stockholm"
+        ],
+        "tallinn": [
+          "tallinn"
+        ],
+        "tirane": [
+          "tirane"
+        ],
+        "ulyanovsk": [
+          "ulyanovsk"
+        ],
+        "vaduz": [
+          "vaduz"
+        ],
+        "vatican": [
+          "vatican"
+        ],
+        "vienna": [
+          "vienna"
+        ],
+        "vilnius": [
+          "vilnius"
+        ],
+        "volgograd": [
+          "volgograd"
+        ],
+        "warsaw": [
+          "warsaw"
+        ],
+        "zagreb": [
+          "zagreb"
+        ],
+        "zurich": [
+          "zurich"
+        ],
+        "antananarivo": [
+          "antananarivo"
+        ],
+        "chagos": [
+          "chagos"
+        ],
+        "christmas": [
+          "christmas"
+        ],
+        "cocos": [
+          "cocos"
+        ],
+        "comoro": [
+          "comoro"
+        ],
+        "kerguelen": [
+          "kerguelen"
+        ],
+        "mahe": [
+          "mahe"
+        ],
+        "maldives": [
+          "maldives"
+        ],
+        "mauritius": [
+          "mauritius"
+        ],
+        "mayotte": [
+          "mayotte"
+        ],
+        "reunion": [
+          "reunion"
+        ],
+        "apia": [
+          "apia"
+        ],
+        "auckland": [
+          "auckland"
+        ],
+        "bougainville": [
+          "bougainville"
+        ],
+        "chatham": [
+          "chatham"
+        ],
+        "easter": [
+          "easter"
+        ],
+        "efate": [
+          "efate"
+        ],
+        "enderbury": [
+          "enderbury"
+        ],
+        "fakaofo": [
+          "fakaofo"
+        ],
+        "fiji": [
+          "fiji"
+        ],
+        "funafuti": [
+          "funafuti"
+        ],
+        "galapagos": [
+          "galapagos"
+        ],
+        "gambier": [
+          "gambier"
+        ],
+        "guadalcanal": [
+          "guadalcanal"
+        ],
+        "guam": [
+          "guam"
+        ],
+        "honolulu": [
+          "honolulu"
+        ],
+        "kiritimati": [
+          "kiritimati"
+        ],
+        "kosrae": [
+          "kosrae"
+        ],
+        "kwajalein": [
+          "kwajalein"
+        ],
+        "majuro": [
+          "majuro"
+        ],
+        "marquesas": [
+          "marquesas"
+        ],
+        "midway": [
+          "midway"
+        ],
+        "nauru": [
+          "nauru"
+        ],
+        "niue": [
+          "niue"
+        ],
+        "norfolk": [
+          "norfolk"
+        ],
+        "noumea": [
+          "noumea"
+        ],
+        "pago pago": [
+          "pago pago"
+        ],
+        "palau": [
+          "palau"
+        ],
+        "pitcairn": [
+          "pitcairn"
+        ],
+        "ponape": [
+          "ponape"
+        ],
+        "port moresby": [
+          "port moresby"
+        ],
+        "rarotonga": [
+          "rarotonga"
+        ],
+        "saipan": [
+          "saipan"
+        ],
+        "tahiti": [
+          "tahiti"
+        ],
+        "tarawa": [
+          "tarawa"
+        ],
+        "tongatapu": [
+          "tongatapu"
+        ],
+        "truk": [
+          "truk"
+        ],
+        "wake": [
+          "wake"
+        ],
+        "wallis": [
+          "wallis"
+        ],
+        "utc": [
+          "utc"
+        ],
+        "gmt": [
+          "gmt"
+        ],
+        "z": [
+          "z"
+        ],
+        "zulu": [
+          "zulu"
+        ],
+        "belo horizonte": [
+          "belo horizonte"
+        ],
+        "brasilia": [
+          "brasilia"
+        ],
+        "brasília": [
+          "brasília"
+        ],
+        "rio": [
+          "rio"
+        ],
+        "rio de janeiro": [
+          "rio de janeiro"
+        ],
+        "são paulo": [
+          "são paulo"
+        ],
+        "brazil": [
+          "brazil"
+        ],
+        "brasil": [
+          "brasil"
+        ],
+        "japan": [
+          "japan"
+        ],
+        "china": [
+          "china"
+        ],
+        "beijing": [
+          "beijing"
+        ],
+        "india": [
+          "india"
+        ],
+        "mumbai": [
+          "mumbai"
+        ],
+        "delhi": [
+          "delhi"
+        ],
+        "new delhi": [
+          "new delhi"
+        ],
+        "uk": [
+          "uk"
+        ],
+        "britain": [
+          "britain"
+        ],
+        "england": [
+          "england"
+        ],
+        "france": [
+          "france"
+        ],
+        "germany": [
+          "germany"
+        ],
+        "spain": [
+          "spain"
+        ],
+        "portugal": [
+          "portugal"
+        ],
+        "italy": [
+          "italy"
+        ],
+        "netherlands": [
+          "netherlands"
+        ],
+        "chile": [
+          "chile"
+        ],
+        "peru": [
+          "peru"
+        ],
+        "colombia": [
+          "colombia"
+        ],
+        "argentina": [
+          "argentina"
+        ],
+        "south africa": [
+          "south africa"
+        ],
+        "la": [
+          "la"
+        ],
+        "nyc": [
+          "nyc"
+        ],
+        "new york city": [
+          "new york city"
+        ],
+        "sf": [
+          "sf"
+        ],
+        "san francisco": [
+          "san francisco"
+        ],
+        "seattle": [
+          "seattle"
+        ],
+        "tel aviv": [
+          "tel aviv"
+        ],
+        "mexico": [
+          "mexico"
+        ],
+        "cape town": [
+          "cape town"
+        ],
+        "salt lake city": [
+          "salt lake city"
+        ],
+        "bangalore": [
+          "bangalore"
+        ],
+        "bengaluru": [
+          "bengaluru"
+        ],
+        "wellington": [
+          "wellington"
+        ],
+        "new zealand": [
+          "new zealand"
+        ],
+        "here": [
+          "here"
+        ],
+        "my time": [
+          "my time"
+        ],
+        "local": [
+          "local"
+        ],
+        "local time": [
+          "local time"
+        ],
+        "my zone": [
+          "my zone"
+        ],
+        "device time": [
+          "device time"
+        ],
+        "home": [
+          "home"
+        ]
+      },
+      "generic": [
+        "place"
+      ],
+      "words_pt": {
+        "abidjan": [
+          "abidjan"
+        ],
+        "accra": [
+          "accra"
+        ],
+        "addis ababa": [
+          "addis ababa"
+        ],
+        "algiers": [
+          "algiers"
+        ],
+        "asmera": [
+          "asmera"
+        ],
+        "bamako": [
+          "bamako"
+        ],
+        "bangui": [
+          "bangui"
+        ],
+        "banjul": [
+          "banjul"
+        ],
+        "bissau": [
+          "bissau"
+        ],
+        "blantyre": [
+          "blantyre"
+        ],
+        "brazzaville": [
+          "brazzaville"
+        ],
+        "bujumbura": [
+          "bujumbura"
+        ],
+        "cairo": [
+          "cairo"
+        ],
+        "casablanca": [
+          "casablanca"
+        ],
+        "ceuta": [
+          "ceuta"
+        ],
+        "conakry": [
+          "conakry"
+        ],
+        "dakar": [
+          "dakar"
+        ],
+        "dar es salaam": [
+          "dar es salaam"
+        ],
+        "djibouti": [
+          "djibouti"
+        ],
+        "douala": [
+          "douala"
+        ],
+        "el aaiun": [
+          "el aaiun"
+        ],
+        "freetown": [
+          "freetown"
+        ],
+        "gaborone": [
+          "gaborone"
+        ],
+        "harare": [
+          "harare"
+        ],
+        "johannesburg": [
+          "johannesburg"
+        ],
+        "juba": [
+          "juba"
+        ],
+        "kampala": [
+          "kampala"
+        ],
+        "khartoum": [
+          "khartoum"
+        ],
+        "kigali": [
+          "kigali"
+        ],
+        "kinshasa": [
+          "kinshasa"
+        ],
+        "lagos": [
+          "lagos"
+        ],
+        "libreville": [
+          "libreville"
+        ],
+        "lome": [
+          "lome"
+        ],
+        "luanda": [
+          "luanda"
+        ],
+        "lubumbashi": [
+          "lubumbashi"
+        ],
+        "lusaka": [
+          "lusaka"
+        ],
+        "malabo": [
+          "malabo"
+        ],
+        "maputo": [
+          "maputo"
+        ],
+        "maseru": [
+          "maseru"
+        ],
+        "mbabane": [
+          "mbabane"
+        ],
+        "mogadishu": [
+          "mogadishu"
+        ],
+        "monrovia": [
+          "monrovia"
+        ],
+        "nairobi": [
+          "nairobi"
+        ],
+        "ndjamena": [
+          "ndjamena"
+        ],
+        "niamey": [
+          "niamey"
+        ],
+        "nouakchott": [
+          "nouakchott"
+        ],
+        "ouagadougou": [
+          "ouagadougou"
+        ],
+        "porto-novo": [
+          "porto-novo"
+        ],
+        "sao tome": [
+          "sao tome"
+        ],
+        "tripoli": [
+          "tripoli"
+        ],
+        "tunis": [
+          "tunis"
+        ],
+        "windhoek": [
+          "windhoek"
+        ],
+        "adak": [
+          "adak"
+        ],
+        "anchorage": [
+          "anchorage"
+        ],
+        "anguilla": [
+          "anguilla"
+        ],
+        "antigua": [
+          "antigua"
+        ],
+        "araguaina": [
+          "araguaina"
+        ],
+        "la rioja": [
+          "la rioja"
+        ],
+        "rio gallegos": [
+          "rio gallegos"
+        ],
+        "salta": [
+          "salta"
+        ],
+        "san juan": [
+          "san juan"
+        ],
+        "san luis": [
+          "san luis"
+        ],
+        "tucuman": [
+          "tucuman"
+        ],
+        "ushuaia": [
+          "ushuaia"
+        ],
+        "aruba": [
+          "aruba"
+        ],
+        "asuncion": [
+          "asuncion"
+        ],
+        "bahia": [
+          "bahia"
+        ],
+        "bahia banderas": [
+          "bahia banderas"
+        ],
+        "barbados": [
+          "barbados"
+        ],
+        "belem": [
+          "belem"
+        ],
+        "belize": [
+          "belize"
+        ],
+        "blanc-sablon": [
+          "blanc-sablon"
+        ],
+        "boa vista": [
+          "boa vista"
+        ],
+        "bogota": [
+          "bogota"
+        ],
+        "boise": [
+          "boise"
+        ],
+        "buenos aires": [
+          "buenos aires"
+        ],
+        "cambridge bay": [
+          "cambridge bay"
+        ],
+        "campo grande": [
+          "campo grande"
+        ],
+        "cancun": [
+          "cancun"
+        ],
+        "caracas": [
+          "caracas"
+        ],
+        "catamarca": [
+          "catamarca"
+        ],
+        "cayenne": [
+          "cayenne"
+        ],
+        "cayman": [
+          "cayman"
+        ],
+        "chicago": [
+          "chicago"
+        ],
+        "chihuahua": [
+          "chihuahua"
+        ],
+        "ciudad juarez": [
+          "ciudad juarez"
+        ],
+        "coral harbour": [
+          "coral harbour"
+        ],
+        "cordoba": [
+          "cordoba"
+        ],
+        "costa rica": [
+          "costa rica"
+        ],
+        "coyhaique": [
+          "coyhaique"
+        ],
+        "creston": [
+          "creston"
+        ],
+        "cuiaba": [
+          "cuiaba"
+        ],
+        "curacao": [
+          "curacao"
+        ],
+        "danmarkshavn": [
+          "danmarkshavn"
+        ],
+        "dawson": [
+          "dawson"
+        ],
+        "dawson creek": [
+          "dawson creek"
+        ],
+        "denver": [
+          "denver"
+        ],
+        "detroit": [
+          "detroit"
+        ],
+        "dominica": [
+          "dominica"
+        ],
+        "edmonton": [
+          "edmonton"
+        ],
+        "eirunepe": [
+          "eirunepe"
+        ],
+        "el salvador": [
+          "el salvador"
+        ],
+        "fort nelson": [
+          "fort nelson"
+        ],
+        "fortaleza": [
+          "fortaleza"
+        ],
+        "glace bay": [
+          "glace bay"
+        ],
+        "godthab": [
+          "godthab"
+        ],
+        "goose bay": [
+          "goose bay"
+        ],
+        "grand turk": [
+          "grand turk"
+        ],
+        "grenada": [
+          "grenada"
+        ],
+        "guadeloupe": [
+          "guadeloupe"
+        ],
+        "guatemala": [
+          "guatemala"
+        ],
+        "guayaquil": [
+          "guayaquil"
+        ],
+        "guyana": [
+          "guyana"
+        ],
+        "halifax": [
+          "halifax"
+        ],
+        "havana": [
+          "havana"
+        ],
+        "hermosillo": [
+          "hermosillo"
+        ],
+        "knox": [
+          "knox"
+        ],
+        "marengo": [
+          "marengo"
+        ],
+        "petersburg": [
+          "petersburg"
+        ],
+        "tell city": [
+          "tell city"
+        ],
+        "vevay": [
+          "vevay"
+        ],
+        "vincennes": [
+          "vincennes"
+        ],
+        "winamac": [
+          "winamac"
+        ],
+        "indianapolis": [
+          "indianapolis"
+        ],
+        "inuvik": [
+          "inuvik"
+        ],
+        "iqaluit": [
+          "iqaluit"
+        ],
+        "jamaica": [
+          "jamaica"
+        ],
+        "jujuy": [
+          "jujuy"
+        ],
+        "juneau": [
+          "juneau"
+        ],
+        "monticello": [
+          "monticello"
+        ],
+        "kralendijk": [
+          "kralendijk"
+        ],
+        "la paz": [
+          "la paz"
+        ],
+        "lima": [
+          "lima"
+        ],
+        "los angeles": [
+          "los angeles"
+        ],
+        "louisville": [
+          "louisville"
+        ],
+        "lower princes": [
+          "lower princes"
+        ],
+        "maceio": [
+          "maceio"
+        ],
+        "managua": [
+          "managua"
+        ],
+        "manaus": [
+          "manaus"
+        ],
+        "marigot": [
+          "marigot"
+        ],
+        "martinique": [
+          "martinique"
+        ],
+        "matamoros": [
+          "matamoros"
+        ],
+        "mazatlan": [
+          "mazatlan"
+        ],
+        "mendoza": [
+          "mendoza"
+        ],
+        "menominee": [
+          "menominee"
+        ],
+        "merida": [
+          "merida"
+        ],
+        "metlakatla": [
+          "metlakatla"
+        ],
+        "mexico city": [
+          "mexico city"
+        ],
+        "miquelon": [
+          "miquelon"
+        ],
+        "moncton": [
+          "moncton"
+        ],
+        "monterrey": [
+          "monterrey"
+        ],
+        "montevideo": [
+          "montevideo"
+        ],
+        "montserrat": [
+          "montserrat"
+        ],
+        "nassau": [
+          "nassau"
+        ],
+        "new york": [
+          "new york"
+        ],
+        "nome": [
+          "nome"
+        ],
+        "noronha": [
+          "noronha"
+        ],
+        "beulah": [
+          "beulah"
+        ],
+        "center": [
+          "center"
+        ],
+        "new salem": [
+          "new salem"
+        ],
+        "ojinaga": [
+          "ojinaga"
+        ],
+        "panama": [
+          "panama"
+        ],
+        "paramaribo": [
+          "paramaribo"
+        ],
+        "phoenix": [
+          "phoenix"
+        ],
+        "port-au-prince": [
+          "port-au-prince"
+        ],
+        "port of spain": [
+          "port of spain"
+        ],
+        "porto velho": [
+          "porto velho"
+        ],
+        "puerto rico": [
+          "puerto rico"
+        ],
+        "punta arenas": [
+          "punta arenas"
+        ],
+        "rankin inlet": [
+          "rankin inlet"
+        ],
+        "recife": [
+          "recife"
+        ],
+        "regina": [
+          "regina"
+        ],
+        "resolute": [
+          "resolute"
+        ],
+        "rio branco": [
+          "rio branco"
+        ],
+        "santarem": [
+          "santarem"
+        ],
+        "santiago": [
+          "santiago"
+        ],
+        "santo domingo": [
+          "santo domingo"
+        ],
+        "sao paulo": [
+          "sao paulo"
+        ],
+        "scoresbysund": [
+          "scoresbysund"
+        ],
+        "sitka": [
+          "sitka"
+        ],
+        "st barthelemy": [
+          "st barthelemy"
+        ],
+        "st johns": [
+          "st johns"
+        ],
+        "st kitts": [
+          "st kitts"
+        ],
+        "st lucia": [
+          "st lucia"
+        ],
+        "st thomas": [
+          "st thomas"
+        ],
+        "st vincent": [
+          "st vincent"
+        ],
+        "swift current": [
+          "swift current"
+        ],
+        "tegucigalpa": [
+          "tegucigalpa"
+        ],
+        "thule": [
+          "thule"
+        ],
+        "tijuana": [
+          "tijuana"
+        ],
+        "toronto": [
+          "toronto"
+        ],
+        "tortola": [
+          "tortola"
+        ],
+        "vancouver": [
+          "vancouver"
+        ],
+        "whitehorse": [
+          "whitehorse"
+        ],
+        "winnipeg": [
+          "winnipeg"
+        ],
+        "yakutat": [
+          "yakutat"
+        ],
+        "casey": [
+          "casey"
+        ],
+        "davis": [
+          "davis"
+        ],
+        "dumontdurville": [
+          "dumontdurville"
+        ],
+        "macquarie": [
+          "macquarie"
+        ],
+        "mawson": [
+          "mawson"
+        ],
+        "mcmurdo": [
+          "mcmurdo"
+        ],
+        "palmer": [
+          "palmer"
+        ],
+        "rothera": [
+          "rothera"
+        ],
+        "syowa": [
+          "syowa"
+        ],
+        "troll": [
+          "troll"
+        ],
+        "vostok": [
+          "vostok"
+        ],
+        "longyearbyen": [
+          "longyearbyen"
+        ],
+        "aden": [
+          "aden"
+        ],
+        "almaty": [
+          "almaty"
+        ],
+        "amman": [
+          "amman"
+        ],
+        "anadyr": [
+          "anadyr"
+        ],
+        "aqtau": [
+          "aqtau"
+        ],
+        "aqtobe": [
+          "aqtobe"
+        ],
+        "ashgabat": [
+          "ashgabat"
+        ],
+        "atyrau": [
+          "atyrau"
+        ],
+        "baghdad": [
+          "baghdad"
+        ],
+        "bahrain": [
+          "bahrain"
+        ],
+        "baku": [
+          "baku"
+        ],
+        "bangkok": [
+          "bangkok"
+        ],
+        "barnaul": [
+          "barnaul"
+        ],
+        "beirut": [
+          "beirut"
+        ],
+        "bishkek": [
+          "bishkek"
+        ],
+        "brunei": [
+          "brunei"
+        ],
+        "calcutta": [
+          "calcutta"
+        ],
+        "chita": [
+          "chita"
+        ],
+        "colombo": [
+          "colombo"
+        ],
+        "damascus": [
+          "damascus"
+        ],
+        "dhaka": [
+          "dhaka"
+        ],
+        "dili": [
+          "dili"
+        ],
+        "dubai": [
+          "dubai"
+        ],
+        "dushanbe": [
+          "dushanbe"
+        ],
+        "famagusta": [
+          "famagusta"
+        ],
+        "gaza": [
+          "gaza"
+        ],
+        "hebron": [
+          "hebron"
+        ],
+        "hong kong": [
+          "hong kong"
+        ],
+        "hovd": [
+          "hovd"
+        ],
+        "irkutsk": [
+          "irkutsk"
+        ],
+        "jakarta": [
+          "jakarta"
+        ],
+        "jayapura": [
+          "jayapura"
+        ],
+        "jerusalem": [
+          "jerusalem"
+        ],
+        "kabul": [
+          "kabul"
+        ],
+        "kamchatka": [
+          "kamchatka"
+        ],
+        "karachi": [
+          "karachi"
+        ],
+        "katmandu": [
+          "katmandu"
+        ],
+        "khandyga": [
+          "khandyga"
+        ],
+        "krasnoyarsk": [
+          "krasnoyarsk"
+        ],
+        "kuala lumpur": [
+          "kuala lumpur"
+        ],
+        "kuching": [
+          "kuching"
+        ],
+        "kuwait": [
+          "kuwait"
+        ],
+        "macau": [
+          "macau"
+        ],
+        "magadan": [
+          "magadan"
+        ],
+        "makassar": [
+          "makassar"
+        ],
+        "manila": [
+          "manila"
+        ],
+        "muscat": [
+          "muscat"
+        ],
+        "nicosia": [
+          "nicosia"
+        ],
+        "novokuznetsk": [
+          "novokuznetsk"
+        ],
+        "novosibirsk": [
+          "novosibirsk"
+        ],
+        "omsk": [
+          "omsk"
+        ],
+        "oral": [
+          "oral"
+        ],
+        "phnom penh": [
+          "phnom penh"
+        ],
+        "pontianak": [
+          "pontianak"
+        ],
+        "pyongyang": [
+          "pyongyang"
+        ],
+        "qatar": [
+          "qatar"
+        ],
+        "qostanay": [
+          "qostanay"
+        ],
+        "qyzylorda": [
+          "qyzylorda"
+        ],
+        "rangoon": [
+          "rangoon"
+        ],
+        "riyadh": [
+          "riyadh"
+        ],
+        "saigon": [
+          "saigon"
+        ],
+        "sakhalin": [
+          "sakhalin"
+        ],
+        "samarkand": [
+          "samarkand"
+        ],
+        "seoul": [
+          "seoul"
+        ],
+        "shanghai": [
+          "shanghai"
+        ],
+        "singapore": [
+          "singapore"
+        ],
+        "srednekolymsk": [
+          "srednekolymsk"
+        ],
+        "taipei": [
+          "taipei"
+        ],
+        "tashkent": [
+          "tashkent"
+        ],
+        "tbilisi": [
+          "tbilisi"
+        ],
+        "tehran": [
+          "tehran"
+        ],
+        "thimphu": [
+          "thimphu"
+        ],
+        "tokyo": [
+          "tokyo"
+        ],
+        "tomsk": [
+          "tomsk"
+        ],
+        "ulaanbaatar": [
+          "ulaanbaatar"
+        ],
+        "urumqi": [
+          "urumqi"
+        ],
+        "ust-nera": [
+          "ust-nera"
+        ],
+        "vientiane": [
+          "vientiane"
+        ],
+        "vladivostok": [
+          "vladivostok"
+        ],
+        "yakutsk": [
+          "yakutsk"
+        ],
+        "yekaterinburg": [
+          "yekaterinburg"
+        ],
+        "yerevan": [
+          "yerevan"
+        ],
+        "azores": [
+          "azores"
+        ],
+        "bermuda": [
+          "bermuda"
+        ],
+        "canary": [
+          "canary"
+        ],
+        "cape verde": [
+          "cape verde"
+        ],
+        "faeroe": [
+          "faeroe"
+        ],
+        "madeira": [
+          "madeira"
+        ],
+        "reykjavik": [
+          "reykjavik"
+        ],
+        "south georgia": [
+          "south georgia"
+        ],
+        "st helena": [
+          "st helena"
+        ],
+        "stanley": [
+          "stanley"
+        ],
+        "adelaide": [
+          "adelaide"
+        ],
+        "brisbane": [
+          "brisbane"
+        ],
+        "broken hill": [
+          "broken hill"
+        ],
+        "darwin": [
+          "darwin"
+        ],
+        "eucla": [
+          "eucla"
+        ],
+        "hobart": [
+          "hobart"
+        ],
+        "lindeman": [
+          "lindeman"
+        ],
+        "lord howe": [
+          "lord howe"
+        ],
+        "melbourne": [
+          "melbourne"
+        ],
+        "perth": [
+          "perth"
+        ],
+        "sydney": [
+          "sydney"
+        ],
+        "amsterdam": [
+          "amsterdam"
+        ],
+        "andorra": [
+          "andorra"
+        ],
+        "astrakhan": [
+          "astrakhan"
+        ],
+        "athens": [
+          "athens"
+        ],
+        "belgrade": [
+          "belgrade"
+        ],
+        "berlin": [
+          "berlin"
+        ],
+        "bratislava": [
+          "bratislava"
+        ],
+        "brussels": [
+          "brussels"
+        ],
+        "bucharest": [
+          "bucharest"
+        ],
+        "budapest": [
+          "budapest"
+        ],
+        "busingen": [
+          "busingen"
+        ],
+        "chisinau": [
+          "chisinau"
+        ],
+        "copenhagen": [
+          "copenhagen"
+        ],
+        "dublin": [
+          "dublin"
+        ],
+        "gibraltar": [
+          "gibraltar"
+        ],
+        "guernsey": [
+          "guernsey"
+        ],
+        "helsinki": [
+          "helsinki"
+        ],
+        "isle of man": [
+          "isle of man"
+        ],
+        "istanbul": [
+          "istanbul"
+        ],
+        "jersey": [
+          "jersey"
+        ],
+        "kaliningrad": [
+          "kaliningrad"
+        ],
+        "kiev": [
+          "kiev"
+        ],
+        "kirov": [
+          "kirov"
+        ],
+        "lisbon": [
+          "lisbon"
+        ],
+        "ljubljana": [
+          "ljubljana"
+        ],
+        "london": [
+          "london"
+        ],
+        "luxembourg": [
+          "luxembourg"
+        ],
+        "madrid": [
+          "madrid"
+        ],
+        "malta": [
+          "malta"
+        ],
+        "mariehamn": [
+          "mariehamn"
+        ],
+        "minsk": [
+          "minsk"
+        ],
+        "monaco": [
+          "monaco"
+        ],
+        "moscow": [
+          "moscow"
+        ],
+        "oslo": [
+          "oslo"
+        ],
+        "paris": [
+          "paris"
+        ],
+        "podgorica": [
+          "podgorica"
+        ],
+        "prague": [
+          "prague"
+        ],
+        "riga": [
+          "riga"
+        ],
+        "rome": [
+          "rome"
+        ],
+        "samara": [
+          "samara"
+        ],
+        "san marino": [
+          "san marino"
+        ],
+        "sarajevo": [
+          "sarajevo"
+        ],
+        "saratov": [
+          "saratov"
+        ],
+        "simferopol": [
+          "simferopol"
+        ],
+        "skopje": [
+          "skopje"
+        ],
+        "sofia": [
+          "sofia"
+        ],
+        "stockholm": [
+          "stockholm"
+        ],
+        "tallinn": [
+          "tallinn"
+        ],
+        "tirane": [
+          "tirane"
+        ],
+        "ulyanovsk": [
+          "ulyanovsk"
+        ],
+        "vaduz": [
+          "vaduz"
+        ],
+        "vatican": [
+          "vatican"
+        ],
+        "vienna": [
+          "vienna"
+        ],
+        "vilnius": [
+          "vilnius"
+        ],
+        "volgograd": [
+          "volgograd"
+        ],
+        "warsaw": [
+          "warsaw"
+        ],
+        "zagreb": [
+          "zagreb"
+        ],
+        "zurich": [
+          "zurich"
+        ],
+        "antananarivo": [
+          "antananarivo"
+        ],
+        "chagos": [
+          "chagos"
+        ],
+        "christmas": [
+          "christmas"
+        ],
+        "cocos": [
+          "cocos"
+        ],
+        "comoro": [
+          "comoro"
+        ],
+        "kerguelen": [
+          "kerguelen"
+        ],
+        "mahe": [
+          "mahe"
+        ],
+        "maldives": [
+          "maldives"
+        ],
+        "mauritius": [
+          "mauritius"
+        ],
+        "mayotte": [
+          "mayotte"
+        ],
+        "reunion": [
+          "reunion"
+        ],
+        "apia": [
+          "apia"
+        ],
+        "auckland": [
+          "auckland"
+        ],
+        "bougainville": [
+          "bougainville"
+        ],
+        "chatham": [
+          "chatham"
+        ],
+        "easter": [
+          "easter"
+        ],
+        "efate": [
+          "efate"
+        ],
+        "enderbury": [
+          "enderbury"
+        ],
+        "fakaofo": [
+          "fakaofo"
+        ],
+        "fiji": [
+          "fiji"
+        ],
+        "funafuti": [
+          "funafuti"
+        ],
+        "galapagos": [
+          "galapagos"
+        ],
+        "gambier": [
+          "gambier"
+        ],
+        "guadalcanal": [
+          "guadalcanal"
+        ],
+        "guam": [
+          "guam"
+        ],
+        "honolulu": [
+          "honolulu"
+        ],
+        "kiritimati": [
+          "kiritimati"
+        ],
+        "kosrae": [
+          "kosrae"
+        ],
+        "kwajalein": [
+          "kwajalein"
+        ],
+        "majuro": [
+          "majuro"
+        ],
+        "marquesas": [
+          "marquesas"
+        ],
+        "midway": [
+          "midway"
+        ],
+        "nauru": [
+          "nauru"
+        ],
+        "niue": [
+          "niue"
+        ],
+        "norfolk": [
+          "norfolk"
+        ],
+        "noumea": [
+          "noumea"
+        ],
+        "pago pago": [
+          "pago pago"
+        ],
+        "palau": [
+          "palau"
+        ],
+        "pitcairn": [
+          "pitcairn"
+        ],
+        "ponape": [
+          "ponape"
+        ],
+        "port moresby": [
+          "port moresby"
+        ],
+        "rarotonga": [
+          "rarotonga"
+        ],
+        "saipan": [
+          "saipan"
+        ],
+        "tahiti": [
+          "tahiti"
+        ],
+        "tarawa": [
+          "tarawa"
+        ],
+        "tongatapu": [
+          "tongatapu"
+        ],
+        "truk": [
+          "truk"
+        ],
+        "wake": [
+          "wake"
+        ],
+        "wallis": [
+          "wallis"
+        ],
+        "utc": [
+          "utc"
+        ],
+        "gmt": [
+          "gmt"
+        ],
+        "z": [
+          "z"
+        ],
+        "zulu": [
+          "zulu"
+        ],
+        "belo horizonte": [
+          "belo horizonte"
+        ],
+        "brasilia": [
+          "brasilia"
+        ],
+        "brasília": [
+          "brasília"
+        ],
+        "rio": [
+          "rio"
+        ],
+        "rio de janeiro": [
+          "rio de janeiro"
+        ],
+        "são paulo": [
+          "são paulo"
+        ],
+        "brazil": [
+          "brazil"
+        ],
+        "brasil": [
+          "brasil"
+        ],
+        "japan": [
+          "japan"
+        ],
+        "china": [
+          "china"
+        ],
+        "beijing": [
+          "beijing"
+        ],
+        "india": [
+          "india"
+        ],
+        "mumbai": [
+          "mumbai"
+        ],
+        "delhi": [
+          "delhi"
+        ],
+        "new delhi": [
+          "new delhi"
+        ],
+        "uk": [
+          "uk"
+        ],
+        "britain": [
+          "britain"
+        ],
+        "england": [
+          "england"
+        ],
+        "france": [
+          "france"
+        ],
+        "germany": [
+          "germany"
+        ],
+        "spain": [
+          "spain"
+        ],
+        "portugal": [
+          "portugal"
+        ],
+        "italy": [
+          "italy"
+        ],
+        "netherlands": [
+          "netherlands"
+        ],
+        "chile": [
+          "chile"
+        ],
+        "peru": [
+          "peru"
+        ],
+        "colombia": [
+          "colombia"
+        ],
+        "argentina": [
+          "argentina"
+        ],
+        "south africa": [
+          "south africa"
+        ],
+        "la": [
+          "la"
+        ],
+        "nyc": [
+          "nyc"
+        ],
+        "new york city": [
+          "new york city"
+        ],
+        "sf": [
+          "sf"
+        ],
+        "san francisco": [
+          "san francisco"
+        ],
+        "seattle": [
+          "seattle"
+        ],
+        "tel aviv": [
+          "tel aviv"
+        ],
+        "mexico": [
+          "mexico"
+        ],
+        "cape town": [
+          "cape town"
+        ],
+        "salt lake city": [
+          "salt lake city"
+        ],
+        "bangalore": [
+          "bangalore"
+        ],
+        "bengaluru": [
+          "bengaluru"
+        ],
+        "wellington": [
+          "wellington"
+        ],
+        "new zealand": [
+          "new zealand"
+        ],
+        "here": [
+          "here"
+        ],
+        "my time": [
+          "my time"
+        ],
+        "local": [
+          "local"
+        ],
+        "local time": [
+          "local time"
+        ],
+        "my zone": [
+          "my zone"
+        ],
+        "device time": [
+          "device time"
+        ],
+        "home": [
+          "home"
+        ]
+      },
+      "generic_pt": [
+        "lugar"
+      ]
+    },
+    {
+      "type": "rosterq",
+      "words": {
+        "day": [
+          "am i off",
+          "am i on",
+          "am i working",
+          "am i at work",
+          "will i be off",
+          "will i be on",
+          "will i be working",
+          "are we off",
+          "are we on",
+          "off or on"
+        ],
+        "next": [
+          "next swing",
+          "my next swing",
+          "next change",
+          "next changeover",
+          "next days off",
+          "next day off",
+          "next days on"
+        ]
+      },
+      "words_pt": {
+        "day": [
+          "estou de folga",
+          "estou trabalhando",
+          "vou estar de folga",
+          "vou trabalhar"
+        ],
+        "next": [
+          "próxima troca",
+          "proxima troca",
+          "próxima folga",
+          "proxima folga"
+        ]
+      }
+    },
+    {
+      "type": "geographic",
+      "words": {
+        "latlon": [
+          "lat long",
+          "lat lon",
+          "latlong",
+          "latitude and longitude",
+          "latitude longitude",
+          "geographic",
+          "wgs84",
+          "degrees"
+        ]
+      },
+      "words_pt": {
+        "latlon": [
+          "lat long",
+          "latitude e longitude",
+          "geográficas",
+          "geograficas",
+          "graus"
+        ]
+      }
+    },
+    {
+      "type": "utmword",
+      "words": {
+        "utm": [
+          "utm"
+        ]
+      },
+      "words_pt": {
+        "utm": [
+          "utm"
+        ]
+      }
+    },
+    {
+      "type": "sunevent",
+      "words": {
+        "sunrise": [
+          "sunrise"
+        ],
+        "sunset": [
+          "sunset"
+        ],
+        "solar noon": [
+          "solar noon"
+        ],
+        "sun times": [
+          "sun times",
+          "sun"
+        ],
+        "daylight": [
+          "daylight",
+          "day length",
+          "length of day"
+        ],
+        "twilight": [
+          "twilight"
+        ]
+      },
+      "words_pt": {
+        "sunrise": [
+          "nascer do sol",
+          "amanhecer"
+        ],
+        "sunset": [
+          "pôr do sol",
+          "por do sol"
+        ],
+        "solar noon": [
+          "meio-dia solar"
+        ],
+        "sun times": [
+          "horários do sol"
+        ],
+        "daylight": [
+          "duração do dia"
+        ],
+        "twilight": [
+          "crepúsculo",
+          "crepusculo"
+        ]
+      }
+    },
+    {
+      "type": "moonphase",
+      "words": {
+        "moon": [
+          "moon",
+          "moon phase",
+          "phase of the moon",
+          "lunar phase",
+          "the moon"
+        ]
+      },
+      "words_pt": {
+        "moon": [
+          "lua",
+          "fase da lua",
+          "fase lunar"
+        ]
+      }
     }
   ],
-  "shapes": [],
+  "shapes": [
+    {
+      "type": "holiday",
+      "re": "(?:christmas|xmas|christmas eve|new year|new year's day|new year's eve|easter|easter sunday|good friday|carnival|carnival tuesday|carnival monday|ash wednesday|corpus christi|palm sunday|pentecost|whit sunday|ascension)\\s+\\d{4}"
+    },
+    {
+      "type": "place",
+      "re": "(?:utc|gmt)\\s?[+-]\\d{1,2}(?::?\\d{2})?"
+    },
+    {
+      "type": "roster",
+      "re": "\\d{1,2}\\s*(?:on|x|/)\\s*,?\\s*\\d{1,2}(?:\\s*off)?"
+    },
+    {
+      "type": "coords",
+      "re": "-?\\d{1,2}(?:\\.\\d+)?\\s*,\\s*-?\\d{1,3}(?:\\.\\d+)?"
+    },
+    {
+      "type": "utmcoord",
+      "re": "\\d{1,2}\\s?[c-hj-np-x]?\\s+(?:e\\s?)?\\d{5,7}(?:\\.\\d+)?\\s+(?:n\\s?)?\\d{5,8}(?:\\.\\d+)?"
+    }
+  ],
   "fillers": [
     "golem",
     "ok",
@@ -2020,6 +5207,18 @@
       ]
     },
     {
+      "unit": "working days",
+      "dim": "workday",
+      "words": [
+        "working days",
+        "working day",
+        "business days",
+        "business day",
+        "workdays",
+        "workday"
+      ]
+    },
+    {
       "unit": "people per km2",
       "dim": "population density",
       "words": [
@@ -2053,13 +5252,38 @@
       "echo": true
     }
   ],
-  "postmods": [],
+  "postmods": [
+    {
+      "prep": "from",
+      "heads": [
+        "roster"
+      ],
+      "attr": "start",
+      "mod": "date"
+    },
+    {
+      "prep": "since",
+      "heads": [
+        "roster"
+      ],
+      "attr": "start",
+      "mod": "date"
+    }
+  ],
   "qmods": [
     {
       "head": "timer",
       "attr": "duration",
       "dims": [
         "time"
+      ]
+    },
+    {
+      "head": "north",
+      "attr": "bearing",
+      "dims": [
+        "bare",
+        "angle"
       ]
     }
   ],
@@ -2167,6 +5391,101 @@
         "passa"
       ],
       "label_pt": "Converter"
+    },
+    {
+      "name": "daysUntil",
+      "label": "Days until",
+      "words": [
+        "days until",
+        "days till",
+        "days to",
+        "days before",
+        "days left until",
+        "how many days until",
+        "how many days till",
+        "how many days to",
+        "how many days are left until",
+        "how many days left until",
+        "countdown to"
+      ],
+      "theme": [
+        "date",
+        "holiday"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {},
+      "words_pt": [
+        "dias até",
+        "dias ate",
+        "quantos dias até",
+        "quantos dias ate",
+        "quantos dias faltam para",
+        "quantos dias faltam até"
+      ],
+      "label_pt": "Days until"
+    },
+    {
+      "name": "whenIs",
+      "label": "When is",
+      "words": [
+        "when is",
+        "when was",
+        "when will be",
+        "when does",
+        "when falls",
+        "what date is",
+        "what date was"
+      ],
+      "theme": [
+        "date",
+        "holiday"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {},
+      "words_pt": [
+        "quando é",
+        "quando e",
+        "quando foi",
+        "quando cai",
+        "que data é"
+      ],
+      "label_pt": "When is"
+    },
+    {
+      "name": "weekday",
+      "label": "Weekday",
+      "words": [
+        "what day is",
+        "what day was",
+        "what day will be",
+        "what weekday is",
+        "what weekday was",
+        "what day of the week is",
+        "what day of the week was",
+        "which day is",
+        "what day does"
+      ],
+      "theme": [
+        "date",
+        "holiday"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {},
+      "words_pt": [
+        "que dia é",
+        "que dia e",
+        "que dia foi",
+        "que dia da semana é",
+        "que dia cai",
+        "em que dia cai"
+      ],
+      "label_pt": "Weekday"
     },
     {
       "name": "reformat",
@@ -2458,6 +5777,188 @@
       "label_pt": "Iniciar"
     },
     {
+      "name": "event",
+      "label": "Event",
+      "words": [
+        "remind me to",
+        "remind me",
+        "schedule",
+        "add an event",
+        "add event",
+        "new event",
+        "create an event",
+        "put on my calendar",
+        "book"
+      ],
+      "theme": [
+        "text"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {
+        "on": {
+          "preps": [
+            "on",
+            "for"
+          ],
+          "types": [
+            "date",
+            "holiday"
+          ]
+        },
+        "at": {
+          "preps": [
+            "at"
+          ],
+          "types": [
+            "clock"
+          ]
+        },
+        "for": {
+          "preps": [
+            "for"
+          ],
+          "types": [
+            "quantity:time"
+          ]
+        }
+      },
+      "words_pt": [
+        "me lembra de",
+        "me lembre de",
+        "me lembra",
+        "agenda",
+        "agende",
+        "marca",
+        "marque",
+        "novo evento"
+      ],
+      "label_pt": "Evento"
+    },
+    {
+      "name": "alarm",
+      "label": "Alarm",
+      "words": [
+        "set",
+        "wake me up",
+        "wake me",
+        "get me up"
+      ],
+      "elidable": true,
+      "theme": [
+        "alarm"
+      ],
+      "required": [
+        "at"
+      ],
+      "roles": {
+        "at": {
+          "preps": [
+            "at",
+            "for"
+          ],
+          "types": [
+            "clock"
+          ]
+        }
+      },
+      "words_pt": [
+        "me acorda",
+        "me acorde",
+        "põe",
+        "coloca"
+      ],
+      "label_pt": "Alarme"
+    },
+    {
+      "name": "declination",
+      "label": "Declination",
+      "words": [
+        "declination",
+        "magnetic declination"
+      ],
+      "theme": [],
+      "required": [],
+      "roles": {
+        "at": {
+          "preps": [
+            "at",
+            "for",
+            "in",
+            ""
+          ],
+          "types": [
+            "coords",
+            "place"
+          ]
+        },
+        "on": {
+          "preps": [
+            "on",
+            "for"
+          ],
+          "types": [
+            "date",
+            "holiday"
+          ]
+        }
+      },
+      "words_pt": [
+        "declinação",
+        "declinacao",
+        "declinação magnética"
+      ],
+      "label_pt": "Declinação"
+    },
+    {
+      "name": "bearing",
+      "label": "Bearing",
+      "words": [
+        "convert"
+      ],
+      "elidable": true,
+      "theme": [
+        "north"
+      ],
+      "required": [
+        "theme",
+        "to"
+      ],
+      "roles": {
+        "to": {
+          "preps": [
+            "to",
+            "into",
+            "as"
+          ],
+          "types": [
+            "north"
+          ]
+        },
+        "at": {
+          "preps": [
+            "at",
+            "for",
+            "in"
+          ],
+          "types": [
+            "coords"
+          ]
+        },
+        "on": {
+          "preps": [
+            "on"
+          ],
+          "types": [
+            "date",
+            "holiday"
+          ]
+        }
+      },
+      "label_pt": "Rumo"
+    },
+    {
       "name": "date",
       "label": "Date",
       "words": [
@@ -2616,6 +6117,315 @@
       "label_pt": "Decodificar"
     },
     {
+      "name": "workcount",
+      "label": "Working days",
+      "words": [
+        "working days",
+        "business days",
+        "how many working days",
+        "how many business days",
+        "workdays"
+      ],
+      "theme": [],
+      "required": [],
+      "roles": {
+        "until": {
+          "preps": [
+            "until",
+            "till",
+            "to",
+            "before"
+          ],
+          "types": [
+            "date",
+            "holiday"
+          ]
+        },
+        "from": {
+          "preps": [
+            "from",
+            "between",
+            "since"
+          ],
+          "types": [
+            "date",
+            "holiday"
+          ]
+        }
+      },
+      "words_pt": [
+        "dias úteis",
+        "dias uteis",
+        "quantos dias úteis",
+        "quantos dias uteis"
+      ],
+      "label_pt": "Dias úteis"
+    },
+    {
+      "name": "workadd",
+      "label": "Working days",
+      "words": [],
+      "elidable": true,
+      "theme": [
+        "quantity:workday"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {
+        "from": {
+          "preps": [
+            "from",
+            "after"
+          ],
+          "types": [
+            "date",
+            "holiday"
+          ]
+        },
+        "before": {
+          "preps": [
+            "before"
+          ],
+          "types": [
+            "date",
+            "holiday"
+          ]
+        }
+      },
+      "label_pt": "Dias úteis"
+    },
+    {
+      "name": "isworkday",
+      "label": "Working day?",
+      "words": [
+        "is",
+        "was",
+        "will"
+      ],
+      "theme": [
+        "date",
+        "holiday"
+      ],
+      "required": [
+        "theme",
+        "as"
+      ],
+      "roles": {
+        "as": {
+          "preps": [
+            ""
+          ],
+          "types": [
+            "daykind"
+          ]
+        }
+      },
+      "words_pt": [
+        "é",
+        "e",
+        "foi",
+        "será"
+      ],
+      "label_pt": "Dia útil?"
+    },
+    {
+      "name": "nextworkday",
+      "label": "Next working day",
+      "words": [],
+      "elidable": true,
+      "theme": [
+        "nextwork"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {
+        "after": {
+          "preps": [
+            "after",
+            "from"
+          ],
+          "types": [
+            "date",
+            "holiday"
+          ]
+        }
+      },
+      "label_pt": "Próximo dia útil"
+    },
+    {
+      "name": "zone",
+      "label": "Time in",
+      "words": [],
+      "elidable": true,
+      "theme": [
+        "clock"
+      ],
+      "required": [
+        "theme",
+        "to"
+      ],
+      "roles": {
+        "from": {
+          "preps": [
+            "",
+            "from",
+            "at"
+          ],
+          "types": [
+            "place"
+          ]
+        },
+        "to": {
+          "preps": [
+            "in",
+            "to",
+            "for",
+            "as"
+          ],
+          "types": [
+            "place"
+          ]
+        },
+        "on": {
+          "preps": [
+            "on"
+          ],
+          "types": [
+            "date",
+            "holiday"
+          ]
+        }
+      },
+      "label_pt": "Hora em"
+    },
+    {
+      "name": "timenow",
+      "label": "Time now",
+      "words": [
+        "what time is it",
+        "what is the time",
+        "what's the time",
+        "current time",
+        "time now",
+        "local time",
+        "time"
+      ],
+      "theme": [],
+      "required": [
+        "in"
+      ],
+      "roles": {
+        "in": {
+          "preps": [
+            "in",
+            "at"
+          ],
+          "types": [
+            "place"
+          ]
+        }
+      },
+      "words_pt": [
+        "que horas são",
+        "que horas sao",
+        "hora atual",
+        "horas"
+      ],
+      "label_pt": "Hora agora"
+    },
+    {
+      "name": "overlap",
+      "label": "Overlap",
+      "words": [
+        "overlap",
+        "working overlap",
+        "common hours",
+        "shared hours",
+        "hours in common"
+      ],
+      "theme": [],
+      "required": [
+        "of",
+        "to",
+        "in"
+      ],
+      "roles": {
+        "of": {
+          "preps": [
+            "of",
+            "for",
+            "between",
+            "from"
+          ],
+          "types": [
+            "clock"
+          ]
+        },
+        "to": {
+          "preps": [
+            "to",
+            "until",
+            "till"
+          ],
+          "types": [
+            "clock"
+          ]
+        },
+        "in": {
+          "preps": [
+            "in",
+            "between",
+            "for",
+            "across"
+          ],
+          "types": [
+            "place"
+          ]
+        }
+      },
+      "words_pt": [
+        "sobreposição",
+        "sobreposicao",
+        "horas em comum"
+      ],
+      "label_pt": "Sobreposição"
+    },
+    {
+      "name": "roster",
+      "label": "Roster",
+      "words": [
+        "when is",
+        "roster"
+      ],
+      "elidable": true,
+      "theme": [
+        "roster",
+        "rosterq"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {
+        "on": {
+          "preps": [
+            "on",
+            "at",
+            "for"
+          ],
+          "types": [
+            "date",
+            "holiday"
+          ]
+        }
+      },
+      "words_pt": [
+        "escala"
+      ],
+      "label_pt": "Escala"
+    },
+    {
       "name": "wordcount",
       "label": "Count words",
       "words": [
@@ -2719,6 +6529,206 @@
         "o que mudou entre"
       ],
       "label_pt": "Diferença"
+    },
+    {
+      "name": "place",
+      "label": "Place",
+      "words": [
+        "is",
+        "is at"
+      ],
+      "subject": [
+        "text",
+        "place"
+      ],
+      "theme": [
+        "coords"
+      ],
+      "required": [
+        "theme",
+        "subject"
+      ],
+      "roles": {},
+      "words_pt": [
+        "é",
+        "fica em",
+        "está em"
+      ],
+      "label_pt": "Lugar"
+    },
+    {
+      "name": "distance",
+      "label": "Distance",
+      "words": [
+        "distance",
+        "how far",
+        "how far is it",
+        "geodesic distance",
+        "great circle distance"
+      ],
+      "theme": [],
+      "required": [
+        "from"
+      ],
+      "roles": {
+        "from": {
+          "preps": [
+            "from",
+            "between"
+          ],
+          "types": [
+            "coords",
+            "place",
+            "text"
+          ]
+        },
+        "to": {
+          "preps": [
+            "to"
+          ],
+          "types": [
+            "coords",
+            "place",
+            "text"
+          ]
+        }
+      },
+      "words_pt": [
+        "distância",
+        "distancia",
+        "qual a distância",
+        "a que distância"
+      ],
+      "label_pt": "Distância"
+    },
+    {
+      "name": "toutm",
+      "label": "To UTM",
+      "words": [],
+      "elidable": true,
+      "theme": [
+        "coords",
+        "place"
+      ],
+      "required": [
+        "theme",
+        "to"
+      ],
+      "roles": {
+        "to": {
+          "preps": [
+            "in",
+            "to",
+            "as"
+          ],
+          "types": [
+            "utmword"
+          ]
+        }
+      },
+      "label_pt": "Para UTM"
+    },
+    {
+      "name": "fromutm",
+      "label": "From UTM",
+      "words": [
+        "utm",
+        "convert utm"
+      ],
+      "elidable": true,
+      "theme": [
+        "utmcoord"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {
+        "to": {
+          "preps": [
+            "to",
+            "in",
+            "as",
+            "into"
+          ],
+          "types": [
+            "geographic"
+          ]
+        }
+      },
+      "label_pt": "De UTM"
+    },
+    {
+      "name": "sun",
+      "label": "Sun",
+      "words": [
+        "when is",
+        "what time is",
+        "when"
+      ],
+      "elidable": true,
+      "theme": [
+        "sunevent"
+      ],
+      "required": [
+        "theme",
+        "at"
+      ],
+      "roles": {
+        "on": {
+          "preps": [
+            "on",
+            "for"
+          ],
+          "types": [
+            "date",
+            "holiday"
+          ]
+        },
+        "at": {
+          "preps": [
+            "in",
+            "at",
+            "for"
+          ],
+          "types": [
+            "coords",
+            "place",
+            "text"
+          ]
+        }
+      },
+      "words_pt": [
+        "quando é",
+        "que horas é"
+      ],
+      "label_pt": "Sol"
+    },
+    {
+      "name": "moon",
+      "label": "Moon",
+      "words": [
+        "show"
+      ],
+      "elidable": true,
+      "theme": [
+        "moonphase"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {
+        "on": {
+          "preps": [
+            "on",
+            "for"
+          ],
+          "types": [
+            "date",
+            "holiday"
+          ]
+        }
+      },
+      "label_pt": "Lua"
     },
     {
       "name": "remember",

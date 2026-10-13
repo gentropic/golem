@@ -1,8 +1,8 @@
 // The sun by NOAA's solar position equations (after Meeus), and the moon's phase from the mean
 // synodic cycle, labelled with its accuracy. Times are given in the place's zone when the place name
 // has one, else in UTC and the card says so.
-import { tool, fmt, rad, deg, iso } from './core.js';
-import { findDate, today, fmtDate } from './dates.js';
+import { tool, frame, noun, fmt, rad, deg, iso } from './core.js';
+import { findDate, today, fmtDate, dateWords } from './dates.js';
 import { zonesOf, offsetOf } from './calendar.js';
 import { placeOf } from './places.js';
 
@@ -26,9 +26,8 @@ export function solar(dayUTC, lat, lon) {
   return { decl, eot, noon, ha: ha(90.833), haCivil: ha(96) };
 }
 tool({
-  name: 'sun', rank: 29,
+  name: 'sun',
   skill: { group: 'Device', title: 'Sun and moon', on: 'NOAA equations, mean lunar cycle', about: 'Sunrise, solar noon, sunset, day length and civil twilight for a place and date (about a minute at mid-latitudes); the moon\'s phase from the mean cycle, to about half a day. Places as coordinates or a saved name.', examples: ['sunrise tomorrow in -19.92, -43.94', 'sunset today at home', 'moon phase on 25 dec'] },
-  read: (text, q) => { const m = /^(?:(?:when is |what time is )?(sunrise|sunset|solar noon|sun times|sun|daylight|day length|twilight)(?: and (?:sunset|sunrise))?)(?: (today|tomorrow|yesterday|on .+?|next \w+|\d{1,2} \w{3,9}(?: \d{4})?))? (?:in|at) (.+)$/.exec(q); return m ? { what: m[1], date: m[2] || 'today', place: m[3] } : null; },
   amend: [{ arg: 'zone', match: /^(?:in |times in )?(.+?) time$/, value: m => { const z = zonesOf(m[1]); return z.length === 1 ? z[0] : null; } }, { arg: 'date', match: /^(?:on |for )?(today|tomorrow|yesterday|\d{1,2} \w{3,9}(?: \d{4})?|\d{4}-\d{2}-\d{2}|next \w+)$/ }],
   topic: () => ['Sun', 1],
   run: a => {
@@ -52,8 +51,7 @@ tool({
 const SYNODIC = 29.530588861, NEW0 = Date.UTC(2000, 0, 6, 18, 14);   // a new moon, 6 Jan 2000 18:14 UTC
 const PHASES = ['new moon', 'waxing crescent', 'first quarter', 'waxing gibbous', 'full moon', 'waning gibbous', 'last quarter', 'waning crescent'];
 tool({
-  name: 'moon', rank: 30,
-  read: (text, q) => { const m = /^(?:moon|moon phase|phase of the moon|lunar phase)(?: (?:on|for) (.+)| (today|tomorrow|tonight))?$/.exec(q); return m ? { date: m[1] || (m[2] === 'tonight' ? 'today' : m[2]) || 'today' } : null; },
+  name: 'moon',
   amend: [{ arg: 'date', match: /^(?:on |for )?(today|tomorrow|yesterday|\d{1,2} \w{3,9}(?: \d{4})?|\d{4}-\d{2}-\d{2}|next \w+)$/ }],
   topic: () => ['Moon', 1],
   run: a => {
@@ -64,4 +62,18 @@ tool({
     const nextNew = NEW0 + (cycles + 1) * SYNODIC * 864e5, thisFull = NEW0 + (cycles + 0.5) * SYNODIC * 864e5, nextFull = thisFull > t ? thisFull : thisFull + SYNODIC * 864e5;
     return { read, value: frac, body: [{ t: 'big', v: name, unit: `${fmt(frac * 100, 3)} % lit, ${fmt(age, 3)} days old` }, { t: 'kv', rows: [['next new moon', fmtDate(new Date(nextNew)) + ' (about)'], ['next full moon', fmtDate(new Date(nextFull)) + ' (about)']] }, { t: 'sub', text: 'From the mean synodic month counted from the new moon of 6 Jan 2000; the true phase can differ by up to about half a day. Meeus\'s periodic terms are not applied.' }], trace: [`age = ((t − 2000-01-06T18:14Z) mod ${SYNODIC} d) = ${fmt(age, 5)} d`, `illuminated fraction = (1 − cos(2π age/P))/2 = ${fmt(frac, 5)}`], py: `sky.moon_phase("${iso(d)}")` };
   }
+});
+/* ── what reads them: "sunrise tomorrow in -19.92, -43.94", "sunset today at home", "moon phase on 25 dec" ── */
+noun({ type: 'sunevent', words: { sunrise: ['sunrise'], sunset: ['sunset'], 'solar noon': ['solar noon'], 'sun times': ['sun times', 'sun'], daylight: ['daylight', 'day length', 'length of day'], twilight: ['twilight'] },
+  words_pt: { sunrise: ['nascer do sol', 'amanhecer'], sunset: ['pôr do sol', 'por do sol'], 'solar noon': ['meio-dia solar'], 'sun times': ['horários do sol'], daylight: ['duração do dia'], twilight: ['crepúsculo', 'crepusculo'] } });
+noun({ type: 'moonphase', words: { moon: ['moon', 'moon phase', 'phase of the moon', 'lunar phase', 'the moon'] }, words_pt: { moon: ['lua', 'fase da lua', 'fase lunar'] } });
+const dayOf = n => { const w = dateWords(n); return !w ? 'today' : w === 'tonight' ? 'today' : w; };
+frame({
+  name: 'sun', label: 'Sun', words: ['when is', 'what time is', 'when'], elidable: true, theme: ['sunevent'], required: ['theme', 'at'],
+  roles: { on: { preps: ['on', 'for'], types: ['date', 'holiday'] }, at: { preps: ['in', 'at', 'for'], types: ['coords', 'place', 'text'] } }, words_pt: ['quando é', 'que horas é'], label_pt: 'Sol',
+  bind: c => { const w = c.theme.map(t => t.value), at = c.roles.at[0]; return { tool: 'sun', args: { what: w.length > 1 ? 'sun times' : w[0], date: dayOf(c.roles.on && c.roles.on[0]), place: at.type === 'coords' ? at.value.replace(/\s+/g, ' ') : String(at.value) } }; }
+});
+frame({
+  name: 'moon', label: 'Moon', words: ['show'], elidable: true, theme: ['moonphase'], required: ['theme'], roles: { on: { preps: ['on', 'for'], types: ['date', 'holiday'] } }, label_pt: 'Lua',
+  bind: c => ({ tool: 'moon', args: { date: dayOf(c.roles.on && c.roles.on[0]) } })
 });

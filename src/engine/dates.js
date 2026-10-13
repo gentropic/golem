@@ -1,5 +1,5 @@
 // Dates and times: day counts, weekdays, and the parsers the calendar tools share.
-import { tool, clock, iso } from './core.js';
+import { tool, frame, noun, shape, clock, iso } from './core.js';
 
 const MON = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'], DOW = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 const MONRE = '(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sept|sep|oct|nov|dec)';
@@ -50,9 +50,8 @@ export function findTime(s) {
   return { h, mi, m };
 }
 tool({
-  name: 'daysUntil', rank: 90,
+  name: 'daysUntil',
   skill: { group: 'Compute', title: 'Dates', on: 'built in', about: 'Day counts and weekdays.', examples: ['days until 25 december', 'what day is 15 nov 2027'] },
-  read: (text, q) => { const m = /^(?:how many )?days (?:until|till|to|before) (.+)$/.exec(q); return m ? { s: m[1] } : null; },
   topic: () => ['Dates', .5],
   run: a => {
     const f = findDate(a.s); if (!f) return null;
@@ -61,8 +60,7 @@ tool({
   }
 });
 tool({
-  name: 'whenIs', rank: 92,
-  read: (text, q) => { const m = /^when (?:is|was|will be|falls?) (.+)$/.exec(q); return m && findDate(m[1]) ? { s: m[1] } : null; },
+  name: 'whenIs',
   topic: () => ['Dates', .5],
   run: a => {
     const f = findDate(a.s); if (!f) return null;
@@ -71,11 +69,25 @@ tool({
   }
 });
 tool({
-  name: 'weekday', rank: 91,
-  read: (text, q) => { const m = /^what (?:day|weekday) (?:is|was|will be) (.+)$/.exec(q); return m ? { s: m[1] } : null; },
+  name: 'weekday',
   topic: () => ['Dates', .5],
   run: a => {
     const f = findDate(a.s); if (!f) return null;
     return { read: ['weekday of', { v: fmtDate(f.d) }], body: [{ t: 'big', v: f.d.toLocaleDateString('en-GB', { weekday: 'long' }) }], trace: [`dates.parse("${a.s}")`, 'Gregorian weekday'], py: `date("${iso(f.d)}").strftime("%A")` };
   }
 });
+/* ── what reads them: a date the grammar parsed, or a holiday, handed to findDate as the words that named it ── */
+noun({ type: 'holiday', words: Object.fromEntries(['christmas', 'christmas day', 'xmas', 'christmas eve', "new year's day", 'new year', 'new years day', "new year's eve", 'new years eve', ...Object.keys(MOVABLE)].map(w => [w, [w]])),
+  words_pt: { christmas: ['natal'], 'christmas eve': ['véspera de natal', 'vespera de natal'], 'new year': ['ano novo', 'réveillon'], easter: ['páscoa', 'pascoa'], carnival: ['carnaval'], 'good friday': ['sexta-feira santa'], 'corpus christi': ['corpus christi'] } });
+shape({ type: 'holiday', re: `(?:${['christmas', 'xmas', 'christmas eve', 'new year', "new year's day", "new year's eve", ...Object.keys(MOVABLE)].join('|')})\\s+\\d{4}` });   // "easter 2027"
+export const dateWords = n => n && (n.type === 'date' || n.type === 'holiday') ? String(n.value) : null;
+const DATE_T = ['date', 'holiday'];
+const onDate = (name, words, words_pt, label) => frame({
+  name, label, words, theme: DATE_T, required: ['theme'], roles: {}, words_pt, label_pt: label,
+  bind: c => dateWords(c.theme[0]) && findDate(dateWords(c.theme[0])) ? { tool: name, args: { s: dateWords(c.theme[0]) } } : null
+});
+onDate('daysUntil', ['days until', 'days till', 'days to', 'days before', 'days left until', 'how many days until', 'how many days till', 'how many days to', 'how many days are left until', 'how many days left until', 'countdown to'],
+  ['dias até', 'dias ate', 'quantos dias até', 'quantos dias ate', 'quantos dias faltam para', 'quantos dias faltam até'], 'Days until');
+onDate('whenIs', ['when is', 'when was', 'when will be', 'when does', 'when falls', 'what date is', 'what date was'], ['quando é', 'quando e', 'quando foi', 'quando cai', 'que data é'], 'When is');
+onDate('weekday', ['what day is', 'what day was', 'what day will be', 'what weekday is', 'what weekday was', 'what day of the week is', 'what day of the week was', 'which day is', 'what day does'],
+  ['que dia é', 'que dia e', 'que dia foi', 'que dia da semana é', 'que dia cai', 'em que dia cai'], 'Weekday');

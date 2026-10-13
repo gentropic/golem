@@ -1,7 +1,7 @@
 // Places, distance and UTM. A place is coordinates in the request or a name saved on this device
 // ("home is -19.92, -43.94"); there is no gazetteer and device location is off, so an unknown name is
 // a question, not a guess. Distance is Vincenty's inverse on WGS84; UTM is the Krüger series.
-import { S, tool, fmt, rad, deg } from './core.js';
+import { S, tool, frame, noun, shape, fmt, rad, deg } from './core.js';
 
 const WGS84 = { a: 6378137, f: 1 / 298.257223563 };
 WGS84.b = WGS84.a * (1 - WGS84.f); WGS84.e2 = WGS84.f * (2 - WGS84.f); WGS84.e = Math.sqrt(WGS84.e2);
@@ -21,9 +21,8 @@ const SRC_PLACES = { t: 'src', text: 'places · a table on this device · no gaz
 
 /* ── places ─────────────────────────────────────────────────── */
 tool({
-  name: 'place', rank: 33,
+  name: 'place',
   skill: { group: 'Device', title: 'Places, distance and UTM', on: 'own geodesy', about: 'Save a place by coordinates; distance and bearings between two places over the WGS84 ellipsoid (Vincenty); latitude and longitude to UTM and back (Krüger series). No gazetteer: a name you have not saved is asked for.', examples: ['home is -19.92, -43.94', 'distance from -19.92,-43.94 to -6.07,-50.16', '-19.92, -43.94 in utm', 'utm 23k 611000 7797000 to lat long'] },
-  read: (text, q) => { const m = new RegExp(`^([a-z][a-z0-9 '\\-]{0,40}?) (?:is|=) (?:at )?${COORD}$`).exec(q); return m ? { name: m[1].trim(), lat: +m[2], lon: +m[3] } : null; },
   topic: () => ['Places', .5],
   undo: a => { const t = placesTable(); t.rows = t.rows.filter(r => r.name !== a.name); },
   run: a => {
@@ -58,8 +57,7 @@ export function vincenty(lat1, lon1, lat2, lon2) {
   return { s, a1, a2, it };
 }
 tool({
-  name: 'distance', rank: 32,
-  read: (text, q) => { const m = /^(?:(?:geodesic |great circle )?distance|how far)(?: is it)? (?:from|between) (.+?) (?:to|and) (.+)$/.exec(q); return m ? { from: m[1], to: m[2] } : null; },
+  name: 'distance',
   topic: () => ['Distance', 1],
   run: a => {
     const read = ['distance from', { v: a.from }, 'to', { v: a.to }];
@@ -106,13 +104,7 @@ export function fromUTM(zone, hemisphere, easting, northing) {
   return { lat: deg(Math.atan(tau)), lon: lon0 + deg(lam) };
 }
 tool({
-  name: 'utm', rank: 31,
-  read: (text, q) => {
-    let m = /^(?:utm )?(\d{1,2}) ?([c-hj-np-x])? ?(?:e ?)?(\d{5,7}(?:\.\d+)?) ?(?:n ?)?(\d{5,8}(?:\.\d+)?)(?: (?:to|in|as) (?:lat ?long|lat ?lon|latitude(?: and)? longitude|geographic|wgs84|degrees))?$/.exec(q);
-    if (m && (/^utm/.test(q) || /to|in|as/.test(q))) return { zone: +m[1], band: m[2] ? m[2].toUpperCase() : null, easting: +m[3], northing: +m[4] };
-    m = /^(.+?) (?:in|to|as) utm(?: (\d{1,2}))?$/.exec(q); if (m) return { place: m[1], ...(m[2] ? { zoneForced: +m[2] } : {}) };
-    return null;
-  },
+  name: 'utm',
   amend: [{ arg: 'zoneForced', match: /^(?:in )?zone (\d{1,2})$/, value: m => +m[1], when: a => a.place }, { arg: 'band', match: /^(?:band|south|north)\b.*?([c-hj-np-x])?$/i, value: m => m[1] ? m[1].toUpperCase() : null, when: a => a.easting != null }],
   topic: () => ['UTM', 1],
   run: a => {
@@ -131,4 +123,34 @@ tool({
     if (Math.abs(p.lat) > 84.5) return { read, body: [{ t: 'note', kind: 'err', text: 'That northing lies beyond the UTM latitude limits.' }], trace: ['outside UTM'] };
     return { read, value: [p.lat, p.lon], body: [{ t: 'big', v: fmtLL(p.lat, p.lon), unit: '' }, { t: 'kv', rows: [['decimal', `${fmt(p.lat, 8)}, ${fmt(p.lon, 8)}`, { mono: true }], ['hemisphere', hemi === 'S' ? `southern${a.band ? ', from band ' + a.band : ''}` : `northern${a.band ? ', from band ' + a.band : ''}`], ['round trip', `${fmt(back.easting, 9)} E ${fmt(back.northing, 9)} N (closes to ${fmt(Math.hypot(back.easting - a.easting, back.northing - a.northing) * 1000, 3)} mm)`], ['datum', 'WGS84 (SIRGAS 2000 is equal at this precision)']] }, { t: 'src', text: 'Transverse Mercator by the Krüger series (Karney 2011), WGS84, k0 0.9996' }], trace: [`krüger inverse(zone ${a.zone}${hemi}, ${a.easting}, ${a.northing}) → ${fmt(p.lat, 10)}, ${fmt(p.lon, 10)}`], py: `utm.to_latlon(${a.easting}, ${a.northing}, ${a.zone}, ${a.band ? '"' + a.band + '"' : 'northern=' + (hemi === 'N')})` };
   }
+});
+/* ── what reads them ─────────────────────────────────────────── */
+shape({ type: 'coords', re: '-?\\d{1,2}(?:\\.\\d+)?\\s*,\\s*-?\\d{1,3}(?:\\.\\d+)?' });   // "-19.92, -43.94"
+shape({ type: 'utmcoord', re: '\\d{1,2}\\s?[c-hj-np-x]?\\s+(?:e\\s?)?\\d{5,7}(?:\\.\\d+)?\\s+(?:n\\s?)?\\d{5,8}(?:\\.\\d+)?' });   // "23k 611000 7797000"
+noun({ type: 'geographic', words: { latlon: ['lat long', 'lat lon', 'latlong', 'latitude and longitude', 'latitude longitude', 'geographic', 'wgs84', 'degrees'] }, words_pt: { latlon: ['lat long', 'latitude e longitude', 'geográficas', 'geograficas', 'graus'] } });
+noun({ type: 'utmword', words: { utm: ['utm'] }, words_pt: { utm: ['utm'] } });
+// a place in a role: coordinates, a known name, or (for a name nobody saved) the words, so the card can ask where it is
+const PLACE_T = ['coords', 'place', 'text'];
+const where = n => n.type === 'coords' ? n.value.replace(/\s+/g, ' ') : String(n.value);
+// "home is -19.92, -43.94"
+frame({
+  name: 'place', label: 'Place', words: ['is', 'is at'], subject: ['text', 'place'], theme: ['coords'], required: ['theme', 'subject'], roles: {},
+  words_pt: ['é', 'fica em', 'está em'], label_pt: 'Lugar',
+  bind: c => { const n = c.roles.subject[0], m = /^(-?[\d.]+)\s*,\s*(-?[\d.]+)$/.exec(c.theme[0].value); return m ? { tool: 'place', args: { name: String(n.value).trim().toLowerCase(), lat: +m[1], lon: +m[2] } } : null; }
+});
+// "distance from -19.92,-43.94 to -6.07,-50.16", "how far is it from home to the camp", "distance between home and perth"
+frame({
+  name: 'distance', label: 'Distance', words: ['distance', 'how far', 'how far is it', 'geodesic distance', 'great circle distance'], theme: [], required: ['from'],
+  roles: { from: { preps: ['from', 'between'], types: PLACE_T }, to: { preps: ['to'], types: PLACE_T } },
+  words_pt: ['distância', 'distancia', 'qual a distância', 'a que distância'], label_pt: 'Distância',
+  bind: c => { const f = c.roles.from.map(where), t = (c.roles.to || []).map(where); const [a, b] = f.length === 2 && !t.length ? f : [f[0], t[0]]; return a && b ? { tool: 'distance', args: { from: a, to: b } } : null; }
+});
+// "-19.92, -43.94 in utm", "home in utm"; "utm 23k 611000 7797000 to lat long"
+frame({
+  name: 'toutm', label: 'To UTM', words: [], elidable: true, theme: ['coords', 'place'], required: ['theme', 'to'], roles: { to: { preps: ['in', 'to', 'as'], types: ['utmword'] } }, label_pt: 'Para UTM',
+  bind: c => ({ tool: 'utm', args: { place: where(c.theme[0]) } })
+});
+frame({
+  name: 'fromutm', label: 'From UTM', words: ['utm', 'convert utm'], elidable: true, theme: ['utmcoord'], required: ['theme'], roles: { to: { preps: ['to', 'in', 'as', 'into'], types: ['geographic'] } }, label_pt: 'De UTM',
+  bind: c => { const m = /^(\d{1,2})\s?([c-hj-np-x])?\s+(?:e\s?)?(\d+(?:\.\d+)?)\s+(?:n\s?)?(\d+(?:\.\d+)?)$/i.exec(c.theme[0].value.trim()); return m ? { tool: 'utm', args: { zone: +m[1], band: m[2] ? m[2].toUpperCase() : null, easting: +m[3], northing: +m[4] } } : null; }
 });

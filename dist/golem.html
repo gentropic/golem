@@ -386,10 +386,13 @@ function frame(f) { FRAMES.push(f); return f; }
 //                                                           called each time (a noun that follows the open table)
 //   shape({ type, re })                                     a token shape that is a thing of that type (270/60)
 //   postmod({ prep, heads, attr, quantity })                a modifier after a noun ("cu above 0.5")
-const LEXICON = { nouns: [], shapes: [], postmods: [] };
+const LEXICON = { nouns: [], shapes: [], postmods: [], units: [], qmods: [] };
 const noun = n => { LEXICON.nouns.push(n); return n; };
 const shape = s => { LEXICON.shapes.push(s); return s; };
 const postmod = p => { LEXICON.postmods.push(p); return p; };
+//   unit({ unit, dim, words })   a unit only the grammar needs ("15 working days"); qmod({ head, attr, dims }) "045 magnetic"
+const unit = u => { LEXICON.units.push(u); return u; };
+const qmod = q => { LEXICON.qmods.push(q); return q; };
 
 // Conditions a tool may declare in `pre`. Each knows whether it holds now and how it can be established:
 // a list of steps { label, tool, args }. When a tool's condition is unmet, runTool() asks which step to
@@ -453,7 +456,7 @@ const p3 = x => String(Math.round(x) % 360).padStart(3, '0');
 const p2 = x => String(Math.round(x)).padStart(2, '0');
 // a quantity node from the parser as a number in a base unit, given the unit's factor
 const qty = (node, f) => node && node.type === 'quantity' ? node.n * f(node.unit) : null;
-  return { S, T, TOOLS, tool, toolByName, FRAMES, frame, LEXICON, noun, shape, postmod, CONDITIONS, condition, setRunner, onJobDone, result, clearResults, startJobs, settle, runTool, clock, fmt, iso, rad, deg, p3, p2, qty };
+  return { S, T, TOOLS, tool, toolByName, FRAMES, frame, LEXICON, noun, shape, postmod, unit, qmod, CONDITIONS, condition, setRunner, onJobDone, result, clearResults, startJobs, settle, runTool, clock, fmt, iso, rad, deg, p3, p2, qty };
 })();
 
 /* ==== src/engine/units.js ==== */
@@ -580,7 +583,7 @@ tool({
 
 /* ==== src/engine/dates.js ==== */
 const __m3 = (() => {
-const { tool, clock, iso } = __m0;
+const { tool, frame, noun, shape, clock, iso } = __m0;
 // Dates and times: day counts, weekdays, and the parsers the calendar tools share.
 
 const MON = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'], DOW = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
@@ -632,9 +635,8 @@ function findTime(s) {
   return { h, mi, m };
 }
 tool({
-  name: 'daysUntil', rank: 90,
+  name: 'daysUntil',
   skill: { group: 'Compute', title: 'Dates', on: 'built in', about: 'Day counts and weekdays.', examples: ['days until 25 december', 'what day is 15 nov 2027'] },
-  read: (text, q) => { const m = /^(?:how many )?days (?:until|till|to|before) (.+)$/.exec(q); return m ? { s: m[1] } : null; },
   topic: () => ['Dates', .5],
   run: a => {
     const f = findDate(a.s); if (!f) return null;
@@ -643,8 +645,7 @@ tool({
   }
 });
 tool({
-  name: 'whenIs', rank: 92,
-  read: (text, q) => { const m = /^when (?:is|was|will be|falls?) (.+)$/.exec(q); return m && findDate(m[1]) ? { s: m[1] } : null; },
+  name: 'whenIs',
   topic: () => ['Dates', .5],
   run: a => {
     const f = findDate(a.s); if (!f) return null;
@@ -653,15 +654,29 @@ tool({
   }
 });
 tool({
-  name: 'weekday', rank: 91,
-  read: (text, q) => { const m = /^what (?:day|weekday) (?:is|was|will be) (.+)$/.exec(q); return m ? { s: m[1] } : null; },
+  name: 'weekday',
   topic: () => ['Dates', .5],
   run: a => {
     const f = findDate(a.s); if (!f) return null;
     return { read: ['weekday of', { v: fmtDate(f.d) }], body: [{ t: 'big', v: f.d.toLocaleDateString('en-GB', { weekday: 'long' }) }], trace: [`dates.parse("${a.s}")`, 'Gregorian weekday'], py: `date("${iso(f.d)}").strftime("%A")` };
   }
 });
-  return { day0, today, fmtDate, easter, findDate, findTime };
+/* ── what reads them: a date the grammar parsed, or a holiday, handed to findDate as the words that named it ── */
+noun({ type: 'holiday', words: Object.fromEntries(['christmas', 'christmas day', 'xmas', 'christmas eve', "new year's day", 'new year', 'new years day', "new year's eve", 'new years eve', ...Object.keys(MOVABLE)].map(w => [w, [w]])),
+  words_pt: { christmas: ['natal'], 'christmas eve': ['véspera de natal', 'vespera de natal'], 'new year': ['ano novo', 'réveillon'], easter: ['páscoa', 'pascoa'], carnival: ['carnaval'], 'good friday': ['sexta-feira santa'], 'corpus christi': ['corpus christi'] } });
+shape({ type: 'holiday', re: `(?:${['christmas', 'xmas', 'christmas eve', 'new year', "new year's day", "new year's eve", ...Object.keys(MOVABLE)].join('|')})\\s+\\d{4}` });   // "easter 2027"
+const dateWords = n => n && (n.type === 'date' || n.type === 'holiday') ? String(n.value) : null;
+const DATE_T = ['date', 'holiday'];
+const onDate = (name, words, words_pt, label) => frame({
+  name, label, words, theme: DATE_T, required: ['theme'], roles: {}, words_pt, label_pt: label,
+  bind: c => dateWords(c.theme[0]) && findDate(dateWords(c.theme[0])) ? { tool: name, args: { s: dateWords(c.theme[0]) } } : null
+});
+onDate('daysUntil', ['days until', 'days till', 'days to', 'days before', 'days left until', 'how many days until', 'how many days till', 'how many days to', 'how many days are left until', 'how many days left until', 'countdown to'],
+  ['dias até', 'dias ate', 'quantos dias até', 'quantos dias ate', 'quantos dias faltam para', 'quantos dias faltam até'], 'Days until');
+onDate('whenIs', ['when is', 'when was', 'when will be', 'when does', 'when falls', 'what date is', 'what date was'], ['quando é', 'quando e', 'quando foi', 'quando cai', 'que data é'], 'When is');
+onDate('weekday', ['what day is', 'what day was', 'what day will be', 'what weekday is', 'what weekday was', 'what day of the week is', 'what day of the week was', 'which day is', 'what day does'],
+  ['que dia é', 'que dia e', 'que dia foi', 'que dia da semana é', 'que dia cai', 'em que dia cai'], 'Weekday');
+  return { day0, today, fmtDate, easter, findDate, findTime, dateWords };
 })();
 
 /* ==== src/vendor/bearing.js ==== */
@@ -11181,8 +11196,8 @@ frame({
 
 /* ==== src/engine/device.js ==== */
 const __m15 = (() => {
-const { tool, frame, fmt, iso } = __m0;
-const { findDate, findTime, today, fmtDate } = __m3;
+const { tool, frame, noun, fmt, iso } = __m0;
+const { findDate, findTime, today, fmtDate, dateWords } = __m3;
 const { parseUnit } = __m1;
 // Device hand-offs: calendar event, timer, alarm. Simulated in the mock; on Android they become intents.
 
@@ -11197,9 +11212,8 @@ function parseEvent(str) {
   return { title: title ? title[0].toUpperCase() + title.slice(1) : 'Event', date: +(d ? d.d : today()), timed: !!t, h: t ? t.h : 0, mi: t ? t.mi : 0, dur: du ? Math.round(du[1] * (du[2][0] === 'h' ? 60 : 1)) : 60 };
 }
 tool({
-  name: 'event', rank: 32,
+  name: 'event',
   skill: { group: 'Device', title: 'Calendar event', on: 'lead-acid intent', about: 'Fills the event and hands it to your calendar app.', examples: ['remind me to send the samples to the lab on friday at 9', 'schedule core shed visit tomorrow at 14:30 for 2 hours'] },
-  read: (text, q) => { const m = /^(?:remind me to|remind me|add (?:an )?event|new event|schedule)[:,]? (.+)$/.exec(q); return m ? parseEvent(text.slice(text.length - m[1].length)) : null; },
   topic: a => [a.title, 2],
   run: a => {
     const d = new Date(a.date), s = new Date(d.getFullYear(), d.getMonth(), d.getDate(), a.timed ? a.h : 0, a.timed ? a.mi : 0), e = new Date(+s + a.dur * 6e4);
@@ -11249,14 +11263,35 @@ frame({
   }
 });
 tool({
-  name: 'alarm', rank: 31,
-  read: (text, q) => { const m = /^(?:set )?(?:an )?alarm (?:for |at )?(.+)$/.exec(q) || /^wake me(?: up)? at (.+)$/.exec(q); const t = m && findTime('at ' + m[1]); return t ? { h: t.h, mi: t.mi } : null; },
+  name: 'alarm',
   topic: () => ['Alarm', 1],
   run: a => {
     const t = String(a.h).padStart(2, '0') + ':' + String(a.mi).padStart(2, '0');
     const [kv, go] = hand('Hand to the Clock app', `AlarmClock.ACTION_SET_ALARM, HOUR=${a.h}, MINUTES=${a.mi}`, 'SET_ALARM, granted at install', 'On Android this creates the alarm in the Clock app. Nothing happens in the mock.');
     return { read: ['set an alarm at', { v: t }], body: [{ t: 'big', v: t }, kv, { t: 'actions', items: [go] }], trace: [`time → ${t}`, 'build intent: ACTION_SET_ALARM'], py: `device.alarm("${t}")` };
   }
+});
+// "remind me to send the samples to the lab on friday at 9": the title as typed, then a date, a time, a length
+frame({
+  name: 'event', label: 'Event', words: ['remind me to', 'remind me', 'schedule', 'add an event', 'add event', 'new event', 'create an event', 'put on my calendar', 'book'],
+  theme: ['text'], required: ['theme'],
+  roles: { on: { preps: ['on', 'for'], types: ['date', 'holiday'] }, at: { preps: ['at'], types: ['clock'] }, for: { preps: ['for'], types: ['quantity:time'] } },
+  words_pt: ['me lembra de', 'me lembre de', 'me lembra', 'agenda', 'agende', 'marca', 'marque', 'novo evento'], label_pt: 'Evento',
+  bind: c => {
+    const title = c.theme[0] && c.theme[0].value, on = c.roles.on && c.roles.on[0], at = c.roles.at && c.roles.at[0], du = c.roles.for && c.roles.for[0];
+    if (!title) return null;
+    if (!on && !at) return { clarify: 'when? Say "on friday", "tomorrow" or "at 9"' };
+    const d = on ? findDate(dateWords(on)) : null; if (on && !d) return null;
+    const u = du && du.unit ? parseUnit(du.unit) : null, dur = u && u.dim === 't' ? Math.round(du.n * u.f / 60) : du ? Math.round(du.n) : 60;
+    return { tool: 'event', args: { title: title[0].toUpperCase() + title.slice(1), date: +(d ? d.d : today()), timed: !!at, h: at ? at.h : 0, mi: at ? at.mi : 0, dur } };
+  }
+});
+// "set an alarm for 6:15", "wake me up at 6", "alarm at 7am"
+noun({ type: 'alarm', words: { alarm: ['alarm', 'wake-up alarm'] }, words_pt: { alarm: ['alarme', 'despertador'] } });
+frame({
+  name: 'alarm', label: 'Alarm', words: ['set', 'wake me up', 'wake me', 'get me up'], elidable: true, theme: ['alarm'], required: ['at'],
+  roles: { at: { preps: ['at', 'for'], types: ['clock'] } }, words_pt: ['me acorda', 'me acorde', 'põe', 'coloca'], label_pt: 'Alarme',
+  bind: c => { const t = c.roles.at && c.roles.at[0]; return t && t.h < 24 ? { tool: 'alarm', args: { h: t.h, mi: t.mi } } : null; }
 });
   return {  };
 })();
@@ -11640,9 +11675,9 @@ function declination(lat, lon, date = new Date(), height = 0) {
 
 /* ==== src/engine/geo.js ==== */
 const __m18 = (() => {
-const { tool, clock, fmt, iso, p3 } = __m0;
+const { tool, frame, noun, qmod, clock, fmt, iso, p3 } = __m0;
 const { field, MODEL, VALID_FROM, VALID_TO } = __m17;
-const { findDate, fmtDate } = __m3;
+const { findDate, fmtDate, dateWords } = __m3;
 // Magnetic declination from @gcu/wmm (vendored WMM2025), and bearings between magnetic and true north.
 // A place is coordinates in the request; device location stays off (SPEC-skills 0.7).
 
@@ -11654,13 +11689,8 @@ const dirWord = x => x < 0 ? 'west' : 'east';
 const SRC = f => ({ t: 'src', text: `@gcu/wmm · vendored · ${MODEL}, valid ${VALID_FROM} to ${VALID_TO}${f.valid ? '' : ' · outside the validity window'}` });
 
 tool({
-  name: 'declination', rank: 68,
+  name: 'declination',
   skill: { group: 'Field', title: 'Magnetic declination', on: '@gcu/wmm', about: 'The World Magnetic Model at a place and date, and magnetic to true bearings.', examples: ['declination at -19.92, -43.94', '045 magnetic to true at -19.92, -43.94'] },
-  read: (text, q) => {
-    if (/^(?:magnetic )?declination(?: here)?$/.test(q)) return { here: true };
-    const m = new RegExp(`^(?:magnetic )?declination (?:at|for|in) ${LL}(?: on (.+))?$`).exec(q); if (!m) return null;
-    const args = { lat: +m[1], lon: +m[2] }; if (m[3]) { const d = findDate(m[3]); if (!d) return null; args.date = iso(d.d); } return args;
-  },
   topic: () => ['Declination', 2],
   run: a => {
     if (a.here) return { read: ['declination', { v: 'here' }], body: [whereNote], trace: ['no place: device location is off and no coordinates were given'] };
@@ -11676,11 +11706,7 @@ tool({
   }
 });
 tool({
-  name: 'bearing', rank: 69,
-  read: (text, q) => {
-    const m = new RegExp(`^(\\d{1,3}(?:\\.\\d+)?) (magnetic|true|grid) to (magnetic|true|grid)(?: at ${LL}(?: on (.+))?)?$`).exec(q); if (!m) return null;
-    const args = { v: +m[1], from: m[2], to: m[3] }; if (m[4]) { args.lat = +m[4]; args.lon = +m[5]; } if (m[6]) { const d = findDate(m[6]); if (!d) return null; args.date = iso(d.d); } return args;
-  },
+  name: 'bearing',
   topic: () => ['Declination', 1],
   run: a => {
     const read = [{ v: p3(a.v) }, a.from, 'to', a.to];
@@ -11694,6 +11720,23 @@ tool({
       trace: [`wmm.field(${a.lat}, ${a.lon}, ${fmt(f.year, 6)}) → declination ${fmt(f.decl, 5)}°`, `${a.v} ${a.from === 'magnetic' ? '+' : '−'} ${fmt(f.decl, 5)} = ${fmt(out, 5)}`], py: `wmm.to_${a.to}(${a.v}, ${a.lat}, ${a.lon}, "${iso(d)}")`
     };
   }
+});
+/* ── what reads them: "declination at -19.92, -43.94", "045 magnetic to true at -19.92, -43.94" ── */
+const llOf = n => { const m = n && n.type === 'coords' && /^(-?[\d.]+)\s*,\s*(-?[\d.]+)$/.exec(n.value); return m ? { lat: +m[1], lon: +m[2] } : null; };
+const dateArg = n => { if (!n) return {}; const d = findDate(dateWords(n)); return d ? { date: iso(d.d) } : null; };
+frame({
+  name: 'declination', label: 'Declination', words: ['declination', 'magnetic declination'], theme: [], required: [],
+  roles: { at: { preps: ['at', 'for', 'in', ''], types: ['coords', 'place'] }, on: { preps: ['on', 'for'], types: ['date', 'holiday'] } },
+  words_pt: ['declinação', 'declinacao', 'declinação magnética'], label_pt: 'Declinação',
+  bind: c => { const at = c.roles.at && c.roles.at[0]; if (!at || at.value === 'here') return { tool: 'declination', args: { here: true } }; const ll = llOf(at), d = dateArg(c.roles.on && c.roles.on[0]); return ll && d ? { tool: 'declination', args: { ...ll, ...d } } : null; }
+});
+noun({ type: 'north', words: { magnetic: ['magnetic', 'magnetic north'], true: ['true', 'true north'], grid: ['grid', 'grid north'] }, words_pt: { magnetic: ['magnético', 'magnetico'], true: ['verdadeiro'], grid: ['quadrícula', 'quadricula'] } });
+qmod({ head: 'north', attr: 'bearing', dims: ['bare', 'angle'] });   // "045 magnetic"
+frame({
+  name: 'bearing', label: 'Bearing', words: ['convert'], elidable: true, theme: ['north'], required: ['theme', 'to'],
+  roles: { to: { preps: ['to', 'into', 'as'], types: ['north'] }, at: { preps: ['at', 'for', 'in'], types: ['coords'] }, on: { preps: ['on'], types: ['date', 'holiday'] } }, label_pt: 'Rumo',
+  bind: c => { const b = c.theme[0].attrs && c.theme[0].attrs.bearing; if (!b) return null; const ll = llOf(c.roles.at && c.roles.at[0]), d = dateArg(c.roles.on && c.roles.on[0]); if (!d) return null;
+    return { tool: 'bearing', args: { v: b.n, from: c.theme[0].value, to: c.roles.to[0].value, ...(ll || {}), ...d } }; }
 });
   return {  };
 })();
@@ -13324,8 +13367,8 @@ function brazilMunicipalities() {
 
 /* ==== src/engine/calendar.js ==== */
 const __m27 = (() => {
-const { S, tool, clock, iso } = __m0;
-const { findDate, findTime, today, day0, fmtDate } = __m3;
+const { S, tool, frame, noun, shape, postmod, unit, clock, iso } = __m0;
+const { findDate, findTime, today, day0, fmtDate, dateWords } = __m3;
 const { isWorkingDay, addWorkingDays, brazilCalendar, federalHolidays } = __m26;
 // Working days and rosters over @gcu/plan's calendar engine (vendored), and time zones through Intl.
 // The calendar is a slot and is always shown: Brazil's federal holidays, or weekdays only.
@@ -13340,18 +13383,8 @@ const DATE = '(.+?)';
 
 /* ── working days ───────────────────────────────────────────── */
 tool({
-  name: 'workdays', rank: 85,
+  name: 'workdays',
   skill: { group: 'Compute', title: 'Working days and rosters', on: '@gcu/plan', about: 'Working days until a date or between two, N working days from a date, whether a day is a working day, and on/off rosters. The calendar is a slot: Brazil\'s federal holidays or weekdays only.', examples: ['working days until 20 dec', 'is 21 apr 2027 a working day', '15 working days from monday', '14 on 14 off from 6 oct, am i off at christmas'] },
-  read: (text, q) => {
-    let m;
-    if ((m = new RegExp(`^(?:how many )?(?:working|business) days (?:until|till|to|before|left until) ${DATE}$`).exec(q))) return { ask: 'until', to: m[1] };
-    if ((m = new RegExp(`^(?:how many )?(?:working|business) days (?:between|from) ${DATE} (?:and|to|until|till) ${DATE}$`).exec(q))) return { ask: 'between', from: m[1], to: m[2] };
-    if ((m = new RegExp(`^(?:is|was|will) ${DATE} (?:be )?a (?:working|business|work) ?day$`).exec(q))) return { ask: 'is', date: m[1] };
-    if ((m = new RegExp(`^(\\d+) (?:working|business) days? (?:from|after) ${DATE}$`).exec(q))) return { ask: 'add', n: +m[1], from: m[2] };
-    if ((m = new RegExp(`^(\\d+) (?:working|business) days? (?:before|back from) ${DATE}$`).exec(q))) return { ask: 'add', n: -m[1], from: m[2] };
-    if ((m = /^(?:what is |when is )?(?:the )?next (?:working|business) day(?: after (.+))?$/.exec(q))) return { ask: 'add', n: 1, from: m[1] || 'today' };
-    return null;
-  },
   amend: [{ arg: 'cal', match: /^(?:in |with |using )?(?:the )?(brazil(?:ian)?|weekdays?(?: only)?|no holidays)(?: calendar| holidays)?$/, value: m => /^brazil/.test(m[1]) ? 'brazil' : 'weekdays' }],
   topic: () => ['Working days', 1],
   run: a => {
@@ -13382,14 +13415,7 @@ tool({
 /* ── rosters: X on, Y off, from a start date ────────────────── */
 const lastRoster = () => { for (let i = S.cards.length - 1; i >= 0; i--) if (S.cards[i].tool === 'roster' && S.cards[i].args.on) return S.cards[i].args; return null; };
 tool({
-  name: 'roster', rank: 86,
-  read: (text, q) => {
-    let m = /^(\d+) on,? (\d+) off(?:,? (?:starting|from|since) (.+?))?(?:[,;]? (?:am i|will i be|are we) (off|on|working|at work)(?: (?:on|at) (.+))?)?$/.exec(q);
-    if (m) return { on: +m[1], off: +m[2], start: m[3] || 'today', ...(m[4] ? { date: m[5] || 'today' } : {}) };
-    m = /^(?:am i|will i be|are we) (?:off|on|working|at work)(?: (?:on|at) (.+))?$/.exec(q); if (m) { const r = lastRoster(); return r ? { ...r, date: m[1] || 'today' } : { noRoster: true }; }
-    m = /^(?:when is (?:the |my )?)?next (?:swing|change|changeover|days? off|days? on)$/.exec(q); if (m) { const r = lastRoster(); return r ? { ...r, date: 'today', next: true } : { noRoster: true }; }
-    return null;
-  },
+  name: 'roster',
   topic: () => ['Roster', 1],
   run: a => {
     if (a.noRoster) return { read: ['roster'], body: [{ t: 'note', kind: 'err', text: 'No roster in this session. Say it first: "14 on 14 off from 6 oct".' }], trace: ['no roster card to read from'] };
@@ -13442,15 +13468,8 @@ const zoneSlot = (key, name, zones, cur) => zones.length > 1 ? { v: zoneName(cur
 const refuseZone = (read, name, zones) => ({ read, body: [{ t: 'note', kind: 'err', text: zones.length ? `"${name}" could be ${zones.map(zoneName).join(' or ')}.` : `I do not know a time zone called "${name}". Try a city from the IANA list, like "sao paulo" or "perth", or an offset like "utc+8".` }], trace: ['zone: no match'] });
 
 tool({
-  name: 'zone', rank: 87,
+  name: 'zone',
   skill: { group: 'Compute', title: 'Time zones', on: 'Intl', about: 'A time in one place as it reads in another, with the offsets used and a note when the clocks change nearby. Cities by their IANA names, plus common aliases.', examples: ['9am sao paulo in perth', 'what time is it in vancouver', '14:30 utc to my time', 'overlap of 9 to 17 in belo horizonte and perth'] },
-  read: (text, q) => {
-    let m;
-    if ((m = /^(?:what time is it|what is the time|current time|time now|now)(?: now)? in (.+)$/.exec(q))) return { to: m[1] };
-    if ((m = new RegExp(`^(?:what is |what's )?(\\d{1,2}(?::\\d{2})? ?(?:am|pm)?|noon|midnight)(?: (?:on|of) (.+?))?(?: (?:in|at|from))? ${PLACE} (?:in|to|at|for|as) ${PLACE}$`).exec(q))) return { time: m[1], ...(m[2] ? { date: m[2] } : {}), from: m[3], to: m[4] };
-    if ((m = new RegExp(`^(?:what is |what's )?${PLACE} (\\d{1,2}(?::\\d{2})? ?(?:am|pm)?|noon|midnight)(?: (?:on|of) (.+?))? (?:in|to|at|for|as) ${PLACE}$`).exec(q))) return { time: m[2], ...(m[3] ? { date: m[3] } : {}), from: m[1], to: m[4] };
-    return null;
-  },
   amend: [{ arg: 'date', match: /^(?:on |for )?(tomorrow|today|next \w+|\d{1,2} \w{3,9}(?: \d{4})?|\d{4}-\d{2}-\d{2})$/ }],
   topic: () => ['Time zones', 1],
   run: a => {
@@ -13474,8 +13493,7 @@ tool({
   }
 });
 tool({
-  name: 'overlap', rank: 88,
-  read: (text, q) => { const m = new RegExp(`^(?:working )?(?:overlap|common hours|shared hours) (?:of|for|between) (\\d{1,2}(?::\\d{2})?) ?(?:to|-|–) ?(\\d{1,2}(?::\\d{2})?) (?:in|between|for) (.+)$`).exec(q); if (!m) return null; const places = m[3].split(/,\s*|\s+and\s+/).filter(Boolean); return places.length >= 2 ? { from: m[1], to: m[2], places } : null; },
+  name: 'overlap',
   topic: () => ['Time zones', 1],
   run: a => {
     const zs = a.places.map(p => ({ name: p, zones: zonesOf(p) })), bad = zs.find(z => z.zones.length !== 1);
@@ -13489,6 +13507,90 @@ tool({
     const rows = windows.map(w => [zoneName(w.zone), best ? `${wall(w.zone, best.s).text} to ${wall(w.zone, best.e).text} (${fmtOffset(offsetOf(w.zone, best.s))})` : `${a.from} to ${a.to} local (${fmtOffset(offsetOf(w.zone, w.s))})`]);
     const hours = best ? (best.e - best.s) / 36e5 : 0;
     return { read, value: hours, body: [{ t: 'big', v: best ? `${hours % 1 ? hours.toFixed(1) : hours} h` : 'None', unit: best ? `in common each day, ${a.from} to ${a.to} local in each place` : `no hour is ${a.from} to ${a.to} in all of them` }, { t: 'kv', rows }, { t: 'sub', text: `Computed for ${fmtDate(day)}; it moves when any of these places changes its clocks.` }], trace: windows.map(w => `${w.zone}: ${new Date(w.s).toISOString()} to ${new Date(w.e).toISOString()}`).concat(best ? [`intersection: ${new Date(best.s).toISOString()} to ${new Date(best.e).toISOString()}`] : ['empty intersection']), py: `# intersect the UTC windows of ${zs.map(z => z.zones[0]).join(', ')}` };
+  }
+});
+/* ── what reads them ─────────────────────────────────────────── */
+const DATE_T = ['date', 'holiday'];
+const hm = t => `${t.h}:${String(t.mi).padStart(2, '0')}`;
+// working days: "working days until 20 dec", "working days between 1 dec and 20 dec", "15 working days from monday",
+// "is 21 apr 2027 a working day", "the next working day after 24 dec"
+unit({ unit: 'working days', dim: 'workday', words: ['working days', 'working day', 'business days', 'business day', 'workdays', 'workday'] });
+noun({ type: 'daykind', words: { working: ['a working day', 'a business day', 'a work day', 'a workday', 'working day', 'business day'] }, words_pt: { working: ['dia útil', 'dia util', 'um dia útil', 'um dia util'] } });
+noun({ type: 'nextwork', words: { next: ['next working day', 'next business day'] }, words_pt: { next: ['próximo dia útil', 'proximo dia util'] } });
+frame({
+  name: 'workcount', label: 'Working days', words: ['working days', 'business days', 'how many working days', 'how many business days', 'workdays'], theme: [], required: [],
+  roles: { until: { preps: ['until', 'till', 'to', 'before'], types: DATE_T }, from: { preps: ['from', 'between', 'since'], types: DATE_T } },
+  words_pt: ['dias úteis', 'dias uteis', 'quantos dias úteis', 'quantos dias uteis'], label_pt: 'Dias úteis',
+  bind: c => {
+    const u = (c.roles.until || []).map(dateWords), f = (c.roles.from || []).map(dateWords);
+    if (f.length === 2 && !u.length) return { tool: 'workdays', args: { ask: 'between', from: f[0], to: f[1] } };
+    if (f.length === 1 && u.length === 1) return { tool: 'workdays', args: { ask: 'between', from: f[0], to: u[0] } };
+    return u.length === 1 && !f.length ? { tool: 'workdays', args: { ask: 'until', to: u[0] } } : null;
+  }
+});
+frame({
+  name: 'workadd', label: 'Working days', words: [], elidable: true, theme: ['quantity:workday'], required: ['theme'],
+  roles: { from: { preps: ['from', 'after'], types: DATE_T }, before: { preps: ['before'], types: DATE_T } }, label_pt: 'Dias úteis',
+  bind: c => { const q = c.theme[0], f = c.roles.from && c.roles.from[0], b = c.roles.before && c.roles.before[0]; if (!q || q.unit !== 'working days' || !Number.isInteger(q.n) || (f && b)) return null;
+    return { tool: 'workdays', args: { ask: 'add', n: b ? -q.n : q.n, from: dateWords(f || b) || 'today' } }; }
+});
+frame({
+  name: 'isworkday', label: 'Working day?', words: ['is', 'was', 'will'], theme: DATE_T, required: ['theme', 'as'], roles: { as: { preps: [''], types: ['daykind'] } },
+  words_pt: ['é', 'e', 'foi', 'será'], label_pt: 'Dia útil?',
+  bind: c => dateWords(c.theme[0]) ? { tool: 'workdays', args: { ask: 'is', date: dateWords(c.theme[0]) } } : null
+});
+frame({
+  name: 'nextworkday', label: 'Next working day', words: [], elidable: true, theme: ['nextwork'], required: ['theme'], roles: { after: { preps: ['after', 'from'], types: DATE_T } }, label_pt: 'Próximo dia útil',
+  bind: c => ({ tool: 'workdays', args: { ask: 'add', n: 1, from: dateWords(c.roles.after && c.roles.after[0]) || 'today' } })
+});
+// time zones: "9am sao paulo in perth", "14:30 utc to my time", "what time is it in vancouver"; a place is an IANA city,
+// an alias, "here", or a place saved on this device
+noun(() => {
+  const names = [...new Set([...ZONES.filter(z => !/^Etc\//.test(z) && z.includes('/')).map(cityOf), ...Object.keys(ALIAS), ...HERE.filter(w => w !== 'me'), 'home', ...(S.tables.places ? S.tables.places.rows.map(r => r.name) : [])])];
+  const words = Object.fromEntries(names.map(n => [n, [n]]));
+  return { type: 'place', exact: true, words, generic: ['place'], words_pt: words, generic_pt: ['lugar'] };
+});
+shape({ type: 'place', re: String.raw`(?:utc|gmt)\s?[+-]\d{1,2}(?::?\d{2})?` });   // "utc+8", "gmt-3"
+frame({
+  name: 'zone', label: 'Time in', words: [], elidable: true, theme: ['clock'], required: ['theme', 'to'],
+  roles: { from: { preps: ['', 'from', 'at'], types: ['place'] }, to: { preps: ['in', 'to', 'for', 'as'], types: ['place'] }, on: { preps: ['on'], types: DATE_T } }, label_pt: 'Hora em',
+  bind: c => {
+    let from = (c.roles.from || []).map(p => p.value), to = (c.roles.to || []).map(p => p.value);
+    if (!from.length && to.length === 2) { from = [to[0]]; to = [to[1]]; }
+    if (from.length !== 1 || to.length !== 1) return null;
+    const d = c.roles.on && dateWords(c.roles.on[0]);
+    return { tool: 'zone', args: { time: hm(c.theme[0]), from: from[0], to: to[0], ...(d ? { date: d } : {}) } };
+  }
+});
+frame({
+  name: 'timenow', label: 'Time now', words: ['what time is it', 'what is the time', "what's the time", 'current time', 'time now', 'local time', 'time'], theme: [], required: ['in'],
+  roles: { in: { preps: ['in', 'at'], types: ['place'] } }, words_pt: ['que horas são', 'que horas sao', 'hora atual', 'horas'], label_pt: 'Hora agora',
+  bind: c => ({ tool: 'zone', args: { to: c.roles.in[0].value } })
+});
+// "overlap of 9 to 17 in belo horizonte and perth"
+frame({
+  name: 'overlap', label: 'Overlap', words: ['overlap', 'working overlap', 'common hours', 'shared hours', 'hours in common'], theme: [], required: ['of', 'to', 'in'],
+  roles: { of: { preps: ['of', 'for', 'between', 'from'], types: ['clock'] }, to: { preps: ['to', 'until', 'till'], types: ['clock'] }, in: { preps: ['in', 'between', 'for', 'across'], types: ['place'] } },
+  words_pt: ['sobreposição', 'sobreposicao', 'horas em comum'], label_pt: 'Sobreposição',
+  bind: c => c.roles.in.length >= 2 ? { tool: 'overlap', args: { from: hm(c.roles.of[0]), to: hm(c.roles.to[0]), places: c.roles.in.map(p => p.value) } } : null
+});
+// rosters: "14 on 14 off from 6 oct", "…, am i off at christmas", "am i off on 21 oct", "when is my next swing"
+shape({ type: 'roster', re: String.raw`\d{1,2}\s*(?:on|x|/)\s*,?\s*\d{1,2}(?:\s*off)?` });
+postmod({ prep: 'from', heads: ['roster'], attr: 'start', mod: 'date' });
+postmod({ prep: 'since', heads: ['roster'], attr: 'start', mod: 'date' });
+noun({ type: 'rosterq', words: { day: ['am i off', 'am i on', 'am i working', 'am i at work', 'will i be off', 'will i be on', 'will i be working', 'are we off', 'are we on', 'off or on'], next: ['next swing', 'my next swing', 'next change', 'next changeover', 'next days off', 'next day off', 'next days on'] },
+  words_pt: { day: ['estou de folga', 'estou trabalhando', 'vou estar de folga', 'vou trabalhar'], next: ['próxima troca', 'proxima troca', 'próxima folga', 'proxima folga'] } });
+frame({
+  name: 'roster', label: 'Roster', words: ['when is', 'roster'], elidable: true, theme: ['roster', 'rosterq'], required: ['theme'],
+  roles: { on: { preps: ['on', 'at', 'for'], types: ['date', 'holiday'] } }, words_pt: ['escala'], label_pt: 'Escala',
+  bind: c => {
+    const r = c.theme.find(t => t.type === 'roster'), q = c.theme.find(t => t.type === 'rosterq'), on = c.roles.on && dateWords(c.roles.on[0]);
+    if (c.theme.length > 2 || (on && !q && r)) return null;
+    let base;
+    if (r) { const m = /^(\d+)\s*(?:on|x|\/)\s*,?\s*(\d+)/i.exec(r.value); if (!m) return null; base = { on: +m[1], off: +m[2], start: r.attrs.start || 'today' }; }
+    else { base = lastRoster(); if (!base) return { tool: 'roster', args: { noRoster: true } }; }
+    if (!q) return { tool: 'roster', args: base };
+    return { tool: 'roster', args: q.value === 'next' ? { ...base, date: 'today', next: true } : { ...base, date: on || 'today' } };
   }
 });
   return { zonesOf, offsetOf, instantOf };
@@ -14296,7 +14398,7 @@ tool({
 
 /* ==== src/engine/places.js ==== */
 const __m35 = (() => {
-const { S, tool, fmt, rad, deg } = __m0;
+const { S, tool, frame, noun, shape, fmt, rad, deg } = __m0;
 // Places, distance and UTM. A place is coordinates in the request or a name saved on this device
 // ("home is -19.92, -43.94"); there is no gazetteer and device location is off, so an unknown name is
 // a question, not a guess. Distance is Vincenty's inverse on WGS84; UTM is the Krüger series.
@@ -14319,9 +14421,8 @@ const SRC_PLACES = { t: 'src', text: 'places · a table on this device · no gaz
 
 /* ── places ─────────────────────────────────────────────────── */
 tool({
-  name: 'place', rank: 33,
+  name: 'place',
   skill: { group: 'Device', title: 'Places, distance and UTM', on: 'own geodesy', about: 'Save a place by coordinates; distance and bearings between two places over the WGS84 ellipsoid (Vincenty); latitude and longitude to UTM and back (Krüger series). No gazetteer: a name you have not saved is asked for.', examples: ['home is -19.92, -43.94', 'distance from -19.92,-43.94 to -6.07,-50.16', '-19.92, -43.94 in utm', 'utm 23k 611000 7797000 to lat long'] },
-  read: (text, q) => { const m = new RegExp(`^([a-z][a-z0-9 '\\-]{0,40}?) (?:is|=) (?:at )?${COORD}$`).exec(q); return m ? { name: m[1].trim(), lat: +m[2], lon: +m[3] } : null; },
   topic: () => ['Places', .5],
   undo: a => { const t = placesTable(); t.rows = t.rows.filter(r => r.name !== a.name); },
   run: a => {
@@ -14356,8 +14457,7 @@ function vincenty(lat1, lon1, lat2, lon2) {
   return { s, a1, a2, it };
 }
 tool({
-  name: 'distance', rank: 32,
-  read: (text, q) => { const m = /^(?:(?:geodesic |great circle )?distance|how far)(?: is it)? (?:from|between) (.+?) (?:to|and) (.+)$/.exec(q); return m ? { from: m[1], to: m[2] } : null; },
+  name: 'distance',
   topic: () => ['Distance', 1],
   run: a => {
     const read = ['distance from', { v: a.from }, 'to', { v: a.to }];
@@ -14404,13 +14504,7 @@ function fromUTM(zone, hemisphere, easting, northing) {
   return { lat: deg(Math.atan(tau)), lon: lon0 + deg(lam) };
 }
 tool({
-  name: 'utm', rank: 31,
-  read: (text, q) => {
-    let m = /^(?:utm )?(\d{1,2}) ?([c-hj-np-x])? ?(?:e ?)?(\d{5,7}(?:\.\d+)?) ?(?:n ?)?(\d{5,8}(?:\.\d+)?)(?: (?:to|in|as) (?:lat ?long|lat ?lon|latitude(?: and)? longitude|geographic|wgs84|degrees))?$/.exec(q);
-    if (m && (/^utm/.test(q) || /to|in|as/.test(q))) return { zone: +m[1], band: m[2] ? m[2].toUpperCase() : null, easting: +m[3], northing: +m[4] };
-    m = /^(.+?) (?:in|to|as) utm(?: (\d{1,2}))?$/.exec(q); if (m) return { place: m[1], ...(m[2] ? { zoneForced: +m[2] } : {}) };
-    return null;
-  },
+  name: 'utm',
   amend: [{ arg: 'zoneForced', match: /^(?:in )?zone (\d{1,2})$/, value: m => +m[1], when: a => a.place }, { arg: 'band', match: /^(?:band|south|north)\b.*?([c-hj-np-x])?$/i, value: m => m[1] ? m[1].toUpperCase() : null, when: a => a.easting != null }],
   topic: () => ['UTM', 1],
   run: a => {
@@ -14430,13 +14524,43 @@ tool({
     return { read, value: [p.lat, p.lon], body: [{ t: 'big', v: fmtLL(p.lat, p.lon), unit: '' }, { t: 'kv', rows: [['decimal', `${fmt(p.lat, 8)}, ${fmt(p.lon, 8)}`, { mono: true }], ['hemisphere', hemi === 'S' ? `southern${a.band ? ', from band ' + a.band : ''}` : `northern${a.band ? ', from band ' + a.band : ''}`], ['round trip', `${fmt(back.easting, 9)} E ${fmt(back.northing, 9)} N (closes to ${fmt(Math.hypot(back.easting - a.easting, back.northing - a.northing) * 1000, 3)} mm)`], ['datum', 'WGS84 (SIRGAS 2000 is equal at this precision)']] }, { t: 'src', text: 'Transverse Mercator by the Krüger series (Karney 2011), WGS84, k0 0.9996' }], trace: [`krüger inverse(zone ${a.zone}${hemi}, ${a.easting}, ${a.northing}) → ${fmt(p.lat, 10)}, ${fmt(p.lon, 10)}`], py: `utm.to_latlon(${a.easting}, ${a.northing}, ${a.zone}, ${a.band ? '"' + a.band + '"' : 'northern=' + (hemi === 'N')})` };
   }
 });
+/* ── what reads them ─────────────────────────────────────────── */
+shape({ type: 'coords', re: '-?\\d{1,2}(?:\\.\\d+)?\\s*,\\s*-?\\d{1,3}(?:\\.\\d+)?' });   // "-19.92, -43.94"
+shape({ type: 'utmcoord', re: '\\d{1,2}\\s?[c-hj-np-x]?\\s+(?:e\\s?)?\\d{5,7}(?:\\.\\d+)?\\s+(?:n\\s?)?\\d{5,8}(?:\\.\\d+)?' });   // "23k 611000 7797000"
+noun({ type: 'geographic', words: { latlon: ['lat long', 'lat lon', 'latlong', 'latitude and longitude', 'latitude longitude', 'geographic', 'wgs84', 'degrees'] }, words_pt: { latlon: ['lat long', 'latitude e longitude', 'geográficas', 'geograficas', 'graus'] } });
+noun({ type: 'utmword', words: { utm: ['utm'] }, words_pt: { utm: ['utm'] } });
+// a place in a role: coordinates, a known name, or (for a name nobody saved) the words, so the card can ask where it is
+const PLACE_T = ['coords', 'place', 'text'];
+const where = n => n.type === 'coords' ? n.value.replace(/\s+/g, ' ') : String(n.value);
+// "home is -19.92, -43.94"
+frame({
+  name: 'place', label: 'Place', words: ['is', 'is at'], subject: ['text', 'place'], theme: ['coords'], required: ['theme', 'subject'], roles: {},
+  words_pt: ['é', 'fica em', 'está em'], label_pt: 'Lugar',
+  bind: c => { const n = c.roles.subject[0], m = /^(-?[\d.]+)\s*,\s*(-?[\d.]+)$/.exec(c.theme[0].value); return m ? { tool: 'place', args: { name: String(n.value).trim().toLowerCase(), lat: +m[1], lon: +m[2] } } : null; }
+});
+// "distance from -19.92,-43.94 to -6.07,-50.16", "how far is it from home to the camp", "distance between home and perth"
+frame({
+  name: 'distance', label: 'Distance', words: ['distance', 'how far', 'how far is it', 'geodesic distance', 'great circle distance'], theme: [], required: ['from'],
+  roles: { from: { preps: ['from', 'between'], types: PLACE_T }, to: { preps: ['to'], types: PLACE_T } },
+  words_pt: ['distância', 'distancia', 'qual a distância', 'a que distância'], label_pt: 'Distância',
+  bind: c => { const f = c.roles.from.map(where), t = (c.roles.to || []).map(where); const [a, b] = f.length === 2 && !t.length ? f : [f[0], t[0]]; return a && b ? { tool: 'distance', args: { from: a, to: b } } : null; }
+});
+// "-19.92, -43.94 in utm", "home in utm"; "utm 23k 611000 7797000 to lat long"
+frame({
+  name: 'toutm', label: 'To UTM', words: [], elidable: true, theme: ['coords', 'place'], required: ['theme', 'to'], roles: { to: { preps: ['in', 'to', 'as'], types: ['utmword'] } }, label_pt: 'Para UTM',
+  bind: c => ({ tool: 'utm', args: { place: where(c.theme[0]) } })
+});
+frame({
+  name: 'fromutm', label: 'From UTM', words: ['utm', 'convert utm'], elidable: true, theme: ['utmcoord'], required: ['theme'], roles: { to: { preps: ['to', 'in', 'as', 'into'], types: ['geographic'] } }, label_pt: 'De UTM',
+  bind: c => { const m = /^(\d{1,2})\s?([c-hj-np-x])?\s+(?:e\s?)?(\d+(?:\.\d+)?)\s+(?:n\s?)?(\d+(?:\.\d+)?)$/i.exec(c.theme[0].value.trim()); return m ? { tool: 'utm', args: { zone: +m[1], band: m[2] ? m[2].toUpperCase() : null, easting: +m[3], northing: +m[4] } } : null; }
+});
   return { placesTable, placeOf, vincenty, utmZone, bandOf, toUTM, fromUTM };
 })();
 
 /* ==== src/engine/sky.js ==== */
 const __m36 = (() => {
-const { tool, fmt, rad, deg, iso } = __m0;
-const { findDate, today, fmtDate } = __m3;
+const { tool, frame, noun, fmt, rad, deg, iso } = __m0;
+const { findDate, today, fmtDate, dateWords } = __m3;
 const { zonesOf, offsetOf } = __m27;
 const { placeOf } = __m35;
 // The sun by NOAA's solar position equations (after Meeus), and the moon's phase from the mean
@@ -14463,9 +14587,8 @@ function solar(dayUTC, lat, lon) {
   return { decl, eot, noon, ha: ha(90.833), haCivil: ha(96) };
 }
 tool({
-  name: 'sun', rank: 29,
+  name: 'sun',
   skill: { group: 'Device', title: 'Sun and moon', on: 'NOAA equations, mean lunar cycle', about: 'Sunrise, solar noon, sunset, day length and civil twilight for a place and date (about a minute at mid-latitudes); the moon\'s phase from the mean cycle, to about half a day. Places as coordinates or a saved name.', examples: ['sunrise tomorrow in -19.92, -43.94', 'sunset today at home', 'moon phase on 25 dec'] },
-  read: (text, q) => { const m = /^(?:(?:when is |what time is )?(sunrise|sunset|solar noon|sun times|sun|daylight|day length|twilight)(?: and (?:sunset|sunrise))?)(?: (today|tomorrow|yesterday|on .+?|next \w+|\d{1,2} \w{3,9}(?: \d{4})?))? (?:in|at) (.+)$/.exec(q); return m ? { what: m[1], date: m[2] || 'today', place: m[3] } : null; },
   amend: [{ arg: 'zone', match: /^(?:in |times in )?(.+?) time$/, value: m => { const z = zonesOf(m[1]); return z.length === 1 ? z[0] : null; } }, { arg: 'date', match: /^(?:on |for )?(today|tomorrow|yesterday|\d{1,2} \w{3,9}(?: \d{4})?|\d{4}-\d{2}-\d{2}|next \w+)$/ }],
   topic: () => ['Sun', 1],
   run: a => {
@@ -14489,8 +14612,7 @@ tool({
 const SYNODIC = 29.530588861, NEW0 = Date.UTC(2000, 0, 6, 18, 14);   // a new moon, 6 Jan 2000 18:14 UTC
 const PHASES = ['new moon', 'waxing crescent', 'first quarter', 'waxing gibbous', 'full moon', 'waning gibbous', 'last quarter', 'waning crescent'];
 tool({
-  name: 'moon', rank: 30,
-  read: (text, q) => { const m = /^(?:moon|moon phase|phase of the moon|lunar phase)(?: (?:on|for) (.+)| (today|tomorrow|tonight))?$/.exec(q); return m ? { date: m[1] || (m[2] === 'tonight' ? 'today' : m[2]) || 'today' } : null; },
+  name: 'moon',
   amend: [{ arg: 'date', match: /^(?:on |for )?(today|tomorrow|yesterday|\d{1,2} \w{3,9}(?: \d{4})?|\d{4}-\d{2}-\d{2}|next \w+)$/ }],
   topic: () => ['Moon', 1],
   run: a => {
@@ -14501,6 +14623,20 @@ tool({
     const nextNew = NEW0 + (cycles + 1) * SYNODIC * 864e5, thisFull = NEW0 + (cycles + 0.5) * SYNODIC * 864e5, nextFull = thisFull > t ? thisFull : thisFull + SYNODIC * 864e5;
     return { read, value: frac, body: [{ t: 'big', v: name, unit: `${fmt(frac * 100, 3)} % lit, ${fmt(age, 3)} days old` }, { t: 'kv', rows: [['next new moon', fmtDate(new Date(nextNew)) + ' (about)'], ['next full moon', fmtDate(new Date(nextFull)) + ' (about)']] }, { t: 'sub', text: 'From the mean synodic month counted from the new moon of 6 Jan 2000; the true phase can differ by up to about half a day. Meeus\'s periodic terms are not applied.' }], trace: [`age = ((t − 2000-01-06T18:14Z) mod ${SYNODIC} d) = ${fmt(age, 5)} d`, `illuminated fraction = (1 − cos(2π age/P))/2 = ${fmt(frac, 5)}`], py: `sky.moon_phase("${iso(d)}")` };
   }
+});
+/* ── what reads them: "sunrise tomorrow in -19.92, -43.94", "sunset today at home", "moon phase on 25 dec" ── */
+noun({ type: 'sunevent', words: { sunrise: ['sunrise'], sunset: ['sunset'], 'solar noon': ['solar noon'], 'sun times': ['sun times', 'sun'], daylight: ['daylight', 'day length', 'length of day'], twilight: ['twilight'] },
+  words_pt: { sunrise: ['nascer do sol', 'amanhecer'], sunset: ['pôr do sol', 'por do sol'], 'solar noon': ['meio-dia solar'], 'sun times': ['horários do sol'], daylight: ['duração do dia'], twilight: ['crepúsculo', 'crepusculo'] } });
+noun({ type: 'moonphase', words: { moon: ['moon', 'moon phase', 'phase of the moon', 'lunar phase', 'the moon'] }, words_pt: { moon: ['lua', 'fase da lua', 'fase lunar'] } });
+const dayOf = n => { const w = dateWords(n); return !w ? 'today' : w === 'tonight' ? 'today' : w; };
+frame({
+  name: 'sun', label: 'Sun', words: ['when is', 'what time is', 'when'], elidable: true, theme: ['sunevent'], required: ['theme', 'at'],
+  roles: { on: { preps: ['on', 'for'], types: ['date', 'holiday'] }, at: { preps: ['in', 'at', 'for'], types: ['coords', 'place', 'text'] } }, words_pt: ['quando é', 'que horas é'], label_pt: 'Sol',
+  bind: c => { const w = c.theme.map(t => t.value), at = c.roles.at[0]; return { tool: 'sun', args: { what: w.length > 1 ? 'sun times' : w[0], date: dayOf(c.roles.on && c.roles.on[0]), place: at.type === 'coords' ? at.value.replace(/\s+/g, ' ') : String(at.value) } }; }
+});
+frame({
+  name: 'moon', label: 'Moon', words: ['show'], elidable: true, theme: ['moonphase'], required: ['theme'], roles: { on: { preps: ['on', 'for'], types: ['date', 'holiday'] } }, label_pt: 'Lua',
+  bind: c => ({ tool: 'moon', args: { date: dayOf(c.roles.on && c.roles.on[0]) } })
 });
   return { solar };
 })();
@@ -18467,6 +18603,7 @@ function ontology() {
   for (const w of COMPOUNDS) { const p = parseUnit(w); if (p) units.push({ unit: w, dim: dimName(p.dim), words: [w] }); }
   units.push({ unit: 'oz', dim: 'mass', words: ['oz', 'ounce', 'ounces'] });   // troy or avoirdupois: the tool decides and shows the slot
   units.push({ unit: 'people per square mile', dim: 'population density', words: ['people per square mile', 'per square mile'], words_pt: ['pessoas por milha quadrada', 'por milha quadrada'] });
+  units.push(...LEXICON.units);
   units.push({ unit: 'people per km2', dim: 'population density', words: ['people per km2', 'people per square kilometre', 'people per square km', 'per km2'], words_pt: ['pessoas por km2', 'habitantes por km2', 'por km2'] });
   const terms = {}; for (const k of Object.keys(ODS)) terms[k] = [k]; for (const [a, k] of Object.entries(ODSA)) terms[k].push(a);
   return {
@@ -18500,7 +18637,7 @@ function ontology() {
     units,
     compounds: [{ mod: 'filter', heads: ['country'], attr: 'filter', echo: true }, { mod: 'scale', heads: ['plot'], attr: 'scale', echo: true }],
     postmods: LEXICON.postmods,
-    qmods: [{ head: 'timer', attr: 'duration', dims: ['time'] }],   // "a 30 minute timer"
+    qmods: [{ head: 'timer', attr: 'duration', dims: ['time'] }, ...LEXICON.qmods],   // "a 30 minute timer"
     verbs: FRAMES.map(({ bind, ...f }) => f),
     inherit: [],
     echoOrder: ['of', 'unit', 'by', 'scale', 'for', 'as'],
@@ -18516,7 +18653,7 @@ const __m49 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/dispatch, built from ../auditable/ext/dispatch/src/ by its own build.
 // Source of truth: gentropic/auditable ext/dispatch (local clone: ../auditable). Re-vendor by copying
 // ext/dispatch/index.js here after 'node ext/dispatch/build.js'. golem uses the grammar rung only:
-// createEngine, makeSession, ENGLISH, PORTUGUESE. At auditable ea0a7666.
+// createEngine, makeSession, ENGLISH, PORTUGUESE. At auditable 44b79edc.
 
 // ⚠ GENERATED FILE — DO NOT EDIT. Source: src/  Build: @gcu/build src/main.js
 // @gcu/dispatch — Session-trained natural-language → tool-call dispatch: a Snips-shaped resolver (averaged-perceptron intent + CRF-class slot tagger + gazetteers + deterministic per-kind assemblers) that trains IN THE BROWSER from the host session's own vocabulary in under a second. Tools are declarative (ten kinds) and a grammar rung (clause: case-grammar frames over an Earley chart with costed repairs, en + pt-BR) reads controlled commands before the learners see them; no shipped model, no network, explainable per decision — refusals return empty calls so the host degrades into its command palette. Born from an incubator where this beat a 26M finetuned transformer 50/52 to 3/24 on a frozen yardstick.
@@ -19545,7 +19682,8 @@ function buildGrammar(X) {
   rule('PP', 'DEMO COLON NPList', (_, __, l) => ({ kind: 'pp', prep: ':', canon: [':'], val: l }));             // "summarise this: …", "diff these: …"
   rule('PP', 'PREP:of DEMO COLON NPList', (_, __, ___, l) => ({ kind: 'pp', prep: ':', canon: [':'], val: l }));   // "word count of this: …"
   rule('PP', 'Date', d => ({ kind: 'pp', prep: '', canon: ['on'], val: [d] }));
-  if (X.bareText) rule('PP', 'TEXT', t => ({ kind: 'pp', prep: '', canon: [''], val: [{ type: 'text', value: t.text, generic: false, attrs: {} }] }));   // a bare text role                   // a bare date is a time argument: "call him tomorrow"
+  const bareOk = n => X.bareTypes.has(n.type) || (n.type === 'quantity' && (X.bareTypes.has('quantity:*') || X.bareTypes.has(`quantity:${n.dim}`)));
+  if (X.bareTypes.size) rule('PP', 'NP', n => bareOk(n) ? { kind: 'pp', prep: '', canon: [''], val: [n] } : null);   // a role with no marker, of a type a frame declares one for                   // a bare date is a time argument: "call him tomorrow"
 
   rule('NPList', 'NP NPTail', (n, t) => [n, ...t]);
   rule('NPTail', '', () => []);
@@ -19565,7 +19703,11 @@ function buildGrammar(X) {
   rule('NP', 'Quantity', q => q);
   rule('NP', 'UNIT', u => ({ type: 'unit', unit: u.unit, dim: u.dim, generic: false, attrs: {} }));   // "in miles": a unit as a thing
   rule('NP', 'TEXT', t => ({ type: 'text', value: t.text, generic: false, attrs: {} }));            // a free-text span (the engine cuts it)
-  rule('NP', 'LIT', t => ({ type: t.type, value: t.value, generic: false, attrs: {} }));            // a token shape the ontology declares (270/60, DH-03)
+  rule('NP', 'LIT PostMods', (t, pm) => {   // a token shape the ontology declares (270/60, DH-03), with its modifiers ("14 on 14 off from 6 oct")
+    const n = { type: t.type, value: t.value, generic: false, attrs: {} };
+    for (const m of pm) { const r = X.postmod(n, m); if (!r) return null; Object.assign(n, r); }
+    return n;
+  });
   rule('NP', 'Date', d => d);
   rule('NP', 'Clock', c => c);
   rule('NP', 'DET Quantity Head', (_, q, h) => X.qmod(q, h));
@@ -19656,7 +19798,7 @@ const ENGLISH = {
   code: 'en', headFirst: false,
   DET: 'the|a|an|this|that|my|our', REF: 'last|previous|latest|current|first|new',
   QUANT: 'all|every|each', EXCEPT: 'except|excluding|minus', CONJ: 'and|or|plus', COMMA: ',',
-  PREP: 'with|using|by|per|in|on|for|from|to|at|as|above|below|over|under|of|into|without|against|where|>|<|>=|<=|=|≥|≤|greater than|more than|less than|at least|at most|equal to|equals',
+  PREP: 'with|using|by|per|in|on|for|from|to|at|as|above|below|over|under|of|into|without|against|where|until|till|after|before|since|between|across|through|during|within|around|near|>|<|>=|<=|=|≥|≤|greater than|more than|less than|at least|at most|equal to|equals',
   THEN: 'then|afterwards|next', BUT: 'but', PRON: 'it|them|those', AGAIN: 'again|rerun|redo|repeat|same',
   QWORD: 'why|how|what|when|who|is|are|does|do|should|can|could|would',
   // closed questions the grammar reads as commands with the verb left out: a wh-word, a copula, the fused forms
@@ -19733,16 +19875,17 @@ function createEngine(ont, locale = ENGLISH) {
   for (const v of ont.verbs) add(col(v, 'words').join('|'), 'VERB', { verb: v.name });
   const NOUNS = Object.fromEntries(ont.nouns.map(n => [n.type, n]));
   for (const n of ont.nouns) {
-    for (const [value, words] of Object.entries(col(n, 'words') ?? {})) add(words.join('|'), 'NOUN', { type: n.type, value });
+    // exact: proper names (places, files) are matched as written, never a typo repair's or a stem's target
+    for (const [value, words] of Object.entries(col(n, 'words') ?? {})) add(words.join('|'), 'NOUN', { type: n.type, value, ...(n.exact ? { exact: true } : {}) });
     if (col(n, 'generic')) add(col(n, 'generic').join('|'), 'NOUN', { type: n.type, value: null, generic: true });
   }
   for (const u of ont.units) add(col(u, 'words').join('|'), 'UNIT', { dim: u.dim, unit: u.unit });
   for (const w of col(ont, 'fillers') ?? []) if (!LEX[w]) add(w, 'FILLER');   // host words that carry nothing ("golem" in "hey golem")
   const MULTI = Object.keys(LEX).filter(k => k.includes(' ')).map(k => k.split(' ')).sort((a, b) => b.length - a.length);
   const SINGLE = Object.keys(LEX).filter(k => !k.includes(' '));
-  const CONTENT = new Set(Object.keys(LEX).filter(k => LEX[k].some(s => ['NOUN', 'VERB', 'UNIT'].includes(s.cat))));
+  const CONTENT = new Set(Object.keys(LEX).filter(k => LEX[k].some(s => ['NOUN', 'VERB', 'UNIT'].includes(s.cat) && !s.exact)));
   const STEMS = {};   // stem → senses of content words, so inflected forms nobody listed still resolve
-  for (const k of CONTENT) if (!k.includes(' ')) (STEMS[locale.stem(k)] ??= []).push(...LEX[k].filter(s => ['NOUN', 'VERB', 'UNIT'].includes(s.cat)).map(s => ({ ...s, lexeme: k })));
+  for (const k of CONTENT) if (!k.includes(' ')) (STEMS[locale.stem(k)] ??= []).push(...LEX[k].filter(s => ['NOUN', 'VERB', 'UNIT'].includes(s.cat) && !s.exact).map(s => ({ ...s, lexeme: k })));
   const NEEDS_ID = new Set(ont.nouns.filter(n => n.needsId).map(n => n.type));
 
   // ---- type-driven helpers used inside the grammar ----
@@ -19750,7 +19893,8 @@ function createEngine(ont, locale = ENGLISH) {
     headFirst: !!locale.headFirst,
     nextDay: locale.THEN.split('|').includes('next'),
     subject: ont.verbs.some(v => v.subject),   // some frame takes a subject before its verb
-    bareText: ont.verbs.some(v => Object.values(v.roles ?? {}).some(r => r.types.includes('text') && r.preps.includes(''))),   // a text with no marker   // "next friday" where the bank has the word
+    // a role with no marker ("decode hex 676f", "9am sao paulo in perth"): only things of the types such roles take
+    bareTypes: new Set(ont.verbs.flatMap(v => Object.values(v.roles ?? {}).filter(r => r.preps.includes('')).flatMap(r => r.types))),   // "next friday" where the bank has the word
     identTypes: new Set(ont.nouns.filter(n => n.ident).map(n => n.type)),
     postmodPreps: [...new Set(ont.postmods.map(p => p.prep))],
     postmodQuantity: new Set(ont.postmods.filter(p => p.quantity).map(p => p.prep)),
@@ -19781,7 +19925,7 @@ function createEngine(ont, locale = ENGLISH) {
   // payload), comparison signs stand alone, a number may carry a sign and thousands separators, and a colon
   // inside a word (09:30) stays in it
   const PIECE = /\r?\n\s*|:(?=\s|$)|[,?!]|[<>]=?|[=≤≥]|-?\d{1,3}(?:,\d{3})+(?:\.\d+)?(?![\d,])|(?:[^\s,?!<>=≤≥:]|:(?!\s|$))+/g;
-  const SHAPES = (ont.shapes ?? []).map(x => ({ type: x.type, re: new RegExp(`^(?:${x.re})$`, 'i') }));
+  const SHAPES = (ont.shapes ?? []).map(x => ({ type: x.type, re: new RegExp(`^(?:${x.re})$`, 'i'), at: new RegExp(`(?:${x.re})`, 'iy') }));
   // shapes the grammar knows itself: clock times (09:30, 9pm, 9h30) and ISO dates
   const clockOf = w => { let m = /^(\d{1,2}):(\d{2})(am|pm)?$/.exec(w) || /^(\d{1,2})()(am|pm)$/.exec(w) || /^(\d{1,2})h(\d{2})?()$/.exec(w); if (!m) return null;
     let h = +m[1]; const mi = m[2] ? +m[2] : 0; if (m[3] === 'pm' && h < 12) h += 12; if (m[3] === 'am' && h === 12) h = 0; return h <= 24 && mi < 60 && (!m[3] || +m[1] <= 12) ? { cat: 'CLOCK', h, mi } : null; };
@@ -19793,6 +19937,10 @@ function createEngine(ont, locale = ENGLISH) {
     const toks = []; const notes = []; const unknown = [];
     const at = (t, a, b) => Object.assign(t, { s: raw[a].s, e: raw[b - 1].e });
     for (let i = 0; i < raw.length;) {
+      let span = null;   // a shape over several pieces, ending where a piece ends
+      for (const sh of SHAPES) { sh.at.lastIndex = raw[i].s; const m = sh.at.exec(text); if (!m) continue; const end = raw[i].s + m[0].length, k = raw.findIndex((r, x) => x > i && r.e === end); if (k > i && (!span || k > span.k)) span = { k, type: sh.type }; }
+      if (span) { const types = SHAPES.filter(sh => { sh.at.lastIndex = raw[i].s; const m = sh.at.exec(text); return m && raw[i].s + m[0].length === raw[span.k].e; }).map(sh => sh.type);
+        toks.push(at({ word: text.slice(raw[i].s, raw[span.k].e).toLowerCase(), senses: types.map(type => ({ cat: 'LIT', type, value: text.slice(raw[i].s, raw[span.k].e) })) }, i, span.k + 1)); i = span.k + 1; continue; }
       let hit = null;
       let mwPlural = false;
       for (const mw of MULTI) if (mw.every((w, k) => raw[i + k]?.w === w || (k === mw.length - 1 && raw[i + k] && locale.stem(raw[i + k].w) === locale.stem(w) && LEX[mw.join(' ')].some(x => x.cat === 'NOUN')))) { hit = mw; mwPlural = locale.plural(raw[i + mw.length - 1].w); break; }
@@ -19827,7 +19975,7 @@ function createEngine(ont, locale = ENGLISH) {
   const FAB = { PREP: () => ({ cat: 'PREP', word: '∅', canon: ['*'] }), DET: () => ({ cat: 'DET', word: '∅' }), LATE: () => ({ cat: 'LATE' }) };
   // repair costs — a dozen numbers, calibrated by calib.mjs against the mutation benchmark
   const COSTS = { skipFunc: 0.5, skipUnk: 0.6, skipContent: 1.5, skipTagged: 2, skipO: 0.5, insPrep: 1, insPrepTagged: 0.5, insDet: 0.5, order: 1, subst1: 0.4, subst2: 1.2, substKnown: 2 };
-  const NEAR_POOL = Object.keys(LEX).filter(k => !k.includes(' ') && LEX[k].some(x => ['NOUN', 'VERB', 'UNIT', 'PREP'].includes(x.cat)));
+  const NEAR_POOL = Object.keys(LEX).filter(k => !k.includes(' ') && LEX[k].some(x => ['NOUN', 'VERB', 'UNIT', 'PREP'].includes(x.cat) && !x.exact));
   const CONTENT_CATS = ['NOUN', 'VERB', 'UNIT', 'NUM', 'IDENT', 'PREP'];
   function makeParser(toks, repair) {
     // repair = { budget, tags?, costs? } — tags (from a slot tagger) shape the costs: cheap to skip an O token,
@@ -19841,7 +19989,7 @@ function createEngine(ont, locale = ENGLISH) {
         if (nearCache.has(i)) return nearCache.get(i);
         const w = toks[i].word; const out = [];
         if (w.length >= 2 && !/^\d/.test(w)) {
-          for (const k of NEAR_POOL) { if (Math.abs(k.length - w.length) > 2) continue; const d = dl(w, k); if (d >= 1 && d <= 2 && (d === 1 || w.length >= 5)) for (const s of LEX[k]) if (CONTENT_CATS.includes(s.cat)) out.push({ v: { ...s, word: k }, cost: (d === 1 ? K.subst1 : K.subst2) * (toks[i].senses.every(x => x.cat === 'UNK') ? 1 : K.substKnown), to: k }); }
+          for (const k of NEAR_POOL) { if (Math.abs(k.length - w.length) > 2) continue; const d = dl(w, k); if (d >= 1 && d <= 2 && (d === 1 || w.length >= 5)) for (const s of LEX[k]) if (CONTENT_CATS.includes(s.cat) && !s.exact) out.push({ v: { ...s, word: k }, cost: (d === 1 ? K.subst1 : K.subst2) * (toks[i].senses.every(x => x.cat === 'UNK') ? 1 : K.substKnown), to: k }); }
           for (const [name, type] of Object.entries(repair.names ?? {})) { const d = dl(w, name); if (d === 1) out.push({ v: { cat: 'IDENT', name, type, word: name }, cost: K.subst1, to: name }); }
         }
         nearCache.set(i, out); return out;
@@ -20064,6 +20212,9 @@ function createEngine(ont, locale = ENGLISH) {
   // The words inside are never repaired, stemmed or looked up: the span becomes one TEXT token before parsing.
   const TEXT_THEME = new Set(ont.verbs.filter(v => (v.theme ?? []).includes('text')).map(v => v.name));
   const TEXT_PREPS = new Set(ont.verbs.flatMap(v => Object.values(v.roles ?? {}).filter(r => r.types.includes('text')).flatMap(r => r.preps)));
+  const TEXT_PREP_FRAMES = {};   // prep → the frames with a text role on it
+  for (const v of ont.verbs) for (const r of Object.values(v.roles ?? {})) if (r.types.includes('text')) for (const p of r.preps) (TEXT_PREP_FRAMES[p] ??= []).push(v);
+  const MAX_TEXT_CANDS = 160;   // a bound on the strict parses tried with free text, for input nothing reads
   const esc = w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const TRAIL = new RegExp(`(?:[\\s,;]*(?:${(locale.TRAIL ?? 'please').split('|').map(esc).join('|')})\\b|[\\s.?!]+)+$`, 'i');   // what closes a sentence, not a text
   // a bare text role opens after the verb of its frame, or after a noun of that frame's theme type
@@ -20080,16 +20231,18 @@ function createEngine(ont, locale = ENGLISH) {
       cands.push([subj], ...one.filter(s => s.i > v).map(s => [subj, s]));
     }
     const len = c => c.reduce((n, s) => n + s.j - s.from, 0);
-    return cands.sort((a, b) => len(a) - len(b) || a[0].i - b[0].i);
+    return cands.sort((a, b) => len(a) - len(b) || a[0].i - b[0].i).slice(0, MAX_TEXT_CANDS);
   }
   function textSpans(toks) {
     const out = [];
+    const said = new Set(toks.flatMap(t => t.senses.filter(s => s.cat === 'VERB').map(s => s.verb)));
+    const meant = p => (TEXT_PREP_FRAMES[p] ?? []).some(v => v.elidable || said.has(v.name));
     for (let i = 1; i <= toks.length; i++) {
       let open = null, lead = 0;
       for (const sn of toks[i - 1].senses) {
         if (sn.cat === 'VERB' && TEXT_THEME.has(sn.verb)) { open ??= 'verb'; if (i + 1 < toks.length && (col(VERBS[sn.verb], 'lead') ?? []).includes(toks[i].word)) lead = 1; }
-        else if (sn.cat === 'PREP' && sn.canon.some(c => TEXT_PREPS.has(c))) open ??= 'prep';
-        else if (sn.cat === 'COLON' && TEXT_PREPS.has(':')) open = 'colon';
+        else if (sn.cat === 'PREP' && sn.canon.some(c => TEXT_PREPS.has(c) && meant(c))) open ??= 'prep';
+        else if (sn.cat === 'COLON' && TEXT_PREPS.has(':') && meant(':')) open = 'colon';
         if ((sn.cat === 'VERB' && BARE_VERBS.has(sn.verb)) || (sn.cat === 'NOUN' && BARE_TYPES.has(sn.type))) open ??= 'bare';
       }
       if (!open || (i === toks.length && open !== 'colon')) continue;
@@ -20396,7 +20549,7 @@ const PORTUGUESE = {
   DET: 'o|a|os|as|um|uma|uns|umas|este|esta|esse|essa|meu|minha|nosso|nossa',
   REF: 'último|última|ultimo|ultima|últimos|últimas|anterior|atual|primeiro|primeira|novo|nova',
   QUANT: 'todos|todas|todo|toda|cada', EXCEPT: 'exceto|menos|excluindo|tirando|fora', CONJ: 'e|ou|mais', COMMA: ',',
-  PREP: 'com|usando|por|em|no|na|nos|nas|para|pra|pro|de|do|da|dos|das|a|ao|à|às|até|como|acima de|abaixo de|sem|contra|dentro de|sobre|onde|>|<|>=|<=|=|≥|≤|maior que|menor que|pelo menos|no mínimo|no minimo|no máximo|no maximo|igual a',
+  PREP: 'com|usando|por|em|no|na|nos|nas|para|pra|pro|de|do|da|dos|das|a|ao|à|às|até|como|acima de|abaixo de|sem|contra|dentro de|sobre|onde|depois de|antes de|desde|entre|durante|através de|atraves de|perto de|>|<|>=|<=|=|≥|≤|maior que|menor que|pelo menos|no mínimo|no minimo|no máximo|no maximo|igual a',
   THEN: 'depois|então|em seguida|aí', BUT: 'mas|porém|só que', PRON: 'isso|isto|ele|ela|eles|elas',
   AGAIN: 'de novo|novamente|repete|repetir|refaz|refazer|mesmo|mesma|igual|outra vez',
   QWORD: 'por que|porque|como|qual|quais|quando|quem|é|são|será|pode|poderia|deveria|dá',
@@ -20408,7 +20561,7 @@ const PORTUGUESE = {
     com: ['with'], usando: ['using'], por: ['by'], em: ['in', 'on'], no: ['in', 'on'], na: ['in', 'on'], nos: ['in', 'on'], nas: ['in', 'on'],
     para: ['for', 'to', 'into'], pra: ['for', 'to', 'into'], pro: ['for', 'to', 'into'], de: ['of', 'from'], do: ['of', 'from'], da: ['of', 'from'], dos: ['of', 'from'], das: ['of', 'from'],
     a: ['to', 'at'], ao: ['to', 'at'], 'à': ['to', 'at'], 'até': ['to'], como: ['as'], 'acima de': ['above', 'over'], 'abaixo de': ['below', 'under'],
-    sem: ['without'], contra: ['against'], 'dentro de': ['into'], sobre: ['on'], 'às': ['at', 'to'], onde: ['where'],
+    sem: ['without'], contra: ['against'], 'dentro de': ['into'], sobre: ['on'], 'às': ['at', 'to'], onde: ['where'], 'depois de': ['after'], 'antes de': ['before'], desde: ['since', 'from'], entre: ['between'], durante: ['during'], 'através de': ['through'], 'atraves de': ['through'], 'perto de': ['near'],
     '>': ['above'], 'maior que': ['above'], '<': ['below'], 'menor que': ['below'], '>=': ['atleast'], '≥': ['atleast'], 'pelo menos': ['atleast'], 'no mínimo': ['atleast'], 'no minimo': ['atleast'],
     '<=': ['atmost'], '≤': ['atmost'], 'no máximo': ['atmost'], 'no maximo': ['atmost'], '=': ['equals'], 'igual a': ['equals'],
   },

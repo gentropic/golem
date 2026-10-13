@@ -1,6 +1,6 @@
 // Device hand-offs: calendar event, timer, alarm. Simulated in the mock; on Android they become intents.
-import { tool, frame, fmt, iso } from './core.js';
-import { findDate, findTime, today, fmtDate } from './dates.js';
+import { tool, frame, noun, fmt, iso } from './core.js';
+import { findDate, findTime, today, fmtDate, dateWords } from './dates.js';
 import { parseUnit } from './units.js';
 
 // the hand-off description every device card carries: the intent, its permission, and the button
@@ -14,9 +14,8 @@ function parseEvent(str) {
   return { title: title ? title[0].toUpperCase() + title.slice(1) : 'Event', date: +(d ? d.d : today()), timed: !!t, h: t ? t.h : 0, mi: t ? t.mi : 0, dur: du ? Math.round(du[1] * (du[2][0] === 'h' ? 60 : 1)) : 60 };
 }
 tool({
-  name: 'event', rank: 32,
+  name: 'event',
   skill: { group: 'Device', title: 'Calendar event', on: 'lead-acid intent', about: 'Fills the event and hands it to your calendar app.', examples: ['remind me to send the samples to the lab on friday at 9', 'schedule core shed visit tomorrow at 14:30 for 2 hours'] },
-  read: (text, q) => { const m = /^(?:remind me to|remind me|add (?:an )?event|new event|schedule)[:,]? (.+)$/.exec(q); return m ? parseEvent(text.slice(text.length - m[1].length)) : null; },
   topic: a => [a.title, 2],
   run: a => {
     const d = new Date(a.date), s = new Date(d.getFullYear(), d.getMonth(), d.getDate(), a.timed ? a.h : 0, a.timed ? a.mi : 0), e = new Date(+s + a.dur * 6e4);
@@ -66,12 +65,33 @@ frame({
   }
 });
 tool({
-  name: 'alarm', rank: 31,
-  read: (text, q) => { const m = /^(?:set )?(?:an )?alarm (?:for |at )?(.+)$/.exec(q) || /^wake me(?: up)? at (.+)$/.exec(q); const t = m && findTime('at ' + m[1]); return t ? { h: t.h, mi: t.mi } : null; },
+  name: 'alarm',
   topic: () => ['Alarm', 1],
   run: a => {
     const t = String(a.h).padStart(2, '0') + ':' + String(a.mi).padStart(2, '0');
     const [kv, go] = hand('Hand to the Clock app', `AlarmClock.ACTION_SET_ALARM, HOUR=${a.h}, MINUTES=${a.mi}`, 'SET_ALARM, granted at install', 'On Android this creates the alarm in the Clock app. Nothing happens in the mock.');
     return { read: ['set an alarm at', { v: t }], body: [{ t: 'big', v: t }, kv, { t: 'actions', items: [go] }], trace: [`time → ${t}`, 'build intent: ACTION_SET_ALARM'], py: `device.alarm("${t}")` };
   }
+});
+// "remind me to send the samples to the lab on friday at 9": the title as typed, then a date, a time, a length
+frame({
+  name: 'event', label: 'Event', words: ['remind me to', 'remind me', 'schedule', 'add an event', 'add event', 'new event', 'create an event', 'put on my calendar', 'book'],
+  theme: ['text'], required: ['theme'],
+  roles: { on: { preps: ['on', 'for'], types: ['date', 'holiday'] }, at: { preps: ['at'], types: ['clock'] }, for: { preps: ['for'], types: ['quantity:time'] } },
+  words_pt: ['me lembra de', 'me lembre de', 'me lembra', 'agenda', 'agende', 'marca', 'marque', 'novo evento'], label_pt: 'Evento',
+  bind: c => {
+    const title = c.theme[0] && c.theme[0].value, on = c.roles.on && c.roles.on[0], at = c.roles.at && c.roles.at[0], du = c.roles.for && c.roles.for[0];
+    if (!title) return null;
+    if (!on && !at) return { clarify: 'when? Say "on friday", "tomorrow" or "at 9"' };
+    const d = on ? findDate(dateWords(on)) : null; if (on && !d) return null;
+    const u = du && du.unit ? parseUnit(du.unit) : null, dur = u && u.dim === 't' ? Math.round(du.n * u.f / 60) : du ? Math.round(du.n) : 60;
+    return { tool: 'event', args: { title: title[0].toUpperCase() + title.slice(1), date: +(d ? d.d : today()), timed: !!at, h: at ? at.h : 0, mi: at ? at.mi : 0, dur } };
+  }
+});
+// "set an alarm for 6:15", "wake me up at 6", "alarm at 7am"
+noun({ type: 'alarm', words: { alarm: ['alarm', 'wake-up alarm'] }, words_pt: { alarm: ['alarme', 'despertador'] } });
+frame({
+  name: 'alarm', label: 'Alarm', words: ['set', 'wake me up', 'wake me', 'get me up'], elidable: true, theme: ['alarm'], required: ['at'],
+  roles: { at: { preps: ['at', 'for'], types: ['clock'] } }, words_pt: ['me acorda', 'me acorde', 'põe', 'coloca'], label_pt: 'Alarme',
+  bind: c => { const t = c.roles.at && c.roles.at[0]; return t && t.h < 24 ? { tool: 'alarm', args: { h: t.h, mi: t.mi } } : null; }
 });
