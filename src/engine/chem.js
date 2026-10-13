@@ -1,6 +1,6 @@
 // Molar mass, conversion factors and element fractions from a parsed formula over the IUPAC weights;
 // the periodic table lookup. No mineral names: the minerals pack is not here, so a formula is required.
-import { tool, fmt } from './core.js';
+import { tool, frame, noun, shape, postmod, fmt } from './core.js';
 import { ELEMENTS, ELEMENTS_SOURCE } from './data/elements.js';
 
 const BY_SYMBOL = new Map(ELEMENTS.map(e => [e[1], e])), BY_NAME = new Map(ELEMENTS.map(e => [e[2], e])), BY_Z = new Map(ELEMENTS.map(e => [e[0], e]));
@@ -56,17 +56,8 @@ const elementOf = w => { const s = w.trim(); return BY_SYMBOL.get(s) || BY_SYMBO
 const sameCase = (text, q, m, i) => { const at = q.indexOf(m[i], m.index); return at < 0 ? m[i] : text.slice(at, at + m[i].length); };
 
 tool({
-  name: 'chem', rank: 95,
+  name: 'chem',
   skill: { group: 'Compute', title: 'Molar mass and conversion factors', on: 'IUPAC weights (data file)', about: 'Molar mass of a formula with the breakdown; element-to-oxide factors and the reverse; how much of an element a formula holds; the periodic table by symbol, name or number. A mineral name is not read: give the formula.', examples: ['molar mass of CuFeS2', 'fe to fe2o3', 'convert 45.2% fe2o3 to fe', 'how much cu in CuFeS2', 'atomic mass of fe', 'element 26'] },
-  read: (text, q) => {
-    let m;
-    if ((m = /^(?:molar|molecular|formula) (?:mass|weight)(?: of)? (\S+)$/.exec(q))) return { ask: 'mass', formula: sameCase(text, q, m, 1) };
-    if ((m = /^(?:what is )?(?:the )?(?:atomic (?:mass|weight|number)|element) (?:of )?([a-z]+|\d+)$/.exec(q)) || (m = /^(?:what is |which element is )?element (?:number )?(\d+)$/.exec(q))) return { ask: 'element', which: m[1] };
-    if ((m = /^(?:how much|what fraction of|fraction of|percent of|% of|how much of) ([a-z]+) (?:is )?in (\S+)$/.exec(q))) return { ask: 'fraction', element: m[1], formula: sameCase(text, q, m, 2) };
-    if ((m = /^(?:convert )?(\d+(?:\.\d+)?) ?(%|wt%|percent|ppm|g\/t|ppb)? ?(\S+) (?:to|as|in) (\S+)$/.exec(q)) && elementOf(m[3]) || (m && (() => { try { parseFormula(sameCase(text, q, m, 3)); return true; } catch (e) { return false; } })())) return { ask: 'factor', value: +m[1], unit: m[2] || null, from: sameCase(text, q, m, 3), to: sameCase(text, q, m, 4) };
-    if ((m = /^(?:factor |conversion factor )?(?:from )?([a-z]+\d*(?:[a-z]+\d*)*) (?:to|as) ((?:[a-z]+\d*)+|oxide)$/.exec(q)) && (elementOf(m[1]) || (() => { try { parseFormula(sameCase(text, q, m, 1)); return true; } catch (e) { return false; } })())) return { ask: 'factor', from: sameCase(text, q, m, 1), to: m[2] === 'oxide' ? 'oxide' : sameCase(text, q, m, 2) };
-    return null;
-  },
   amend: [{ arg: 'to', match: /^(?:as |to )?([A-Za-z]+\d*(?:[A-Za-z]+\d*)*)$/, when: a => a.ask === 'factor' && a.to === 'oxide', value: m => m[1] }],
   topic: a => [a.ask === 'element' ? 'Periodic table' : a.ask === 'mass' ? 'Molar mass' : 'Conversion factor', 1],
   run: a => {
@@ -110,5 +101,50 @@ tool({
     const rows = [['factor', `${fmt(factor, 5)}: ${pretty(pt.text)} = ${pretty(pf.text)} × ${fmt(factor, 5)}`], ['reverse', `${fmt(1 / factor, 5)}: ${pretty(pf.text)} = ${pretty(pt.text)} × ${fmt(1 / factor, 5)}`], ['by', `M(${pretty(pt.text)}) ÷ ${fmt(pt.counts.get(el))} ${el} = ${fmt(mt.total / pt.counts.get(el), 6)}; M(${pretty(pf.text)}) ÷ ${fmt(pf.counts.get(el))} ${el} = ${fmt(mf.total / pf.counts.get(el), 6)}`]];
     if (a.value != null) { const u = a.unit || ''; read.unshift({ v: `${fmt(a.value)} ${u}`.trim() }); return { read, value: a.value * factor, body: [{ t: 'big', v: fmt(a.value * factor, 5), unit: `${u} ${pretty(pt.text)}`.trim() }, { t: 'kv', rows }, SRC], trace: [`factor ${pretty(pf.text)} → ${pretty(pt.text)} = ${fmt(factor, 6)}`, `${a.value} × ${fmt(factor, 6)} = ${fmt(a.value * factor, 6)}`], py: `${a.value} * chem.factor("${pf.text}", "${pt.text}")` }; }
     return { read, value: factor, copy: fmt(factor, 5), body: [{ t: 'big', v: fmt(factor, 5), unit: `× ${pretty(pf.text)} gives ${pretty(pt.text)}` }, { t: 'kv', rows }, SRC], trace: [`M(${pt.text}) = ${fmt(mt.total, 6)}, M(${pf.text}) = ${fmt(mf.total, 6)}`, `shared element ${el}: ${pf.counts.get(el)} in ${pf.text}, ${pt.counts.get(el)} in ${pt.text}`, `factor = ${fmt(factor, 6)}`], py: `chem.factor("${pf.text}", "${pt.text}")` };
+  }
+});
+/* ── what reads it: formulas as typed ("CuFeS2", "fe2o3"), elements by symbol or name, "element 26" ── */
+// as typed, with capitals: CuFeS2, NaCl, Fe2O3, Ca(OH)2, CuSO4·5H2O, Fe0.9S (parseFormula checks it when bound)
+shape({ type: 'formula', re: String.raw`(?=[^a-z]*[A-Z][^A-Z]*[A-Z0-9])[A-Z(][A-Za-z0-9().·]*[A-Za-z0-9)]`, flags: '' });
+// lowercase: only runs of real element symbols with counts, so an unknown word is not a formula: fe2o3, cuo, h2o
+const SYMS = ELEMENTS.map(e => e[1].toLowerCase()).sort((a, b) => b.length - a.length).join('|');
+// with a count, or short (cuo, nacl): longer plain words spelled in symbols ("python" is P Y Th O N) stay words
+shape({ type: 'formula', re: `(?=[a-z.]*\\d|[a-z]{2,5}(?![a-z\\d]))(?:(?:${SYMS})\\d*(?:\\.\\d+)?){2,}` });
+// symbols that are English words (in, as, at, no, be, he, so) and single letters stay out; the names cover them
+const PLAIN = new Set(['in', 'as', 'at', 'no', 'be', 'he', 'so', 'is', 'am', 'pm', 'or', 'es', 'md']);
+noun({ type: 'element', words: Object.fromEntries(ELEMENTS.map(e => [e[1], [e[2], ...(e[1].length > 1 && !PLAIN.has(e[1].toLowerCase()) ? [e[1].toLowerCase()] : [])]])),
+  words_pt: Object.fromEntries(ELEMENTS.map(e => [e[1], [e[2], ...(e[1].length > 1 && !PLAIN.has(e[1].toLowerCase()) ? [e[1].toLowerCase()] : [])]])) });
+noun({ type: 'chemword', words: { mass: ['molar mass', 'molecular mass', 'molecular weight', 'formula weight', 'formula mass'], atomicmass: ['atomic mass', 'atomic weight'], number: ['atomic number'], element: ['element', 'element number', 'the element'], oxide: ['oxide', 'its oxide'] },
+  words_pt: { mass: ['massa molar', 'peso molecular'], atomicmass: ['massa atômica', 'massa atomica'], number: ['número atômico', 'numero atomico'], element: ['elemento'], oxide: ['óxido', 'oxido'] } });
+postmod({ prep: '', heads: ['chemword'], attr: 'n', quantity: true });   // "element 26"
+const CHEM = ['formula', 'element'];
+const chemOf = n => n.type === 'element' ? n.value : n.type === 'formula' ? n.value : null;
+// "molar mass of CuFeS2", "atomic mass of fe", "atomic number of iron", "element 26", "what element is 26"
+frame({
+  name: 'chemfact', label: 'Chemistry', words: ['what element is', 'which element is'], elidable: true, theme: ['chemword', 'quantity:bare'], required: [],
+  roles: { of: { preps: ['of', 'for'], types: CHEM } }, label_pt: 'Química',
+  bind: c => {
+    const w = c.theme.find(t => t.type === 'chemword'), n = c.theme.find(t => t.type === 'quantity'), of = c.roles.of && c.roles.of[0];
+    if (w && w.value === 'mass' && of) return { tool: 'chem', args: { ask: 'mass', formula: chemOf(of) } };
+    if (w && (w.value === 'atomicmass' || w.value === 'number') && of && of.type === 'element') return { tool: 'chem', args: { ask: 'element', which: of.value } };
+    const z = (w && w.value === 'element' && w.attrs.n) || (!w && n); if (z && Number.isInteger(z.n) && z.n >= 1 && z.n <= 118 && !of) return { tool: 'chem', args: { ask: 'element', which: String(z.n) } };
+    return null;
+  }
+});
+// "how much cu in CuFeS2", "what fraction of fe is in fe2o3"
+frame({
+  name: 'chemfrac', label: 'Fraction', words: ['how much', 'what fraction of', 'fraction of', 'percent of', '% of', 'how much of'], theme: ['element'], required: ['theme', 'in'],
+  roles: { in: { preps: ['in', 'of'], types: ['formula', 'text'] } }, words_pt: ['quanto', 'quanto de', 'fração de'], label_pt: 'Fração',   // text: a mineral name reaches the tool, which says where minerals live
+  bind: c => ({ tool: 'chem', args: { ask: 'fraction', element: c.theme[0].value.toLowerCase(), formula: c.roles.in[0].value } })
+});
+// "convert 45.2% fe2o3 to fe", "fe to fe2o3", "factor from cu to cuo", "fe to oxide"
+frame({
+  name: 'chemfactor', label: 'Conversion factor', words: ['convert', 'factor', 'conversion factor', 'factor from'], elidable: true, theme: ['quantity:*', 'quantity:bare', 'formula', 'element'], required: ['to'],
+  roles: { of: { preps: ['', 'of'], types: CHEM }, to: { preps: ['to', 'as', 'into', 'in'], types: [...CHEM, 'chemword'] } }, label_pt: 'Fator de conversão',
+  bind: c => {
+    const th = c.theme[0], to = c.roles.to[0], from = c.roles.of ? c.roles.of[0] : th && th.type !== 'quantity' ? th : null;
+    if (!from || (to.type === 'chemword' && to.value !== 'oxide')) return null;
+    const q = th && th.type === 'quantity' ? th : null, toV = to.type === 'chemword' ? 'oxide' : chemOf(to);
+    return { tool: 'chem', args: { ask: 'factor', ...(q ? { value: q.n, unit: q.unit } : {}), from: chemOf(from), to: toV } };
   }
 });

@@ -1,7 +1,7 @@
 // ⚠ VENDORED — DO NOT EDIT. @gcu/dispatch, built from ../auditable/ext/dispatch/src/ by its own build.
 // Source of truth: gentropic/auditable ext/dispatch (local clone: ../auditable). Re-vendor by copying
 // ext/dispatch/index.js here after 'node ext/dispatch/build.js'. golem uses the grammar rung only:
-// createEngine, makeSession, ENGLISH, PORTUGUESE. At auditable ac6b2da5.
+// createEngine, makeSession, ENGLISH, PORTUGUESE. At auditable 10ef7fb6.
 
 // ⚠ GENERATED FILE — DO NOT EDIT. Source: src/  Build: @gcu/build src/main.js
 // @gcu/dispatch — Session-trained natural-language → tool-call dispatch: a Snips-shaped resolver (averaged-perceptron intent + CRF-class slot tagger + gazetteers + deterministic per-kind assemblers) that trains IN THE BROWSER from the host session's own vocabulary in under a second. Tools are declarative (ten kinds) and a grammar rung (clause: case-grammar frames over an Earley chart with costed repairs, en + pt-BR) reads controlled commands before the learners see them; no shipped model, no network, explainable per decision — refusals return empty calls so the host degrades into its command palette. Born from an incubator where this beat a 26M finetuned transformer 50/52 to 3/24 on a frozen yardstick.
@@ -1281,7 +1281,7 @@ function createEngine(ont, locale = ENGLISH) {
   // payload), comparison signs stand alone, a number may carry a sign and thousands separators, and a colon
   // inside a word (09:30) stays in it
   const PIECE = /\r?\n\s*|:(?=\s|$)|[,?!]|[<>]=?|[=≤≥]|-?\d{1,3}(?:,\d{3})+(?:\.\d+)?(?![\d,])|(?:[^\s,?!<>=≤≥:]|:(?!\s|$))+/g;
-  const SHAPES = (ont.shapes ?? []).map(x => ({ type: x.type, re: new RegExp(`^(?:${x.re})$`, 'i'), at: new RegExp(`(?:${x.re})`, 'iy') }));
+  const SHAPES = (ont.shapes ?? []).map(x => ({ type: x.type, re: new RegExp(`^(?:${x.re})$`, x.flags ?? 'i'), at: new RegExp(`(?:${x.re})`, (x.flags ?? 'i') + 'y') }));
   // shapes the grammar knows itself: clock times (09:30, 9pm, 9h30) and ISO dates
   const clockOf = w => { let m = /^(\d{1,2}):(\d{2})(am|pm)?$/.exec(w) || /^(\d{1,2})()(am|pm)$/.exec(w) || /^(\d{1,2})h(\d{2})?()$/.exec(w); if (!m) return null;
     let h = +m[1]; const mi = m[2] ? +m[2] : 0; if (m[3] === 'pm' && h < 12) h += 12; if (m[3] === 'am' && h === 12) h = 0; return h <= 24 && mi < 60 && (!m[3] || +m[1] <= 12) ? { cat: 'CLOCK', h, mi } : null; };
@@ -1293,8 +1293,8 @@ function createEngine(ont, locale = ENGLISH) {
     const toks = []; const notes = []; const unknown = [];
     const at = (t, a, b) => Object.assign(t, { s: raw[a].s, e: raw[b - 1].e });
     for (let i = 0; i < raw.length;) {
-      let span = null;   // a shape over several pieces, ending where a piece ends
-      for (const sh of SHAPES) { sh.at.lastIndex = raw[i].s; const m = sh.at.exec(text); if (!m) continue; const end = raw[i].s + m[0].length, k = raw.findIndex((r, x) => x > i && r.e === end); if (k > i && (!span || k > span.k)) span = { k, type: sh.type }; }
+      let span = null;   // a shape over several pieces, ending where a piece (never a line break) ends
+      for (const sh of SHAPES) { sh.at.lastIndex = raw[i].s; const m = sh.at.exec(text); if (!m) continue; const end = raw[i].s + m[0].length, k = raw.findIndex((r, x) => x > i && r.e === end && r.e > r.s); if (k > i && (!span || k > span.k)) span = { k, type: sh.type }; }
       if (span) { const types = SHAPES.filter(sh => { sh.at.lastIndex = raw[i].s; const m = sh.at.exec(text); return m && raw[i].s + m[0].length === raw[span.k].e; }).map(sh => sh.type);
         toks.push(at({ word: text.slice(raw[i].s, raw[span.k].e).toLowerCase(), senses: types.map(type => ({ cat: 'LIT', type, value: text.slice(raw[i].s, raw[span.k].e) })) }, i, span.k + 1)); i = span.k + 1; continue; }
       let hit = null;
@@ -1304,8 +1304,13 @@ function createEngine(ont, locale = ENGLISH) {
       const i0 = i, w = raw[i++].w, src = raw[i0].src.trim();
       if (w === '?' || w === '!') continue;
       if (w === ':') { toks.push(at({ word: ':', senses: [{ cat: 'COLON' }] }, i0, i)); continue; }
+      // a filler that is also a unit is the unit right after a number ("75 um"); elsewhere it is a filler ("um, what is …")
+      if (LEX[w] && LEX[w][0].cat === 'FILLER' && toks.at(-1)?.senses.some(x => x.cat === 'NUM') && LEX[w].some(x => x.cat === 'UNIT')) { toks.push(at({ word: w, senses: LEX[w].filter(x => x.cat === 'UNIT') }, i0, i)); continue; }
       if (LEX[w]) { if (LEX[w][0].cat !== 'FILLER') { const plural = locale.plural(w); toks.push(at({ word: w, senses: plural ? LEX[w].map(x => x.cat === 'NOUN' ? { ...x, plural } : x) : LEX[w] }, i0, i)); } continue; }
-      const lit = [clockOf(w), dateOf(w), ...SHAPES.filter(x => x.re.test(w)).map(x => ({ cat: 'LIT', type: x.type, value: src }))].filter(Boolean);
+      const lit = [clockOf(w), dateOf(w), ...SHAPES.filter(x => x.re.test(src)).map(x => ({ cat: 'LIT', type: x.type, value: src }))].filter(Boolean);
+      // a number glued to a unit the lexicon knows is the two of them: "5km", "45.2%", "2.7g/cm3"
+      const glued = !lit.length && /^(-?\d+(?:\.\d+)?)([^\d\s.,-].*)$/.exec(w);
+      if (glued && LEX[glued[2]]?.some(s => s.cat === 'UNIT')) { const cut = raw[i0].s + glued[1].length; toks.push({ word: glued[1], senses: [{ cat: 'NUM', n: parseFloat(glued[1]) }], s: raw[i0].s, e: cut }, { word: glued[2], senses: LEX[glued[2]].filter(s => s.cat === 'UNIT'), s: cut, e: raw[i0].e }); continue; }
       const num = /^-?\d+(\.\d+)?$/.test(w) || /^-?\d{1,3}(,\d{3})+(\.\d+)?$/.test(w) ? [{ cat: 'NUM', n: parseFloat(w.replace(/,/g, '')) }] : [];
       if (lit.length || num.length) { toks.push(at({ word: w, senses: [...num, ...lit] }, i0, i)); continue; }
       if (session?.names?.[w]) { toks.push(at({ word: w, senses: [{ cat: 'IDENT', name: w, type: session.names[w] }] }, i0, i)); continue; }

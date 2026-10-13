@@ -531,7 +531,7 @@ frame({
   name: 'convert', label: 'Convert', words: ['convert', 'change'], elidable: true,
   theme: ['quantity:*'], required: ['theme', 'unit'], roles: { unit: { preps: ['in', 'to', 'as', 'into'], types: ['unit'] } },
   words_pt: ['converter', 'converte', 'converta', 'passar', 'passa'], label_pt: 'Converter',
-  bind: c => { const q = c.theme[0], to = c.roles.unit && c.roles.unit[0]; return q && q.type === 'quantity' && to ? { tool: 'convert', args: { v: q.n, from: q.unit, to: to.unit } } : null; }
+  bind: c => { const q = c.theme[0], to = c.roles.unit && c.roles.unit[0]; return q && q.type === 'quantity' && to && q.unit !== 'mesh' && to.unit !== 'mesh' ? { tool: 'convert', args: { v: q.n, from: q.unit, to: to.unit } } : null; }
 });
   return { U, UNIT_TABLE, DIM, COMPOUNDS, parseUnit, dimName };
 })();
@@ -12561,7 +12561,8 @@ function format(value, unit, opts) {
 
 /* ==== src/engine/sample.js ==== */
 const __m22 = (() => {
-const { tool, fmt } = __m0;
+const { tool, frame, noun, compound, qmod, postmod, unit, fmt } = __m0;
+const { parseUnit } = __m1;
 const { core, sieve } = __m21;
 // Core and sample arithmetic: sample mass from core size, sieve sizes, specific gravity by Archimedes,
 // recovery and RQD. The DCDMA core table and the sieve table come from @gcu/units (vendored); the
@@ -12572,14 +12573,8 @@ const CODES = '(aq|bq|nq|nq2|nq3|hq|hq3|pq|pq3)';
 const NUM = '(\\d+(?:\\.\\d+)?)';
 
 tool({
-  name: 'coremass', rank: 76,
+  name: 'coremass',
   skill: { group: 'Field', title: 'Core and sample arithmetic', on: '@gcu/units', about: 'Sample mass from core size, length, split and density; sieve mesh to microns; specific gravity from mass in air and water; recovery and RQD from piece lengths.', examples: ['mass of 1 m of nq core at 2.7', '200 mesh in microns', 'sg from 120.5 g in air and 75.2 g in water', 'rqd of 12, 8, 25, 4, 31 and 9 cm in a 100 cm run'] },
-  read: (text, q) => {
-    let m = new RegExp(`^(?:sample )?mass of ${NUM} ?m of (half |quarter |whole )?${CODES}(?: core)?(?: at (?:sg |density |rho )?${NUM})?$`).exec(q);
-    if (!m) m = new RegExp(`^(half |quarter |whole )?${CODES}(?: core)?,? ${NUM} ?m,? (?:at |sg |density )${NUM}$`).exec(q) && (m => [m[0], m[3], m[1], m[2], m[4]])(new RegExp(`^(half |quarter |whole )?${CODES}(?: core)?,? ${NUM} ?m,? (?:at |sg |density )${NUM}$`).exec(q));
-    if (!m) return null;
-    return { length: +m[1], split: (m[2] || 'whole').trim(), code: m[3].toUpperCase(), density: m[4] ? +m[4] : null };
-  },
   topic: () => ['Sample mass', 1],
   run: a => {
     const d = core.diameter(a.code), read = ['mass of', { v: `${fmt(a.length)} m` }, 'of', { v: `${a.split} ${a.code}`, key: 'split', alts: ['whole', 'half', 'quarter'], cur: a.split }, 'core'];
@@ -12594,11 +12589,7 @@ tool({
   }
 });
 tool({
-  name: 'sieve', rank: 77,
-  read: (text, q) => {
-    let m = /^(\d+) mesh (?:in|to|as) (?:microns?|um|µm|mm)$/.exec(q); if (m) return { mesh: +m[1] };
-    m = new RegExp(`^${NUM} ?(um|µm|microns?|mm) (?:in|to|as) mesh$`).exec(q); return m ? { um: +m[1] * (m[2] === 'mm' ? 1000 : 1) } : null;
-  },
+  name: 'sieve',
   topic: () => ['Sieve', 1],
   run: a => {
     if (a.mesh != null) {
@@ -12610,8 +12601,7 @@ tool({
   }
 });
 tool({
-  name: 'sg', rank: 78,
-  read: (text, q) => { const m = new RegExp(`^(?:sg|specific gravity|density) (?:of|from) ${NUM} ?g in air and ${NUM} ?g in water$`).exec(q); return m ? { air: +m[1], water: +m[2] } : null; },
+  name: 'sg',
   topic: () => ['Specific gravity', 1],
   run: a => {
     const read = ['specific gravity from', { v: `${fmt(a.air)} g in air` }, 'and', { v: `${fmt(a.water)} g in water` }];
@@ -12622,8 +12612,7 @@ tool({
 });
 const RQD_CLASS = v => v < 25 ? 'very poor' : v < 50 ? 'poor' : v < 75 ? 'fair' : v < 90 ? 'good' : 'excellent';
 tool({
-  name: 'rqd', rank: 79,
-  read: (text, q) => { const m = new RegExp(`^(?:rqd|recovery)(?: and (?:rqd|recovery))? (?:of|for|from) ((?:\\d+(?:\\.\\d+)?,? ?(?:and )?)+?) ?cm (?:in|over|for) (?:a |an )?${NUM} ?(m|cm) run$`).exec(q); if (!m) return null; const pieces = [...m[1].matchAll(/\d+(?:\.\d+)?/g)].map(x => +x[0]); return pieces.length ? { pieces, run: +m[2] * (m[3] === 'm' ? 100 : 1) } : null; },
+  name: 'rqd',
   topic: () => ['RQD', 1],
   run: a => {
     const total = a.pieces.reduce((s, p) => s + p, 0), sound = a.pieces.filter(p => p >= 10), rqd = sound.reduce((s, p) => s + p, 0) / a.run * 100, rec = total / a.run * 100;
@@ -12634,6 +12623,64 @@ tool({
       body: [{ t: 'big', v: fmt(rqd, 3), unit: `% RQD, ${RQD_CLASS(rqd)}` }, { t: 'kv', rows: [['recovery', `${fmt(rec, 3)}% (${fmt(total)} of ${fmt(a.run)} cm)`], ['pieces of 10 cm or more', `${sound.length} of ${a.pieces.length}: ${sound.join(', ')} cm`], ['class', `${RQD_CLASS(rqd)} (Deere, 1964)`]] }],
       trace: [`recovery = ${fmt(total)} ÷ ${fmt(a.run)} = ${fmt(rec, 4)}%`, `RQD = Σ pieces ≥ 10 cm ÷ run = ${sound.reduce((s, p) => s + p, 0)} ÷ ${fmt(a.run)} = ${fmt(rqd, 4)}%`], py: `rqd(${JSON.stringify(a.pieces)}, run_cm=${a.run})`
     };
+  }
+});
+/* ── what reads them ─────────────────────────────────────────── */
+// "mass of 1 m of nq core at 2.7", "mass of 1 m of half hq core at 2.7"
+noun({ type: 'corecode', words: Object.fromEntries(['aq', 'bq', 'nq', 'nq2', 'nq3', 'hq', 'hq3', 'pq', 'pq3'].map(k => [k.toUpperCase(), [k]])), generic: ['core', 'drill core'], generic_pt: ['testemunho'] });
+noun({ type: 'split', words: { whole: ['whole'], half: ['half', 'half-core'], quarter: ['quarter', 'quarter-core'] }, words_pt: { whole: ['inteiro'], half: ['meio'], quarter: ['quarto'] } });
+compound({ mod: 'split', heads: ['corecode'], attr: 'split' });
+noun({ type: 'coremass', words: { mass: ['mass', 'sample mass', 'core mass', 'weight of core', 'core weight'] }, words_pt: { mass: ['massa', 'massa da amostra'] } });
+const toM = q => { if (!q.unit) return q.n; if (q.unit === 'µm') return q.n * 1e-6; const u = parseUnit(q.unit); return u && u.dim === 'L' ? q.n * u.f : null; };
+unit({ unit: 'µm', dim: 'length', words: ['µm', 'um', 'micron', 'microns', 'micrometre', 'micrometres', 'micrometer', 'micrometers'] });   // the sieve's unit; @gcu/units has no micron
+postmod({ prep: '', heads: ['sgword'], attr: 'value', quantity: true });   // "sg 2.9"
+// "half nq, 1.5 m, sg 2.9": the same question as a list
+frame({
+  name: 'coremass2', label: 'Sample mass', words: [], elidable: true, theme: ['corecode', 'quantity:length', 'sgword'], required: ['theme'], roles: {}, label_pt: 'Massa da amostra',
+  bind: c => { const cc = c.theme.find(n => n.type === 'corecode'), len = c.theme.find(n => n.type === 'quantity'), sg = c.theme.find(n => n.type === 'sgword');
+    return cc && cc.value && len && c.theme.length <= 3 ? { tool: 'coremass', args: { length: toM(len), split: (cc.attrs && cc.attrs.split) || 'whole', code: cc.value, density: sg && sg.attrs.value ? sg.attrs.value.n : null } } : null; }
+});
+frame({
+  name: 'coremass', label: 'Sample mass', words: ['calculate', 'compute'], elidable: true, theme: ['coremass'], required: ['theme', 'of'],
+  roles: { of: { preps: ['of', 'for'], types: ['quantity:length', 'corecode'] }, at: { preps: ['at', 'with'], types: ['quantity:density', 'quantity:bare'] } }, label_pt: 'Massa da amostra',
+  bind: c => {
+    const len = c.roles.of.find(n => n.type === 'quantity'), cc = c.roles.of.find(n => n.type === 'corecode'), d = c.roles.at && c.roles.at[0];
+    if (!len || !cc || !cc.value) return null;
+    return { tool: 'coremass', args: { length: toM(len), split: (cc.attrs && cc.attrs.split) || 'whole', code: cc.value, density: d ? d.n : null } };
+  }
+});
+// "200 mesh in microns", "75 µm in mesh"
+unit({ unit: 'mesh', dim: 'mesh', words: ['mesh'] });
+noun({ type: 'meshword', words: { mesh: ['mesh'] } });
+frame({
+  name: 'sieve', label: 'Sieve', words: ['convert'], elidable: true, theme: ['quantity:mesh', 'quantity:length'], required: ['theme', 'to'],
+  roles: { to: { preps: ['in', 'to', 'as', 'into'], types: ['unit', 'meshword'] } }, label_pt: 'Peneira',
+  bind: c => { const q = c.theme[0], to = c.roles.to[0];
+    if (q.unit === 'mesh' && to.type === 'unit' && (to.dim === 'length' || to.unit === 'µm')) return { tool: 'sieve', args: { mesh: q.n } };
+    if (q.unit && q.unit !== 'mesh' && (to.type === 'meshword' || to.unit === 'mesh')) { const m = toM(q); return m != null ? { tool: 'sieve', args: { um: Math.round(m * 1e6 * 1000) / 1000 } } : null; }
+    return null; }
+});
+// "sg from 120.5 g in air and 75.2 g in water": a mass in air and a mass in water are units of their own
+unit({ unit: 'g in air', dim: 'mass in air', words: ['g in air', 'grams in air', 'gram in air'] });
+unit({ unit: 'g in water', dim: 'mass in water', words: ['g in water', 'grams in water', 'gram in water'] });
+noun({ type: 'sgword', words: { sg: ['sg', 'specific gravity', 'density', 'relative density'] }, words_pt: { sg: ['densidade', 'peso específico'] } });
+frame({
+  name: 'sg', label: 'Specific gravity', words: ['calculate', 'compute'], elidable: true, theme: ['sgword'], required: ['theme', 'from'],
+  roles: { from: { preps: ['from', 'of', 'with', 'for'], types: ['quantity:mass in air', 'quantity:mass in water'] } }, label_pt: 'Densidade',
+  bind: c => { const air = c.roles.from.find(q => q.dim === 'mass in air'), water = c.roles.from.find(q => q.dim === 'mass in water'); return air && water ? { tool: 'sg', args: { air: air.n, water: water.n } } : null; }
+});
+// "rqd of 12, 8, 25, 4, 31 and 9 cm in a 100 cm run"
+noun({ type: 'rqdword', words: { rqd: ['rqd', 'recovery', 'rqd and recovery', 'recovery and rqd'] }, words_pt: { rqd: ['rqd', 'recuperação'] } });
+noun({ type: 'corerun', words: {}, generic: ['run', 'core run', 'drill run'], generic_pt: ['manobra'] });
+qmod({ head: 'corerun', attr: 'length', dims: ['length'] });
+const toCm = (q, unitOf) => { const u = q.unit || unitOf; if (!u) return null; const p = parseUnit(u); return p && p.dim === 'L' ? q.n * p.f * 100 : null; };
+frame({
+  name: 'rqd', label: 'RQD', words: ['calculate', 'compute'], elidable: true, theme: ['rqdword'], required: ['theme', 'of', 'in'],
+  roles: { of: { preps: ['of', 'for', 'from'], types: ['quantity:length', 'coords', 'point3'] }, in: { preps: ['in', 'over', 'for'], types: ['corerun'] } }, label_pt: 'RQD',
+  bind: c => {
+    const qs = c.roles.of.flatMap(n => n.type === 'quantity' ? [n] : String(n.value).split(',').map(x => ({ type: 'quantity', n: +x.trim(), unit: null })));
+    const unitOf = (qs.find(q => q.unit) || {}).unit, pieces = qs.map(q => toCm(q, unitOf)), run = c.roles.in[0].attrs && c.roles.in[0].attrs.length;
+    return pieces.length && pieces.every(p => p != null) && run ? { tool: 'rqd', args: { pieces, run: toCm(run) } } : null;
   }
 });
   return {  };
@@ -13972,7 +14019,7 @@ const ELEMENTS = [
 
 /* ==== src/engine/chem.js ==== */
 const __m30 = (() => {
-const { tool, fmt } = __m0;
+const { tool, frame, noun, shape, postmod, fmt } = __m0;
 const { ELEMENTS, ELEMENTS_SOURCE } = __m29;
 // Molar mass, conversion factors and element fractions from a parsed formula over the IUPAC weights;
 // the periodic table lookup. No mineral names: the minerals pack is not here, so a formula is required.
@@ -14030,17 +14077,8 @@ const elementOf = w => { const s = w.trim(); return BY_SYMBOL.get(s) || BY_SYMBO
 const sameCase = (text, q, m, i) => { const at = q.indexOf(m[i], m.index); return at < 0 ? m[i] : text.slice(at, at + m[i].length); };
 
 tool({
-  name: 'chem', rank: 95,
+  name: 'chem',
   skill: { group: 'Compute', title: 'Molar mass and conversion factors', on: 'IUPAC weights (data file)', about: 'Molar mass of a formula with the breakdown; element-to-oxide factors and the reverse; how much of an element a formula holds; the periodic table by symbol, name or number. A mineral name is not read: give the formula.', examples: ['molar mass of CuFeS2', 'fe to fe2o3', 'convert 45.2% fe2o3 to fe', 'how much cu in CuFeS2', 'atomic mass of fe', 'element 26'] },
-  read: (text, q) => {
-    let m;
-    if ((m = /^(?:molar|molecular|formula) (?:mass|weight)(?: of)? (\S+)$/.exec(q))) return { ask: 'mass', formula: sameCase(text, q, m, 1) };
-    if ((m = /^(?:what is )?(?:the )?(?:atomic (?:mass|weight|number)|element) (?:of )?([a-z]+|\d+)$/.exec(q)) || (m = /^(?:what is |which element is )?element (?:number )?(\d+)$/.exec(q))) return { ask: 'element', which: m[1] };
-    if ((m = /^(?:how much|what fraction of|fraction of|percent of|% of|how much of) ([a-z]+) (?:is )?in (\S+)$/.exec(q))) return { ask: 'fraction', element: m[1], formula: sameCase(text, q, m, 2) };
-    if ((m = /^(?:convert )?(\d+(?:\.\d+)?) ?(%|wt%|percent|ppm|g\/t|ppb)? ?(\S+) (?:to|as|in) (\S+)$/.exec(q)) && elementOf(m[3]) || (m && (() => { try { parseFormula(sameCase(text, q, m, 3)); return true; } catch (e) { return false; } })())) return { ask: 'factor', value: +m[1], unit: m[2] || null, from: sameCase(text, q, m, 3), to: sameCase(text, q, m, 4) };
-    if ((m = /^(?:factor |conversion factor )?(?:from )?([a-z]+\d*(?:[a-z]+\d*)*) (?:to|as) ((?:[a-z]+\d*)+|oxide)$/.exec(q)) && (elementOf(m[1]) || (() => { try { parseFormula(sameCase(text, q, m, 1)); return true; } catch (e) { return false; } })())) return { ask: 'factor', from: sameCase(text, q, m, 1), to: m[2] === 'oxide' ? 'oxide' : sameCase(text, q, m, 2) };
-    return null;
-  },
   amend: [{ arg: 'to', match: /^(?:as |to )?([A-Za-z]+\d*(?:[A-Za-z]+\d*)*)$/, when: a => a.ask === 'factor' && a.to === 'oxide', value: m => m[1] }],
   topic: a => [a.ask === 'element' ? 'Periodic table' : a.ask === 'mass' ? 'Molar mass' : 'Conversion factor', 1],
   run: a => {
@@ -14084,6 +14122,51 @@ tool({
     const rows = [['factor', `${fmt(factor, 5)}: ${pretty(pt.text)} = ${pretty(pf.text)} × ${fmt(factor, 5)}`], ['reverse', `${fmt(1 / factor, 5)}: ${pretty(pf.text)} = ${pretty(pt.text)} × ${fmt(1 / factor, 5)}`], ['by', `M(${pretty(pt.text)}) ÷ ${fmt(pt.counts.get(el))} ${el} = ${fmt(mt.total / pt.counts.get(el), 6)}; M(${pretty(pf.text)}) ÷ ${fmt(pf.counts.get(el))} ${el} = ${fmt(mf.total / pf.counts.get(el), 6)}`]];
     if (a.value != null) { const u = a.unit || ''; read.unshift({ v: `${fmt(a.value)} ${u}`.trim() }); return { read, value: a.value * factor, body: [{ t: 'big', v: fmt(a.value * factor, 5), unit: `${u} ${pretty(pt.text)}`.trim() }, { t: 'kv', rows }, SRC], trace: [`factor ${pretty(pf.text)} → ${pretty(pt.text)} = ${fmt(factor, 6)}`, `${a.value} × ${fmt(factor, 6)} = ${fmt(a.value * factor, 6)}`], py: `${a.value} * chem.factor("${pf.text}", "${pt.text}")` }; }
     return { read, value: factor, copy: fmt(factor, 5), body: [{ t: 'big', v: fmt(factor, 5), unit: `× ${pretty(pf.text)} gives ${pretty(pt.text)}` }, { t: 'kv', rows }, SRC], trace: [`M(${pt.text}) = ${fmt(mt.total, 6)}, M(${pf.text}) = ${fmt(mf.total, 6)}`, `shared element ${el}: ${pf.counts.get(el)} in ${pf.text}, ${pt.counts.get(el)} in ${pt.text}`, `factor = ${fmt(factor, 6)}`], py: `chem.factor("${pf.text}", "${pt.text}")` };
+  }
+});
+/* ── what reads it: formulas as typed ("CuFeS2", "fe2o3"), elements by symbol or name, "element 26" ── */
+// as typed, with capitals: CuFeS2, NaCl, Fe2O3, Ca(OH)2, CuSO4·5H2O, Fe0.9S (parseFormula checks it when bound)
+shape({ type: 'formula', re: String.raw`(?=[^a-z]*[A-Z][^A-Z]*[A-Z0-9])[A-Z(][A-Za-z0-9().·]*[A-Za-z0-9)]`, flags: '' });
+// lowercase: only runs of real element symbols with counts, so an unknown word is not a formula: fe2o3, cuo, h2o
+const SYMS = ELEMENTS.map(e => e[1].toLowerCase()).sort((a, b) => b.length - a.length).join('|');
+// with a count, or short (cuo, nacl): longer plain words spelled in symbols ("python" is P Y Th O N) stay words
+shape({ type: 'formula', re: `(?=[a-z.]*\\d|[a-z]{2,5}(?![a-z\\d]))(?:(?:${SYMS})\\d*(?:\\.\\d+)?){2,}` });
+// symbols that are English words (in, as, at, no, be, he, so) and single letters stay out; the names cover them
+const PLAIN = new Set(['in', 'as', 'at', 'no', 'be', 'he', 'so', 'is', 'am', 'pm', 'or', 'es', 'md']);
+noun({ type: 'element', words: Object.fromEntries(ELEMENTS.map(e => [e[1], [e[2], ...(e[1].length > 1 && !PLAIN.has(e[1].toLowerCase()) ? [e[1].toLowerCase()] : [])]])),
+  words_pt: Object.fromEntries(ELEMENTS.map(e => [e[1], [e[2], ...(e[1].length > 1 && !PLAIN.has(e[1].toLowerCase()) ? [e[1].toLowerCase()] : [])]])) });
+noun({ type: 'chemword', words: { mass: ['molar mass', 'molecular mass', 'molecular weight', 'formula weight', 'formula mass'], atomicmass: ['atomic mass', 'atomic weight'], number: ['atomic number'], element: ['element', 'element number', 'the element'], oxide: ['oxide', 'its oxide'] },
+  words_pt: { mass: ['massa molar', 'peso molecular'], atomicmass: ['massa atômica', 'massa atomica'], number: ['número atômico', 'numero atomico'], element: ['elemento'], oxide: ['óxido', 'oxido'] } });
+postmod({ prep: '', heads: ['chemword'], attr: 'n', quantity: true });   // "element 26"
+const CHEM = ['formula', 'element'];
+const chemOf = n => n.type === 'element' ? n.value : n.type === 'formula' ? n.value : null;
+// "molar mass of CuFeS2", "atomic mass of fe", "atomic number of iron", "element 26", "what element is 26"
+frame({
+  name: 'chemfact', label: 'Chemistry', words: ['what element is', 'which element is'], elidable: true, theme: ['chemword', 'quantity:bare'], required: [],
+  roles: { of: { preps: ['of', 'for'], types: CHEM } }, label_pt: 'Química',
+  bind: c => {
+    const w = c.theme.find(t => t.type === 'chemword'), n = c.theme.find(t => t.type === 'quantity'), of = c.roles.of && c.roles.of[0];
+    if (w && w.value === 'mass' && of) return { tool: 'chem', args: { ask: 'mass', formula: chemOf(of) } };
+    if (w && (w.value === 'atomicmass' || w.value === 'number') && of && of.type === 'element') return { tool: 'chem', args: { ask: 'element', which: of.value } };
+    const z = (w && w.value === 'element' && w.attrs.n) || (!w && n); if (z && Number.isInteger(z.n) && z.n >= 1 && z.n <= 118 && !of) return { tool: 'chem', args: { ask: 'element', which: String(z.n) } };
+    return null;
+  }
+});
+// "how much cu in CuFeS2", "what fraction of fe is in fe2o3"
+frame({
+  name: 'chemfrac', label: 'Fraction', words: ['how much', 'what fraction of', 'fraction of', 'percent of', '% of', 'how much of'], theme: ['element'], required: ['theme', 'in'],
+  roles: { in: { preps: ['in', 'of'], types: ['formula', 'text'] } }, words_pt: ['quanto', 'quanto de', 'fração de'], label_pt: 'Fração',   // text: a mineral name reaches the tool, which says where minerals live
+  bind: c => ({ tool: 'chem', args: { ask: 'fraction', element: c.theme[0].value.toLowerCase(), formula: c.roles.in[0].value } })
+});
+// "convert 45.2% fe2o3 to fe", "fe to fe2o3", "factor from cu to cuo", "fe to oxide"
+frame({
+  name: 'chemfactor', label: 'Conversion factor', words: ['convert', 'factor', 'conversion factor', 'factor from'], elidable: true, theme: ['quantity:*', 'quantity:bare', 'formula', 'element'], required: ['to'],
+  roles: { of: { preps: ['', 'of'], types: CHEM }, to: { preps: ['to', 'as', 'into', 'in'], types: [...CHEM, 'chemword'] } }, label_pt: 'Fator de conversão',
+  bind: c => {
+    const th = c.theme[0], to = c.roles.to[0], from = c.roles.of ? c.roles.of[0] : th && th.type !== 'quantity' ? th : null;
+    if (!from || (to.type === 'chemword' && to.value !== 'oxide')) return null;
+    const q = th && th.type === 'quantity' ? th : null, toV = to.type === 'chemword' ? 'oxide' : chemOf(to);
+    return { tool: 'chem', args: { ask: 'factor', ...(q ? { value: q.n, unit: q.unit } : {}), from: chemOf(from), to: toV } };
   }
 });
   return { parseFormula, molarMass };
@@ -18823,7 +18906,7 @@ const __m49 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/dispatch, built from ../auditable/ext/dispatch/src/ by its own build.
 // Source of truth: gentropic/auditable ext/dispatch (local clone: ../auditable). Re-vendor by copying
 // ext/dispatch/index.js here after 'node ext/dispatch/build.js'. golem uses the grammar rung only:
-// createEngine, makeSession, ENGLISH, PORTUGUESE. At auditable ac6b2da5.
+// createEngine, makeSession, ENGLISH, PORTUGUESE. At auditable 10ef7fb6.
 
 // ⚠ GENERATED FILE — DO NOT EDIT. Source: src/  Build: @gcu/build src/main.js
 // @gcu/dispatch — Session-trained natural-language → tool-call dispatch: a Snips-shaped resolver (averaged-perceptron intent + CRF-class slot tagger + gazetteers + deterministic per-kind assemblers) that trains IN THE BROWSER from the host session's own vocabulary in under a second. Tools are declarative (ten kinds) and a grammar rung (clause: case-grammar frames over an Earley chart with costed repairs, en + pt-BR) reads controlled commands before the learners see them; no shipped model, no network, explainable per decision — refusals return empty calls so the host degrades into its command palette. Born from an incubator where this beat a 26M finetuned transformer 50/52 to 3/24 on a frozen yardstick.
@@ -20103,7 +20186,7 @@ function createEngine(ont, locale = ENGLISH) {
   // payload), comparison signs stand alone, a number may carry a sign and thousands separators, and a colon
   // inside a word (09:30) stays in it
   const PIECE = /\r?\n\s*|:(?=\s|$)|[,?!]|[<>]=?|[=≤≥]|-?\d{1,3}(?:,\d{3})+(?:\.\d+)?(?![\d,])|(?:[^\s,?!<>=≤≥:]|:(?!\s|$))+/g;
-  const SHAPES = (ont.shapes ?? []).map(x => ({ type: x.type, re: new RegExp(`^(?:${x.re})$`, 'i'), at: new RegExp(`(?:${x.re})`, 'iy') }));
+  const SHAPES = (ont.shapes ?? []).map(x => ({ type: x.type, re: new RegExp(`^(?:${x.re})$`, x.flags ?? 'i'), at: new RegExp(`(?:${x.re})`, (x.flags ?? 'i') + 'y') }));
   // shapes the grammar knows itself: clock times (09:30, 9pm, 9h30) and ISO dates
   const clockOf = w => { let m = /^(\d{1,2}):(\d{2})(am|pm)?$/.exec(w) || /^(\d{1,2})()(am|pm)$/.exec(w) || /^(\d{1,2})h(\d{2})?()$/.exec(w); if (!m) return null;
     let h = +m[1]; const mi = m[2] ? +m[2] : 0; if (m[3] === 'pm' && h < 12) h += 12; if (m[3] === 'am' && h === 12) h = 0; return h <= 24 && mi < 60 && (!m[3] || +m[1] <= 12) ? { cat: 'CLOCK', h, mi } : null; };
@@ -20115,8 +20198,8 @@ function createEngine(ont, locale = ENGLISH) {
     const toks = []; const notes = []; const unknown = [];
     const at = (t, a, b) => Object.assign(t, { s: raw[a].s, e: raw[b - 1].e });
     for (let i = 0; i < raw.length;) {
-      let span = null;   // a shape over several pieces, ending where a piece ends
-      for (const sh of SHAPES) { sh.at.lastIndex = raw[i].s; const m = sh.at.exec(text); if (!m) continue; const end = raw[i].s + m[0].length, k = raw.findIndex((r, x) => x > i && r.e === end); if (k > i && (!span || k > span.k)) span = { k, type: sh.type }; }
+      let span = null;   // a shape over several pieces, ending where a piece (never a line break) ends
+      for (const sh of SHAPES) { sh.at.lastIndex = raw[i].s; const m = sh.at.exec(text); if (!m) continue; const end = raw[i].s + m[0].length, k = raw.findIndex((r, x) => x > i && r.e === end && r.e > r.s); if (k > i && (!span || k > span.k)) span = { k, type: sh.type }; }
       if (span) { const types = SHAPES.filter(sh => { sh.at.lastIndex = raw[i].s; const m = sh.at.exec(text); return m && raw[i].s + m[0].length === raw[span.k].e; }).map(sh => sh.type);
         toks.push(at({ word: text.slice(raw[i].s, raw[span.k].e).toLowerCase(), senses: types.map(type => ({ cat: 'LIT', type, value: text.slice(raw[i].s, raw[span.k].e) })) }, i, span.k + 1)); i = span.k + 1; continue; }
       let hit = null;
@@ -20126,8 +20209,13 @@ function createEngine(ont, locale = ENGLISH) {
       const i0 = i, w = raw[i++].w, src = raw[i0].src.trim();
       if (w === '?' || w === '!') continue;
       if (w === ':') { toks.push(at({ word: ':', senses: [{ cat: 'COLON' }] }, i0, i)); continue; }
+      // a filler that is also a unit is the unit right after a number ("75 um"); elsewhere it is a filler ("um, what is …")
+      if (LEX[w] && LEX[w][0].cat === 'FILLER' && toks.at(-1)?.senses.some(x => x.cat === 'NUM') && LEX[w].some(x => x.cat === 'UNIT')) { toks.push(at({ word: w, senses: LEX[w].filter(x => x.cat === 'UNIT') }, i0, i)); continue; }
       if (LEX[w]) { if (LEX[w][0].cat !== 'FILLER') { const plural = locale.plural(w); toks.push(at({ word: w, senses: plural ? LEX[w].map(x => x.cat === 'NOUN' ? { ...x, plural } : x) : LEX[w] }, i0, i)); } continue; }
-      const lit = [clockOf(w), dateOf(w), ...SHAPES.filter(x => x.re.test(w)).map(x => ({ cat: 'LIT', type: x.type, value: src }))].filter(Boolean);
+      const lit = [clockOf(w), dateOf(w), ...SHAPES.filter(x => x.re.test(src)).map(x => ({ cat: 'LIT', type: x.type, value: src }))].filter(Boolean);
+      // a number glued to a unit the lexicon knows is the two of them: "5km", "45.2%", "2.7g/cm3"
+      const glued = !lit.length && /^(-?\d+(?:\.\d+)?)([^\d\s.,-].*)$/.exec(w);
+      if (glued && LEX[glued[2]]?.some(s => s.cat === 'UNIT')) { const cut = raw[i0].s + glued[1].length; toks.push({ word: glued[1], senses: [{ cat: 'NUM', n: parseFloat(glued[1]) }], s: raw[i0].s, e: cut }, { word: glued[2], senses: LEX[glued[2]].filter(s => s.cat === 'UNIT'), s: cut, e: raw[i0].e }); continue; }
       const num = /^-?\d+(\.\d+)?$/.test(w) || /^-?\d{1,3}(,\d{3})+(\.\d+)?$/.test(w) ? [{ cat: 'NUM', n: parseFloat(w.replace(/,/g, '')) }] : [];
       if (lit.length || num.length) { toks.push(at({ word: w, senses: [...num, ...lit] }, i0, i)); continue; }
       if (session?.names?.[w]) { toks.push(at({ word: w, senses: [{ cat: 'IDENT', name: w, type: session.names[w] }] }, i0, i)); continue; }

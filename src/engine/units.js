@@ -66,5 +66,5 @@ frame({
   name: 'convert', label: 'Convert', words: ['convert', 'change'], elidable: true,
   theme: ['quantity:*'], required: ['theme', 'unit'], roles: { unit: { preps: ['in', 'to', 'as', 'into'], types: ['unit'] } },
   words_pt: ['converter', 'converte', 'converta', 'passar', 'passa'], label_pt: 'Converter',
-  bind: c => { const q = c.theme[0], to = c.roles.unit && c.roles.unit[0]; return q && q.type === 'quantity' && to ? { tool: 'convert', args: { v: q.n, from: q.unit, to: to.unit } } : null; }
+  bind: c => { const q = c.theme[0], to = c.roles.unit && c.roles.unit[0]; return q && q.type === 'quantity' && to && q.unit !== 'mesh' && to.unit !== 'mesh' ? { tool: 'convert', args: { v: q.n, from: q.unit, to: to.unit } } : null; }
 });

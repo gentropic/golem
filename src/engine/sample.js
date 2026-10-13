@@ -1,7 +1,8 @@
 // Core and sample arithmetic: sample mass from core size, sieve sizes, specific gravity by Archimedes,
 // recovery and RQD. The DCDMA core table and the sieve table come from @gcu/units (vendored); the
 // arithmetic is golem's own and shown step by step.
-import { tool, fmt } from './core.js';
+import { tool, frame, noun, compound, qmod, postmod, unit, fmt } from './core.js';
+import { parseUnit } from './units.js';
 import { core, sieve } from '../vendor/units.js';
 
 const SRC = { t: 'src', text: '@gcu/units · vendored · DCDMA core sizes and the sieve table' };
@@ -9,14 +10,8 @@ const CODES = '(aq|bq|nq|nq2|nq3|hq|hq3|pq|pq3)';
 const NUM = '(\\d+(?:\\.\\d+)?)';
 
 tool({
-  name: 'coremass', rank: 76,
+  name: 'coremass',
   skill: { group: 'Field', title: 'Core and sample arithmetic', on: '@gcu/units', about: 'Sample mass from core size, length, split and density; sieve mesh to microns; specific gravity from mass in air and water; recovery and RQD from piece lengths.', examples: ['mass of 1 m of nq core at 2.7', '200 mesh in microns', 'sg from 120.5 g in air and 75.2 g in water', 'rqd of 12, 8, 25, 4, 31 and 9 cm in a 100 cm run'] },
-  read: (text, q) => {
-    let m = new RegExp(`^(?:sample )?mass of ${NUM} ?m of (half |quarter |whole )?${CODES}(?: core)?(?: at (?:sg |density |rho )?${NUM})?$`).exec(q);
-    if (!m) m = new RegExp(`^(half |quarter |whole )?${CODES}(?: core)?,? ${NUM} ?m,? (?:at |sg |density )${NUM}$`).exec(q) && (m => [m[0], m[3], m[1], m[2], m[4]])(new RegExp(`^(half |quarter |whole )?${CODES}(?: core)?,? ${NUM} ?m,? (?:at |sg |density )${NUM}$`).exec(q));
-    if (!m) return null;
-    return { length: +m[1], split: (m[2] || 'whole').trim(), code: m[3].toUpperCase(), density: m[4] ? +m[4] : null };
-  },
   topic: () => ['Sample mass', 1],
   run: a => {
     const d = core.diameter(a.code), read = ['mass of', { v: `${fmt(a.length)} m` }, 'of', { v: `${a.split} ${a.code}`, key: 'split', alts: ['whole', 'half', 'quarter'], cur: a.split }, 'core'];
@@ -31,11 +26,7 @@ tool({
   }
 });
 tool({
-  name: 'sieve', rank: 77,
-  read: (text, q) => {
-    let m = /^(\d+) mesh (?:in|to|as) (?:microns?|um|µm|mm)$/.exec(q); if (m) return { mesh: +m[1] };
-    m = new RegExp(`^${NUM} ?(um|µm|microns?|mm) (?:in|to|as) mesh$`).exec(q); return m ? { um: +m[1] * (m[2] === 'mm' ? 1000 : 1) } : null;
-  },
+  name: 'sieve',
   topic: () => ['Sieve', 1],
   run: a => {
     if (a.mesh != null) {
@@ -47,8 +38,7 @@ tool({
   }
 });
 tool({
-  name: 'sg', rank: 78,
-  read: (text, q) => { const m = new RegExp(`^(?:sg|specific gravity|density) (?:of|from) ${NUM} ?g in air and ${NUM} ?g in water$`).exec(q); return m ? { air: +m[1], water: +m[2] } : null; },
+  name: 'sg',
   topic: () => ['Specific gravity', 1],
   run: a => {
     const read = ['specific gravity from', { v: `${fmt(a.air)} g in air` }, 'and', { v: `${fmt(a.water)} g in water` }];
@@ -59,8 +49,7 @@ tool({
 });
 const RQD_CLASS = v => v < 25 ? 'very poor' : v < 50 ? 'poor' : v < 75 ? 'fair' : v < 90 ? 'good' : 'excellent';
 tool({
-  name: 'rqd', rank: 79,
-  read: (text, q) => { const m = new RegExp(`^(?:rqd|recovery)(?: and (?:rqd|recovery))? (?:of|for|from) ((?:\\d+(?:\\.\\d+)?,? ?(?:and )?)+?) ?cm (?:in|over|for) (?:a |an )?${NUM} ?(m|cm) run$`).exec(q); if (!m) return null; const pieces = [...m[1].matchAll(/\d+(?:\.\d+)?/g)].map(x => +x[0]); return pieces.length ? { pieces, run: +m[2] * (m[3] === 'm' ? 100 : 1) } : null; },
+  name: 'rqd',
   topic: () => ['RQD', 1],
   run: a => {
     const total = a.pieces.reduce((s, p) => s + p, 0), sound = a.pieces.filter(p => p >= 10), rqd = sound.reduce((s, p) => s + p, 0) / a.run * 100, rec = total / a.run * 100;
@@ -71,5 +60,63 @@ tool({
       body: [{ t: 'big', v: fmt(rqd, 3), unit: `% RQD, ${RQD_CLASS(rqd)}` }, { t: 'kv', rows: [['recovery', `${fmt(rec, 3)}% (${fmt(total)} of ${fmt(a.run)} cm)`], ['pieces of 10 cm or more', `${sound.length} of ${a.pieces.length}: ${sound.join(', ')} cm`], ['class', `${RQD_CLASS(rqd)} (Deere, 1964)`]] }],
       trace: [`recovery = ${fmt(total)} ÷ ${fmt(a.run)} = ${fmt(rec, 4)}%`, `RQD = Σ pieces ≥ 10 cm ÷ run = ${sound.reduce((s, p) => s + p, 0)} ÷ ${fmt(a.run)} = ${fmt(rqd, 4)}%`], py: `rqd(${JSON.stringify(a.pieces)}, run_cm=${a.run})`
     };
+  }
+});
+/* ── what reads them ─────────────────────────────────────────── */
+// "mass of 1 m of nq core at 2.7", "mass of 1 m of half hq core at 2.7"
+noun({ type: 'corecode', words: Object.fromEntries(['aq', 'bq', 'nq', 'nq2', 'nq3', 'hq', 'hq3', 'pq', 'pq3'].map(k => [k.toUpperCase(), [k]])), generic: ['core', 'drill core'], generic_pt: ['testemunho'] });
+noun({ type: 'split', words: { whole: ['whole'], half: ['half', 'half-core'], quarter: ['quarter', 'quarter-core'] }, words_pt: { whole: ['inteiro'], half: ['meio'], quarter: ['quarto'] } });
+compound({ mod: 'split', heads: ['corecode'], attr: 'split' });
+noun({ type: 'coremass', words: { mass: ['mass', 'sample mass', 'core mass', 'weight of core', 'core weight'] }, words_pt: { mass: ['massa', 'massa da amostra'] } });
+const toM = q => { if (!q.unit) return q.n; if (q.unit === 'µm') return q.n * 1e-6; const u = parseUnit(q.unit); return u && u.dim === 'L' ? q.n * u.f : null; };
+unit({ unit: 'µm', dim: 'length', words: ['µm', 'um', 'micron', 'microns', 'micrometre', 'micrometres', 'micrometer', 'micrometers'] });   // the sieve's unit; @gcu/units has no micron
+postmod({ prep: '', heads: ['sgword'], attr: 'value', quantity: true });   // "sg 2.9"
+// "half nq, 1.5 m, sg 2.9": the same question as a list
+frame({
+  name: 'coremass2', label: 'Sample mass', words: [], elidable: true, theme: ['corecode', 'quantity:length', 'sgword'], required: ['theme'], roles: {}, label_pt: 'Massa da amostra',
+  bind: c => { const cc = c.theme.find(n => n.type === 'corecode'), len = c.theme.find(n => n.type === 'quantity'), sg = c.theme.find(n => n.type === 'sgword');
+    return cc && cc.value && len && c.theme.length <= 3 ? { tool: 'coremass', args: { length: toM(len), split: (cc.attrs && cc.attrs.split) || 'whole', code: cc.value, density: sg && sg.attrs.value ? sg.attrs.value.n : null } } : null; }
+});
+frame({
+  name: 'coremass', label: 'Sample mass', words: ['calculate', 'compute'], elidable: true, theme: ['coremass'], required: ['theme', 'of'],
+  roles: { of: { preps: ['of', 'for'], types: ['quantity:length', 'corecode'] }, at: { preps: ['at', 'with'], types: ['quantity:density', 'quantity:bare'] } }, label_pt: 'Massa da amostra',
+  bind: c => {
+    const len = c.roles.of.find(n => n.type === 'quantity'), cc = c.roles.of.find(n => n.type === 'corecode'), d = c.roles.at && c.roles.at[0];
+    if (!len || !cc || !cc.value) return null;
+    return { tool: 'coremass', args: { length: toM(len), split: (cc.attrs && cc.attrs.split) || 'whole', code: cc.value, density: d ? d.n : null } };
+  }
+});
+// "200 mesh in microns", "75 µm in mesh"
+unit({ unit: 'mesh', dim: 'mesh', words: ['mesh'] });
+noun({ type: 'meshword', words: { mesh: ['mesh'] } });
+frame({
+  name: 'sieve', label: 'Sieve', words: ['convert'], elidable: true, theme: ['quantity:mesh', 'quantity:length'], required: ['theme', 'to'],
+  roles: { to: { preps: ['in', 'to', 'as', 'into'], types: ['unit', 'meshword'] } }, label_pt: 'Peneira',
+  bind: c => { const q = c.theme[0], to = c.roles.to[0];
+    if (q.unit === 'mesh' && to.type === 'unit' && (to.dim === 'length' || to.unit === 'µm')) return { tool: 'sieve', args: { mesh: q.n } };
+    if (q.unit && q.unit !== 'mesh' && (to.type === 'meshword' || to.unit === 'mesh')) { const m = toM(q); return m != null ? { tool: 'sieve', args: { um: Math.round(m * 1e6 * 1000) / 1000 } } : null; }
+    return null; }
+});
+// "sg from 120.5 g in air and 75.2 g in water": a mass in air and a mass in water are units of their own
+unit({ unit: 'g in air', dim: 'mass in air', words: ['g in air', 'grams in air', 'gram in air'] });
+unit({ unit: 'g in water', dim: 'mass in water', words: ['g in water', 'grams in water', 'gram in water'] });
+noun({ type: 'sgword', words: { sg: ['sg', 'specific gravity', 'density', 'relative density'] }, words_pt: { sg: ['densidade', 'peso específico'] } });
+frame({
+  name: 'sg', label: 'Specific gravity', words: ['calculate', 'compute'], elidable: true, theme: ['sgword'], required: ['theme', 'from'],
+  roles: { from: { preps: ['from', 'of', 'with', 'for'], types: ['quantity:mass in air', 'quantity:mass in water'] } }, label_pt: 'Densidade',
+  bind: c => { const air = c.roles.from.find(q => q.dim === 'mass in air'), water = c.roles.from.find(q => q.dim === 'mass in water'); return air && water ? { tool: 'sg', args: { air: air.n, water: water.n } } : null; }
+});
+// "rqd of 12, 8, 25, 4, 31 and 9 cm in a 100 cm run"
+noun({ type: 'rqdword', words: { rqd: ['rqd', 'recovery', 'rqd and recovery', 'recovery and rqd'] }, words_pt: { rqd: ['rqd', 'recuperação'] } });
+noun({ type: 'corerun', words: {}, generic: ['run', 'core run', 'drill run'], generic_pt: ['manobra'] });
+qmod({ head: 'corerun', attr: 'length', dims: ['length'] });
+const toCm = (q, unitOf) => { const u = q.unit || unitOf; if (!u) return null; const p = parseUnit(u); return p && p.dim === 'L' ? q.n * p.f * 100 : null; };
+frame({
+  name: 'rqd', label: 'RQD', words: ['calculate', 'compute'], elidable: true, theme: ['rqdword'], required: ['theme', 'of', 'in'],
+  roles: { of: { preps: ['of', 'for', 'from'], types: ['quantity:length', 'coords', 'point3'] }, in: { preps: ['in', 'over', 'for'], types: ['corerun'] } }, label_pt: 'RQD',
+  bind: c => {
+    const qs = c.roles.of.flatMap(n => n.type === 'quantity' ? [n] : String(n.value).split(',').map(x => ({ type: 'quantity', n: +x.trim(), unit: null })));
+    const unitOf = (qs.find(q => q.unit) || {}).unit, pieces = qs.map(q => toCm(q, unitOf)), run = c.roles.in[0].attrs && c.roles.in[0].attrs.length;
+    return pieces.length && pieces.every(p => p != null) && run ? { tool: 'rqd', args: { pieces, run: toCm(run) } } : null;
   }
 });
