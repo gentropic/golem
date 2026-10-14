@@ -479,28 +479,455 @@ const qty = (node, f) => node && node.type === 'quantity' ? node.n * f(node.unit
   return { S, T, TOOLS, tool, toolByName, FRAMES, frame, amend, session, LEXICON, noun, shape, postmod, unit, qmod, compound, CONDITIONS, condition, setRunner, onJobDone, result, clearResults, startJobs, settle, runTool, clock, fmt, iso, rad, deg, p3, p2, qty };
 })();
 
-/* ==== src/engine/units.js ==== */
+/* ==== src/vendor/units.js ==== */
 const __m1 = (() => {
+// ⚠ VENDORED — DO NOT EDIT. @gcu/units, copied from ../auditable/ext/units/index.js (built from its src/ by @gcu/build).
+// Re-vendor by copying that file here. golem uses its conversion factors (src/engine/units.js keeps the words people
+// type), the sieve and the DCDMA core tables.
+
+// ⚠ GENERATED FILE — DO NOT EDIT. Source: src/  Build: @gcu/build src/main.js
+// @gcu/units — Unit conversion for length, mass, area, volume, angle, grade, density, and magnetic quantities. Sieve mesh conversions, drill core utilities, formatting helpers.
+
+// ── src/convert.js ──
+
+// Unit dimension registry and convert function. Factors are exact where a definition makes them so: the international
+// inch, foot, yard and mile (1959), the avoirdupois pound (0.45359237 kg, 1959) and its ounce, the troy ounce
+// (31.1034768 g), the short and long tons, the US gallon (231 in³), the oil barrel (42 gal), the psi (lbf/in²,
+// standard gravity), the acre (66 × 660 ft). Temperature is affine: a unit carries an offset as well as a factor.
+
+const PI$convert = Math.PI;
+const IN = 0.0254, FT = 0.3048, LB_G = 453.59237, OZT_G = 31.1034768, ST_G = 2000 * LB_G, LT_G = 2240 * LB_G;
+
+const UNITS = {
+  // length (canonical: m)
+  um:  { dim: 'length', mul: 1e-6 },
+  mm:  { dim: 'length', mul: 1e-3 },
+  cm:  { dim: 'length', mul: 1e-2 },
+  m:   { dim: 'length', mul: 1 },
+  km:  { dim: 'length', mul: 1e3 },
+  in:  { dim: 'length', mul: IN },
+  ft:  { dim: 'length', mul: FT },
+  yd:  { dim: 'length', mul: 3 * FT },
+  mi:  { dim: 'length', mul: 5280 * FT },
+
+  // mass (canonical: g)
+  mg:      { dim: 'mass', mul: 1e-3 },
+  g:       { dim: 'mass', mul: 1 },
+  kg:      { dim: 'mass', mul: 1e3 },
+  t:       { dim: 'mass', mul: 1e6 },
+  kt:      { dim: 'mass', mul: 1e9 },
+  Mt:      { dim: 'mass', mul: 1e12 },
+  st:      { dim: 'mass', mul: ST_G },
+  lt_mass: { dim: 'mass', mul: LT_G },
+  oz:      { dim: 'mass', mul: LB_G / 16 },
+  lb:      { dim: 'mass', mul: LB_G },
+  ozt:     { dim: 'mass', mul: OZT_G },
+  ct:      { dim: 'mass', mul: 0.2 },
+
+  // concentration / grade (canonical: fraction, dimensionless 0–1)
+  fraction: { dim: 'grade', mul: 1 },
+  ppm:      { dim: 'grade', mul: 1e-6 },
+  ppb:      { dim: 'grade', mul: 1e-9 },
+  pct:      { dim: 'grade', mul: 1e-2 },
+  'g/t':    { dim: 'grade', mul: 1e-6 },
+  'mg/kg':  { dim: 'grade', mul: 1e-6 },
+  'oz/t':   { dim: 'grade', mul: OZT_G / ST_G },   // troy oz per short ton
+  'oz/lt':  { dim: 'grade', mul: OZT_G / LT_G },   // troy oz per long ton
+
+  // density (canonical: g/cm3)
+  'g/cm3':  { dim: 'density', mul: 1 },
+  'kg/m3':  { dim: 'density', mul: 1e-3 },
+  't/m3':   { dim: 'density', mul: 1 },
+  'lb/ft3': { dim: 'density', mul: LB_G / (FT * FT * FT * 1e6) },
+
+  // area (canonical: m2)
+  mm2: { dim: 'area', mul: 1e-6 },
+  cm2: { dim: 'area', mul: 1e-4 },
+  m2:  { dim: 'area', mul: 1 },
+  ha:  { dim: 'area', mul: 1e4 },
+  km2: { dim: 'area', mul: 1e6 },
+  ft2: { dim: 'area', mul: FT * FT },
+  acre: { dim: 'area', mul: 43560 * FT * FT },
+  mi2: { dim: 'area', mul: (5280 * FT) ** 2 },
+
+  // volume (canonical: m3)
+  cm3: { dim: 'volume', mul: 1e-6 },
+  L:   { dim: 'volume', mul: 1e-3 },
+  m3:  { dim: 'volume', mul: 1 },
+  ft3: { dim: 'volume', mul: FT * FT * FT },
+  gal: { dim: 'volume', mul: 231 * IN * IN * IN },   // US gallon
+  bbl: { dim: 'volume', mul: 42 * 231 * IN * IN * IN },   // oil barrel
+
+  // angle (canonical: rad)
+  deg:  { dim: 'angle', mul: PI$convert / 180 },
+  rad:  { dim: 'angle', mul: 1 },
+  grad: { dim: 'angle', mul: PI$convert / 200 },
+  mrad: { dim: 'angle', mul: 1e-3 },
+
+  // magnetic field (canonical: T)
+  T:  { dim: 'magnetic', mul: 1 },
+  mT: { dim: 'magnetic', mul: 1e-3 },
+  uT: { dim: 'magnetic', mul: 1e-6 },
+  nT: { dim: 'magnetic', mul: 1e-9 },
+  Oe: { dim: 'magnetic', mul: 1e-4 },  // 1 Oe = 1 G = 1e-4 T (free space)
+
+  // pressure (canonical: Pa)
+  Pa:  { dim: 'pressure', mul: 1 },
+  kPa: { dim: 'pressure', mul: 1e3 },
+  MPa: { dim: 'pressure', mul: 1e6 },
+  GPa: { dim: 'pressure', mul: 1e9 },
+  bar: { dim: 'pressure', mul: 1e5 },
+  atm: { dim: 'pressure', mul: 101325 },
+  psi: { dim: 'pressure', mul: LB_G / 1000 * 9.80665 / (IN * IN) },
+
+  // time (canonical: s)
+  s:   { dim: 'time', mul: 1 },
+  min: { dim: 'time', mul: 60 },
+  h:   { dim: 'time', mul: 3600 },
+  day: { dim: 'time', mul: 86400 },
+
+  // temperature (canonical: K) — affine: K = (value + off) × mul
+  K:  { dim: 'temperature', mul: 1, off: 0 },
+  C:  { dim: 'temperature', mul: 1, off: 273.15 },
+  F:  { dim: 'temperature', mul: 5 / 9, off: 459.67 },
+};
+
+function convert(value, from, to, opts) {
+  const f = UNITS[from], t = UNITS[to];
+  if (!f) throw new Error(`unknown unit: ${from}`);
+  if (!t) throw new Error(`unknown unit: ${to}`);
+  if (f.dim !== t.dim) throw new Error(`incompatible dimensions: ${f.dim} → ${t.dim}`);
+  const factor = f.mul / t.mul, fo = f.off || 0, too = t.off || 0;
+  // a factor alone for every dimension but temperature, so those results are bit-for-bit what they were
+  const one = fo || too ? v => (v + fo) * factor - too : v => v * factor;
+  if (typeof value === 'number') return one(value);
+  // typed array / array-like (duck-type on .length + indexing)
+  const data = value.data || value;
+  if (opts?.inplace) {
+    for (let i = 0; i < data.length; i++) data[i] = one(data[i]);
+    return value;
+  }
+  if (typeof data.constructor === 'function' && data.constructor !== Object && typeof data.length === 'number') {
+    const out = new data.constructor(data.length);
+    for (let i = 0; i < data.length; i++) out[i] = one(data[i]);
+    return out;
+  }
+  // plain array
+  const out = new Array(data.length);
+  for (let i = 0; i < data.length; i++) out[i] = one(data[i]);
+  return out;
+}
+
+// Convenience aliases
+const length = {
+  cmToMm: v => convert(v, 'cm', 'mm'),
+  mmToCm: v => convert(v, 'mm', 'cm'),
+  umToCm: v => convert(v, 'um', 'cm'),
+  cmToUm: v => convert(v, 'cm', 'um'),
+  ftToM:  v => convert(v, 'ft', 'm'),
+  mToFt:  v => convert(v, 'm', 'ft'),
+  kmToM:  v => convert(v, 'km', 'm'),
+  inToCm: v => convert(v, 'in', 'cm'),
+};
+
+const mass = {
+  kgToG:  v => convert(v, 'kg', 'g'),
+  gToKg:  v => convert(v, 'g', 'kg'),
+  tToKg:  v => convert(v, 't', 'kg'),
+  lbToKg: v => convert(v, 'lb', 'kg'),
+  ozToG:  v => convert(v, 'oz', 'g'),
+  oztToG: v => convert(v, 'ozt', 'g'),
+};
+
+const grade = {
+  oztToGt:       v => convert(v, 'oz/t', 'g/t'),
+  gtToOzt:       v => convert(v, 'g/t', 'oz/t'),
+  gtToPpm:       v => convert(v, 'g/t', 'ppm'),
+  gtToPct:       v => convert(v, 'g/t', 'pct'),
+  pctToFraction: v => convert(v, 'pct', 'fraction'),
+  fractionToPct: v => convert(v, 'fraction', 'pct'),
+};
+
+const density = {
+  kgm3ToGcm3: v => convert(v, 'kg/m3', 'g/cm3'),
+  gcm3ToKgm3: v => convert(v, 'g/cm3', 'kg/m3'),
+};
+
+const area = {
+  haToM2:  v => convert(v, 'ha', 'm2'),
+  km2ToM2: v => convert(v, 'km2', 'm2'),
+  m2ToHa:  v => convert(v, 'm2', 'ha'),
+};
+
+const volume = {
+  cm3ToM3: v => convert(v, 'cm3', 'm3'),
+  lToM3:   v => convert(v, 'L', 'm3'),
+  m3ToL:   v => convert(v, 'm3', 'L'),
+};
+
+const angle = {
+  degToRad:  v => convert(v, 'deg', 'rad'),
+  radToDeg:  v => convert(v, 'rad', 'deg'),
+  gradToRad: v => convert(v, 'grad', 'rad'),
+};
+
+const magnetic = {
+  nTToT:  v => convert(v, 'nT', 'T'),
+  oeToT:  v => convert(v, 'Oe', 'T'),
+  uTToNT: v => convert(v, 'uT', 'nT'),
+};
+
+// ── src/sieve.js ──
+
+// Tyler / ASTM mesh ↔ µm lookup table
+
+const TABLE = [
+  { mesh: 635, aperture_um: 20 },
+  { mesh: 500, aperture_um: 25 },
+  { mesh: 450, aperture_um: 32 },
+  { mesh: 400, aperture_um: 38 },
+  { mesh: 325, aperture_um: 45 },
+  { mesh: 270, aperture_um: 53 },
+  { mesh: 230, aperture_um: 63 },
+  { mesh: 200, aperture_um: 75 },
+  { mesh: 170, aperture_um: 90 },
+  { mesh: 150, aperture_um: 106 },
+  { mesh: 120, aperture_um: 125 },
+  { mesh: 100, aperture_um: 150 },
+  { mesh: 80,  aperture_um: 180 },
+  { mesh: 70,  aperture_um: 212 },
+  { mesh: 60,  aperture_um: 250 },
+  { mesh: 50,  aperture_um: 300 },
+  { mesh: 45,  aperture_um: 355 },
+  { mesh: 40,  aperture_um: 425 },
+  { mesh: 35,  aperture_um: 500 },
+  { mesh: 30,  aperture_um: 600 },
+  { mesh: 25,  aperture_um: 710 },
+  { mesh: 20,  aperture_um: 850 },
+  { mesh: 18,  aperture_um: 1000 },
+  { mesh: 16,  aperture_um: 1180 },
+  { mesh: 14,  aperture_um: 1400 },
+  { mesh: 12,  aperture_um: 1700 },
+  { mesh: 10,  aperture_um: 2000 },
+  { mesh: 8,   aperture_um: 2360 },
+  { mesh: 7,   aperture_um: 2800 },
+  { mesh: 6,   aperture_um: 3350 },
+  { mesh: 5,   aperture_um: 4000 },
+  { mesh: 4,   aperture_um: 4750 },
+];
+
+// index by mesh number for O(1) lookup
+const BY_MESH = {};
+for (const row of TABLE) BY_MESH[row.mesh] = row.aperture_um;
+
+const sieve = {
+  toMicrons(mesh) {
+    const um = BY_MESH[mesh];
+    if (um === undefined) throw new Error(`unknown mesh: ${mesh}`);
+    return um;
+  },
+
+  toMesh(um) {
+    // exact match first
+    for (const row of TABLE) {
+      if (row.aperture_um === um) return row.mesh;
+    }
+    // nearest
+    let best = TABLE[0], bestDist = Math.abs(TABLE[0].aperture_um - um);
+    for (let i = 1; i < TABLE.length; i++) {
+      const d = Math.abs(TABLE[i].aperture_um - um);
+      if (d < bestDist) { best = TABLE[i]; bestDist = d; }
+    }
+    return { nearest: best.mesh, exact: false, aperture_um: best.aperture_um };
+  },
+
+  toCm(mesh) {
+    return sieve.toMicrons(mesh) / 10000;
+  },
+
+  table() {
+    return TABLE.map(r => ({ ...r }));
+  },
+};
+
+// ── src/core.js ──
+
+// DCDMA wireline diamond core sizes
+
+const PI$core = Math.PI;   // unitVolume uses it; the module stood on the bundle's copy before
+
+const CORES = [
+  { code: 'AQ',  core_mm: 27.0, hole_mm: 48.0,  variant: 'standard' },
+  { code: 'BQ',  core_mm: 36.5, hole_mm: 60.0,  variant: 'standard' },
+  { code: 'NQ',  core_mm: 47.6, hole_mm: 75.7,  variant: 'standard' },
+  { code: 'NQ2', core_mm: 50.6, hole_mm: 75.7,  variant: 'oversize' },
+  { code: 'NQ3', core_mm: 45.1, hole_mm: 75.7,  variant: 'triple_tube' },
+  { code: 'HQ',  core_mm: 63.5, hole_mm: 96.0,  variant: 'standard' },
+  { code: 'HQ3', core_mm: 61.1, hole_mm: 96.0,  variant: 'triple_tube' },
+  { code: 'PQ',  core_mm: 85.0, hole_mm: 122.6, variant: 'standard' },
+  { code: 'PQ3', core_mm: 83.0, hole_mm: 122.6, variant: 'triple_tube' },
+];
+
+const BY_CODE = {};
+for (const row of CORES) BY_CODE[row.code] = row;
+
+function lookup(code) {
+  const row = BY_CODE[code];
+  if (!row) throw new Error(`unknown core code: ${code}`);
+  return row;
+}
+
+function mmToCm(mm) {
+  return Math.round(mm * 100) / 1000;
+}
+
+const core = {
+  diameter(code) {
+    const { core_mm } = lookup(code);
+    return { mm: core_mm, cm: mmToCm(core_mm) };
+  },
+
+  holeDiameter(code) {
+    const { hole_mm } = lookup(code);
+    return { mm: hole_mm, cm: mmToCm(hole_mm) };
+  },
+
+  halfCoreDiameter(code) {
+    const { core_mm } = lookup(code);
+    const half = core_mm / 2;
+    return { mm: Math.round(half * 10) / 10, cm: mmToCm(half) };
+  },
+
+  unitVolume(code, opts) {
+    const { core_mm } = lookup(code);
+    const d_cm = core_mm / 10;
+    // cross-sectional area × 100 cm (1 metre of core)
+    let cm3 = PI$core / 4 * d_cm * d_cm * 100;
+    const split = opts?.split || 'whole';
+    if (split === 'half') cm3 /= 2;
+    else if (split === 'quarter') cm3 /= 4;
+    return {
+      cm3_per_m: Math.round(cm3 * 10) / 10,
+      m3_per_m: Math.round(cm3 * 1e-6 * 1e9) / 1e9,
+    };
+  },
+
+  sampleMass({ code, length_m, density_gcm3, split }) {
+    const vol = core.unitVolume(code, { split: split || 'whole' });
+    const volume_cm3 = vol.cm3_per_m * length_m;
+    const mass_g = volume_cm3 * density_gcm3;
+    return {
+      mass_g: Math.round(mass_g),
+      mass_kg: Math.round(mass_g / 100) / 10,
+      volume_cm3: Math.round(volume_cm3 * 10) / 10,
+    };
+  },
+
+  table() {
+    return CORES.map(r => ({ ...r }));
+  },
+};
+
+// ── src/format.js ──
+
+// Format values with unit labels and auto-scaling
+
+
+const UNICODE = {
+  um: 'µm', m2: 'm²', cm2: 'cm²', mm2: 'mm²', km2: 'km²',
+  m3: 'm³', cm3: 'cm³', 'g/cm3': 'g/cm³', 'kg/m3': 'kg/m³',
+  't/m3': 't/m³', 'lb/ft3': 'lb/ft³',
+};
+
+// Auto-scale chains: try each target in order, pick the first that gives a "nice" value
+const SCALE_CHAINS = {
+  length: [
+    { unit: 'km', min: 1, max: Infinity },
+    { unit: 'm',  min: 1, max: 1000 },
+    { unit: 'cm', min: 1, max: 100 },
+    { unit: 'mm', min: 1, max: 10 },
+    { unit: 'um', min: 0, max: Infinity },
+  ],
+  mass: [
+    { unit: 'Mt', min: 1, max: Infinity },
+    { unit: 'kt', min: 1, max: 1000 },
+    { unit: 't',  min: 1, max: 1000 },
+    { unit: 'kg', min: 1, max: 1000 },
+    { unit: 'g',  min: 1, max: 1000 },
+    { unit: 'mg', min: 0, max: Infinity },
+  ],
+  density: [
+    { unit: 'g/cm3', min: 0, max: Infinity },
+  ],
+  grade: [
+    { unit: 'pct', min: 1, max: Infinity },
+    { unit: 'g/t', min: 0.001, max: 10000 },
+    { unit: 'ppm', min: 0, max: Infinity },
+  ],
+};
+
+function format(value, unit, opts) {
+  const dec = opts?.decimals;
+  let displayUnit = unit;
+  let displayValue = value;
+
+  if (opts?.auto) {
+    const entry = UNITS[unit];
+    if (entry) {
+      const chain = SCALE_CHAINS[entry.dim];
+      if (chain) {
+        for (const step of chain) {
+          const v = convert(value, unit, step.unit);
+          const abs = Math.abs(v);
+          if (abs >= step.min && abs < step.max) {
+            displayValue = v;
+            displayUnit = step.unit;
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  const numStr = dec !== undefined ? displayValue.toFixed(dec) : String(displayValue);
+  const label = UNICODE[displayUnit] || displayUnit;
+
+  if (displayUnit === 'pct') return numStr + '%';
+  return numStr + ' ' + label;
+}
+
+// ── src/main.js ──
+
+// @gcu/units — entry point
+  return { UNITS, convert, length, mass, grade, density, area, volume, angle, magnetic, sieve, core, format };
+})();
+
+/* ==== src/engine/units.js ==== */
+const __m2 = (() => {
 const { unit, tool, frame, fmt } = __m0;
-// Unit conversion with dimension checks. A small table until @gcu/units stands under it.
+const { UNITS } = __m1;
+// Unit conversion with dimension checks. The factors are @gcu/units' (exact where a definition makes them so, since
+// 14 Oct 2026); golem keeps the words people type for each unit and composes "oz per short ton" from two of them.
+// Mass is in kilograms here (the package's grams ÷ 1000), so a pressure stays kg / (m·s²) in the estimator.
 
 const U = {};
 const UNIT_TABLE = [];
-const u = (dim, f, ...n) => { UNIT_TABLE.push({ dim, f, name: n[0], words: n }); n.forEach(k => { U[k] = { dim, f, name: n[0] }; }); };
-u('L', 1, 'm', 'meter', 'metre'); u('L', 1000, 'km', 'kilometer', 'kilometre'); u('L', .01, 'cm'); u('L', .001, 'mm');
-u('L', .3048, 'ft', 'foot', 'feet'); u('L', .0254, 'inch', 'inches', '"'); u('L', 1609.344, 'mi', 'mile'); u('L', .9144, 'yd', 'yard');
-u('M', 1e-3, 'g', 'gram'); u('M', 1, 'kg', 'kilogram'); u('M', 1000, 't', 'tonne', 'metric ton'); u('M', .45359237, 'lb', 'lbs', 'pound');
-u('M', .0311034768, 'troy oz', 'ozt', 'troy ounce'); u('M', .028349523125, 'oz (av)', 'avoirdupois oz');
-u('M', 907.18474, 'short ton', 'st', 'ton'); u('M', 1016.0469088, 'long ton'); u('M', 2e-4, 'ct', 'carat');
-u('R', 1e-6, 'g/t', 'gpt'); u('R', 1e-6, 'ppm'); u('R', 1e-9, 'ppb'); u('R', .01, '%', 'percent', 'pct');
-u('A', 1, 'm²', 'm2'); u('A', 1e6, 'km²', 'km2', 'sq km', 'square kilometer', 'square km'); u('A', 1e4, 'ha', 'hectare');
-u('A', 4046.8564224, 'acre'); u('A', 2589988.110336, 'sq mi', 'square mile', 'mi2', 'mi²');
-u('V', 1e-3, 'L', 'l', 'liter', 'litre'); u('V', 1, 'm³', 'm3', 'cubic meter'); u('V', 1e-6, 'cm³', 'cm3', 'cc');
-u('V', .028316846592, 'ft³', 'ft3', 'cubic foot', 'cubic feet'); u('V', .003785411784, 'gal', 'gallon'); u('V', .158987294928, 'bbl', 'barrel');
-u('P', 1, 'Pa', 'pa'); u('P', 1e3, 'kPa', 'kpa'); u('P', 1e6, 'MPa', 'mpa'); u('P', 6894.757293168, 'psi'); u('P', 1e5, 'bar');
-u('t', 1, 's', 'sec', 'second'); u('t', 60, 'min', 'minute'); u('t', 3600, 'h', 'hr', 'hour'); u('t', 86400, 'day');
-[['°C', 1, 273.15, 'c', '°c', 'celsius'], ['°F', 5 / 9, 459.67, 'f', '°f', 'fahrenheit'], ['K', 1, 0, 'k', 'kelvin']]
-  .forEach(([name, f, off, ...n]) => { UNIT_TABLE.push({ dim: 'T', f, off, name, words: n }); n.forEach(k => { U[k] = { dim: 'T', f, off, name }; }); });
+const BASE = { M: 1e-3 };   // golem's base over the package's, by dimension
+const u = (dim, key, ...n) => { const p = UNITS[key]; if (!p) throw new Error(`@gcu/units has no ${key}`); const f = p.mul * (BASE[dim] || 1), off = p.off;
+  UNIT_TABLE.push({ dim, f, ...(off != null ? { off } : {}), name: n[0], words: n }); n.forEach(k => { U[k] = { dim, f, ...(off != null ? { off } : {}), name: n[0] }; }); };
+u('L', 'm', 'm', 'meter', 'metre'); u('L', 'km', 'km', 'kilometer', 'kilometre'); u('L', 'cm', 'cm'); u('L', 'mm', 'mm');
+u('L', 'ft', 'ft', 'foot', 'feet'); u('L', 'in', 'inch', 'inches', '"'); u('L', 'mi', 'mi', 'mile'); u('L', 'yd', 'yd', 'yard');
+u('M', 'g', 'g', 'gram'); u('M', 'kg', 'kg', 'kilogram'); u('M', 't', 't', 'tonne', 'metric ton'); u('M', 'lb', 'lb', 'lbs', 'pound');
+u('M', 'ozt', 'troy oz', 'ozt', 'troy ounce'); u('M', 'oz', 'oz (av)', 'avoirdupois oz');
+u('M', 'st', 'short ton', 'st', 'ton'); u('M', 'lt_mass', 'long ton'); u('M', 'ct', 'ct', 'carat');
+u('R', 'g/t', 'g/t', 'gpt'); u('R', 'ppm', 'ppm'); u('R', 'ppb', 'ppb'); u('R', 'pct', '%', 'percent', 'pct');
+u('A', 'm2', 'm²', 'm2'); u('A', 'km2', 'km²', 'km2', 'sq km', 'square kilometer', 'square km'); u('A', 'ha', 'ha', 'hectare');
+u('A', 'acre', 'acre'); u('A', 'mi2', 'sq mi', 'square mile', 'mi2', 'mi²');
+u('V', 'L', 'L', 'l', 'liter', 'litre'); u('V', 'm3', 'm³', 'm3', 'cubic meter'); u('V', 'cm3', 'cm³', 'cm3', 'cc');
+u('V', 'ft3', 'ft³', 'ft3', 'cubic foot', 'cubic feet'); u('V', 'gal', 'gal', 'gallon'); u('V', 'bbl', 'bbl', 'barrel');
+u('P', 'Pa', 'Pa', 'pa'); u('P', 'kPa', 'kPa', 'kpa'); u('P', 'MPa', 'MPa', 'mpa'); u('P', 'psi', 'psi'); u('P', 'bar', 'bar');
+u('t', 's', 's', 'sec', 'second'); u('t', 'min', 'min', 'minute'); u('t', 'h', 'h', 'hr', 'hour'); u('t', 'day', 'day');
+u('T', 'C', '°C', 'c', '°c', 'celsius'); u('T', 'F', '°F', 'f', '°f', 'fahrenheit'); u('T', 'K', 'K', 'k', 'kelvin');
 const DIM = { L: 'length', M: 'mass', R: 'mass ratio', T: 'temperature', A: 'area', V: 'volume', P: 'pressure', t: 'time' };
 // compound units the parser should know as single words (parseUnit composes them from the table)
 const COMPOUNDS = ['g/cm3', 'g/cc', 'lb/ft3', 'oz per short ton', 'oz/t', 'troy oz per short ton', 't/m3', 'kg/m3'];
@@ -537,7 +964,7 @@ tool({
     const out = (a.v + f.off) * f.f / t.f - t.off;
     return {
       read, value: out,
-      body: [{ t: 'big', v: fmt(out), unit: t.name }, { t: 'src', text: `@gcu/units · exact factors · dimension: ${dimName(f.dim)}` }],
+      body: [{ t: 'big', v: fmt(out), unit: t.name }, { t: 'src', text: `@gcu/units · vendored · exact factors · dimension: ${dimName(f.dim)}` }],
       trace: [`units.parse("${a.from}") → ${dimName(f.dim)}, factor ${fmt(f.f, 9)}`, `units.parse("${a.to}") → factor ${fmt(t.f, 9)}`, `${fmt(a.v)} × ${fmt(f.f, 9)} ÷ ${fmt(t.f, 9)} = ${fmt(out, 9)}`],
       py: `units.convert(${a.v}, "${f.name}", "${t.name}")`
     };
@@ -555,7 +982,7 @@ for (const [u, dim, words] of [['yd', 'length', ['yard', 'yards']], ['in', 'leng
 })();
 
 /* ==== src/engine/calc.js ==== */
-const __m2 = (() => {
+const __m3 = (() => {
 const { tool, frame, fmt, rad, deg } = __m0;
 // Arithmetic by recursive descent. No eval, no Function. Trigonometry in degrees.
 
@@ -609,7 +1036,7 @@ frame({
 })();
 
 /* ==== src/engine/dates.js ==== */
-const __m3 = (() => {
+const __m4 = (() => {
 const { tool, frame, noun, shape, clock, iso } = __m0;
 // Dates and times: day counts, weekdays, and the parsers the calendar tools share.
 
@@ -707,7 +1134,7 @@ onDate('weekday', ['what day is', 'what day was', 'what day will be', 'what week
 })();
 
 /* ==== src/vendor/bearing.js ==== */
-const __m4 = (() => {
+const __m5 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/bearing, the structural-geology engine (projections, vectors, statistics),
 // copied from ../auditable/ext/bearing/index.js, itself synced from gentropic/bearing.js dist/bearing.mjs.
 // Re-vendor by copying that file here. golem uses conversions, vec3 and equalArea.
@@ -4634,10 +5061,10 @@ function mapValue(name, value, min, max, options) {
 })();
 
 /* ==== src/engine/orientation.js ==== */
-const __m5 = (() => {
+const __m6 = (() => {
 const { tool, frame, noun, shape, postmod, qmod, fmt, deg, p3, p2 } = __m0;
-const { parseUnit } = __m1;
-const { conversions, vec3 } = __m4;
+const { parseUnit } = __m2;
+const { conversions, vec3 } = __m5;
 // Orientation: true thickness from an intercept, and planes on a stereonet. @gcu/bearing (vendored) does the
 // vectors; the shell draws the `net` block (lower hemisphere, equal area) from the planes and lines it carries.
 const planeDD = a => a.conv === 'sd' ? (a.a1 + 90) % 360 : a.a1;
@@ -4723,7 +5150,7 @@ frame({
 })();
 
 /* ==== src/vendor/yaml.js ==== */
-const __m6 = (() => {
+const __m7 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/yaml, the strict YAML subset (parse to a typed tree, emit canonical text), copied from ../auditable/ext/yaml/index.js at auditable 5fa5f72e (MIT).
 // Re-vendor by copying that file here.
 
@@ -6351,7 +6778,7 @@ function format(text) {
 })();
 
 /* ==== src/vendor/wkt.js ==== */
-const __m7 = (() => {
+const __m8 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/wkt, Well-Known Text to and from GeoJSON geometry, copied from ../auditable/ext/wkt/index.js at auditable 5fa5f72e (MIT).
 // Re-vendor by copying that file here.
 
@@ -6478,7 +6905,7 @@ function stringify(geom, opts = {}) {
 })();
 
 /* ==== src/vendor/dxf.js ==== */
-const __m8 = (() => {
+const __m9 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/dxf, the DXF reader and writer (R2000 ASCII), copied from ../auditable/ext/dxf/index.js at auditable 5fa5f72e (MIT).
 // Re-vendor by copying that file here.
 
@@ -7686,11 +8113,11 @@ function extractScene(doc) {
 })();
 
 /* ==== src/engine/interchange.js ==== */
-const __m9 = (() => {
+const __m10 = (() => {
 const { S, tool, frame, fmt } = __m0;
-const { parse: parseYaml, emit, scalar, mapNode, seqNode, mapEntry } = __m6;
-const { parse: parseWkt, stringify: toWkt } = __m7;
-const { read: readDxf, explode, arcFromBulge } = __m8;
+const { parse: parseYaml, emit, scalar, mapNode, seqNode, mapEntry } = __m7;
+const { parse: parseWkt, stringify: toWkt } = __m8;
+const { read: readDxf, explode, arcFromBulge } = __m9;
 // Formats that are not tables: YAML and JSON both ways (within the strict subset @gcu/yaml reads), WKT and
 // GeoJSON both ways (@gcu/wkt), and DXF to GeoJSON or WKT one way (@gcu/dxf). Pasted after a colon, or a
 // file from the picker kept on the device. What does not carry over is said on the card.
@@ -7866,7 +8293,7 @@ frame({
 })();
 
 /* ==== src/vendor/sadpan.js ==== */
-const __m10 = (() => {
+const __m11 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sadpan, DataFrame-style tables and series, copied from
 // ../auditable/ext/sadpan/index.js (built from its src/ by @gcu/build). Re-vendor by copying that file here.
 // golem uses series() for summary statistics.
@@ -9995,7 +10422,7 @@ if (typeof window !== 'undefined') {
 })();
 
 /* ==== src/vendor/recon.js ==== */
-const __m11 = (() => {
+const __m12 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/recon, copied from ../auditable/ext/recon/index.js (built from its src/ by @gcu/build).
 // Re-vendor by copying that file here.
 
@@ -10506,7 +10933,7 @@ function assemble(ctx) {
 })();
 
 /* ==== src/vendor/sift.js ==== */
-const __m12 = (() => {
+const __m13 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sift, copied from ../auditable/ext/sift/index.js (built from its src/ by @gcu/build).
 // Re-vendor by copying that file here.
 
@@ -10773,13 +11200,13 @@ function _wrap(n) { return n && PARENS.has(n.op) ? '(' + _str(n) + ')' : _str(n)
 })();
 
 /* ==== src/engine/table.js ==== */
-const __m13 = (() => {
+const __m14 = (() => {
 const { S, T, tool, frame, amend, noun, shape, postmod, qmod, compound, condition, fmt } = __m0;
-const { DOCUMENT } = __m9;
-const { series } = __m10;
-const { sniff, detectAnalyte, NULL_SENTINELS } = __m11;
-const { parsePredicate, evaluatePredicate, predicateToString } = __m12;
-const { parseUnit } = __m1;
+const { DOCUMENT } = __m10;
+const { series } = __m11;
+const { sniff, detectAnalyte, NULL_SENTINELS } = __m12;
+const { parsePredicate, evaluatePredicate, predicateToString } = __m13;
+const { parseUnit } = __m2;
 // The open table: a real delimited file typed by @gcu/recon, or the synthetic sample; a histogram; and
 // table questions in controlled English answered through @gcu/sadpan and @gcu/sift (all vendored).
 // Sample data stays labelled as sample data; a file is named on every card that reads it.
@@ -11198,9 +11625,9 @@ amend({ tools: ['query'], name: 'addagg', label: 'And', words: [], elidable: tru
 })();
 
 /* ==== src/engine/knowledge.js ==== */
-const __m14 = (() => {
+const __m15 = (() => {
 const { T, tool, frame, unit, fmt } = __m0;
-const { parseUnit } = __m1;
+const { parseUnit } = __m2;
 // Knowledge from packs: a Factbook sample, an ODS term index,
 // and a style check from The Elements of Style (1918). All sample data, labelled as such.
 
@@ -11334,10 +11761,10 @@ for (const [u, words] of [['mi2', ['square miles', 'square mile', 'sq mi', 'mi2'
 })();
 
 /* ==== src/engine/device.js ==== */
-const __m15 = (() => {
+const __m16 = (() => {
 const { tool, frame, noun, postmod, fmt, iso } = __m0;
-const { findDate, findTime, today, fmtDate, dateWords } = __m3;
-const { parseUnit } = __m1;
+const { findDate, findTime, today, fmtDate, dateWords } = __m4;
+const { parseUnit } = __m2;
 // Device hand-offs: calendar event, timer, alarm. Simulated in the mock; on Android they become intents.
 
 // the hand-off description every device card carries: the intent, its permission, and the button
@@ -11431,10 +11858,10 @@ postmod({ prep: '', heads: ['timer'], attr: 'duration', quantity: true });   // 
 })();
 
 /* ==== src/engine/structure.js ==== */
-const __m16 = (() => {
+const __m17 = (() => {
 const { frame, noun, postmod, qmod, tool, fmt, rad, deg, p3, p2 } = __m0;
-const { conversions, vec3, statistics } = __m4;
-const { oriOf } = __m5;
+const { conversions, vec3, statistics } = __m5;
+const { oriOf } = __m6;
 // Structural geometry over @gcu/bearing (vendored): apparent dip, the three-point problem, the line of
 // intersection of two planes, rake, oriented core, and the Fisher mean of a set. Every answer draws the
 // net. Planes are read as dip direction/dip with the usual strike/dip slot; lines as trend/plunge.
@@ -11607,7 +12034,7 @@ frame({
 })();
 
 /* ==== src/vendor/wmm.js ==== */
-const __m17 = (() => {
+const __m18 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/wmm, the World Magnetic Model (WMM2025) evaluated from NOAA's coefficients,
 // copied from ../auditable/ext/wmm/index.js. Re-vendor by copying that file here when the model is reissued.
 
@@ -11858,10 +12285,10 @@ function declination(lat, lon, date = new Date(), height = 0) {
 })();
 
 /* ==== src/engine/geo.js ==== */
-const __m18 = (() => {
+const __m19 = (() => {
 const { tool, frame, noun, qmod, clock, fmt, iso, p3 } = __m0;
-const { field, MODEL, VALID_FROM, VALID_TO } = __m17;
-const { findDate, fmtDate, dateWords } = __m3;
+const { field, MODEL, VALID_FROM, VALID_TO } = __m18;
+const { findDate, fmtDate, dateWords } = __m4;
 // Magnetic declination from @gcu/wmm (vendored WMM2025), and bearings between magnetic and true north.
 // A place is coordinates in the request; device location stays off (SPEC-skills 0.7).
 
@@ -11926,7 +12353,7 @@ frame({
 })();
 
 /* ==== src/engine/data/timescale.js ==== */
-const __m19 = (() => {
+const __m20 = (() => {
 // The International Chronostratigraphic Chart as a records pack: one row per unit, five ranks.
 // Source: ICS (Cohen, Finney, Gibbard & Fan 2013; updated chart) as served by Macrostrat
 // (macrostrat.org/api/v2/defs/intervals?timescale_id=11, CC BY 4.0), fetched 8 Oct 2026. The Hadean is
@@ -12111,9 +12538,9 @@ const TIMESCALE = [
 })();
 
 /* ==== src/engine/timescale.js ==== */
-const __m20 = (() => {
+const __m21 = (() => {
 const { tool, frame, noun, unit, fmt } = __m0;
-const { TIMESCALE, TIMESCALE_SOURCE } = __m19;
+const { TIMESCALE, TIMESCALE_SOURCE } = __m20;
 // The geologic timescale: the ICS chart as a records pack (data/timescale.js). Ages, bounds, ranks,
 // what a unit sits in, what came before and after, what it is subdivided into, and which unit an age
 // in Ma falls in. Lookups only; the chart is the answer.
@@ -12212,397 +12639,11 @@ noun({ type: 'chron', words: Object.fromEntries(Object.keys(RETIRED).map(k => [k
   return { RANKS, unitByName, parentOf, chainOf, childrenOf, beforeOf, afterOf, atAge };
 })();
 
-/* ==== src/vendor/units.js ==== */
-const __m21 = (() => {
-// ⚠ VENDORED — DO NOT EDIT. @gcu/units, copied from ../auditable/ext/units/index.js (built from its src/ by @gcu/build).
-// Re-vendor by copying that file here. golem uses the sieve and core tables; conversions stay in src/engine/units.js
-// until this package's factors are exact (they are rounded to six figures) and it covers the units golem needs.
-
-// ⚠ GENERATED FILE — DO NOT EDIT. Source: src/  Build: @gcu/build src/main.js
-// @gcu/units — Unit conversion for length, mass, area, volume, angle, grade, density, and magnetic quantities. Sieve mesh conversions, drill core utilities, formatting helpers.
-
-// ── src/convert.js ──
-
-// Unit dimension registry and convert function
-
-const PI = Math.PI;
-
-const UNITS = {
-  // length (canonical: m)
-  um:  { dim: 'length', mul: 1e-6 },
-  mm:  { dim: 'length', mul: 1e-3 },
-  cm:  { dim: 'length', mul: 1e-2 },
-  m:   { dim: 'length', mul: 1 },
-  km:  { dim: 'length', mul: 1e3 },
-  in:  { dim: 'length', mul: 0.0254 },
-  ft:  { dim: 'length', mul: 0.3048 },
-
-  // mass (canonical: g)
-  mg:      { dim: 'mass', mul: 1e-3 },
-  g:       { dim: 'mass', mul: 1 },
-  kg:      { dim: 'mass', mul: 1e3 },
-  t:       { dim: 'mass', mul: 1e6 },
-  kt:      { dim: 'mass', mul: 1e9 },
-  Mt:      { dim: 'mass', mul: 1e12 },
-  st:      { dim: 'mass', mul: 907185 },
-  lt_mass: { dim: 'mass', mul: 1016047 },
-  oz:      { dim: 'mass', mul: 28.3495 },
-  lb:      { dim: 'mass', mul: 453.592 },
-  ozt:     { dim: 'mass', mul: 31.1035 },
-
-  // concentration / grade (canonical: fraction, dimensionless 0–1)
-  fraction: { dim: 'grade', mul: 1 },
-  ppm:      { dim: 'grade', mul: 1e-6 },
-  ppb:      { dim: 'grade', mul: 1e-9 },
-  pct:      { dim: 'grade', mul: 1e-2 },
-  'g/t':    { dim: 'grade', mul: 1e-6 },
-  'mg/kg':  { dim: 'grade', mul: 1e-6 },
-  'oz/t':   { dim: 'grade', mul: 31.1035 / 907185 },   // troy oz per short ton
-  'oz/lt':  { dim: 'grade', mul: 31.1035 / 1016047 },   // troy oz per long ton
-
-  // density (canonical: g/cm3)
-  'g/cm3':  { dim: 'density', mul: 1 },
-  'kg/m3':  { dim: 'density', mul: 1e-3 },
-  't/m3':   { dim: 'density', mul: 1 },
-  'lb/ft3': { dim: 'density', mul: 0.016018 },
-
-  // area (canonical: m2)
-  mm2: { dim: 'area', mul: 1e-6 },
-  cm2: { dim: 'area', mul: 1e-4 },
-  m2:  { dim: 'area', mul: 1 },
-  ha:  { dim: 'area', mul: 1e4 },
-  km2: { dim: 'area', mul: 1e6 },
-
-  // volume (canonical: m3)
-  cm3: { dim: 'volume', mul: 1e-6 },
-  L:   { dim: 'volume', mul: 1e-3 },
-  m3:  { dim: 'volume', mul: 1 },
-
-  // angle (canonical: rad)
-  deg:  { dim: 'angle', mul: PI / 180 },
-  rad:  { dim: 'angle', mul: 1 },
-  grad: { dim: 'angle', mul: PI / 200 },
-  mrad: { dim: 'angle', mul: 1e-3 },
-
-  // magnetic field (canonical: T)
-  T:  { dim: 'magnetic', mul: 1 },
-  mT: { dim: 'magnetic', mul: 1e-3 },
-  uT: { dim: 'magnetic', mul: 1e-6 },
-  nT: { dim: 'magnetic', mul: 1e-9 },
-  Oe: { dim: 'magnetic', mul: 1e-4 },  // 1 Oe = 1 G = 1e-4 T (free space)
-};
-
-function convert(value, from, to, opts) {
-  const f = UNITS[from], t = UNITS[to];
-  if (!f) throw new Error(`unknown unit: ${from}`);
-  if (!t) throw new Error(`unknown unit: ${to}`);
-  if (f.dim !== t.dim) throw new Error(`incompatible dimensions: ${f.dim} → ${t.dim}`);
-  const factor = f.mul / t.mul;
-  if (typeof value === 'number') return value * factor;
-  // typed array / array-like (duck-type on .length + indexing)
-  const data = value.data || value;
-  if (opts?.inplace) {
-    for (let i = 0; i < data.length; i++) data[i] *= factor;
-    return value;
-  }
-  if (typeof data.constructor === 'function' && data.constructor !== Object && typeof data.length === 'number') {
-    const out = new data.constructor(data.length);
-    for (let i = 0; i < data.length; i++) out[i] = data[i] * factor;
-    return out;
-  }
-  // plain array
-  const out = new Array(data.length);
-  for (let i = 0; i < data.length; i++) out[i] = data[i] * factor;
-  return out;
-}
-
-// Convenience aliases
-const length = {
-  cmToMm: v => convert(v, 'cm', 'mm'),
-  mmToCm: v => convert(v, 'mm', 'cm'),
-  umToCm: v => convert(v, 'um', 'cm'),
-  cmToUm: v => convert(v, 'cm', 'um'),
-  ftToM:  v => convert(v, 'ft', 'm'),
-  mToFt:  v => convert(v, 'm', 'ft'),
-  kmToM:  v => convert(v, 'km', 'm'),
-  inToCm: v => convert(v, 'in', 'cm'),
-};
-
-const mass = {
-  kgToG:  v => convert(v, 'kg', 'g'),
-  gToKg:  v => convert(v, 'g', 'kg'),
-  tToKg:  v => convert(v, 't', 'kg'),
-  lbToKg: v => convert(v, 'lb', 'kg'),
-  ozToG:  v => convert(v, 'oz', 'g'),
-  oztToG: v => convert(v, 'ozt', 'g'),
-};
-
-const grade = {
-  oztToGt:       v => convert(v, 'oz/t', 'g/t'),
-  gtToOzt:       v => convert(v, 'g/t', 'oz/t'),
-  gtToPpm:       v => convert(v, 'g/t', 'ppm'),
-  gtToPct:       v => convert(v, 'g/t', 'pct'),
-  pctToFraction: v => convert(v, 'pct', 'fraction'),
-  fractionToPct: v => convert(v, 'fraction', 'pct'),
-};
-
-const density = {
-  kgm3ToGcm3: v => convert(v, 'kg/m3', 'g/cm3'),
-  gcm3ToKgm3: v => convert(v, 'g/cm3', 'kg/m3'),
-};
-
-const area = {
-  haToM2:  v => convert(v, 'ha', 'm2'),
-  km2ToM2: v => convert(v, 'km2', 'm2'),
-  m2ToHa:  v => convert(v, 'm2', 'ha'),
-};
-
-const volume = {
-  cm3ToM3: v => convert(v, 'cm3', 'm3'),
-  lToM3:   v => convert(v, 'L', 'm3'),
-  m3ToL:   v => convert(v, 'm3', 'L'),
-};
-
-const angle = {
-  degToRad:  v => convert(v, 'deg', 'rad'),
-  radToDeg:  v => convert(v, 'rad', 'deg'),
-  gradToRad: v => convert(v, 'grad', 'rad'),
-};
-
-const magnetic = {
-  nTToT:  v => convert(v, 'nT', 'T'),
-  oeToT:  v => convert(v, 'Oe', 'T'),
-  uTToNT: v => convert(v, 'uT', 'nT'),
-};
-
-// ── src/sieve.js ──
-
-// Tyler / ASTM mesh ↔ µm lookup table
-
-const TABLE = [
-  { mesh: 635, aperture_um: 20 },
-  { mesh: 500, aperture_um: 25 },
-  { mesh: 450, aperture_um: 32 },
-  { mesh: 400, aperture_um: 38 },
-  { mesh: 325, aperture_um: 45 },
-  { mesh: 270, aperture_um: 53 },
-  { mesh: 230, aperture_um: 63 },
-  { mesh: 200, aperture_um: 75 },
-  { mesh: 170, aperture_um: 90 },
-  { mesh: 150, aperture_um: 106 },
-  { mesh: 120, aperture_um: 125 },
-  { mesh: 100, aperture_um: 150 },
-  { mesh: 80,  aperture_um: 180 },
-  { mesh: 70,  aperture_um: 212 },
-  { mesh: 60,  aperture_um: 250 },
-  { mesh: 50,  aperture_um: 300 },
-  { mesh: 45,  aperture_um: 355 },
-  { mesh: 40,  aperture_um: 425 },
-  { mesh: 35,  aperture_um: 500 },
-  { mesh: 30,  aperture_um: 600 },
-  { mesh: 25,  aperture_um: 710 },
-  { mesh: 20,  aperture_um: 850 },
-  { mesh: 18,  aperture_um: 1000 },
-  { mesh: 16,  aperture_um: 1180 },
-  { mesh: 14,  aperture_um: 1400 },
-  { mesh: 12,  aperture_um: 1700 },
-  { mesh: 10,  aperture_um: 2000 },
-  { mesh: 8,   aperture_um: 2360 },
-  { mesh: 7,   aperture_um: 2800 },
-  { mesh: 6,   aperture_um: 3350 },
-  { mesh: 5,   aperture_um: 4000 },
-  { mesh: 4,   aperture_um: 4750 },
-];
-
-// index by mesh number for O(1) lookup
-const BY_MESH = {};
-for (const row of TABLE) BY_MESH[row.mesh] = row.aperture_um;
-
-const sieve = {
-  toMicrons(mesh) {
-    const um = BY_MESH[mesh];
-    if (um === undefined) throw new Error(`unknown mesh: ${mesh}`);
-    return um;
-  },
-
-  toMesh(um) {
-    // exact match first
-    for (const row of TABLE) {
-      if (row.aperture_um === um) return row.mesh;
-    }
-    // nearest
-    let best = TABLE[0], bestDist = Math.abs(TABLE[0].aperture_um - um);
-    for (let i = 1; i < TABLE.length; i++) {
-      const d = Math.abs(TABLE[i].aperture_um - um);
-      if (d < bestDist) { best = TABLE[i]; bestDist = d; }
-    }
-    return { nearest: best.mesh, exact: false, aperture_um: best.aperture_um };
-  },
-
-  toCm(mesh) {
-    return sieve.toMicrons(mesh) / 10000;
-  },
-
-  table() {
-    return TABLE.map(r => ({ ...r }));
-  },
-};
-
-// ── src/core.js ──
-
-// DCDMA wireline diamond core sizes
-
-const CORES = [
-  { code: 'AQ',  core_mm: 27.0, hole_mm: 48.0,  variant: 'standard' },
-  { code: 'BQ',  core_mm: 36.5, hole_mm: 60.0,  variant: 'standard' },
-  { code: 'NQ',  core_mm: 47.6, hole_mm: 75.7,  variant: 'standard' },
-  { code: 'NQ2', core_mm: 50.6, hole_mm: 75.7,  variant: 'oversize' },
-  { code: 'NQ3', core_mm: 45.1, hole_mm: 75.7,  variant: 'triple_tube' },
-  { code: 'HQ',  core_mm: 63.5, hole_mm: 96.0,  variant: 'standard' },
-  { code: 'HQ3', core_mm: 61.1, hole_mm: 96.0,  variant: 'triple_tube' },
-  { code: 'PQ',  core_mm: 85.0, hole_mm: 122.6, variant: 'standard' },
-  { code: 'PQ3', core_mm: 83.0, hole_mm: 122.6, variant: 'triple_tube' },
-];
-
-const BY_CODE = {};
-for (const row of CORES) BY_CODE[row.code] = row;
-
-function lookup(code) {
-  const row = BY_CODE[code];
-  if (!row) throw new Error(`unknown core code: ${code}`);
-  return row;
-}
-
-function mmToCm(mm) {
-  return Math.round(mm * 100) / 1000;
-}
-
-const core = {
-  diameter(code) {
-    const { core_mm } = lookup(code);
-    return { mm: core_mm, cm: mmToCm(core_mm) };
-  },
-
-  holeDiameter(code) {
-    const { hole_mm } = lookup(code);
-    return { mm: hole_mm, cm: mmToCm(hole_mm) };
-  },
-
-  halfCoreDiameter(code) {
-    const { core_mm } = lookup(code);
-    const half = core_mm / 2;
-    return { mm: Math.round(half * 10) / 10, cm: mmToCm(half) };
-  },
-
-  unitVolume(code, opts) {
-    const { core_mm } = lookup(code);
-    const d_cm = core_mm / 10;
-    // cross-sectional area × 100 cm (1 metre of core)
-    let cm3 = PI / 4 * d_cm * d_cm * 100;
-    const split = opts?.split || 'whole';
-    if (split === 'half') cm3 /= 2;
-    else if (split === 'quarter') cm3 /= 4;
-    return {
-      cm3_per_m: Math.round(cm3 * 10) / 10,
-      m3_per_m: Math.round(cm3 * 1e-6 * 1e9) / 1e9,
-    };
-  },
-
-  sampleMass({ code, length_m, density_gcm3, split }) {
-    const vol = core.unitVolume(code, { split: split || 'whole' });
-    const volume_cm3 = vol.cm3_per_m * length_m;
-    const mass_g = volume_cm3 * density_gcm3;
-    return {
-      mass_g: Math.round(mass_g),
-      mass_kg: Math.round(mass_g / 100) / 10,
-      volume_cm3: Math.round(volume_cm3 * 10) / 10,
-    };
-  },
-
-  table() {
-    return CORES.map(r => ({ ...r }));
-  },
-};
-
-// ── src/format.js ──
-
-// Format values with unit labels and auto-scaling
-
-
-const UNICODE = {
-  um: 'µm', m2: 'm²', cm2: 'cm²', mm2: 'mm²', km2: 'km²',
-  m3: 'm³', cm3: 'cm³', 'g/cm3': 'g/cm³', 'kg/m3': 'kg/m³',
-  't/m3': 't/m³', 'lb/ft3': 'lb/ft³',
-};
-
-// Auto-scale chains: try each target in order, pick the first that gives a "nice" value
-const SCALE_CHAINS = {
-  length: [
-    { unit: 'km', min: 1, max: Infinity },
-    { unit: 'm',  min: 1, max: 1000 },
-    { unit: 'cm', min: 1, max: 100 },
-    { unit: 'mm', min: 1, max: 10 },
-    { unit: 'um', min: 0, max: Infinity },
-  ],
-  mass: [
-    { unit: 'Mt', min: 1, max: Infinity },
-    { unit: 'kt', min: 1, max: 1000 },
-    { unit: 't',  min: 1, max: 1000 },
-    { unit: 'kg', min: 1, max: 1000 },
-    { unit: 'g',  min: 1, max: 1000 },
-    { unit: 'mg', min: 0, max: Infinity },
-  ],
-  density: [
-    { unit: 'g/cm3', min: 0, max: Infinity },
-  ],
-  grade: [
-    { unit: 'pct', min: 1, max: Infinity },
-    { unit: 'g/t', min: 0.001, max: 10000 },
-    { unit: 'ppm', min: 0, max: Infinity },
-  ],
-};
-
-function format(value, unit, opts) {
-  const dec = opts?.decimals;
-  let displayUnit = unit;
-  let displayValue = value;
-
-  if (opts?.auto) {
-    const entry = UNITS[unit];
-    if (entry) {
-      const chain = SCALE_CHAINS[entry.dim];
-      if (chain) {
-        for (const step of chain) {
-          const v = convert(value, unit, step.unit);
-          const abs = Math.abs(v);
-          if (abs >= step.min && abs < step.max) {
-            displayValue = v;
-            displayUnit = step.unit;
-            break;
-          }
-        }
-      }
-    }
-  }
-
-  const numStr = dec !== undefined ? displayValue.toFixed(dec) : String(displayValue);
-  const label = UNICODE[displayUnit] || displayUnit;
-
-  if (displayUnit === 'pct') return numStr + '%';
-  return numStr + ' ' + label;
-}
-
-// ── src/main.js ──
-
-// @gcu/units — entry point
-  return { UNITS, convert, length, mass, grade, density, area, volume, angle, magnetic, sieve, core, format };
-})();
-
 /* ==== src/engine/sample.js ==== */
 const __m22 = (() => {
 const { tool, frame, noun, compound, qmod, postmod, unit, fmt } = __m0;
-const { parseUnit } = __m1;
-const { core, sieve } = __m21;
+const { parseUnit } = __m2;
+const { core, sieve } = __m1;
 // Core and sample arithmetic: sample mass from core size, sieve sizes, specific gravity by Archimedes,
 // recovery and RQD. The DCDMA core table and the sieve table come from @gcu/units (vendored); the
 // arithmetic is golem's own and shown step by step.
@@ -13641,7 +13682,7 @@ function brazilMunicipalities() {
 /* ==== src/engine/calendar.js ==== */
 const __m27 = (() => {
 const { S, tool, frame, amend, noun, shape, postmod, unit, clock, iso } = __m0;
-const { findDate, findTime, today, day0, fmtDate, dateWords } = __m3;
+const { findDate, findTime, today, day0, fmtDate, dateWords } = __m4;
 const { isWorkingDay, addWorkingDays, brazilCalendar, federalHolidays } = __m26;
 // Working days and rosters over @gcu/plan's calendar engine (vendored), and time zones through Intl.
 // The calendar is a slot and is always shown: Brazil's federal holidays, or weekdays only.
@@ -13877,7 +13918,7 @@ amend({ tools: ['workdays'], name: 'workcal', label: 'Calendar', words: [], elid
 /* ==== src/engine/estimate.js ==== */
 const __m28 = (() => {
 const { amend, noun, tool, fmt } = __m0;
-const { U } = __m1;
+const { U } = __m2;
 // Estimates with ranges: arithmetic over intervals by simulation, units carried through, the seed kept
 // in the plan. "2.7 ± 0.1 t/m3 * 1.35 Mm3", "(120 to 180) * (0.4 to 0.6) / 7". Percentiles are called
 // percentiles: mining and petroleum read P10/P90 the opposite way round.
@@ -14098,7 +14139,7 @@ const ELEMENTS = [
 const __m30 = (() => {
 const { tool, frame, noun, shape, postmod, fmt } = __m0;
 const { ELEMENTS, ELEMENTS_SOURCE } = __m29;
-const { UNIT_TABLE } = __m1;
+const { UNIT_TABLE } = __m2;
 // Molar mass, conversion factors and element fractions from a parsed formula over the IUPAC weights;
 // the periodic table lookup. No mineral names: the minerals pack is not here, so a formula is required.
 
@@ -14648,8 +14689,8 @@ frame({
 /* ==== src/engine/log.js ==== */
 const __m34 = (() => {
 const { S, tool, frame, amend, noun, fmt, iso } = __m0;
-const { parseUnit, dimName } = __m1;
-const { findDate, today, fmtDate, dateWords } = __m3;
+const { parseUnit, dimName } = __m2;
+const { findDate, today, fmtDate, dateWords } = __m4;
 // The log: a device table of things done, written from cards and asked about in plain words.
 // Rows belong to the device, like notes; a card writes its row once (by id), undo removes it, and
 // "open the log" makes it the open table so every table question works on it.
@@ -14959,7 +15000,7 @@ amend({ tools: ['utm'], name: 'utmband', label: 'Band', words: [], elidable: tru
 /* ==== src/engine/sky.js ==== */
 const __m36 = (() => {
 const { tool, frame, amend, noun, compound, fmt, rad, deg, iso } = __m0;
-const { findDate, today, fmtDate, dateWords } = __m3;
+const { findDate, today, fmtDate, dateWords } = __m4;
 const { zonesOf, offsetOf } = __m27;
 const { placeOf } = __m35;
 // The sun by NOAA's solar position equations (after Meeus), and the moon's phase from the mean
@@ -15045,9 +15086,9 @@ amend({ tools: ['sun'], name: 'sunzone', label: 'Zone', words: [], elidable: tru
 /* ==== src/engine/apply.js ==== */
 const __m37 = (() => {
 const { S, tool, fmt, rad, deg, p3, p2 } = __m0;
-const { whereOf } = __m13;
-const { evaluatePredicate, predicateToString } = __m12;
-const { conversions, vec3 } = __m4;
+const { whereOf } = __m14;
+const { evaluatePredicate, predicateToString } = __m13;
+const { conversions, vec3 } = __m5;
 // Field compute over a table: a single-value skill applied to every row the filter selects, the row's
 // columns bound to the skill's arguments through their names, constants filling what no column holds.
 // Rows a binding cannot fill are listed, not skipped silently.
@@ -19015,10 +19056,10 @@ const SUGGESTIONS = ['pop means population', 'histogram of cu', 'log scale', 'po
 /* ==== src/engine/ontology.js ==== */
 const __m48 = (() => {
 const { FRAMES, LEXICON, S } = __m0;
-const { UNIT_TABLE, COMPOUNDS, DIM, parseUnit, dimName } = __m1;
-const { ELEMENT } = __m13;
-const { FB, ODS, ODSA } = __m14;
-const { TIMESCALE } = __m19;
+const { UNIT_TABLE, COMPOUNDS, DIM, parseUnit, dimName } = __m2;
+const { ELEMENT } = __m14;
+const { FB, ODS, ODSA } = __m15;
+const { TIMESCALE } = __m20;
 // The clause ontology, assembled from what golem knows: units from the conversion table, nouns from the
 // sample packs, verb frames from the declarations. Inert data; the build writes it to dist/golem.json.
 // Portuguese synonyms are listed here by hand until packs carry them in their golem facet.
@@ -21234,7 +21275,7 @@ const __m50 = (() => {
 const { S, T, TOOLS, FRAMES, tool, frame, amend, session, noun, toolByName, runTool, iso } = __m0;
 const { examples, vocab } = __m47;
 const { ontology } = __m48;
-const { calcOf } = __m2;
+const { calcOf } = __m3;
 const { estimateOf } = __m28;
 const { createEngine, makeSession, ENGLISH } = __m49;
 // The reading ladder: context (amendments, meta-intents), grammar (the clause parser, then the regex
@@ -21590,10 +21631,10 @@ function reset() {
 /* ==== src/engine/engine.js ==== */
 const __m52 = (() => {
 const { S, T, runTool, toolByName, startJobs } = __m0;
-const { DOCUMENT } = __m9;
+const { DOCUMENT } = __m10;
 const { DOCTEXT } = __m41;
 const { bindingsOf, runSteps } = __m42;
-const { tableFromText } = __m13;
+const { tableFromText } = __m14;
 const { convertBinary } = __m45;
 const { norm, grammar, context, taught, sessionRead, readingOf, guessRead } = __m50;
 const { current, newSession, renameSession, touch } = __m51;
@@ -22360,7 +22401,7 @@ function orientationFromRotationVector(v) {
 /* ==== src/shell/render.js ==== */
 const __m54 = (() => {
 const { fmt } = __m0;
-const { conversions, equalArea } = __m4;
+const { conversions, equalArea } = __m5;
 // Rendering. The engine hands over plain blocks; this is the only file that turns them into markup.
 
 const escHtml = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));

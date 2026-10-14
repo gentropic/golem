@@ -7337,8 +7337,8 @@
       "unit": "°C",
       "dim": "temperature",
       "words": [
-        "c",
         "°c",
+        "c",
         "celsius"
       ]
     },
@@ -7346,8 +7346,8 @@
       "unit": "°F",
       "dim": "temperature",
       "words": [
-        "f",
         "°f",
+        "f",
         "fahrenheit"
       ]
     },
