@@ -1,0 +1,8 @@
+{
+  "id": "org.gentropic.golem",
+  "artifact": "dist/golem.html",
+  "plugins": [
+    "intent"
+  ],
+  "dir": "android"
+}

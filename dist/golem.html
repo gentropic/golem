@@ -27518,10 +27518,24 @@ function renderSkills() {
 }
 // The installed app (SPEC 13.11). A service worker keeps golem.html, the manifest and the icons for offline use and makes
 // no request on its own; "Check for updates" asks it to, and the header counts that request (principle 6). Opened as a
-// file there is no worker, and nothing to install or update.
+// file there is no worker, and nothing to install or update. Inside the lead-acid shell (the Android app) there is none either:
+// the app has no network permission, a new version is a new APK, and the library is reached through .gcudat files.
+const inApp = shell.present;
+const OFFLINE_APP = 'This app has no network permission, so the library is out of reach from here: download the .gcudat from gcu-library in a browser and open it with the paperclip.';
 let requests = 0, update = { at: null, ready: false, note: '' };
+// Saving a file: a download in a browser; in the app (whose WebView drops downloads) lead-acid publishes it to Downloads,
+// under the name Android gave it ("x (1).ics" when x.ics is there).
+async function saveFile(name, data, mime) {
+  if (inApp) {
+    try { const r = await shell.publish(name, typeof data === 'string' ? new TextEncoder().encode(data) : data, { collection: 'Downloads', mime }); status(`Saved ${r.name || name} to Downloads.`); }
+    catch (e) { status(`Not saved: ${e.message}`); }
+    return;
+  }
+  const url = URL.createObjectURL(new Blob([data], { type: mime })), a = document.createElement('a');
+  a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000); status(`Saved ${name}.`);
+}
 const countRequest = () => { requests++; $('st-req').textContent = `${requests} request${requests === 1 ? '' : 's'}`; };
-const sw = registerGcuSw({ url: 'sw.js', persist: true, onUpdateAvailable: () => { update.ready = true; renderPacks(); } });
+const sw = inApp ? { supported: false, checkNow: async () => null, applyUpdate() {} } : registerGcuSw({ url: 'sw.js', persist: true, onUpdateAvailable: () => { update.ready = true; renderPacks(); } });
 async function checkUpdates() {
   countRequest(); update.note = 'Checking…'; renderPacks();
   const r = await sw.checkNow();
@@ -27531,6 +27545,7 @@ async function checkUpdates() {
   renderPacks();
 }
 function appItem() {
+  if (inApp) return '<div class="item"><h3>This app</h3><p>Installed as an Android app through lead-acid. It has no network permission and checks for nothing: a new version comes as a new APK.</p></div>';
   if (!sw.supported) return '<div class="item"><h3>This app</h3><p>Opened as a file, so there is nothing to install or update. Served over https, golem installs as an app and works offline.</p></div>';
   const at = update.at ? ` Last checked ${new Date(update.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}.` : '';
   return `<div class="item"><h3>This app</h3><p>Kept on this device and works offline. It looks for a new version only when you ask; that is one request to where golem came from.${at}</p>`
@@ -27584,7 +27599,7 @@ async function installBook(slug) {
 async function removeBook(slug) { await store.removePack(slug); useBook(slug, null); bookNote[slug] = BOOKS[slug].removed; renderPacks(); }
 function bookItem(slug) {
   const i = bookInfo(slug), B = BOOKS[slug];
-  const acts = i.kind === 'sample' ? `<button class="btn go" type="button" data-pk-install="${slug}">Install from the library (${B.size})</button>` : `<button class="btn" type="button" data-pk-remove="${slug}">Remove</button>`;
+  const acts = i.kind === 'sample' ? (inApp ? `<span class="sub">${OFFLINE_APP}</span>` : `<button class="btn go" type="button" data-pk-install="${slug}">Install from the library (${B.size})</button>`) : `<button class="btn" type="button" data-pk-remove="${slug}">Remove</button>`;
   return `<p>${i.kind === 'sample' ? B.sample : `Installed: version ${escHtml(i.version || '')}, kept on this device.`}</p><div class="opts">${store && store.kind === 'idb' ? acts : '<span class="sub">This browser gives golem no IndexedDB, so a pack cannot be kept.</span>'}${bookNote[slug] ? `<span class="sub">${escHtml(bookNote[slug])}</span>` : ''}</div>`;
 }
 async function removeFactbook() { await store.removePack('factbook'); useFactbook(null); packNote = 'Removed. The 14-country sample answers again.'; renderPacks(); }
@@ -27602,10 +27617,11 @@ async function openPackFile(name, bytes) {
 function factbookItem() {
   const i = factbookInfo();
   const state = i.kind === 'sample' ? 'The 14-country sample ships with golem.' : `Installed: version ${escHtml(i.version)}, ${i.count} countries${i.profiles ? ', with the full profiles' : ''}. Kept on this device.`;
-  const acts = i.kind === 'sample'
+  const acts = inApp ? `${i.kind === 'sample' ? '' : '<button class="btn" type="button" id="fb-remove">Remove</button>'}<span class="sub">${OFFLINE_APP}</span>`
+    : i.kind === 'sample'
     ? `<button class="btn go" type="button" id="fb-install">Install from the library (2.8 MB)</button><button class="btn" type="button" id="fb-install-full">With full profiles (5.1 MB)</button>`
     : `${i.profiles ? '' : '<button class="btn" type="button" id="fb-install-full">Add the full profiles (5.1 MB)</button>'}<button class="btn" type="button" id="fb-remove">Remove</button>`;
-  return `<p>${state} Installing makes one request to the library for its list and one per pack; a .gcudat file opened with the paperclip installs with none.</p><div class="opts">${store && store.kind === 'idb' ? acts : '<span class="sub">This browser gives golem no IndexedDB, so a pack cannot be kept.</span>'}${packNote ? `<span class="sub">${escHtml(packNote)}</span>` : ''}</div>`;
+  return `<p>${state}${inApp ? '' : ' Installing makes one request to the library for its list and one per pack; a .gcudat file opened with the paperclip installs with none.'}</p><div class="opts">${store && store.kind === 'idb' ? acts : '<span class="sub">This browser gives golem no IndexedDB, so a pack cannot be kept.</span>'}${packNote ? `<span class="sub">${escHtml(packNote)}</span>` : ''}</div>`;
 }
 function renderPacks() {
   const lab = { live: 'installed', samp: 'sample', plan: 'not wired' };
@@ -27791,8 +27807,7 @@ $('stream').addEventListener('click', e => {
       e => say(e && e.status === 503 ? `No app on this phone takes ${send.name}.` : e && e.status === 400 ? `The shell refused the ${e.field || 'request'}: ${e.message || ''}` : `The hand-off failed: ${(e && e.message) || e}`, 'err'));
   }
   else if (act === 'save' && c.res.file) {
-    const f = c.res.file, url = URL.createObjectURL(new Blob([f.bytes || f.text], { type: f.mime })), a = document.createElement('a');
-    a.href = url; a.download = f.name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000); status(`Saved ${f.name}.`);
+    const f = c.res.file; saveFile(f.name, f.bytes || f.text, f.mime);
   }
   else if (act === 'copy') {
     const fail = () => { const p = document.createElement('pre'); p.textContent = c.res.copy; b.closest('.ans').appendChild(p); status('Copy was blocked here. The text is shown so you can select it.'); };
@@ -27822,8 +27837,7 @@ $('dlist').addEventListener('click', e => {
   else if (b.dataset.ren) { ren = +b.dataset.ren; del = null; renderDrawer(); }
   else if (b.dataset.exp) {   // the session as a file of its own; the paperclip opens it again
     const d = exportSession(+b.dataset.exp), slug = (d.session.name || 'session').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'session';
-    const url = URL.createObjectURL(new Blob([JSON.stringify(d, null, 1)], { type: 'application/json' })), a = document.createElement('a');
-    a.href = url; a.download = `${slug}.golem.json`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000); status(`Saved ${slug}.golem.json.`);
+    saveFile(`${slug}.golem.json`, JSON.stringify(d, null, 1), 'application/json');
   }
   else if (b.dataset.del) {
     const id = +b.dataset.del;

@@ -52,6 +52,17 @@ The build is concatenation: `src/shell/index.html` with the two typefaces embedd
 
 If Playwright has no browser installed, run `npx playwright install chromium` or point `CHROMIUM_PATH` at one.
 
+### The Android app
+
+`android/` is golem inside the lead-acid shell, written by lead-acid's `init` (`lead-acid.json` holds its id, artifact and plugins: `intent`, for the calendar, timer and alarm hand-offs). It builds the same `dist/golem.html`, copied in at every build. It needs a clone of lead-acid beside this one until `@gcu/lead-acid` is on npm, the Android SDK, and a JDK 17 (Android Studio's works; the command finds it):
+
+```sh
+npm run build && node ../lead-acid/cli.mjs build    # → android/app/build/outputs/apk/debug/app-debug.apk
+adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+The app has no network permission: there is no service worker in it, packs install from a `.gcudat` opened with the paperclip, and saved files go to Downloads.
+
 ## Layout
 
 ```
@@ -120,7 +131,7 @@ dist/sw.js, manifest.webmanifest, icon*.png, icon.svg
 
 ## Status
 
-A working prototype. The reading and the tools are real; the packs are small samples, the table is synthetic sample data, and the Android hand-offs are simulated. SPEC.md section 12 has the full list, and section 13 the path to an app.
+A working prototype. The reading and the tools are real; the bundled packs are small samples (the full ones install on request), the table is synthetic sample data, and the Android hand-offs work inside the lead-acid app, which has not yet been tried on a phone. SPEC.md section 12 has the full list, and section 13 the path to an app.
 
 ## Licence
 

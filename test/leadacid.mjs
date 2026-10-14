@@ -1,6 +1,6 @@
 // The lead-acid hand-offs (SPEC 13.10), on the desktop: lead-acid's bench (auditable ext/leadacid/bench.js) mocks the
 // native layer under the real shim, validates every intent against the plugin's schema and records it. The event, timer
-// and alarm cards hand their fields over; a phone with no app for one says so. Skipped without the sibling clone.
+// and alarm cards hand their fields over; a phone with no app for one says so; the packs drawer knows the app has no network. Skipped without the sibling clone.
 import { chromium } from 'playwright';
 import { readFileSync, existsSync } from 'node:fs';
 import { createServer } from 'node:http';
@@ -34,6 +34,16 @@ check(tm.sent && tm.sent.name === 'clock.timer' && tm.sent.fields.seconds === 30
 const before = await page.evaluate(() => window.__bench.intents.length);
 const al = await handOff('set an alarm for 6:15');
 check(/No app on this phone takes clock\.alarm/.test(al.note) && (await page.evaluate(() => window.__bench.intents.length)) === before, `a phone with no alarm app says so (${al.note})`);
+// saving: the WebView drops downloads, so the event's .ics is published to Downloads through the shell
+await page.fill('#q', 'remind me to call the lab on friday at 9'); await page.press('#q', 'Enter'); await page.waitForTimeout(150);
+await page.locator('#stream .card').last().locator('[data-act="save"]').click(); await page.waitForTimeout(300);
+const pub = await page.evaluate(() => { const p = window.__bench.published.slice(-1)[0]; return p && { name: p.name, collection: p.collection, mime: p.mime, text: new TextDecoder().decode(p.bytes) }; });
+check(pub && pub.name === 'call-the-lab.ics' && pub.collection === 'Downloads' && pub.mime === 'text/calendar' && /BEGIN:VCALENDAR/.test(pub.text), `Save .ics publishes to Downloads (${pub && pub.name}, ${pub && pub.collection})`);
+// the app has no network permission: no service worker, no library buttons, packs through the paperclip
+await page.evaluate(() => document.querySelector('[data-tab="packs"]').click()); await page.waitForTimeout(200);
+const drawer = await page.textContent('#v-packs');
+check(/Installed as an Android app/.test(drawer) && !/Install from the library|Check for updates/.test(drawer) && /open it with the paperclip/.test(drawer), 'in the app the drawer offers the paperclip, not the library or updates');
+check((await page.evaluate(() => navigator.serviceWorker.getRegistrations().then(r => r.length))) === 0, 'in the app no service worker is registered');
 errors.forEach(e => console.log('FAIL page error: ' + e));
 await browser.close(); server.close();
 if (failed || errors.length) { console.log('\nleadacid test failed'); process.exit(1); }

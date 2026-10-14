@@ -1,0 +1,8 @@
+.gradle/
+.kotlin/
+build/
+local.properties
+# Signing: the keystore never enters a repo (lead-acid docs/signing.md)
+keystore.properties
+*.keystore
+*.jks
