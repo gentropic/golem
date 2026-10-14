@@ -26,7 +26,7 @@ export const clauseEngine = (loc = order[0]) => enginesFor(clauses, ontology())(
 const clauseSession = () => makeSession([]);   // no memory of its own: what came before is the cards', read by the context rung
 // The parser's verdict on a text, then the frame's bind(): a frame may answer { tool, args }, or
 // { clarify } when the reading is whole but a value is missing, which becomes a clarify verdict too.
-// Only the first command of a sequence is taken for now; "then" chains are a plan the planner does not build yet.
+// Only the first command of a sequence is read here; a request in steps is cut and read step by step by submit() (stepsOf in engine.js).
 // When the grammar finds several readings, each is bound: if exactly one names a tool that takes it, that is the
 // reading ("python" is a verb and a format; only the verb has a tool for "python\n<code>"), and the trace says so.
 const bindOf = cmd => { const f = FRAMES.find(x => x.name === cmd.verb), b = f && f.bind(cmd); return b && !b.clarify ? b : null; };

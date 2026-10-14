@@ -41,6 +41,12 @@ check(await page.locator('#stream .card').count() === 2 && /25 c in f/.test(awai
 const listed = await page.evaluate(() => document.querySelectorAll('#dlist .srow').length);
 check(listed >= 4, `the branch is a session of its own in the sidebar (${listed} listed)`);
 
+// a request in steps: each step a card, the preview naming them first
+await page.fill('#q', '2 km in miles then 25 c in f'); await page.waitForTimeout(250);
+const pv = await page.textContent('#pv');
+const n0 = await page.locator('#stream .card').count(); await page.press('#q', 'Enter'); await page.waitForTimeout(300);
+check(/2 steps/.test(pv) && (await page.locator('#stream .card').count()) === n0 + 2 && /2 steps, in order/.test(await page.textContent('#status')), `a request in steps makes a card per step (${pv.trim()})`);
+
 // a file dropped on the window opens as the paperclip would
 await page.evaluate(() => { const dt = new DataTransfer(); dt.items.add(new File(['hole,cu\nA,0.5\nB,0.9\n'], 'dropped.csv', { type: 'text/csv' })); window.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, cancelable: true })); });
 await page.waitForTimeout(400);

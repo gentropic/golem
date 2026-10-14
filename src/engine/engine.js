@@ -34,7 +34,8 @@ import { bindingsOf, runSteps } from './recipes.js';
 import { tableFromText } from './table.js';
 import { convertBinary } from './formats.js';
 import './notes.js';
-import { norm, grammar, context, taught, sessionRead, readingOf, guessRead } from './reading.js';
+import { norm, grammar, context, taught, sessionRead, readingOf, guessRead, clauseEngine } from './reading.js';
+import { makeSession } from '../vendor/dispatch.js';
 import { current, newSession, renameSession, touch } from './sessions.js';
 import { streamedTable } from './stream.js';   // last: it wraps the table tools the modules above registered
 
@@ -102,13 +103,61 @@ export function submit(raw) {
   if (s && s.session === 'yes') return { kind: 'nothing', msg: last && last.res.ask ? 'Which one? Tap an option or type it.' : 'Nothing is waiting for a yes.' };
   // a saved recipe by name: replayed with the new subjects into a session of its own (a batch on every table is a card)
   if (s && s.session === 'recipe') return runRecipe(S.recipes[s.name], s.rest);
+  // a request in steps ("open assays.csv then mean cu by lith"): only when the whole does not read as one command
+  const steps = stepsOf(raw, last); if (steps) return chain(steps, raw);
   // a whole command first; then what amends the last card ("in feet", "2 sentences"); then the words taught on this device
   const r = grammar(text, q, 'grammar', raw) || context(q, last, raw) || taught(text, q, raw) || guessRead(raw) || { tool: 'none', args: { q }, rung: 'none', res: T.none({ q }) };
   return { kind: 'card', card: addCard(raw, r, performance.now() - t0) };
 }
 
+/* ── the planner's sequence: steps said in order ── */
+// Where a request is cut into steps: at "then" ("and then", ", then"; "depois", "em seguida"), as the clause tokenizer
+// finds the word (never inside a quoted value). Only when the whole does not read as one command, so a payload that
+// happens to say "then" ("word count: we went in then left") stays whole; and only when the first step reads alone.
+const STEP_WORDS = new Set(['then', 'afterwards', 'depois', 'então', 'em seguida']);
+function stepsOf(raw, last) {
+  const { toks } = clauseEngine().tokenize(raw, { names: {} }), cuts = [];
+  toks.forEach((tk, i) => {
+    if (!tk.senses.some(x => x.cat === 'THEN') || !STEP_WORDS.has(raw.slice(tk.s, tk.e).toLowerCase())) return;
+    let from = tk.s; for (let j = i - 1; j >= 0 && toks[j].senses.some(x => x.cat === 'CONJ' || x.cat === 'COMMA'); j--) from = toks[j].s;
+    cuts.push([from, tk.e]);
+  });
+  if (!cuts.length) return null;
+  const pieces = []; let at = 0;
+  for (const [a, b] of cuts) { pieces.push(raw.slice(at, a)); at = b; }
+  pieces.push(raw.slice(at));
+  const out = pieces.map(p => p.trim().replace(/^[,;]\s*|[,;]\s*$/g, '')).filter(Boolean);
+  if (out.length < 2) return null;
+  const done = p => { const v = previewOne(p); return !!v && v.rung !== 'partial' && v.rung !== 'ambiguous'; };
+  // the grammar read a sequence: the steps it saw
+  if (['en', 'pt'].some(l => { const r = clauseEngine(l).understand(raw, makeSession([])); return r.status === 'ok' && r.commands.length > 1; })) return out;
+  // the whole reads as one command: steps only if every one reads alone (a payload that says "then" stays whole)
+  const whole = previewOne(raw);
+  if (whole && whole.rung !== 'partial') return out.every(done) ? out : null;
+  // the whole does not read: steps if the first one does (the later ones read after it runs)
+  return done(out[0]) ? out : null;
+}
+// Each step is read and run after the one before it, so the second reads what the first opened ("lith" is a column
+// only once the table is open). A step that does not read, or asks a question, stops the chain on its own card.
+function chain(pieces, raw) {
+  const cards = []; let fresh = false;
+  for (const [i, p] of pieces.entries()) {
+    const o = submit(p);
+    if (o.kind === 'new-session') { fresh = true; continue; }
+    if (o.kind !== 'card') break;
+    o.card.res.trace.unshift(`plan: step ${i + 1} of ${pieces.length} of "${raw}"`); cards.push(o.card);
+    if (['none', 'guess'].includes(o.card.rung) || o.card.res.ask) break;
+  }
+  return { kind: 'cards', cards, fresh, steps: pieces.length };
+}
+
 // What the composer would do with this text, without doing it: submit()'s order, dry. → { rung, echo } or null.
+// A request in steps previews as its steps.
 export function preview(raw) {
+  raw = raw.trim(); if (!raw) return null;
+  const steps = stepsOf(raw); return steps ? { rung: 'grammar', echo: `${steps.length} steps: ${steps.join(' → ')}`, steps: steps.length } : previewOne(raw);
+}
+function previewOne(raw) {
   raw = raw.trim(); if (!raw) return null;
   const text = norm(raw), q = text.toLowerCase(), last = S.cards[S.cards.length - 1];
   const s = sessionRead(raw);

@@ -21728,7 +21728,7 @@ const clauseEngine = (loc = order[0]) => enginesFor(clauses, ontology())(loc);
 const clauseSession = () => makeSession([]);   // no memory of its own: what came before is the cards', read by the context rung
 // The parser's verdict on a text, then the frame's bind(): a frame may answer { tool, args }, or
 // { clarify } when the reading is whole but a value is missing, which becomes a clarify verdict too.
-// Only the first command of a sequence is taken for now; "then" chains are a plan the planner does not build yet.
+// Only the first command of a sequence is read here; a request in steps is cut and read step by step by submit() (stepsOf in engine.js).
 // When the grammar finds several readings, each is bound: if exactly one names a tool that takes it, that is the
 // reading ("python" is a verb and a format; only the verb has a tool for "python\n<code>"), and the trace says so.
 const bindOf = cmd => { const f = FRAMES.find(x => x.name === cmd.verb), b = f && f.bind(cmd); return b && !b.clarify ? b : null; };
@@ -22643,7 +22643,8 @@ const { DOCTEXT } = __m44;
 const { bindingsOf, runSteps } = __m45;
 const { tableFromText } = __m14;
 const { convertBinary } = __m48;
-const { norm, grammar, context, taught, sessionRead, readingOf, guessRead } = __m53;
+const { norm, grammar, context, taught, sessionRead, readingOf, guessRead, clauseEngine } = __m53;
+const { makeSession } = __m52;
 const { current, newSession, renameSession, touch } = __m54;
 const { streamedTable } = __m58;
 // The entry point: submit(raw) reads a request and returns what happened. Cards are recomputed in
@@ -22713,13 +22714,61 @@ function submit(raw) {
   if (s && s.session === 'yes') return { kind: 'nothing', msg: last && last.res.ask ? 'Which one? Tap an option or type it.' : 'Nothing is waiting for a yes.' };
   // a saved recipe by name: replayed with the new subjects into a session of its own (a batch on every table is a card)
   if (s && s.session === 'recipe') return runRecipe(S.recipes[s.name], s.rest);
+  // a request in steps ("open assays.csv then mean cu by lith"): only when the whole does not read as one command
+  const steps = stepsOf(raw, last); if (steps) return chain(steps, raw);
   // a whole command first; then what amends the last card ("in feet", "2 sentences"); then the words taught on this device
   const r = grammar(text, q, 'grammar', raw) || context(q, last, raw) || taught(text, q, raw) || guessRead(raw) || { tool: 'none', args: { q }, rung: 'none', res: T.none({ q }) };
   return { kind: 'card', card: addCard(raw, r, performance.now() - t0) };
 }
 
+/* ── the planner's sequence: steps said in order ── */
+// Where a request is cut into steps: at "then" ("and then", ", then"; "depois", "em seguida"), as the clause tokenizer
+// finds the word (never inside a quoted value). Only when the whole does not read as one command, so a payload that
+// happens to say "then" ("word count: we went in then left") stays whole; and only when the first step reads alone.
+const STEP_WORDS = new Set(['then', 'afterwards', 'depois', 'então', 'em seguida']);
+function stepsOf(raw, last) {
+  const { toks } = clauseEngine().tokenize(raw, { names: {} }), cuts = [];
+  toks.forEach((tk, i) => {
+    if (!tk.senses.some(x => x.cat === 'THEN') || !STEP_WORDS.has(raw.slice(tk.s, tk.e).toLowerCase())) return;
+    let from = tk.s; for (let j = i - 1; j >= 0 && toks[j].senses.some(x => x.cat === 'CONJ' || x.cat === 'COMMA'); j--) from = toks[j].s;
+    cuts.push([from, tk.e]);
+  });
+  if (!cuts.length) return null;
+  const pieces = []; let at = 0;
+  for (const [a, b] of cuts) { pieces.push(raw.slice(at, a)); at = b; }
+  pieces.push(raw.slice(at));
+  const out = pieces.map(p => p.trim().replace(/^[,;]\s*|[,;]\s*$/g, '')).filter(Boolean);
+  if (out.length < 2) return null;
+  const done = p => { const v = previewOne(p); return !!v && v.rung !== 'partial' && v.rung !== 'ambiguous'; };
+  // the grammar read a sequence: the steps it saw
+  if (['en', 'pt'].some(l => { const r = clauseEngine(l).understand(raw, makeSession([])); return r.status === 'ok' && r.commands.length > 1; })) return out;
+  // the whole reads as one command: steps only if every one reads alone (a payload that says "then" stays whole)
+  const whole = previewOne(raw);
+  if (whole && whole.rung !== 'partial') return out.every(done) ? out : null;
+  // the whole does not read: steps if the first one does (the later ones read after it runs)
+  return done(out[0]) ? out : null;
+}
+// Each step is read and run after the one before it, so the second reads what the first opened ("lith" is a column
+// only once the table is open). A step that does not read, or asks a question, stops the chain on its own card.
+function chain(pieces, raw) {
+  const cards = []; let fresh = false;
+  for (const [i, p] of pieces.entries()) {
+    const o = submit(p);
+    if (o.kind === 'new-session') { fresh = true; continue; }
+    if (o.kind !== 'card') break;
+    o.card.res.trace.unshift(`plan: step ${i + 1} of ${pieces.length} of "${raw}"`); cards.push(o.card);
+    if (['none', 'guess'].includes(o.card.rung) || o.card.res.ask) break;
+  }
+  return { kind: 'cards', cards, fresh, steps: pieces.length };
+}
+
 // What the composer would do with this text, without doing it: submit()'s order, dry. → { rung, echo } or null.
+// A request in steps previews as its steps.
 function preview(raw) {
+  raw = raw.trim(); if (!raw) return null;
+  const steps = stepsOf(raw); return steps ? { rung: 'grammar', echo: `${steps.length} steps: ${steps.join(' → ')}`, steps: steps.length } : previewOne(raw);
+}
+function previewOne(raw) {
   raw = raw.trim(); if (!raw) return null;
   const text = norm(raw), q = text.toLowerCase(), last = S.cards[S.cards.length - 1];
   const s = sessionRead(raw);
@@ -29665,6 +29714,7 @@ const PT = {
   'Installed: version {v}, kept on this device.': 'Instalado: versão {v}, guardado neste aparelho.', 'This browser gives golem no IndexedDB, so a pack cannot be kept.': 'Este navegador não dá IndexedDB ao golem, então um pacote não pode ser guardado.',
   ' Installing makes one request to the library for its list and one per pack; a .gcudat file opened with the paperclip installs with none.': ' Instalar faz um pedido à biblioteca pela lista e um por pacote; um arquivo .gcudat aberto com o clipe instala sem nenhum.',
   'The 14-country sample ships with golem.': 'A amostra de 14 países vem com o golem.', 'Installed: version {v}, {n} countries{full}. Kept on this device.': 'Instalado: versão {v}, {n} países{full}. Guardado neste aparelho.', ', with the full profiles': ', com os perfis completos',
+  '{n} steps, in order.': '{n} passos, em ordem.', 'Stopped at step {k} of {n}: that step did not read.': 'Parou no passo {k} de {n}: esse passo não foi lido.', 'Step {k} of {n} asks a question; the rest did not run.': 'O passo {k} de {n} faz uma pergunta; o resto não rodou.',
   'Installing…': 'Instalando…', 'Installed: {n} countries{full}.': 'Instalado: {n} países{full}.', 'Removed. The 14-country sample answers again.': 'Removido. A amostra de 14 países responde de novo.',
   'A sample term index ships: where a term is defined, without the passage.': 'Vem um índice de termos de amostra: onde um termo é definido, sem o trecho.', 'Installed: {n} terms with their defining passages.': 'Instalado: {n} termos com os trechos que os definem.',
   'Removed. The sample term index answers again.': 'Removido. O índice de amostra responde de novo.', 'A sample of rules 10, 11 and 13 ships.': 'Vem uma amostra das regras 10, 11 e 13.',
@@ -30014,6 +30064,16 @@ function show(o) {
       // for a screen reader: what was read and the start of the answer, once
       const ans = el.querySelector('.ans'), read = el.querySelector('.read');
       $('sr').textContent = `#${pad(o.card.id)}, ${(read ? read.innerText : o.card.raw).replace(/\s+/g, ' ')}. ${ans ? ans.innerText.replace(/\s+/g, ' ').slice(0, 220) : ''}`;
+      break;
+    }
+    // a request in steps: each step's card, in order; a chain that stopped says where
+    case 'cards': {
+      if (o.fresh) renderStream();
+      else for (const c of o.cards) { const el = cardEl(c); $('stream').appendChild(el); drawCharts(el); if (voice.all) say(el); }
+      welcome(); armCaptures(); showTab('ask');
+      const first = o.cards[0] && cardOf(o.cards[0].id); if (first) first.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+      const stop = o.cards[o.cards.length - 1], asks = stop && stop.res.ask && !['none', 'guess'].includes(stop.rung);
+      status(o.cards.length === o.steps && !asks ? t('{n} steps, in order.', { n: o.steps }) : t(asks ? 'Step {k} of {n} asks a question; the rest did not run.' : 'Stopped at step {k} of {n}: that step did not read.', { k: o.cards.length || 1, n: o.steps }));
       break;
     }
   }

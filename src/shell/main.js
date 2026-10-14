@@ -119,6 +119,16 @@ function show(o) {
       $('sr').textContent = `#${pad(o.card.id)}, ${(read ? read.innerText : o.card.raw).replace(/\s+/g, ' ')}. ${ans ? ans.innerText.replace(/\s+/g, ' ').slice(0, 220) : ''}`;
       break;
     }
+    // a request in steps: each step's card, in order; a chain that stopped says where
+    case 'cards': {
+      if (o.fresh) renderStream();
+      else for (const c of o.cards) { const el = cardEl(c); $('stream').appendChild(el); drawCharts(el); if (voice.all) say(el); }
+      welcome(); armCaptures(); showTab('ask');
+      const first = o.cards[0] && cardOf(o.cards[0].id); if (first) first.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+      const stop = o.cards[o.cards.length - 1], asks = stop && stop.res.ask && !['none', 'guess'].includes(stop.rung);
+      status(o.cards.length === o.steps && !asks ? t('{n} steps, in order.', { n: o.steps }) : t(asks ? 'Step {k} of {n} asks a question; the rest did not run.' : 'Stopped at step {k} of {n}: that step did not read.', { k: o.cards.length || 1, n: o.steps }));
+      break;
+    }
   }
   tick(); renderPacks();
 }
