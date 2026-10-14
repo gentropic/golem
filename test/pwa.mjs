@@ -11,7 +11,7 @@ const dist = join(dirname(fileURLToPath(import.meta.url)), '..', 'dist');
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json' };
 let html = readFileSync(join(dist, 'golem.html'), 'utf8'), hits = [];
 const server = createServer((req, res) => {
-  const path = decodeURIComponent(new URL(req.url, 'http://x').pathname).replace(/^\//, '') || 'golem.html';
+  const path = decodeURIComponent(new URL(req.url, 'http://x').pathname).replace(/^\//, '') || 'index.html';   // a folder answers with its index, as GitHub Pages does
   hits.push(path);
   if (path === 'golem.html') { res.writeHead(200, { 'content-type': TYPES['.html'], 'cache-control': 'no-cache' }); res.end(html); return; }
   const f = join(dist, path); if (!existsSync(f)) { res.writeHead(404); res.end(); return; }
@@ -40,7 +40,14 @@ await page.reload(); await page.waitForTimeout(400);
 await page.fill('#q', '2 km in miles'); await page.press('#q', 'Enter'); await page.waitForTimeout(200);
 const offline = await page.locator('#stream .card').last().textContent();
 check(offline.includes('1.24274') && hits.length === 0, `offline: the page loads from the cache and answers (${hits.length} requests reached the server)`);
+// the folder's address (gentropic.org/golem/) offline: the worker's fallback answers with the cached golem
+await page.goto(base); await page.waitForTimeout(400);
+check((await page.title()).startsWith('GCU golem') && hits.length === 0, 'offline, the folder address opens the cached golem');
 await ctx.setOffline(false);
+// online, the folder address goes on to golem.html and keeps ?new
+await page.goto(base + '?new'); await page.waitForURL(/golem\.html/, { timeout: 5000 }).catch(() => {});
+check(/\/golem\.html(\?new)?$/.test(page.url()) || page.url() === base + 'golem.html', `the folder address goes on to golem.html (${page.url()})`);
+await page.goto(base + 'golem.html'); await page.waitForTimeout(300);
 
 // a new golem on the server changes nothing until "Check for updates"
 html = html.replace('<title>GCU golem</title>', '<title>GCU golem (new)</title>'); hits = [];

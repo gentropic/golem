@@ -173,10 +173,18 @@ export const MANIFEST = {
 // Bump SW_CACHE only when the precache list or this config changes.
 const SW_CACHE = 'golem-shell-v1';
 const SW_PRECACHE = ['./golem.html', './manifest.webmanifest', './icon.svg', './icon-192.png', './icon-512.png', './icon-maskable-512.png'];
+const INDEX_HTML = `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>golem</title>
+<meta http-equiv="refresh" content="0; url=golem.html"><link rel="canonical" href="golem.html">
+<script>location.replace('golem.html' + location.search + location.hash)</script>
+</head><body><p><a href="golem.html">golem</a></p></body></html>
+`;
 async function installable(dir) {
   const { makeSw } = await import(pathToFileURL(join(src, 'vendor', 'sw', 'make.mjs')).href);
   writeFileSync(join(dir, 'sw.js'), makeSw({ app: 'golem', cache: SW_CACHE, precache: SW_PRECACHE, autoCheck: false, navFallback: './golem.html', routes: [] }));
   writeFileSync(join(dir, 'manifest.webmanifest'), JSON.stringify(MANIFEST, null, 2) + '\n');
+  // the folder's own address (gentropic.org/golem/) goes on to golem.html, keeping ?new; offline the worker's fallback answers
+  writeFileSync(join(dir, 'index.html'), INDEX_HTML);
   writeFileSync(join(dir, 'icon.svg'), ICON_SVG + '\n');
   writeFileSync(join(dir, 'icon-192.png'), png(192, 0.34, true));
   writeFileSync(join(dir, 'icon-512.png'), png(512, 0.34, true));

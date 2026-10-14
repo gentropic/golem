@@ -11851,7 +11851,7 @@ const { tool, frame, noun } = __m0;
 // Each works from a small sample that ships with golem, or from the gcu-library pack once the shell has installed it and
 // handed its compiled index here (useBook). Packs are compiled at install by packs.js; only the index is kept.
 
-const READER = 'https://gentropic.github.io/gcu-library/read.html?book=';
+const READER = 'https://gentropic.org/gcu-library/read.html?book=';
 
 /* ── Open Data Structures: where a term is defined ───────────── */
 // the sample: a locator per term, no passage
@@ -27553,7 +27553,7 @@ function appItem() {
 }
 // The Factbook pack (SPEC 13.8), installed on request: from gcu-library (one request for its registry, one per pack, each
 // checked against the registry's SHA-256) or from a .gcudat file opened with the paperclip. Kept by store.js under /packs/.
-const LIBRARY = 'https://gentropic.github.io/gcu-library/';
+const LIBRARY = 'https://gentropic.org/gcu-library/';
 let packNote = '', packBusy = false;
 const b64 = buf => { let s = ''; const a = new Uint8Array(buf); for (let i = 0; i < a.length; i++) s += String.fromCharCode(a[i]); return btoa(s); };
 async function fetchPack(entry) {

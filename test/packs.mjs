@@ -17,7 +17,7 @@ const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePa
 const ctx = await browser.newContext(), page = await ctx.newPage();
 const errors = []; page.on('pageerror', e => errors.push(e.message));
 let tamper = false, served = [];
-await ctx.route('https://gentropic.github.io/gcu-library/**', route => {
+await ctx.route('https://gentropic.org/gcu-library/**', route => {
   const path = new URL(route.request().url()).pathname.replace(/^\/gcu-library\//, ''); served.push(path);
   const f = join(LIB, path); if (!existsSync(f)) return route.fulfill({ status: 404 });
   let body = readFileSync(f); if (tamper && path.endsWith('.gcudat')) { body = Buffer.from(body); body[body.length - 1] ^= 1; }

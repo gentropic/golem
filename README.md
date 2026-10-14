@@ -9,7 +9,7 @@ This repository holds the specification and a working prototype.
 
 ## Try it
 
-Open `dist/golem.html`, then:
+Open [gentropic.org/golem](https://gentropic.org/golem/) (it installs as an app and then works offline), or `dist/golem.html` from a build, then:
 
 - Tap the dashed `045/30 as dip direction/dip` slot on the thickness card. The reading flips to strike/dip and the answer recomputes.
 - Run `pop of mongolia`. It has no reading and offers `pop means population`. Tap that, then run `pop of mongolia` again.
@@ -51,6 +51,10 @@ npm test             # build, engine tests, then drive the page through the same
 The build is concatenation: `src/shell/index.html` with the two typefaces embedded, then the shell, engine and vendored modules in import order inside one `<script>`. Each module's text goes in verbatim inside a function, so its private names stay private; the function returns its exports as an object, and a module that imports names reads them from that object (with `as` aliases if it wants them), so two modules may export the same name. No bundler, no transforms of the code. The build refuses import cycles, an import the other module does not export, and the module syntax the wrapping cannot carry. It also writes `dist/golem.json`, the parser ontology the engine derives from its tool declarations. The built page makes no network request; the one external link is the library reader, opened on tap.
 
 If Playwright has no browser installed, run `npx playwright install chromium` or point `CHROMIUM_PATH` at one.
+
+### The web app
+
+[gentropic.org/golem](https://gentropic.org/golem/) is the org site (`gentropic/gentropic.github.io`, a public repo) serving `golem/`: `dist/golem.html`, the worker, the manifest, the icons, and an `index.html` that sends the folder's address on to `golem.html`. `npm run deploy` builds and copies those files into a clone of the site beside this one (`../gentropic.github.io`); committing and pushing the site publishes them. The served `golem.html` is the whole app, readable source included.
 
 ### The Android app
 

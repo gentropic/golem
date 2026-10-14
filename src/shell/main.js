@@ -118,7 +118,7 @@ function appItem() {
 }
 // The Factbook pack (SPEC 13.8), installed on request: from gcu-library (one request for its registry, one per pack, each
 // checked against the registry's SHA-256) or from a .gcudat file opened with the paperclip. Kept by store.js under /packs/.
-const LIBRARY = 'https://gentropic.github.io/gcu-library/';
+const LIBRARY = 'https://gentropic.org/gcu-library/';
 let packNote = '', packBusy = false;
 const b64 = buf => { let s = ''; const a = new Uint8Array(buf); for (let i = 0; i < a.length; i++) s += String.fromCharCode(a[i]); return btoa(s); };
 async function fetchPack(entry) {

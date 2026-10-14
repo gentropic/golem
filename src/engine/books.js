@@ -3,7 +3,7 @@
 // handed its compiled index here (useBook). Packs are compiled at install by packs.js; only the index is kept.
 import { tool, frame, noun } from './core.js';
 
-const READER = 'https://gentropic.github.io/gcu-library/read.html?book=';
+const READER = 'https://gentropic.org/gcu-library/read.html?book=';
 
 /* ── Open Data Structures: where a term is defined ───────────── */
 // the sample: a locator per term, no passage
