@@ -5,7 +5,7 @@
 // names declared twice, and the module syntax the wrapping cannot carry (default exports, namespace
 // imports, aliased imports, re-exports, `export let`, import.meta, several declarators on one export line).
 // It also writes dist/golem.json, the clause ontology the engine derives from its declarations.
-import { readFileSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync } from 'node:fs';
 import { deflateSync } from 'node:zlib';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -140,15 +140,21 @@ function fontFaces() {
 }
 
 // ── the installable app (SPEC 13.11): what installing needs, beside golem.html, which stays the whole app ──
-// The mark (an orange square) on Basalt, drawn here: no binary we did not make. Colours are the Switchboard swatches.
+// The mark (an orange square, as in the sidebar) on Basalt, drawn here: no binary we did not make. Colours are the
+// Switchboard swatches. One mark, every icon: the PWA's SVG and PNGs and the Android app's adaptive icon.
 const BASALT = '#15171A', ORANGE = '#FB9044', STONE = '#D2D1CE';
 const rgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
 const CRC = Array.from({ length: 256 }, (_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; });
 const crc32 = b => { let c = 0xFFFFFFFF; for (const x of b) c = CRC[(c ^ x) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
-function png(size, mark) {   // mark: the square's side over the icon's
+const RX = 12 / 64;   // the tile's corner radius over its side, as in ICON_SVG
+// mark: the square's side over the icon's. rounded: the tile's corners cut as in the SVG (transparent outside, edges
+// anti-aliased by 4×4 coverage); a maskable icon is full bleed, since the platform cuts its own shape.
+function png(size, mark, rounded) {
   const bg = rgb(BASALT), fg = rgb(ORANGE), row = size * 4 + 1, raw = Buffer.alloc(row * size);
-  const lo = Math.round(size * (1 - mark) / 2), hi = size - lo;
-  for (let y = 0; y < size; y++) { raw[y * row] = 0; for (let x = 0; x < size; x++) { const c = x >= lo && x < hi && y >= lo && y < hi ? fg : bg; raw.set([...c, 255], y * row + 1 + x * 4); } }
+  const lo = Math.round(size * (1 - mark) / 2), hi = size - lo, r = RX * size;
+  const inside = (px, py) => { const cx = Math.min(Math.max(px, r), size - r), cy = Math.min(Math.max(py, r), size - r); return (px - cx) ** 2 + (py - cy) ** 2 <= r * r; };
+  const cover = (x, y) => { if (!rounded) return 255; let n = 0; for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) n += inside(x + (i + 0.5) / 4, y + (j + 0.5) / 4); return Math.round(n * 255 / 16); };
+  for (let y = 0; y < size; y++) { raw[y * row] = 0; for (let x = 0; x < size; x++) { const c = x >= lo && x < hi && y >= lo && y < hi ? fg : bg; raw.set([...c, cover(x, y)], y * row + 1 + x * 4); } }
   const chunk = (type, data) => { const len = Buffer.alloc(4); len.writeUInt32BE(data.length); const td = Buffer.concat([Buffer.from(type), data]); const c = Buffer.alloc(4); c.writeUInt32BE(crc32(td)); return Buffer.concat([len, td, c]); };
   const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(size, 0); ihdr.writeUInt32BE(size, 4); ihdr.set([8, 6, 0, 0, 0], 8);
   return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', ihdr), chunk('IDAT', deflateSync(raw, { level: 9 })), chunk('IEND', Buffer.alloc(0))]);
@@ -172,13 +178,50 @@ async function installable(dir) {
   writeFileSync(join(dir, 'sw.js'), makeSw({ app: 'golem', cache: SW_CACHE, precache: SW_PRECACHE, autoCheck: false, navFallback: './golem.html', routes: [] }));
   writeFileSync(join(dir, 'manifest.webmanifest'), JSON.stringify(MANIFEST, null, 2) + '\n');
   writeFileSync(join(dir, 'icon.svg'), ICON_SVG + '\n');
-  writeFileSync(join(dir, 'icon-192.png'), png(192, 0.34));
-  writeFileSync(join(dir, 'icon-512.png'), png(512, 0.34));
+  writeFileSync(join(dir, 'icon-192.png'), png(192, 0.34, true));
+  writeFileSync(join(dir, 'icon-512.png'), png(512, 0.34, true));
   writeFileSync(join(dir, 'icon-maskable-512.png'), png(512, 0.28));   // inside the maskable safe zone (the middle 80%)
+}
+// The Android app's icon (android/, the lead-acid app): an adaptive icon, Basalt behind the mark on the 108 dp canvas,
+// the mark sized as on the maskable PNG once the launcher's mask is applied (26 dp of the 72 dp it shows), and the same
+// shape as the monochrome layer that Android 13's themed icons tint. These res files are golem's, written here so the
+// mark has one source; the build leaves android/ alone where it does not exist.
+const ANDROID_RES = join(root, 'android', 'app', 'src', 'main', 'res');
+const ANDROID_GEN = "<!-- Written by build.mjs from golem's mark (ICON_SVG): edit it there. -->";
+function androidIcon() {
+  if (!existsSync(ANDROID_RES)) return false;
+  const put = (p, t) => { mkdirSync(dirname(join(ANDROID_RES, p)), { recursive: true }); writeFileSync(join(ANDROID_RES, p), t); };
+  put('drawable/ic_launcher_foreground.xml', `<?xml version="1.0" encoding="utf-8"?>
+${ANDROID_GEN}
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:pathData="M41,41 H67 V67 H41 Z"
+        android:fillColor="${ORANGE}" />
+</vector>
+`);
+  put('values/colors.xml', `<?xml version="1.0" encoding="utf-8"?>
+${ANDROID_GEN}
+<resources>
+    <color name="ic_launcher_background">${BASALT}</color>
+</resources>
+`);
+  put('mipmap-anydpi-v26/ic_launcher.xml', `<?xml version="1.0" encoding="utf-8"?>
+${ANDROID_GEN}
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/ic_launcher_background" />
+    <foreground android:drawable="@drawable/ic_launcher_foreground" />
+    <monochrome android:drawable="@drawable/ic_launcher_foreground" />
+</adaptive-icon>
+`);
+  return true;
 }
 const HEAD_PWA = `<link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="data:image/svg+xml,${encodeURIComponent(ICON_SVG)}">
-<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-maskable-512.png">
 <meta name="theme-color" content="${STONE}" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="${BASALT}" media="(prefers-color-scheme: dark)">
 `;
@@ -195,7 +238,8 @@ if (process.argv[1] && posix(process.argv[1]).endsWith('/build.mjs')) {
   mkdirSync(join(root, 'dist'), { recursive: true });
   writeFileSync(join(root, 'dist', 'golem.html'), out);
   await installable(join(root, 'dist'));
+  const android = androidIcon();
   const { ontology } = await import(pathToFileURL(join(src, 'engine', 'index.js')).href);
   writeFileSync(join(root, 'dist', 'golem.json'), JSON.stringify(ontology(), null, 2) + '\n');
-  console.log(`dist/golem.html  ${(out.length / 1024).toFixed(1)} kB  from ${js.split('/* ==== src/').length - 1} modules · dist/golem.json written · sw.js, manifest and icons for installing`);
+  console.log(`dist/golem.html  ${(out.length / 1024).toFixed(1)} kB  from ${js.split('/* ==== src/').length - 1} modules · dist/golem.json written · sw.js, manifest and icons for installing${android ? ' · the Android icon' : ''}`);
 }
