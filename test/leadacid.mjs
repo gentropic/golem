@@ -17,7 +17,8 @@ let failed = 0;
 const check = (ok, what) => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${what}`); if (!ok) failed++; };
 const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
 const ctx = await browser.newContext(), page = await ctx.newPage(); const errors = []; page.on('pageerror', e => errors.push(e.message));
-await ctx.addInitScript(() => { window.__benchFixtures = { intent: { 'clock.alarm': false } }; });   // this "phone" has no alarm app
+// this "phone" has no alarm app; its recognizer hears "2 km in miles"
+await ctx.addInitScript(() => { window.__benchFixtures = { intent: { 'clock.alarm': false }, speech: { script: [[120, 'partial', { text: '2 km' }], [120, 'result', { alternatives: [{ text: '2 km in miles', confidence: 0.93 }] }]] } }; });
 await ctx.addInitScript({ content: readFileSync(BENCH, 'utf8') });
 await page.goto(url); await page.waitForSelector('html[data-ready]'); await page.waitForTimeout(200);
 check((await page.textContent('#st-where')) === 'in the lead-acid shell', 'golem sees the shell');
@@ -39,6 +40,24 @@ await page.fill('#q', 'remind me to call the lab on friday at 9'); await page.pr
 await page.locator('#stream .card').last().locator('[data-act="save"]').click(); await page.waitForTimeout(300);
 const pub = await page.evaluate(() => { const p = window.__bench.published.slice(-1)[0]; return p && { name: p.name, collection: p.collection, mime: p.mime, text: new TextDecoder().decode(p.bytes) }; });
 check(pub && pub.name === 'call-the-lab.ics' && pub.collection === 'Downloads' && pub.mime === 'text/calendar' && /BEGIN:VCALENDAR/.test(pub.text), `Save .ics publishes to Downloads (${pub && pub.name}, ${pub && pub.collection})`);
+// voice: the mic fills the box with what the on-device recognizer heard and runs nothing; "say" reads a card aloud
+// with an offline voice; "read every answer aloud" speaks each new card
+await page.fill('#q', ''); const cardsBefore = await page.locator('#stream .card').count();
+check(await page.isVisible('#mic'), 'the mic shows where the phone has an offline recognizer');
+await page.click('#mic'); await page.waitForTimeout(600);
+const heard = await page.inputValue('#q'), speechReq = await page.evaluate(() => window.__bench.speech.slice(-1)[0] || null);
+check(heard === '2 km in miles' && (await page.locator('#stream .card').count()) === cardsBefore && speechReq && speechReq.lang === 'en-US', `the mic puts what it heard in the box and runs nothing (${JSON.stringify(heard)})`);
+await page.press('#q', 'Enter'); await page.waitForTimeout(200);
+const last = page.locator('#stream .card').last();
+await last.locator('[data-act="say"]').click(); await page.waitForTimeout(200);
+const spoken = await page.evaluate(() => window.__bench.spoken.slice(-1)[0] || null);
+check(spoken && /1\.24274/.test(spoken.text) && !/@gcu/.test(spoken.text), `say reads the answer aloud, without its sources (${spoken && spoken.text})`);
+await page.evaluate(() => document.querySelector('[data-tab="packs"]').click()); await page.waitForTimeout(150);
+await page.click('#say-all'); await page.evaluate(() => document.querySelector('[data-tab="ask"]').click());
+const n0 = await page.evaluate(() => window.__bench.spoken.length);
+await page.fill('#q', '25 c in f'); await page.press('#q', 'Enter'); await page.waitForTimeout(300);
+check((await page.evaluate(() => window.__bench.spoken.slice(-1)[0].text)).includes('77') && (await page.evaluate(() => window.__bench.spoken.length)) === n0 + 1, 'with "read every answer aloud" a new card is spoken');
+
 // the app has no network permission: no service worker, no library buttons, packs through the paperclip
 await page.evaluate(() => document.querySelector('[data-tab="packs"]').click()); await page.waitForTimeout(200);
 const drawer = await page.textContent('#v-packs');

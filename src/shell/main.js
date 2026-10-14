@@ -106,7 +106,7 @@ function show(o) {
     case 'undo': { const el = $('stream').querySelector(`[data-id="${o.card.id}"]`); if (el) el.remove(); welcome(); status(`Removed #${pad(o.card.id)}: ${o.card.raw}`); break; }
     case 'nothing': status(o.msg); break;
     case 'card': {
-      const el = cardEl(o.card); $('stream').appendChild(el); drawCharts(el); welcome(); showTab('ask'); el.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+      const el = cardEl(o.card); $('stream').appendChild(el); drawCharts(el); welcome(); if (voice.all) say(el); showTab('ask'); el.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
       // for a screen reader: what was read and the start of the answer, once
       const ans = el.querySelector('.ans'), read = el.querySelector('.read');
       $('sr').textContent = `#${pad(o.card.id)}, ${(read ? read.innerText : o.card.raw).replace(/\s+/g, ' ')}. ${ans ? ans.innerText.replace(/\s+/g, ' ').slice(0, 220) : ''}`;
@@ -152,6 +152,48 @@ async function checkUpdates() {
   update.note = !r ? 'No worker controls this page yet. Reload once, then check again.' : r.changed ? '' : 'golem is up to date.';
   if (r && r.changed) update.ready = true;
   renderPacks();
+}
+/* ── voice, in the app only: the phone's on-device recognizer in, its offline voices out. A browser's speech services
+   may send the audio away, so the page never uses them. What is heard goes into the box, read by the preview; it runs
+   when the person presses Enter, like anything typed. ── */
+const VOICE = 'golem.say';
+const voice = { hear: false, say: false, all: false };
+try { voice.all = localStorage.getItem(VOICE) === 'all'; } catch (e) { /* storage is optional */ }
+const data = d => typeof d === 'string' ? (() => { try { return JSON.parse(d); } catch (e) { return {}; } })() : (d || {});
+if (inApp) {
+  shell.speech.support('en-US').then(s => { if (s && s.onDevice && s.language && s.language.installed) { voice.hear = true; $('mic').hidden = false; } }).catch(() => {});
+  shell.tts.support().then(t => { if (t && t.available && t.offlineVoices) { voice.say = true; document.documentElement.dataset.say = '1'; renderPacks(); } }).catch(() => {});
+}
+// the words the recognizer should expect: the open table's columns and categories, and the units golem knows by name
+const biasWords = () => [...(S.table ? S.table.cols.map(c => c.name) : []), ...(S.table ? S.table.cols.flatMap(c => c.values || []).slice(0, 40) : []), 'g/t', 'ppm', 'dip direction', 'trend', 'plunge'].slice(0, 80);
+let listening = null;
+async function listen() {
+  if (listening) { listening.stop(); return; }
+  const q = $('q'), put = t => { q.value = t; q.dispatchEvent(new Event('input')); };
+  try {
+    listening = await shell.speech.listen({ lang: 'en-US', bias: biasWords() });
+    $('mic').setAttribute('aria-pressed', 'true'); status('Listening. Tap the mic again to stop.');
+    listening.on('partial', d => put(data(d).text || ''))
+      .on('result', d => { const a = data(d).alternatives || [], t = a.length ? a[0].text : ''; put(t); q.focus(); status(t ? 'Heard. The reading is under the box; press Enter to run it.' : 'Nothing heard.'); })
+      .on('error', d => status(`The recognizer stopped: ${data(d).code || 'error'}.`))
+      .onClose(() => { listening = null; $('mic').setAttribute('aria-pressed', 'false'); });
+  } catch (e) {
+    listening = null; $('mic').setAttribute('aria-pressed', 'false');
+    status(e.status === 403 ? 'Voice needs the microphone: allow it in the dialog, or in the app\'s settings.' : e.status === 503 ? 'This phone has no offline recognizer for English. Its language pack for offline speech is in the system settings.' : `Voice failed: ${e.message}`);
+  }
+}
+$('mic').addEventListener('click', () => { if (awake) listen(); });
+// a card said aloud: what was read, then the answer's first lines, without sources
+function spokenOf(el) {
+  const read = el.querySelector('.read'), ans = [...el.querySelector('.ans').children].filter(n => !n.matches('.src, .opts, .lbl, figure, svg, canvas'));
+  return [read ? read.innerText.replace(/^read as\s*/i, '').replace(/⇄/g, '') : '', ...ans.slice(0, 2).map(n => n.innerText)].join('. ').replace(/\s+/g, ' ').slice(0, 400);
+}
+function say(el) { if (voice.say && el) shell.tts.speak(spokenOf(el), { lang: 'en-US', queue: 'flush' }).catch(e => status(e.status === 503 ? 'No offline voice for English on this phone.' : `Could not speak: ${e.message}`)); }
+function voiceItem() {
+  if (!inApp) return '';
+  const hear = voice.hear ? 'The mic in the box listens with the phone\'s own recognizer, offline; what it hears goes into the box for you to check.' : 'No offline recognizer for English on this phone, so there is no mic.';
+  const out = voice.say ? `Answers can be read aloud with the phone's offline voices.</p><div class="opts"><button class="btn${voice.all ? ' go' : ''}" type="button" id="say-all" aria-pressed="${voice.all}">${voice.all ? 'Reading every answer aloud' : 'Read every answer aloud'}</button></div>` : 'No offline voice for English, so nothing is read aloud.</p>';
+  return `<div class="item"><h3>Voice</h3><p>${hear} ${out}</div>`;
 }
 function appItem() {
   if (inApp) return '<div class="item"><h3>This app</h3><p>Installed as an Android app through lead-acid. It has no network permission and checks for nothing: a new version comes as a new APK.</p></div>';
@@ -244,12 +286,13 @@ function renderPacks() {
   });
   const al = Object.entries(S.aliases);
   h += `<div class="lbl">On this device</div><div class="item"><h3>Taught words</h3><p>${al.length ? al.map(([k, v]) => `${escHtml(k)} → ${escHtml(v)}`).join('<br>') : 'None yet. Try “pop means population”.'}</p></div><div class="item"><h3>Notes</h3><p>${S.facts.length ? S.facts.map(escHtml).join('<br>') : 'None yet. Try “remember that …”.'}</p></div><div class="item"><h3>Open table</h3><p>${S.table ? `${escHtml(S.table.name)} · ${S.table.rows.length} rows · ${S.table.source === 'sample' ? 'sample data' : 'from your files'}` : 'None.'}</p></div><div class="item"><h3>Files on this device</h3><p>${Object.values(S.files).length ? Object.values(S.files).map(f => `${escHtml(f.name)} · ${(f.size / 1024).toFixed(0)} kB`).join('<br>') : 'None yet. Tap the paperclip to open a CSV.'}</p></div>`;
-  h += appItem();
+  h += voiceItem() + appItem();
   $('v-packs').innerHTML = h;
   for (const [id, fn] of [['fb-install', () => installFactbook(false)], ['fb-install-full', () => installFactbook(true)], ['fb-remove', removeFactbook]]) { const b = $(id); if (b) b.addEventListener('click', fn); }
   const ck = $('sw-check'), ap = $('sw-apply');
   if (ck) ck.addEventListener('click', checkUpdates);
   if (ap) ap.addEventListener('click', () => sw.applyUpdate());
+  const sa = $('say-all'); if (sa) sa.addEventListener('click', () => { voice.all = !voice.all; try { localStorage.setItem(VOICE, voice.all ? 'all' : ''); } catch (e) { /* storage is optional */ } renderPacks(); });
 }
 
 /* ── the drawer: sessions and history ── */
@@ -415,6 +458,7 @@ $('stream').addEventListener('click', e => {
   else if (act === 'answer') { answer(c, +b.dataset.i); replaceCard(c); }
   else if (act === 'skills') showTab('skills');
   else if (['copyans', 'edit', 'pin', 'branch'].includes(act)) cardAction(c, act);
+  else if (act === 'say') say(b.closest('.card'));
   else if (act === 'handoff') {
     // inside lead-acid: the allowlisted intent, the other app opens for the person to confirm; in a browser: what it would do
     const say = (text, kind) => { const n = document.createElement('div'); n.className = 'note ' + kind; n.textContent = text; b.replaceWith(n); };

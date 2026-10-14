@@ -284,9 +284,10 @@ Adding to the calendar needs no Google API and no network. golem fills the field
 | Dial, message, email | `ACTION_DIAL`, `ACTION_SENDTO` | none |
 | New contact | `ContactsContract.Intents.Insert` | none |
 | Share a result | `ACTION_SEND` | none |
-| Voice input | the lead-acid `speech` plugin: the phone's on-device recognizer only, never the networked one; see `auditable/spec_inbox/lead-acid_and_friends/speech-plugin-spec.md` | `RECORD_AUDIO` (runtime) |
+| Voice input | the lead-acid `speech` plugin: the phone's on-device recognizer only, never the networked one. In the app since 14 Oct 2026: the mic in the box fills it with what was heard, and the preview shows the reading; it runs on Enter, like anything typed. Not in a browser, whose speech services may send the audio away | `RECORD_AUDIO` (runtime, asked on the first tap) |
+| Voice output | the lead-acid `tts` plugin: the phone's offline voices only. A card's "say" reads what was read and the answer, without sources; "read every answer aloud" is a setting on the device | none |
 
-Default to the user-confirms route: the app then requests no dangerous permissions.
+Default to the user-confirms route: the app then requests no dangerous permission but the microphone, and that one only when voice is first used.
 
 **The intent route.** lead-acid's `intent` plugin (verified on the S24+, 2026) is the route this section asked for: `shell.intent.send(name, fields)` with `name` from a fixed allowlist (`calendar.insert`, `clock.timer`, `clock.alarm`, `map.view`, `dial`, `sendto`, `contact.insert`) and typed fields; the shell builds the intent itself, and the page never passes a raw action string or URI scheme.
 
