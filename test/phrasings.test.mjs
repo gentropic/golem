@@ -47,6 +47,8 @@ const GROUPS = [
     'mass of 1 m of nq core at a density of 2.7',
     'what does 1 m of nq core weigh at a density of 2.7']],
   ['landlocked', ['landlocked countries by population', 'which countries are landlocked, sorted by population']],
+  ['ranked countries', ['the 3 largest countries', 'list the 3 biggest countries', 'what are the 3 largest countries?', 'show me the 3 largest countries please']],
+  ['countries by a condition', ['countries with population above 100 million', 'countries where population is above 100 million', 'which countries have a population over 100 million', 'countries having population greater than 100 million']],
   ['unit first', ['0.35 oz per short ton in g/t', 'how many g/t is 0.35 oz per short ton']],
   ['weekday', ['what day is 15 nov 2027', 'please tell me what day 15 nov 2027 is']],
 ];
@@ -117,7 +119,7 @@ test('guess: no exact reading offers repaired readings, runs none until one is p
   assert.ok(g.textOf(c).includes('assumed a preposition'), 'the card says what the reading changed');
   assert.equal(g.S.cards.length, 1, 'nothing ran');
   g.answer(c, 0);
-  assert.equal(c.tool, 'fact'); assert.equal(c.rung, 'guess'); assert.equal(c.args.country, 'mongolia');
+  assert.equal(c.tool, 'fact'); assert.equal(c.rung, 'guess'); assert.equal(c.args.country, 'Mongolia');
   assert.match(c.res.trace[0], /^guess: read as Look up population/);
   const saved = JSON.parse(JSON.stringify(g.serialize()));
   assert.ok(JSON.stringify(saved).includes('"rung":"guess"'), 'the mark travels with the session');

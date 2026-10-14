@@ -343,7 +343,7 @@ svg text{font:10px var(--mono);fill:var(--au-fg-muted)}
         <div class="pv" id="pv" hidden><i aria-hidden="true"></i><span></span></div>
         <div class="sg" id="sg" hidden aria-label="Completions"></div>
         <div class="crow">
-          <button class="ibtn" id="attach" type="button" title="Open a file: a table, a drawing or a document" aria-label="Open a file"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M15 8.5l-6 6a3.5 3.5 0 0 1-5-5l6.5-6.5a2.3 2.3 0 0 1 3.3 3.3L7.4 12.6a1.1 1.1 0 0 1-1.6-1.6L11.5 5.3"/></svg></button><input type="file" id="file" accept=".golem.json,.json,.csv,.tsv,.txt,.md,.markdown,.html,.htm,.xlsx,.xlsm,.dm,.parquet,.dxf,.yaml,.yml,.wkt,.geojson,text/csv,text/tab-separated-values,text/plain" hidden>
+          <button class="ibtn" id="attach" type="button" title="Open a file: a table, a drawing or a document" aria-label="Open a file"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M15 8.5l-6 6a3.5 3.5 0 0 1-5-5l6.5-6.5a2.3 2.3 0 0 1 3.3 3.3L7.4 12.6a1.1 1.1 0 0 1-1.6-1.6L11.5 5.3"/></svg></button><input type="file" id="file" accept=".golem.json,.json,.gcudat,.csv,.tsv,.txt,.md,.markdown,.html,.htm,.xlsx,.xlsm,.dm,.parquet,.dxf,.yaml,.yml,.wkt,.geojson,text/csv,text/tab-separated-values,text/plain" hidden>
           <span class="grow"><span class="only-wide">Enter runs · Tab completes · Shift+Enter for a new line · ↑ for earlier queries</span></span>
           <button class="send" id="send" type="submit" aria-label="Run" title="Run"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 13V3M3.5 7.5L8 3l4.5 4.5"/></svg></button>
         </div>
@@ -11633,51 +11633,8 @@ amend({ tools: ['query'], name: 'addagg', label: 'And', words: [], elidable: tru
 const __m15 = (() => {
 const { T, tool, frame, unit, fmt } = __m0;
 const { parseUnit } = __m2;
-// Knowledge from packs: a Factbook sample, an ODS term index,
-// and a style check from The Elements of Style (1918). All sample data, labelled as such.
-
-/* ── records: Factbook sample (rounded) ────────────────────── */
-const FB = [['Australia', 'Canberra', 7741220, 26.8e6, 0], ['Brazil', 'Brasília', 8515770, 220.1e6, 0], ['Canada', 'Ottawa', 9984670, 38.8e6, 0], ['Chile', 'Santiago', 756102, 18.7e6, 0],
-  ['Germany', 'Berlin', 357022, 84.1e6, 0], ['Indonesia', 'Jakarta', 1904569, 281.6e6, 0], ['Ireland', 'Dublin', 70273, 5.2e6, 0], ['Japan', 'Tokyo', 377915, 123.2e6, 0],
-  ['Kazakhstan', 'Astana', 2724900, 20.3e6, 1], ['Mongolia', 'Ulaanbaatar', 1564116, 3.3e6, 1], ['Peru', 'Lima', 1285216, 32.6e6, 0], ['Portugal', 'Lisbon', 92090, 10.2e6, 0],
-  ['South Africa', 'Pretoria', 1219090, 60.4e6, 0], ['Zambia', 'Lusaka', 752618, 20.8e6, 1]];
-const fbFind = n => FB.find(r => r[0].toLowerCase() === n.trim().toLowerCase().replace(/^the /, ''));
-const FBSRC = { t: 'src', text: 'factbook pack · a rounded 14-country sample, not the full pack' };
-const FIELDS = ['capital', 'population', 'area', 'density'];
-tool({
-  name: 'fact',
-  skill: { group: 'Knowledge', title: 'Records', on: 'factbook pack', about: 'Lookups, unit changes and filters across records.', examples: ['population density of mongolia in people per square mile', 'landlocked countries by population', 'area of brazil in square miles'] },
-  topic: a => [fbFind(a.country)[0] + ' ' + a.field, 2],
-  run: a => {
-    const r = fbFind(a.country); if (!r) return null;
-    const read = [a.field, 'of', { v: r[0] }], trace = [`factbook.get("${r[0]}")`]; let big, py = `data("factbook")["${r[0]}"].${a.field}`;
-    if (a.field === 'capital') big = { t: 'big', v: r[1] };
-    else if (a.field === 'population') big = { t: 'big', v: fmt(r[3], 4), unit: 'people' };
-    else if (a.field === 'area') {
-      let un = a.unit && parseUnit(a.unit); if (!un || un.dim !== 'A') un = parseUnit('km²');
-      read.push('in', { v: un.name }); big = { t: 'big', v: fmt(r[2] * 1e6 / un.f, 5), unit: un.name };
-      trace.push(`area ${fmt(r[2], 9)} km² → ${un.name}`); py = `units.convert(${py}, "km²", "${un.name}")`;
-    } else {
-      const mi = /mi/.test(a.unit || ''), v = r[3] / r[2] * (mi ? 2.589988110336 : 1), per = mi ? 'sq mi' : 'km²';
-      read.push('in', { v: 'people / ' + per }); big = { t: 'big', v: fmt(v, 3), unit: `people per ${per}` };
-      trace.push(`population ${fmt(r[3], 4)} ÷ area ${fmt(r[2], 9)} km²`, mi ? 'units: per km² → per sq mi' : 'no unit change');
-      py = `c = data("factbook")["${r[0]}"]\nunits.convert(c.population / c.area, "1/km²", "1/${per}")`;
-    }
-    return { read, body: [big, FBSRC], trace, py };
-  }
-});
-tool({
-  name: 'factList',
-  topic: () => ['Landlocked countries', 2],
-  run: a => {
-    const k = a.by === 'population' ? 3 : 2, rows = FB.filter(r => r[4]).sort((x, y) => y[k] - x[k]);
-    return {
-      read: ['filter countries where', { v: 'landlocked' }, 'sort by', { v: a.by, key: 'by', alts: ['area', 'population'], cur: a.by }],
-      body: [{ t: 'table', head: ['Country', 'Area km²', 'Population'], num: [false, true, true], rows: rows.map(r => [r[0], fmt(r[2], 9), fmt(r[3], 4)]) }, { t: 'sub', text: `${rows.length} of ${FB.length} records match.` }, FBSRC],
-      trace: ['factbook.records → 14', 'filter landlocked = true', `sort by ${a.by}, descending`], py: `data("factbook").filter(landlocked=True).sort("${a.by}", desc=True)`
-    };
-  }
-});
+// Knowledge from packs: an ODS term index and a style check from The Elements of Style (1918), sample data labelled as such.
+// The Factbook is factbook.js.
 
 /* ── text: ODS term index + Strunk (1918) check ────────────── */
 const ODS = { skiplist: ['4 Skiplists', '4.1 The Basic Structure'], 'hash table': ['5 Hash Tables', '5.1 ChainedHashTable'], 'binary heap': ['10 Heaps', '10.1 BinaryHeap'], treap: ['7 Random Binary Search Trees', '7.2 Treap'], 'scapegoat tree': ['8 Scapegoat Trees', '8.1 ScapegoatTree'], 'red-black tree': ['9 Red-Black Trees', '9.2 RedBlackTree'], 'b-tree': ['14 External Memory Searching', '14.2 B-Trees'] };
@@ -11725,34 +11682,12 @@ tool({
 
 /* ── clause frames over this knowledge ── */
 // "what is the capital of brazil", "population density of mongolia in people per square mile"
-frame({
-  name: 'lookup', label: 'Look up', words: ['lookup', 'look up', 'get', 'find'], elidable: true,
-  theme: ['property'], required: ['theme', 'of'], roles: { of: { preps: ['of', 'for'], types: ['country'] }, unit: { preps: ['in', 'as'], types: ['unit'] } },
-  words_pt: ['consultar', 'consulta', 'buscar', 'busca'], label_pt: 'Consultar',
-  bind: c => {
-    const p = c.theme[0] && c.theme[0].value, of = c.roles.of && c.roles.of[0], unit = c.roles.unit && c.roles.unit[0]; if (!p || !of) return null;
-    const field = p === 'population density' ? 'density' : p;
-    if (of.type === 'country' && FIELDS.includes(field)) return { tool: 'fact', args: { field, country: of.value.toLowerCase(), unit: unit ? unit.unit : undefined } };
-    return null;
-  }
-});
 // "what is a skiplist", "define treap", "treap"
 frame({
   name: 'define', label: 'Define', words: ['define', 'explain', 'describe'], elidable: true,
   theme: ['term'], required: ['theme'], roles: {},
   words_pt: ['definir', 'define', 'defina', 'explicar', 'explica', 'descrever', 'descreve'], label_pt: 'Definir',
   bind: c => { const t = c.theme[0]; return t && t.value ? { tool: 'define', args: { term: t.value } } : null; }
-});
-// "landlocked countries by population", "which countries are landlocked"
-frame({
-  name: 'list', label: 'List', words: ['list', 'rank'], elidable: true,
-  theme: ['country'], required: ['theme'], roles: { by: { preps: ['by', 'sort'], types: ['property'] } },
-  words_pt: ['listar', 'lista', 'ordenar', 'ordena'], label_pt: 'Listar',
-  bind: c => {
-    const t = c.theme[0], by = c.roles.by && c.roles.by[0].value; if (!t || !t.attrs || t.attrs.filter !== 'landlocked') return null;
-    if (by && by !== 'area' && by !== 'population') return null;
-    return { tool: 'factList', args: { by: by || 'area' } };
-  }
 });
 // "check: …", "review this: …"
 frame({
@@ -11762,11 +11697,214 @@ frame({
 });
 // areas the records are asked in: parseUnit knows them, the grammar learns their words here
 for (const [u, words] of [['mi2', ['square miles', 'square mile', 'sq mi', 'mi2']], ['km2', ['square kilometres', 'square kilometers', 'square km', 'sq km', 'km2']], ['ha', ['hectares', 'hectare', 'ha']], ['acres', ['acres', 'acre']]]) unit({ unit: u, dim: 'area', words });
-  return { FB, fbFind, ODS, ODSA };
+  return { ODS, ODSA };
+})();
+
+/* ==== src/engine/factbook.js ==== */
+const __m16 = (() => {
+const { tool, frame, noun, compound, qmod, fmt } = __m0;
+const { parseUnit } = __m2;
+// The Factbook (SPEC 13.8): the rounded 14-country sample that ships with golem, or gcu-library's factbook pack once it is
+// installed on this device (the shell keeps it, and hands it here with useFactbook()). Lookups of every field, with
+// units through @gcu/units; lists ranked, by region, and filtered by the grammar's conditions ("population above 100
+// million"); "landlocked" only where the data says it (the sample, or the pack with its full profiles).
+
+/* ── the data in use ─────────────────────────────────────────── */
+// the sample: [name, iso2, region, capital, area km², population, landlocked]
+const SAMPLE_ROWS = [['Australia', 'au', 'australia-oceania', 'Canberra', 7741220, 26.8e6, 0], ['Brazil', 'br', 'south-america', 'Brasília', 8515770, 220.1e6, 0],
+  ['Canada', 'ca', 'north-america', 'Ottawa', 9984670, 38.8e6, 0], ['Chile', 'cl', 'south-america', 'Santiago', 756102, 18.7e6, 0], ['Germany', 'de', 'europe', 'Berlin', 357022, 84.1e6, 0],
+  ['Indonesia', 'id', 'east-n-southeast-asia', 'Jakarta', 1904569, 281.6e6, 0], ['Ireland', 'ie', 'europe', 'Dublin', 70273, 5.2e6, 0], ['Japan', 'jp', 'east-n-southeast-asia', 'Tokyo', 377915, 123.2e6, 0],
+  ['Kazakhstan', 'kz', 'central-asia', 'Astana', 2724900, 20.3e6, 1], ['Mongolia', 'mn', 'east-n-southeast-asia', 'Ulaanbaatar', 1564116, 3.3e6, 1], ['Peru', 'pe', 'south-america', 'Lima', 1285216, 32.6e6, 0],
+  ['Portugal', 'pt', 'europe', 'Lisbon', 92090, 10.2e6, 0], ['South Africa', 'za', 'africa', 'Pretoria', 1219090, 60.4e6, 0], ['Zambia', 'zm', 'africa', 'Lusaka', 752618, 20.8e6, 1]];
+const SAMPLE = { kind: 'sample', version: 'sample', records: SAMPLE_ROWS.map(([name, iso2, region, capital, area, population, ll]) => ({ name, id: iso2, iso2, region, capital, capitalFull: capital, area, population, landlocked: !!ll, gdp: null, government: null, coords: null, background: null })) };
+let DATA = SAMPLE, BY = new Map();
+// a pack as installed: { name, version, attribution, license, records: [the pack's records], profiles?: { id: { landlocked, coastline } } }
+const toNum = v => typeof v === 'number' && isFinite(v) ? v : null;
+const capitalOf = c => c ? String(c).split(';')[0].replace(/\s*\(.*?\)\s*/g, ' ').trim() : null;
+function normalize(p) {
+  const prof = p.profiles || null;
+  return { kind: 'pack', version: p.version, attribution: p.attribution, license: p.license, profiles: !!prof,
+    records: p.records.filter(r => r && r.name).map(r => ({ name: r.name, id: r.id, iso2: r.iso2 || null, region: r.region || null, capital: capitalOf(r.capital), capitalFull: r.capital || null,
+      area: toNum(r.area_km2), population: toNum(r.population), gdp: toNum(r.gdp_ppp_usd), government: r.government || null, coords: Array.isArray(r.coordinates) ? r.coordinates : null,
+      background: r.background || null, landlocked: prof ? (prof[r.id] ? !!prof[r.id].landlocked : null) : null, coastline: prof && prof[r.id] ? prof[r.id].coastline : null })) };
+}
+function useFactbook(pack) { DATA = pack ? normalize(pack) : SAMPLE; index(); return factbookInfo(); }
+const factbookInfo = () => ({ kind: DATA.kind, version: DATA.version, count: DATA.records.length, profiles: DATA.kind === 'sample' || !!DATA.profiles });
+// what the full profiles add, kept small: the pack's factbook-full records → { id: { landlocked, coastline } }
+function profilesOf(fullRecords) {
+  const out = {};
+  for (const r of fullRecords) {
+    const c = r && r.profile && r.profile.Geography && r.profile.Geography.Coastline && r.profile.Geography.Coastline.text; if (!c) continue;
+    const km = /^([\d,.]+)\s*km/.exec(c); out[r.id] = { landlocked: /landlocked/i.test(c) || (km && parseFloat(km[1].replace(/,/g, '')) === 0), coastline: c.split(/\s*note\b/i)[0].trim() };
+  }
+  return out;
+}
+
+/* ── names: the record's own, its forms without "The" or what is in brackets, aliases, and the browser's names by ISO code ── */
+const fold = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[’`]/g, "'").replace(/\s+/g, ' ').trim();
+const ALIAS = { 'United States': ['usa', 'u.s.', 'united states of america'], 'United Kingdom': ['uk', 'britain', 'great britain'], Burma: ['myanmar'], Turkey: ['turkiye'],
+  'Czechia': ['czech republic'], 'Eswatini': ['swaziland'], 'Cabo Verde': ['cape verde'], 'Holy See (Vatican City)': ['vatican'], 'Timor-Leste': ['east timor'], "Côte d'Ivoire": ['ivory coast'],
+  // two Congos: each by its full names; "congo" alone is both, so it names neither
+  DRC: ['democratic republic of the congo', 'dr congo', 'congo kinshasa', 'congo'], 'Congo (Brazzaville)': ['republic of the congo', 'congo brazzaville', 'congo'] };
+const display = lang => { try { return new Intl.DisplayNames([lang], { type: 'region' }); } catch (e) { return null; } };
+const EN = display('en'), PT = display('pt');
+function formsOf(name) { const n = fold(name), out = [n]; const nb = n.replace(/\s*\(.*\)\s*/g, ' ').trim(); if (nb !== n) out.push(nb); for (const x of [...out]) if (/^the /.test(x)) out.push(x.slice(4)); return out; }
+function wordsOf(r, D) {
+  const out = new Set(formsOf(r.name)); for (const a of (D === EN ? ALIAS[r.name] : null) || []) out.add(fold(a));
+  if (D && r.iso2) { let d = null; try { d = D.of(r.iso2.toUpperCase()); } catch (e) { d = null; } if (d && d.toUpperCase() !== r.iso2.toUpperCase()) for (const f of formsOf(d)) out.add(f); }
+  return [...out].filter(w => w.length > 1);
+}
+// a word two records share names neither (no guessing): "congo" is two countries
+function wordTable(D) {
+  const seen = new Map();
+  for (const r of DATA.records) for (const w of wordsOf(r, D)) seen.set(w, seen.has(w) && seen.get(w) !== r.name ? null : r.name);
+  const words = {}; for (const [w, n] of seen) if (n) (words[n] ??= []).push(w);
+  return words;
+}
+let WORDS_EN = {}, WORDS_PT = {};
+function index() { BY = new Map(DATA.records.map(r => [r.name, r])); WORDS_EN = wordTable(EN); WORDS_PT = wordTable(PT); for (const r of DATA.records) for (const w of WORDS_EN[r.name] || []) BY.set(w, r); }
+index();
+const fbFind = n => { if (!n) return null; const k = fold(String(n)).replace(/^the /, ''); return BY.get(n) || BY.get(k) || BY.get('the ' + k) || null; };
+
+/* ── fields ──────────────────────────────────────────────────── */
+const REGION = { 'south-america': 'South America', europe: 'Europe', africa: 'Africa', 'australia-oceania': 'Australia and Oceania', 'central-america-n-caribbean': 'Central America and the Caribbean',
+  antarctica: 'Antarctica', 'central-asia': 'Central Asia', 'middle-east': 'Middle East', 'north-america': 'North America', 'east-n-southeast-asia': 'East and Southeast Asia', 'south-asia': 'South Asia' };
+const usd = v => v >= 1e12 ? `${fmt(v / 1e12, 4)} trillion` : v >= 1e9 ? `${fmt(v / 1e9, 4)} billion` : v >= 1e6 ? `${fmt(v / 1e6, 4)} million` : fmt(v, 6);
+// a field's value for a record (numbers in the Factbook's units: km², people, US dollars), or null where it says nothing
+const FIELD = {
+  capital: { label: 'capital', get: r => r.capital },
+  population: { label: 'population', get: r => r.population, num: true },
+  area: { label: 'area', get: r => r.area, num: true, dim: 'A' },
+  density: { label: 'population density', get: r => r.population != null && r.area ? r.population / r.area : null, num: true, derived: 'population ÷ area' },
+  gdp: { label: 'GDP (PPP)', get: r => r.gdp, num: true },
+  gdppc: { label: 'GDP (PPP) per person', get: r => r.gdp != null && r.population ? r.gdp / r.population : null, num: true, derived: 'GDP (PPP) ÷ population' },
+  government: { label: 'government', get: r => r.government },
+  region: { label: 'region', get: r => r.region && REGION[r.region] },
+  background: { label: 'background', get: r => r.background },
+  location: { label: 'location', get: r => r.coords && `${fmt(r.coords[0], 4)}, ${fmt(r.coords[1], 4)} (the country's centre)` },
+  coastline: { label: 'coastline', get: r => r.coastline || null },
+};
+const FIELD_OF = { 'population density': 'density', density: 'density' };
+const fieldOf = v => FIELD_OF[v] || (FIELD[v] ? v : null);
+const srcBlock = () => ({ t: 'src', text: DATA.kind === 'sample' ? 'factbook · a rounded 14-country sample that ships with golem; the full pack installs under Packs and this device'
+  : `factbook ${DATA.version} · CIA World Factbook · public domain (CC0) · installed on this device` });
+// a number field as shown, with its unit: area in the unit asked for, density per km² or per square mile
+function shown(field, v, unitWord) {
+  if (field === 'area') { let u = unitWord && parseUnit(unitWord); if (!u || u.dim !== 'A') u = parseUnit('km²'); return { v: u.name === 'km²' ? Math.round(v).toLocaleString('en-US') : fmt(v * 1e6 / u.f, 6), unit: u.name, note: u.name !== 'km²' ? `area ${fmt(v, 9)} km² → ${u.name}` : null }; }
+  if (field === 'density') { const mi = /mi/.test(unitWord || ''); return { v: fmt(v * (mi ? 2.589988110336 : 1), 3), unit: `people per ${mi ? 'sq mi' : 'km²'}`, note: mi ? 'per km² → per sq mi' : null }; }
+  if (field === 'population') return { v: Math.round(v).toLocaleString('en-US'), unit: 'people' };   // as published
+  if (field === 'gdp') return { v: usd(v), unit: 'US dollars, PPP' };
+  if (field === 'gdppc') return { v: fmt(v, 4), unit: 'US dollars per person, PPP' };
+  return { v: fmt(v, 6) };
+}
+tool({
+  name: 'fact',
+  skill: { group: 'Knowledge', title: 'Records', on: 'factbook pack', about: 'Every field of every country in the Factbook: capital, population, area, density, GDP, government, region, background. Lists ranked, by region and filtered by conditions. A sample ships; the full pack installs on request.', examples: ['population density of mongolia in people per square mile', 'landlocked countries by population', 'area of brazil in square miles', 'the 5 most populous countries in south america', 'countries with population above 100 million'] },
+  topic: a => { const r = fbFind(a.country); return [(r ? r.name : a.country) + ' ' + a.field, 2]; },
+  run: a => {
+    const r = fbFind(a.country), field = fieldOf(a.field), F = field && FIELD[field]; if (!F) return null;
+    if (!r) return { read: [F.label, 'of', { v: a.country }], body: [{ t: 'note', kind: 'err', text: `${a.country} is not in the ${DATA.kind === 'sample' ? 'sample of 14 countries; the full Factbook installs under Packs and this device' : 'Factbook'}.` }, srcBlock()], trace: [`factbook.find("${a.country}") → none`] };
+    const read = [F.label, 'of', { v: r.name }], trace = [`factbook.get("${r.name}")`], v = F.get(r);
+    if (v == null) return { read, body: [{ t: 'note', kind: 'err', text: `The Factbook gives no ${F.label} for ${r.name}.` }, srcBlock()], trace: [...trace, `${field}: none`] };
+    if (field === 'background') return { read, body: [{ t: 'sub', text: v }, srcBlock()], trace: [...trace, 'background: the passage as published'], py: `data("factbook")["${r.name}"].background` };
+    if (!F.num) return { read, body: [{ t: 'big', v: String(v), size: String(v).length > 40 ? 17 : undefined }, ...(field === 'capital' && r.capitalFull && r.capitalFull !== v ? [{ t: 'sub', text: r.capitalFull }] : []), srcBlock()], trace, py: `data("factbook")["${r.name}"].${field}` };
+    const s = shown(field, v, a.unit);
+    if (field === 'area' || field === 'density') read.push('in', { v: s.unit.replace(/^people per /, 'people / ') });
+    if (F.derived) trace.push(`${F.derived}: ${field === 'density' ? `${fmt(r.population, 4)} ÷ ${fmt(r.area, 9)} km²` : `${usd(r.gdp)} ÷ ${fmt(r.population, 4)}`}`);
+    if (s.note) trace.push(s.note);
+    return { read, value: v, body: [{ t: 'big', v: s.v, unit: s.unit }, srcBlock()], trace, py: `data("factbook")["${r.name}"].${field}` };
+  }
+});
+
+/* ── lists: ranked, by region, filtered ──────────────────────── */
+const SIFT = { above: (x, y) => x > y, below: (x, y) => x < y, atleast: (x, y) => x >= y, atmost: (x, y) => x <= y, equals: (x, y) => x === y, differs: (x, y) => x !== y };
+// a condition the grammar read, over records: numbers in the Factbook's units (an area with its unit is converted)
+function test(c, r) {
+  if (c.or) return c.or.some(x => test(x, r)); if (c.and) return c.and.every(x => test(x, r)); if (c.not) return !test(c.not, r);
+  const field = fieldOf(c.col.value), F = field && FIELD[field]; if (!F) throw new Error(`the Factbook has no field "${c.col.value}"`);
+  const v = F.get(r); if (c.op === 'blank') return v == null; if (c.op === 'present') return v != null; if (v == null) return false;
+  const num = x => { if (x.n == null) throw new Error(`${F.label} is a number; "${x.s}" is not one`); if (!x.unit || field !== 'area') return x.n; const u = parseUnit(x.unit); if (!u || u.dim !== 'A') throw new Error(`${x.unit} is not an area`); return x.n * u.f / 1e6; };
+  if (c.op === 'between') return v >= num(c.vals[0]) && v <= num(c.vals[1]);
+  if (c.op === 'in') return c.vals.some(x => String(v).toLowerCase() === String(x.s ?? x.n).toLowerCase());
+  if (!F.num) { if (c.op !== 'equals' && c.op !== 'differs') throw new Error(`${F.label} is not a number`); const eq = String(v).toLowerCase() === String(c.val.s ?? c.val.n).toLowerCase(); return c.op === 'equals' ? eq : !eq; }
+  return SIFT[c.op](v, num(c.val));
+}
+const condText = c => c.or ? c.or.map(condText).join(' or ') : c.and ? c.and.map(condText).join(' and ') : c.not ? `not (${condText(c.not)})` : `${c.col.value} ${{ above: '>', below: '<', atleast: '≥', atmost: '≤', equals: '=', differs: '≠', between: 'between', in: 'in', blank: 'is blank', present: 'is not blank' }[c.op]}${c.val ? ' ' + (c.val.s ?? c.val.n + (c.val.unit ? ' ' + c.val.unit : '')) : c.vals ? ' ' + c.vals.map(x => x.s ?? x.n).join(', ') : ''}`;
+tool({
+  name: 'factList',
+  topic: a => [a.filter && a.filter.landlocked !== false && !a.where && !a.region ? 'Landlocked countries' : 'Countries', 2],
+  run: a => {
+    // cards from before 14 Oct 2026 carry only { by }: the landlocked list
+    const landlocked = a.filter ? !!a.filter.landlocked : true, by = fieldOf(a.by || 'area'), F = FIELD[by], desc = a.order !== 'asc';
+    const read = ['countries', ...(landlocked ? ['that are', { v: 'landlocked' }] : []), ...(a.region ? ['in', { v: REGION[a.region] || a.region }] : []), ...(a.where ? ['where', { v: condText(a.where) }] : []), 'by', { v: F.label, key: 'by', alts: ['area', 'population', 'density', 'gdp', 'gdppc'], cur: by }, ...(a.limit ? ['top', { v: String(a.limit) }] : [])];
+    if (landlocked && !factbookInfo().profiles) return { read, body: [{ t: 'note', kind: 'err', text: 'The installed Factbook does not say which countries are landlocked. Add its full profiles under Packs and this device.' }, srcBlock()], trace: ['filter landlocked: not in this data'] };
+    let rows = DATA.records;
+    try { rows = rows.filter(r => (!landlocked || r.landlocked) && (!a.region || r.region === a.region) && (!a.where || test(a.where, r))); }
+    catch (e) { return { read, body: [{ t: 'note', kind: 'err', text: e.message }, srcBlock()], trace: ['condition: rejected'] }; }
+    const known = rows.filter(r => F.get(r) != null), unknown = rows.length - known.length;
+    known.sort((x, y) => desc ? F.get(y) - F.get(x) : F.get(x) - F.get(y));
+    const shownRows = a.limit ? known.slice(0, a.limit) : known;
+    const cols = [...new Set([by, 'area', 'population'])].filter(k => FIELD[k].num);
+    return {
+      read,
+      body: [{ t: 'table', head: ['Country', ...cols.map(k => k === 'area' ? 'Area km²' : FIELD[k].label[0].toUpperCase() + FIELD[k].label.slice(1))], num: [false, ...cols.map(() => true)],
+        rows: shownRows.map(r => [r.name, ...cols.map(k => { const v = FIELD[k].get(r); return v == null ? '—' : k === 'gdp' ? usd(v) : k === 'population' || k === 'area' ? Math.round(v).toLocaleString('en-US') : fmt(v, 4); })]) },
+        { t: 'sub', text: `${a.limit && known.length > a.limit ? `The first ${shownRows.length} of ${known.length} that match` : `${known.length} match`}, of ${DATA.records.length} records${unknown ? `; ${unknown} more match but give no ${F.label}` : ''}.` }, srcBlock()],
+      trace: [`factbook.records → ${DATA.records.length}`, ...(landlocked ? ['filter landlocked'] : []), ...(a.region ? [`filter region = ${a.region}`] : []), ...(a.where ? [`filter ${condText(a.where)}`] : []), `sort by ${by}, ${desc ? 'descending' : 'ascending'}${a.limit ? `, first ${a.limit}` : ''}`],
+      py: `data("factbook")${landlocked ? '.filter(landlocked=True)' : ''}${a.region ? `.filter(region="${a.region}")` : ''}.sort("${by}", desc=${desc ? 'True' : 'False'})${a.limit ? `[:${a.limit}]` : ''}`
+    };
+  }
+});
+
+/* ── what reads them ─────────────────────────────────────────── */
+noun(() => ({ type: 'country', exact: true, words: WORDS_EN, generic: ['country', 'countries', 'nation', 'nations', 'territory', 'territories'], words_pt: WORDS_PT, generic_pt: ['país', 'pais', 'países', 'paises'] }));
+noun({ type: 'region', exact: true, words: { 'south-america': ['south america'], europe: ['europe'], africa: ['africa'], 'australia-oceania': ['oceania', 'australia and oceania'], 'central-america-n-caribbean': ['central america', 'the caribbean', 'caribbean', 'central america and the caribbean'],
+  antarctica: ['antarctica'], 'central-asia': ['central asia'], 'middle-east': ['the middle east', 'middle east'], 'north-america': ['north america'], 'east-n-southeast-asia': ['east asia', 'southeast asia', 'east and southeast asia'], 'south-asia': ['south asia'] },
+  words_pt: { 'south-america': ['américa do sul', 'america do sul'], europe: ['europa'], africa: ['áfrica', 'africa'], 'australia-oceania': ['oceania'], 'central-america-n-caribbean': ['américa central', 'caribe'], antarctica: ['antártida'], 'central-asia': ['ásia central'], 'middle-east': ['oriente médio'], 'north-america': ['américa do norte'], 'east-n-southeast-asia': ['sudeste asiático', 'leste asiático'], 'south-asia': ['sul da ásia'] } });
+noun({ type: 'property', words: { capital: ['capital', 'capital city'], population: ['population', 'inhabitants', 'number of people'], area: ['area', 'land area', 'size'], 'population density': ['population density'],
+  gdp: ['gdp', 'gdp ppp', 'economy', 'economic output'], gdppc: ['gdp per capita', 'gdp per person', 'gdp per head', 'income per person'], government: ['government', 'government type', 'form of government', 'political system'],
+  region: ['region', 'continent'], background: ['background', 'history', 'overview'], location: ['location', 'coordinates'], coastline: ['coastline', 'coast'] },
+  generic: ['property', 'value'],
+  words_pt: { capital: ['capital'], population: ['população', 'populacao'], area: ['área', 'area'], 'population density': ['densidade populacional', 'densidade de população'], gdp: ['pib'], gdppc: ['pib per capita'], government: ['governo'], region: ['região', 'regiao'], background: ['história', 'historia'], location: ['localização'], coastline: ['litoral', 'costa'] }, generic_pt: ['propriedade', 'valor'] });
+noun({ type: 'filter', words: { landlocked: ['landlocked'] }, words_pt: { landlocked: ['sem litoral', 'sem costa'] } });
+compound({ mod: 'filter', heads: ['country'], attr: 'filter', echo: true });
+// "the 5 largest countries", "the most populous countries": a ranking said as an adjective
+noun({ type: 'rank', words: { largest: ['largest', 'biggest'], smallest: ['smallest'], populous: ['most populous', 'most populated'], unpopulous: ['least populous', 'least populated'], dense: ['most densely populated', 'densest'], richest: ['richest', 'wealthiest'], poorest: ['poorest'] },
+  words_pt: { largest: ['maiores'], smallest: ['menores'], populous: ['mais populosos'], richest: ['mais ricos'], poorest: ['mais pobres'] } });
+compound({ mod: 'rank', heads: ['country'], attr: 'rank', echo: true });
+qmod({ head: 'country', attr: 'limit', dims: ['bare'] });   // "5 countries"
+const RANK = { largest: ['area', 'desc'], smallest: ['area', 'asc'], populous: ['population', 'desc'], unpopulous: ['population', 'asc'], dense: ['density', 'desc'], richest: ['gdppc', 'desc'], poorest: ['gdppc', 'asc'] };
+// "population density of mongolia in people per square mile", "capital of brazil", "gdp of chile"
+frame({
+  name: 'lookup', label: 'Look up', words: ['lookup', 'look up', 'get', 'find'], elidable: true,
+  theme: ['property'], required: ['theme', 'of'], roles: { of: { preps: ['of', 'for', 'in'], types: ['country'] }, unit: { preps: ['in', 'as'], types: ['unit'] } },
+  words_pt: ['consultar', 'consulta', 'buscar', 'busca'], label_pt: 'Consultar',
+  bind: c => {
+    const p = c.theme[0] && c.theme[0].value, of = c.roles.of && c.roles.of[0], unit = c.roles.unit && c.roles.unit[0], field = p && fieldOf(p); if (!field || !of || of.type !== 'country' || !of.value) return null;
+    return { tool: 'fact', args: { field, country: of.value, unit: unit ? unit.unit : undefined } };
+  }
+});
+// "landlocked countries by population", "the 5 largest countries in africa", "countries with population above 100 million"
+frame({
+  name: 'list', label: 'List', words: ['list', 'rank', 'show', 'show me', 'which are the'], elidable: true,
+  theme: ['country'], required: ['theme'], roles: { by: { preps: ['by', 'sort'], types: ['property'] }, in: { preps: ['in', 'of', 'from'], types: ['region'] }, where: { preps: ['where', 'with', 'having'], types: ['cond'] } },
+  words_pt: ['listar', 'lista', 'ordenar', 'ordena'], label_pt: 'Listar',
+  bind: c => {
+    const t = c.theme[0]; if (!t || c.theme.length > 1 || t.value) return null;   // a list is of countries, not of one
+    const at = t.attrs || {}, rank = at.rank && RANK[at.rank], w = c.roles.where && c.roles.where[0], region = c.roles.in && c.roles.in[0].value;
+    // sorted by what was asked for, else by the ranking, else by the number the condition names ("population above 100 million")
+    const firstCol = x => x.col ? x.col.value : x.and ? firstCol(x.and[0]) : x.or ? firstCol(x.or[0]) : x.not ? firstCol(x.not) : null, condField = w && fieldOf(firstCol(w.cond));
+    const by = c.roles.by ? fieldOf(c.roles.by[0].value) : !rank && condField && FIELD[condField].num ? condField : null;
+    if (!at.filter && !rank && !w && !region && !by) return null;
+    if (c.roles.by && (!by || !FIELD[by].num)) return null;
+    return { tool: 'factList', args: { by: by || (rank ? rank[0] : 'area'), order: rank ? rank[1] : 'desc', filter: { landlocked: at.filter === 'landlocked' }, ...(region ? { region } : {}), ...(w ? { where: w.cond } : {}), ...(at.limit ? { limit: at.limit.n } : {}) } };
+  }
+});
+  return { useFactbook, factbookInfo, profilesOf, fbFind, FIELD, fieldOf };
 })();
 
 /* ==== src/engine/device.js ==== */
-const __m16 = (() => {
+const __m17 = (() => {
 const { tool, frame, noun, postmod, fmt, iso } = __m0;
 const { findDate, findTime, today, fmtDate, dateWords } = __m4;
 const { parseUnit } = __m2;
@@ -11863,7 +12001,7 @@ postmod({ prep: '', heads: ['timer'], attr: 'duration', quantity: true });   // 
 })();
 
 /* ==== src/engine/structure.js ==== */
-const __m17 = (() => {
+const __m18 = (() => {
 const { frame, noun, postmod, qmod, tool, fmt, rad, deg, p3, p2 } = __m0;
 const { conversions, vec3, statistics } = __m5;
 const { oriOf } = __m6;
@@ -12039,7 +12177,7 @@ frame({
 })();
 
 /* ==== src/vendor/wmm.js ==== */
-const __m18 = (() => {
+const __m19 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/wmm, the World Magnetic Model (WMM2025) evaluated from NOAA's coefficients,
 // copied from ../auditable/ext/wmm/index.js. Re-vendor by copying that file here when the model is reissued.
 
@@ -12290,9 +12428,9 @@ function declination(lat, lon, date = new Date(), height = 0) {
 })();
 
 /* ==== src/engine/geo.js ==== */
-const __m19 = (() => {
+const __m20 = (() => {
 const { tool, frame, noun, qmod, clock, fmt, iso, p3 } = __m0;
-const { field, MODEL, VALID_FROM, VALID_TO } = __m18;
+const { field, MODEL, VALID_FROM, VALID_TO } = __m19;
 const { findDate, fmtDate, dateWords } = __m4;
 // Magnetic declination from @gcu/wmm (vendored WMM2025), and bearings between magnetic and true north.
 // A place is coordinates in the request; device location stays off (SPEC-skills 0.7).
@@ -12358,7 +12496,7 @@ frame({
 })();
 
 /* ==== src/engine/data/timescale.js ==== */
-const __m20 = (() => {
+const __m21 = (() => {
 // The International Chronostratigraphic Chart as a records pack: one row per unit, five ranks.
 // Source: ICS (Cohen, Finney, Gibbard & Fan 2013; updated chart) as served by Macrostrat
 // (macrostrat.org/api/v2/defs/intervals?timescale_id=11, CC BY 4.0), fetched 8 Oct 2026. The Hadean is
@@ -12543,9 +12681,9 @@ const TIMESCALE = [
 })();
 
 /* ==== src/engine/timescale.js ==== */
-const __m21 = (() => {
+const __m22 = (() => {
 const { tool, frame, noun, unit, fmt } = __m0;
-const { TIMESCALE, TIMESCALE_SOURCE } = __m20;
+const { TIMESCALE, TIMESCALE_SOURCE } = __m21;
 // The geologic timescale: the ICS chart as a records pack (data/timescale.js). Ages, bounds, ranks,
 // what a unit sits in, what came before and after, what it is subdivided into, and which unit an age
 // in Ma falls in. Lookups only; the chart is the answer.
@@ -12645,7 +12783,7 @@ noun({ type: 'chron', words: Object.fromEntries(Object.keys(RETIRED).map(k => [k
 })();
 
 /* ==== src/engine/sample.js ==== */
-const __m22 = (() => {
+const __m23 = (() => {
 const { tool, frame, noun, compound, qmod, postmod, unit, fmt } = __m0;
 const { parseUnit } = __m2;
 const { core, sieve } = __m1;
@@ -12785,7 +12923,7 @@ frame({
 })();
 
 /* ==== src/engine/explain.js ==== */
-const __m23 = (() => {
+const __m24 = (() => {
 const { tool, frame, amend, noun, shape, clock, fmt } = __m0;
 // Explainers: formal notation parsed and described, one row per piece. Cron schedules, epoch times,
 // chmod modes, URLs and ECMAScript regular expressions. Each member has a recogniser so a bare
@@ -13160,7 +13298,7 @@ amend({ tools: ['explain'], name: 'explainas', label: 'Explain as', words: [], e
 })();
 
 /* ==== src/vendor/parquet.js ==== */
-const __m24 = (() => {
+const __m25 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/parquet, Parquet read and write over vendored hyparquet and hyparquet-writer, pure JS, minified by its own build, copied from ../auditable/ext/parquet/index.js at auditable 5fa5f72e (MIT; hyparquet MIT).
 // Re-vendor by copying that file here.
 
@@ -13169,9 +13307,9 @@ const e=["BOOLEAN","INT32","INT64","INT96","FLOAT","DOUBLE","BYTE_ARRAY","FIXED_
 })();
 
 /* ==== src/engine/convert.js ==== */
-const __m25 = (() => {
+const __m26 = (() => {
 const { S, tool, frame, amend, noun, fmt } = __m0;
-const { writeParquet } = __m24;
+const { writeParquet } = __m25;
 // Conversions that need no file format reader: hashes, text encodings both ways, and the open table
 // as CSV, TSV or JSON with a save action. Format readers (xlsx, dm, parquet) are the second pass.
 
@@ -13328,7 +13466,7 @@ for (const op of ['encode', 'decode']) amend({ tools: ['encode'], name: `op${op}
 })();
 
 /* ==== src/vendor/plan-calendar.js ==== */
-const __m26 = (() => {
+const __m27 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/plan's calendar engine and Brazilian holidays, copied from
 // ../auditable/ext/plan/src/calendar.js and src/holidays-br.js (MIT). The scheduling half of the package is not here.
 // Re-vendor by copying those two files here again and keeping the single export block at the end.
@@ -13685,10 +13823,10 @@ function brazilMunicipalities() {
 })();
 
 /* ==== src/engine/calendar.js ==== */
-const __m27 = (() => {
+const __m28 = (() => {
 const { S, tool, frame, amend, noun, shape, postmod, unit, clock, iso } = __m0;
 const { findDate, findTime, today, day0, fmtDate, dateWords } = __m4;
-const { isWorkingDay, addWorkingDays, brazilCalendar, federalHolidays } = __m26;
+const { isWorkingDay, addWorkingDays, brazilCalendar, federalHolidays } = __m27;
 // Working days and rosters over @gcu/plan's calendar engine (vendored), and time zones through Intl.
 // The calendar is a slot and is always shown: Brazil's federal holidays, or weekdays only.
 
@@ -13921,7 +14059,7 @@ amend({ tools: ['workdays'], name: 'workcal', label: 'Calendar', words: [], elid
 })();
 
 /* ==== src/engine/estimate.js ==== */
-const __m28 = (() => {
+const __m29 = (() => {
 const { amend, noun, tool, fmt } = __m0;
 const { U } = __m2;
 // Estimates with ranges: arithmetic over intervals by simulation, units carried through, the seed kept
@@ -14096,7 +14234,7 @@ amend({ tools: ['estimate'], name: 'estdist', label: 'Distribution', words: ['as
 })();
 
 /* ==== src/engine/data/elements.js ==== */
-const __m29 = (() => {
+const __m30 = (() => {
 // The elements with their standard atomic weights, abridged to five significant figures.
 // Source: IUPAC Commission on Isotopic Abundances and Atomic Weights (CIAAW), Standard Atomic Weights 2024
 // (ciaaw.org/atomic-weights.htm, the 2021 report with Gd, Lu and Zr revised in 2024), cross-checked against
@@ -14141,9 +14279,9 @@ const ELEMENTS = [
 })();
 
 /* ==== src/engine/chem.js ==== */
-const __m30 = (() => {
+const __m31 = (() => {
 const { tool, frame, noun, shape, postmod, fmt } = __m0;
-const { ELEMENTS, ELEMENTS_SOURCE } = __m29;
+const { ELEMENTS, ELEMENTS_SOURCE } = __m30;
 const { UNIT_TABLE } = __m2;
 // Molar mass, conversion factors and element fractions from a parsed formula over the IUPAC weights;
 // the periodic table lookup. No mineral names: the minerals pack is not here, so a formula is required.
@@ -14302,7 +14440,7 @@ frame({
 })();
 
 /* ==== src/engine/text.js ==== */
-const __m31 = (() => {
+const __m32 = (() => {
 const { tool, frame, amend, noun, qmod, fmt } = __m0;
 // Text tools over a pasted payload: counts and readability, extracted key sentences, and a diff.
 // The payload is what follows the first colon, or every line after the first of a multi-line input;
@@ -14448,7 +14586,7 @@ amend({ tools: ['diff'], name: 'diffunit', label: 'Diff by', words: [], elidable
 })();
 
 /* ==== src/engine/forms.js ==== */
-const __m32 = (() => {
+const __m33 = (() => {
 const { tool, frame, amend, noun } = __m0;
 // The form card: a tool that still needs answers asks for them one at a time; each answer lands in
 // args and is an editable slot, and the result recomputes when any changes. The decision matrix is the
@@ -14525,10 +14663,10 @@ amend({ tools: ['decide'], name: 'score', label: 'Score', words: ['is', 'scores'
 })();
 
 /* ==== src/engine/econ.js ==== */
-const __m33 = (() => {
+const __m34 = (() => {
 const { tool, frame, noun, shape, postmod, qmod, fmt } = __m0;
-const { ELEMENTS } = __m29;
-const { numberAsk, firstNeed } = __m32;
+const { ELEMENTS } = __m30;
+const { numberAsk, firstNeed } = __m33;
 // Sampling theory and mine economics as declared formulas. Every term is a slot; a term the person did
 // not give is asked for, with the conventional value offered first and never applied on its own. Prices
 // are always the person's input. No geostatistics here: these are formulas over given numbers.
@@ -14692,7 +14830,7 @@ frame({
 })();
 
 /* ==== src/engine/log.js ==== */
-const __m34 = (() => {
+const __m35 = (() => {
 const { S, tool, frame, amend, noun, fmt, iso } = __m0;
 const { parseUnit, dimName } = __m2;
 const { findDate, today, fmtDate, dateWords } = __m4;
@@ -14837,7 +14975,7 @@ amend({ tools: ['logAdd'], name: 'logfix', label: 'Correct', words: ['that was',
 })();
 
 /* ==== src/engine/places.js ==== */
-const __m35 = (() => {
+const __m36 = (() => {
 const { S, tool, frame, amend, noun, shape, postmod, fmt, rad, deg } = __m0;
 // Places, distance and UTM. A place is coordinates in the request or a name saved on this device
 // ("home is -19.92, -43.94"); there is no gazetteer and device location is off, so an unknown name is
@@ -15003,11 +15141,11 @@ amend({ tools: ['utm'], name: 'utmband', label: 'Band', words: [], elidable: tru
 })();
 
 /* ==== src/engine/sky.js ==== */
-const __m36 = (() => {
+const __m37 = (() => {
 const { tool, frame, amend, noun, compound, fmt, rad, deg, iso } = __m0;
 const { findDate, today, fmtDate, dateWords } = __m4;
-const { zonesOf, offsetOf } = __m27;
-const { placeOf } = __m35;
+const { zonesOf, offsetOf } = __m28;
+const { placeOf } = __m36;
 // The sun by NOAA's solar position equations (after Meeus), and the moon's phase from the mean
 // synodic cycle, labelled with its accuracy. Times are given in the place's zone when the place name
 // has one, else in UTC and the card says so.
@@ -15089,7 +15227,7 @@ amend({ tools: ['sun'], name: 'sunzone', label: 'Zone', words: [], elidable: tru
 })();
 
 /* ==== src/engine/apply.js ==== */
-const __m37 = (() => {
+const __m38 = (() => {
 const { S, tool, fmt, rad, deg, p3, p2 } = __m0;
 const { whereOf } = __m14;
 const { evaluatePredicate, predicateToString } = __m13;
@@ -15156,7 +15294,7 @@ tool({
 })();
 
 /* ==== src/vendor/ipynb.js ==== */
-const __m38 = (() => {
+const __m39 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/ipynb, copied from ../auditable/ext/ipynb/index.js (MIT). golem uses importNotebook
 // for its import-substitution table only (numpy → natra, pandas → sadpan, …). Re-vendor by copying that file here.
 
@@ -15705,9 +15843,9 @@ function exportNotebook(cells, opts = {}) {
 })();
 
 /* ==== src/engine/python.js ==== */
-const __m39 = (() => {
+const __m40 = (() => {
 const { tool, frame, amend, result, fmt } = __m0;
-const { importNotebook } = __m38;
+const { importNotebook } = __m39;
 // Run and trace Python with adder, on the device. The tool itself stays synchronous: a first run returns a
 // "running" card carrying a job, the runner (a Web Worker in the page, adder in-process in the tests)
 // answers later, and the card is recomputed from the kept result. Replay reruns the code, which is
@@ -15777,7 +15915,7 @@ amend({ tools: ['python'], name: 'pytraceoff', label: 'Run', words: ['no trace',
 })();
 
 /* ==== src/vendor/librarian.js ==== */
-const __m40 = (() => {
+const __m41 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/librarian, the in-process text search (BM25F, fuzzy expansion, snippets, did-you-mean), copied from ../auditable/ext/librarian/index.js at auditable 5fa5f72e (MIT).
 // Re-vendor by copying that file here.
 
@@ -17053,9 +17191,9 @@ const Librarian = {
 })();
 
 /* ==== src/engine/docs.js ==== */
-const __m41 = (() => {
+const __m42 = (() => {
 const { S, tool, frame, amend, noun, postmod } = __m0;
-const { Librarian } = __m40;
+const { Librarian } = __m41;
 // Search my documents (A7). Markdown, plain text and HTML opened with the paperclip are kept on the device,
 // cut into passages (by heading, then by paragraph) and indexed by @gcu/librarian. A search returns
 // passages verbatim with the matched words marked; golem never rewrites them. The index is derived
@@ -17208,9 +17346,9 @@ amend({ tools: ['docPassage'], name: 'docstep', label: 'Passage', words: [], eli
 })();
 
 /* ==== src/engine/recipes.js ==== */
-const __m42 = (() => {
+const __m43 = (() => {
 const { S, tool, frame, noun, session, runTool } = __m0;
-const { listOf } = __m32;
+const { listOf } = __m33;
 // Recipes (A9): a session's plan saved under a name, with the subjects that may change between runs.
 // A recipe is stored as card specs, plain JSON like a session; running it replays every step with the
 // new subjects into a new session, and stops at the first step that no longer reads. Nothing is skipped
@@ -17404,7 +17542,7 @@ session({
 })();
 
 /* ==== src/vendor/sheet.js ==== */
-const __m43 = (() => {
+const __m44 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sheet, copied from ../auditable/ext/sheet/index.js (built from its src/ by @gcu/build, MIT).
 // Re-vendor by copying that file here. Reading is asynchronous (DecompressionStream), so golem converts at open time, not in a tool.
 
@@ -18636,7 +18774,7 @@ const sheet = {
 })();
 
 /* ==== src/vendor/dm.js ==== */
-const __m44 = (() => {
+const __m45 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/dm, the read-only Datamine .dm reader, copied from ../auditable/ext/dm/index.js (MIT).
 // Re-vendor by copying that file here.
 
@@ -18912,10 +19050,10 @@ function readDM(buffer) {
 })();
 
 /* ==== src/engine/formats.js ==== */
-const __m45 = (() => {
-const { sheet } = __m43;
-const { readDM } = __m44;
-const { readParquet, parquetInfo } = __m24;
+const __m46 = (() => {
+const { sheet } = __m44;
+const { readDM } = __m45;
+const { readParquet, parquetInfo } = __m25;
 // Binary table formats, converted to text when a file is opened: xlsx through @gcu/sheet (one text per
 // sheet), Datamine .dm through @gcu/dm, Parquet through @gcu/parquet. Tools stay synchronous and the device keeps the converted text,
 // so a session replays from it. What did not carry over is said on the card.
@@ -18966,7 +19104,7 @@ async function convertBinary(name, buffer) {
 })();
 
 /* ==== src/engine/notes.js ==== */
-const __m46 = (() => {
+const __m47 = (() => {
 const { S, tool, frame } = __m0;
 // Notes and taught words. Both belong to the device and are shared by every session.
 const textOf = c => c.theme[0] && c.theme[0].type === 'text' ? c.theme[0].value : null;
@@ -19017,7 +19155,7 @@ frame({
 })();
 
 /* ==== src/engine/skills.js ==== */
-const __m47 = (() => {
+const __m48 = (() => {
 const { TOOLS, tool } = __m0;
 // The catalog: skills derived from the declarations, planned skills named here, and the packs golem
 // knows about. Examples feed the Skills tab, the "nearest skills" suggestions and the teach vocabulary.
@@ -19035,7 +19173,7 @@ tool({ name: 'mapdial', planned: true, skill: { group: 'Device', title: 'Map, di
 const PACKS = [
   ['timescale', 'International Chronostratigraphic Chart', 'ICS 2023 · Macrostrat · CC BY 4.0', 'live', 'Every unit of the chart: bounds, rank, parents, neighbours, subdivisions.'],
   ['factbook', 'CIA World Factbook', '2.8 MB · CC0', 'samp', 'Records: lookup, convert, filter, rank.'],
-  ['factbook-full', 'Factbook, full profiles', '2.3 MB · CC0', 'plan', 'Deeper filters, such as exports and resources.'],
+  ['factbook-full', 'Factbook, full profiles', '2.3 MB · CC0', 'samp', 'Installed with the factbook when asked: which countries are landlocked, and their coastlines. More fields later.'],
   ['ods', 'Open Data Structures', '1.9 MB · CC BY 2.5', 'samp', 'Term index into the reader. Listings can run in adder.'],
   ['elements-of-style', 'The Elements of Style (1918)', '36 kB · public domain', 'live', 'Rules compiled into a text checker.'],
   ['rtow · rtnw · rtrol', 'Ray Tracing series', '11.5 MB · CC0', 'plan', 'Reader only until a term index is built.'],
@@ -19059,17 +19197,16 @@ const SUGGESTIONS = ['pop means population', 'histogram of cu', 'log scale', 'po
 })();
 
 /* ==== src/engine/ontology.js ==== */
-const __m48 = (() => {
+const __m49 = (() => {
 const { FRAMES, LEXICON, S } = __m0;
 const { UNIT_TABLE, COMPOUNDS, DIM, parseUnit, dimName } = __m2;
 const { ELEMENT } = __m14;
-const { FB, ODS, ODSA } = __m15;
-const { TIMESCALE } = __m20;
+const { ODS, ODSA } = __m15;
+const { TIMESCALE } = __m21;
 // The clause ontology, assembled from what golem knows: units from the conversion table, nouns from the
 // sample packs, verb frames from the declarations. Inert data; the build writes it to dist/golem.json.
 // Portuguese synonyms are listed here by hand until packs carry them in their golem facet.
 
-const FB_PT = { Australia: ['austrália', 'australia'], Brazil: ['brasil'], Canada: ['canadá', 'canada'], Chile: ['chile'], Germany: ['alemanha'], Indonesia: ['indonésia', 'indonesia'], Ireland: ['irlanda'], Japan: ['japão', 'japao'], Kazakhstan: ['cazaquistão', 'cazaquistao'], Mongolia: ['mongólia', 'mongolia'], Peru: ['peru'], Portugal: ['portugal'], 'South Africa': ['áfrica do sul', 'africa do sul'], Zambia: ['zâmbia', 'zambia'] };
 const uniq = a => [...new Set(a)];
 function variables() {
   const cols = S.table ? S.table.cols.filter(c => c.type === 'numeric' && !/^(from|to|x|y|z|east|north|elev)/i.test(c.name))
@@ -19094,11 +19231,6 @@ function ontology(only) {
       { type: 'variable', needsId: true, words: variables(), generic: ['grade', 'grades', 'column', 'columns'],
         words_pt: variables(), generic_pt: ['teor', 'teores', 'coluna', 'colunas'] },
       { type: 'plot', words: { histogram: ['histogram', 'hist', 'distribution'] }, generic: ['plot', 'chart'], words_pt: { histogram: ['histograma'] }, generic_pt: ['gráfico', 'grafico'] },
-      { type: 'country', words: Object.fromEntries(FB.map(r => [r[0], [r[0].toLowerCase()]])), generic: ['country', 'countries', 'nation', 'nations'],
-        words_pt: Object.fromEntries(FB.map(r => [r[0], FB_PT[r[0]]])), generic_pt: ['país', 'pais', 'países', 'paises'] },
-      { type: 'property', words: { density: ['density'], hardness: ['hardness'], formula: ['formula'], streak: ['streak'], capital: ['capital'], population: ['population'], area: ['area'], 'population density': ['population density'] }, generic: ['property', 'value'],
-        words_pt: { density: ['densidade'], hardness: ['dureza'], formula: ['fórmula', 'formula'], streak: ['traço', 'traco'], capital: ['capital'], population: ['população', 'populacao'], area: ['área', 'area'], 'population density': ['densidade populacional', 'densidade de população'] }, generic_pt: ['propriedade', 'valor'] },
-      { type: 'filter', words: { landlocked: ['landlocked'] }, words_pt: { landlocked: ['sem litoral', 'sem costa'] } },
       { type: 'scale', words: { log: ['log', 'logarithmic', 'log scale'], linear: ['linear', 'linear scale'] }, words_pt: { log: ['log', 'logarítmica', 'logaritmica', 'escala log'], linear: ['linear', 'escala linear'] } },
       { type: 'term', words: terms, generic: ['term', 'word'], words_pt: { ...terms, 'hash table': ['hash table', 'tabela hash'], 'b-tree': ['b-tree', 'btree', 'árvore b', 'arvore b'] }, generic_pt: ['termo', 'palavra'] },
       { type: 'table', words: { 'assays.csv': ['assays.csv', 'assays', 'sample table', 'the sample', 'sample data'] }, generic: ['table', 'csv', 'data', 'file'], words_pt: { 'assays.csv': ['assays.csv', 'assays', 'tabela de amostra'] }, generic_pt: ['tabela', 'arquivo'] },
@@ -19116,11 +19248,11 @@ function ontology(only) {
     shapes: LEXICON.shapes,
     fillers: ['golem', 'ok', 'okay', 'did i', 'have i', 'do i', 'did we', 'have we', 'instead', 'what about', 'how about', 'make it', 'make that', 'show it', 'show that', 'show me that', 'give it', 'put it', 'change it to', 'switch to', 'and now', 'now show'],
     units,
-    compounds: [{ mod: 'filter', heads: ['country'], attr: 'filter', echo: true }, { mod: 'scale', heads: ['plot'], attr: 'scale', echo: true }, ...LEXICON.compounds],
+    compounds: [{ mod: 'scale', heads: ['plot'], attr: 'scale', echo: true }, ...LEXICON.compounds],
     postmods: LEXICON.postmods,
     qmods: [{ head: 'timer', attr: 'duration', dims: ['time'] }, ...LEXICON.qmods],   // "a 30 minute timer"
     verbs: (only || FRAMES.filter(f => !f.amends && !f.session)).map(({ bind, tools, amends, session, ...f }) => f),
-    conditions: { subjects: ['variable', 'column'] },   // what a condition on rows may name: "cu > 0.5 and lith is BRX"
+    conditions: { subjects: ['variable', 'column', 'property'] },   // a table's columns, and the Factbook's fields   // what a condition on rows may name: "cu > 0.5 and lith is BRX"
     inherit: [],
     echoOrder: ['of', 'unit', 'by', 'scale', 'for', 'as'],
     roleLabels_pt: { of: 'de', unit: 'unidade', by: 'por', scale: 'escala', for: 'duração', as: 'como' },
@@ -19131,11 +19263,11 @@ function ontology(only) {
 })();
 
 /* ==== src/vendor/dispatch.js ==== */
-const __m49 = (() => {
+const __m50 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/dispatch, built from ../auditable/ext/dispatch/src/ by its own build.
 // Source of truth: gentropic/auditable ext/dispatch (local clone: ../auditable). Re-vendor by copying
 // ext/dispatch/index.js here after 'node ext/dispatch/build.js'. golem uses the grammar rung only:
-// createEngine, makeSession, ENGLISH, PORTUGUESE. At auditable f47d796a.
+// createEngine, makeSession, ENGLISH, PORTUGUESE. At auditable 3a7b253c.
 
 // ⚠ GENERATED FILE — DO NOT EDIT. Source: src/  Build: @gcu/build src/main.js
 // @gcu/dispatch — Session-trained natural-language → tool-call dispatch: a Snips-shaped resolver (averaged-perceptron intent + CRF-class slot tagger + gazetteers + deterministic per-kind assemblers) that trains IN THE BROWSER from the host session's own vocabulary in under a second. Tools are declarative (ten kinds) and a grammar rung (clause: case-grammar frames over an Earley chart with costed repairs, en + pt-BR) reads controlled commands before the learners see them; no shipped model, no network, explainable per decision — refusals return empty calls so the host degrades into its command palette. Born from an incubator where this beat a 26M finetuned transformer 50/52 to 3/24 on a frozen yardstick.
@@ -20136,6 +20268,8 @@ function buildGrammar(X) {
     let n = c; for (const m of l) { const r = X.compound(m, n); if (!r) return null; n = r; }
     return { kind: 'cmd', verb: null, args: [{ kind: 'np', list: [n] }, ...a], question: true };
   });
+  // "which countries have a population over 100 million" = "countries having a population over …": the question word, a thing, its arguments
+  rule('Question', 'WH NPList PPs', (_, l, a) => a.length ? { kind: 'cmd', verb: null, args: [{ kind: 'np', list: l }, ...a], question: true } : null);
   rule('Program', 'Cmd THEN Program', (c, _, p) => [c, ...p]);
   // a fragment (understand with { fragment: true }): what is left of a command when the rest is the session's last one —
   // "in feet", "and chile", "log scale", "where au > 1", "again but with 300 m". It is an 'again' the ellipsis completes.
@@ -20307,6 +20441,9 @@ function buildGrammar(X) {
   // a fraction said after the whole: "an hour and a half", "one and a half hours", "2 km and a quarter" (never a list)
   rule('Quantity', `Quantity CONJ:${X.and} FRAC`, (q, _, f) => q.unit ? { ...q, n: q.n + f.n } : null);
   rule('Quantity', `NUM CONJ:${X.and} FRAC UNIT`, (t, _, f, u) => ({ type: 'quantity', n: t.n + f.n, unit: u.unit, dim: u.dim }));
+  // a number with its multiplier: "100 million", "2.5 billion tonnes"
+  rule('Quantity', 'NUM MULT', (t, m) => ({ type: 'quantity', n: +(t.n * m.n).toPrecision(15), unit: null, dim: 'bare' }));
+  rule('Quantity', 'NUM MULT UNIT', (t, m, u) => ({ type: 'quantity', n: +(t.n * m.n).toPrecision(15), unit: u.unit, dim: u.dim }));
   rule('Quantity', 'DET UNIT', (d, u) => X.indefinite.includes(d.word) ? { type: 'quantity', n: 1, unit: u.unit, dim: u.dim } : null);   // "an hour", "um minuto"
   // conditions on rows, for roles of type 'cond': "cu > 0.5 and lith is BRX", "au between 1 and 2", "lith in BRX, GRD",
   // "cu is not blank", "not au above 1". A condition is one thing; "and" binds tighter than "or". The columns it may
@@ -20392,6 +20529,7 @@ const ENGLISH = {
     twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90, hundred: 100, 'a hundred': 100, dozen: 12, 'a dozen': 12, 'a couple of': 2, 'a few': 3,
     'half an': 0.5, 'half a': 0.5, half: 0.5, 'a quarter of an': 0.25, 'a quarter of a': 0.25, 'quarter of an': 0.25, 'quarter of a': 0.25, 'three quarters of an': 0.75, 'three quarters of a': 0.75 },
   fractions: { 'a half': 0.5, 'a quarter': 0.25, 'three quarters': 0.75 },
+  multipliers: { thousand: 1e3, million: 1e6, billion: 1e9, trillion: 1e12 },
   AMPM: "am|pm|a.m.|p.m.|o'clock",
   indefinite: ['a', 'an'], newRef: ['new'], firstRef: ['first'],
   phr: { new: 'new', last: 'last', every: 'every', except: 'except', fromRun: 'from run', above: 'above', below: 'below', atleast: 'at least', atmost: 'at most', equals: 'equal to', then: 'Then', assuming: 'assuming', of: 'of', hole: '___', than: 'than' },
@@ -20451,7 +20589,8 @@ function createEngine(ont, locale = ENGLISH) {
   for (const [w, c] of Object.entries(locale.clocks ?? {})) add(w, 'CLOCK', { h: c[0], mi: c[1] });
   if (locale.AMPM) add(locale.AMPM, 'AMPM');
   for (const [w, n] of Object.entries(locale.numbers ?? {})) add(w, 'NUM', { n });
-  for (const [w, n] of Object.entries(locale.fractions ?? {})) add(w, 'FRAC', { n });   // "and a half": only after a whole   // number words: "ninety", "half an", "a quarter of an"
+  for (const [w, n] of Object.entries(locale.fractions ?? {})) add(w, 'FRAC', { n });   // "and a half": only after a whole
+  for (const [w, n] of Object.entries(locale.multipliers ?? {})) add(w, 'MULT', { n });   // "100 million", "2.5 billion": only after a number   // number words: "ninety", "half an", "a quarter of an"
   const L = k => `${k}_${locale.code}`;   // ontology synonym column for this locale, falling back to the default column
   const col = (o, k) => o[L(k)] ?? o[k];
   // a frame may take a subject before its verb ("pop means population"): it binds as the role 'subject'
@@ -20626,7 +20765,7 @@ function createEngine(ont, locale = ENGLISH) {
   }
   const describeRepairs = (toks, repairs) => repairs.map(r => r.op === 'skip' ? `ignored "${r.word}"` : r.op === 'subst' ? `read "${r.word}" as "${r.to}"` : r.sym === 'LATE' ? 'read the arguments out of order' : `assumed ${r.sym === 'PREP' ? 'a preposition' : 'an article'} before "${toks[r.at]?.word ?? 'the end'}"`);
   // human names for the terminals the chart was waiting for
-  const EXPECT = { DOQ: 'a question word', EXIST: "'there'", NOT: "'not'", BLANK: "'blank'", FRAC: "'a half'", UNK: 'a word', NOUN: 'a thing', VERB: 'a verb', DET: 'an article', PREP: 'a preposition', NUM: 'a number', UNIT: 'a unit', IDENT: 'a name', CONJ: `'${locale.CONJ.split('|')[0]}'`, THEN: `'${locale.THEN.split('|')[0]}'`, COMMA: "','", QUANT: 'a quantifier', REF: `'${locale.REF.split('|')[0]}'`, PRON: 'a pronoun', REL: `'${locale.REL.split('|')[0]}'`, SUBJ: `'${locale.SUBJ.split('|')[0]}'`, TIME: 'a time', COMP: 'a comparative', WH: 'a question word', COP: `'${(locale.COP ?? 'is').split('|')[0]}'`, WHCOP: `'${(locale.WHCOP ?? 'what is').split('|')[0]}'`, EXCEPT: `'${locale.EXCEPT.split('|')[0]}'`, BUT: `'${locale.BUT.split('|')[0]}'`, AGAIN: `'${locale.AGAIN.split('|')[0]}'`, DAY: 'a date', MONTH: 'a date', DATE: 'a date', CLOCK: 'a clock time', AMPM: "'am' or 'pm'", COLON: "':'", LIT: 'a value', DEMO: `'${(locale.DEMO ?? 'this').split('|')[0]}'` };
+  const EXPECT = { MULT: "'million'", DOQ: 'a question word', EXIST: "'there'", NOT: "'not'", BLANK: "'blank'", FRAC: "'a half'", UNK: 'a word', NOUN: 'a thing', VERB: 'a verb', DET: 'an article', PREP: 'a preposition', NUM: 'a number', UNIT: 'a unit', IDENT: 'a name', CONJ: `'${locale.CONJ.split('|')[0]}'`, THEN: `'${locale.THEN.split('|')[0]}'`, COMMA: "','", QUANT: 'a quantifier', REF: `'${locale.REF.split('|')[0]}'`, PRON: 'a pronoun', REL: `'${locale.REL.split('|')[0]}'`, SUBJ: `'${locale.SUBJ.split('|')[0]}'`, TIME: 'a time', COMP: 'a comparative', WH: 'a question word', COP: `'${(locale.COP ?? 'is').split('|')[0]}'`, WHCOP: `'${(locale.WHCOP ?? 'what is').split('|')[0]}'`, EXCEPT: `'${locale.EXCEPT.split('|')[0]}'`, BUT: `'${locale.BUT.split('|')[0]}'`, AGAIN: `'${locale.AGAIN.split('|')[0]}'`, DAY: 'a date', MONTH: 'a date', DATE: 'a date', CLOCK: 'a clock time', AMPM: "'am' or 'pm'", COLON: "':'", LIT: 'a value', DEMO: `'${(locale.DEMO ?? 'this').split('|')[0]}'` };
   const expectName = sym => { const [cat, w] = sym.split(':'); if (cat === 'LATE' || cat === 'TEXT' || (cat === 'LIT' && !(ont.shapes ?? []).length)) return null; return w ? `'${w}'` : (EXPECT[cat] ?? cat); };
 
   // ---- binding ----
@@ -21250,6 +21389,7 @@ const PORTUGUESE = {
   numbers: { dois: 2, duas: 2, três: 3, tres: 3, quatro: 4, cinco: 5, seis: 6, sete: 7, oito: 8, nove: 9, dez: 10, onze: 11, doze: 12, quinze: 15, vinte: 20, trinta: 30, quarenta: 40, cinquenta: 50, sessenta: 60, noventa: 90, cem: 100,
     meia: 0.5, meio: 0.5, 'um quarto de': 0.25, 'uma dúzia de': 12 },
   fractions: { meia: 0.5, meio: 0.5, 'um quarto': 0.25 },
+  multipliers: { mil: 1e3, 'milhão': 1e6, milhao: 1e6, 'milhões': 1e6, milhoes: 1e6, 'bilhão': 1e9, bilhao: 1e9, 'bilhões': 1e9, bilhoes: 1e9 },
   indefinite: ['um', 'uma', 'uns', 'umas'], newRef: ['novo', 'nova'], firstRef: ['primeiro', 'primeira'],
   phr: { new: 'novo', last: 'último', every: 'todo', except: 'exceto', fromRun: 'da rodada', above: 'acima de', below: 'abaixo de', atleast: 'pelo menos', atmost: 'no máximo', equals: 'igual a', then: 'Depois', assuming: 'assumindo', of: 'de', hole: '___', than: 'que' },
   stem: w => { let x = w.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -21276,13 +21416,13 @@ const PORTUGUESE = {
 })();
 
 /* ==== src/engine/reading.js ==== */
-const __m50 = (() => {
+const __m51 = (() => {
 const { S, T, TOOLS, FRAMES, tool, frame, amend, session, noun, toolByName, runTool, iso } = __m0;
-const { examples, vocab } = __m47;
-const { ontology } = __m48;
+const { examples, vocab } = __m48;
+const { ontology } = __m49;
 const { calcOf } = __m3;
-const { estimateOf } = __m28;
-const { createEngine, makeSession, ENGLISH } = __m49;
+const { estimateOf } = __m29;
+const { createEngine, makeSession, ENGLISH } = __m50;
 // The reading ladder: context (amendments, meta-intents), grammar (the clause parser, then the regex
 // rules the declarations carry), taught words (device lexicon rewrites, then grammar again). Plus the
 // tools that talk about the session itself: none, why, export.
@@ -21544,7 +21684,7 @@ function sessionRead(raw) {
 })();
 
 /* ==== src/engine/sessions.js ==== */
-const __m51 = (() => {
+const __m52 = (() => {
 const { S, toolByName, runTool, startJobs, clearResults } = __m0;
 // Sessions: stored as plans (card specs), replayed on open, named from the tools that ran.
 // The shell persists whatever `serialize()` returns and feeds it back through `hydrate()`.
@@ -21655,15 +21795,15 @@ function reset() {
 })();
 
 /* ==== src/engine/engine.js ==== */
-const __m52 = (() => {
+const __m53 = (() => {
 const { S, T, runTool, toolByName, startJobs } = __m0;
 const { DOCUMENT } = __m10;
-const { DOCTEXT } = __m41;
-const { bindingsOf, runSteps } = __m42;
+const { DOCTEXT } = __m42;
+const { bindingsOf, runSteps } = __m43;
 const { tableFromText } = __m14;
-const { convertBinary } = __m45;
-const { norm, grammar, context, taught, sessionRead, readingOf, guessRead } = __m50;
-const { current, newSession, renameSession, touch } = __m51;
+const { convertBinary } = __m46;
+const { norm, grammar, context, taught, sessionRead, readingOf, guessRead } = __m51;
+const { current, newSession, renameSession, touch } = __m52;
 // The entry point: submit(raw) reads a request and returns what happened. Cards are recomputed in
 // place by rerun(); answers and slot flips go through it, so args stay the only state that matters.
 
@@ -21798,8 +21938,59 @@ function seedExamples() {
   return { addCard, rerun, flipSlot, answer, undo, submit, preview, hashOf, openFile, openBinary, seedExamples };
 })();
 
+/* ==== src/engine/packs.js ==== */
+const __m54 = (() => {
+const { profilesOf } = __m16;
+// Packs as gcu-library ships them: a .gcudat is a gzipped tar holding gcudat.json (the manifest) and the data files
+// (gcu-library tools/build-gcudat.mjs). Read here with the platform's own gunzip (DecompressionStream, in browsers and
+// in Node) and a small ustar reader; @gcu/archive reads every container, but golem needs only this one.
+
+const dec = new TextDecoder();
+async function gunzip(bytes) {
+  const out = new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip')));
+  return new Uint8Array(await out.arrayBuffer());
+}
+// ustar: 512-byte headers (name at 0, size in octal at 124, type at 156, prefix at 345), the data padded to 512
+function untar(t) {
+  const files = {};
+  for (let o = 0; o + 512 <= t.length;) {
+    const h = t.subarray(o, o + 512); if (h.every(b => b === 0)) break;
+    const str = (a, n) => dec.decode(h.subarray(a, a + n)).replace(/\0.*$/s, '');
+    const name = (str(345, 155) ? str(345, 155) + '/' : '') + str(0, 100), size = parseInt(str(124, 12).trim() || '0', 8), type = str(156, 1);
+    if (type === '0' || type === '' ) files[name.replace(/^\.\//, '')] = t.subarray(o + 512, o + 512 + size);
+    o += 512 + Math.ceil(size / 512) * 512;
+  }
+  return files;
+}
+// → { manifest, json(path) }: the manifest parsed, and any JSON file of the pack by its path
+async function readGcudat(bytes) {
+  const files = untar(await gunzip(bytes));
+  const at = p => files[p] || files[Object.keys(files).find(k => k.endsWith('/' + p)) || ''];
+  const m = at('gcudat.json'); if (!m) throw new Error('not a gcudat pack: no gcudat.json inside');
+  const manifest = JSON.parse(dec.decode(m));
+  return { manifest, json: p => { const f = at(p); if (!f) throw new Error(`the pack has no ${p}`); return JSON.parse(dec.decode(f)); } };
+}
+// the factbook-full expansion, kept small: which countries are landlocked, and their coastlines
+async function factbookProfiles(fullBytes) {
+  const f = await readGcudat(fullBytes); if (f.manifest.name !== 'factbook-full') throw new Error(`that is the ${f.manifest.name} pack, not the factbook's full profiles`);
+  const fi = f.json(f.manifest.index || 'dataset.json'), fr = f.json(fi.records || 'records.json');
+  return profilesOf(Array.isArray(fr) ? fr : fr.records);
+}
+// the factbook pack (and its factbook-full expansion) → what useFactbook() takes
+async function factbookFromGcudat(bytes, fullBytes) {
+  const p = await readGcudat(bytes);
+  if (p.manifest.name !== 'factbook') throw new Error(`that is the ${p.manifest.name} pack, not the factbook`);
+  const index = p.json(p.manifest.index || 'dataset.json'), recs = p.json(index.records || 'records.json');
+  const records = Array.isArray(recs) ? recs : recs.records;
+  if (!Array.isArray(records) || !records.length) throw new Error('the factbook pack holds no records');
+  const profiles = fullBytes ? await factbookProfiles(fullBytes) : null;
+  return { name: 'factbook', version: p.manifest.version || index.version, attribution: p.manifest.attribution || index.attribution, license: p.manifest.license || index.license, records, ...(profiles ? { profiles } : {}) };
+}
+  return { gunzip, untar, readGcudat, factbookProfiles, factbookFromGcudat };
+})();
+
 /* ==== src/vendor/vfs.js ==== */
-const __m53 = (() => {
+const __m55 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/vfs, copied from ../auditable/ext/vfs/index.js (built from its src/ by node ext/vfs/build.js), at
 // auditable 8837da6e. golem's shell keeps sessions, device state, files and packs in it over IndexedDB (src/shell/store.js).
 // golem constructs only IDBBackend and MemoryBackend; the network backends in this bundle (fetch, REST, Dropbox) are
@@ -25610,8 +25801,8 @@ function fromPicker(vfs, destPath, opts) {
 })();
 
 /* ==== src/shell/store.js ==== */
-const __m54 = (() => {
-const { VFS } = __m53;
+const __m56 = (() => {
+const { VFS } = __m55;
 // Where the device keeps golem (SPEC 13.9): @gcu/vfs over IndexedDB, one file per session, one per opened file, the
 // device state and a small meta file, so a session can be exported as itself and nothing has a size cap but the
 // browser's. Only what changed is written. When IndexedDB is not there, the whole state goes to localStorage as before;
@@ -25716,7 +25907,7 @@ function noStore() {
 })();
 
 /* ==== src/vendor/leadacid.js ==== */
-const __m55 = (() => {
+const __m57 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. The lead-acid shell shim, copied from ../auditable/ext/leadacid/index.js
 // (itself vendored from gentropic/lead-acid, lead-acid.js). Re-vendor by copying that file here.
 
@@ -26342,7 +26533,7 @@ function orientationFromRotationVector(v) {
 })();
 
 /* ==== src/shell/render.js ==== */
-const __m56 = (() => {
+const __m58 = (() => {
 const { fmt } = __m0;
 const { conversions, equalArea } = __m5;
 // Rendering. The engine hands over plain blocks; this is the only file that turns them into markup.
@@ -26456,7 +26647,7 @@ function figImage(ctx, x, y, w, h, cols, rows, b64) {
 })();
 
 /* ==== src/vendor/sw-register.js ==== */
-const __m57 = (() => {
+const __m59 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sw's page-side companion, copied from ../auditable/ext/sw/register.js (at auditable 8837da6e).
 
 // @gcu/sw — the page-side companion (ES module). Registration + persistent
@@ -26534,18 +26725,20 @@ function registerGcuSw(opts = {}) {
 })();
 
 /* ==== src/shell/main.js ==== */
-const __m58 = (() => {
+const __m60 = (() => {
 const { S } = __m0;
-const { submit, flipSlot, answer, seedExamples, openFile, openBinary, preview } = __m52;
-const { completions } = __m50;
-const { BINARY } = __m45;
+const { submit, flipSlot, answer, seedExamples, openFile, openBinary, preview } = __m53;
+const { completions } = __m51;
+const { useFactbook, factbookInfo } = __m16;
+const { factbookFromGcudat, factbookProfiles, readGcudat } = __m54;
+const { BINARY } = __m46;
 const { setRunner, onJobDone } = __m0;
-const { sessions, current, newSession, openSession, renameSession, deleteSession, searchHistory, parts, hydrate, onChange, exportSession, importSession } = __m51;
-const { openStore } = __m54;
-const { skills, PACKS, STARTERS } = __m47;
-const { shell } = __m55;
-const { escHtml, pad, cardEl } = __m56;
-const { registerGcuSw } = __m57;
+const { sessions, current, newSession, openSession, renameSession, deleteSession, searchHistory, parts, hydrate, onChange, exportSession, importSession } = __m52;
+const { openStore } = __m56;
+const { skills, PACKS, STARTERS } = __m48;
+const { shell } = __m57;
+const { escHtml, pad, cardEl } = __m58;
+const { registerGcuSw } = __m59;
 // The shell: wiring, tabs, the session drawer, storage, and the sleep switch. Everything that touches
 // the DOM or the browser lives here or in render.js; the engine never does.
 
@@ -26634,14 +26827,67 @@ function appItem() {
   return `<div class="item"><h3>This app</h3><p>Kept on this device and works offline. It looks for a new version only when you ask; that is one request to where golem came from.${at}</p>`
     + `<div class="opts">${update.ready ? '<button class="btn go" type="button" id="sw-apply">Reload to the new golem</button>' : '<button class="btn" type="button" id="sw-check">Check for updates</button>'}${update.note ? `<span class="sub">${escHtml(update.note)}</span>` : ''}</div></div>`;
 }
+// The Factbook pack (SPEC 13.8), installed on request: from gcu-library (one request for its registry, one per pack, each
+// checked against the registry's SHA-256) or from a .gcudat file opened with the paperclip. Kept by store.js under /packs/.
+const LIBRARY = 'https://gentropic.github.io/gcu-library/';
+let packNote = '', packBusy = false;
+const b64 = buf => { let s = ''; const a = new Uint8Array(buf); for (let i = 0; i < a.length; i++) s += String.fromCharCode(a[i]); return btoa(s); };
+async function fetchPack(entry) {
+  countRequest();
+  const r = await fetch(new URL(entry.url, LIBRARY)); if (!r.ok) throw new Error(`the library answered ${r.status} for ${entry.name}`);
+  const bytes = new Uint8Array(await r.arrayBuffer());
+  if (entry.integrity && crypto.subtle) { const want = entry.integrity.replace(/^sha256-/, ''), got = b64(await crypto.subtle.digest('SHA-256', bytes)); if (got !== want) throw new Error(`${entry.name} did not match the registry's checksum, so it was not installed`); }
+  return bytes;
+}
+async function installFactbook(full) {
+  if (packBusy) return; packBusy = true; packNote = 'Installing…'; renderPacks();
+  try {
+    countRequest();
+    const reg = await (await fetch(new URL('registry.json', LIBRARY))).json(), list = reg.packs || reg.entries || reg;
+    const find = n => (Array.isArray(list) ? list : Object.values(list)).find(e => e && e.name === n);
+    const fb = find('factbook'), ff = full ? find('factbook-full') : null; if (!fb || (full && !ff)) throw new Error('the library lists no factbook pack');
+    const pack = await factbookFromGcudat(await fetchPack(fb), ff ? await fetchPack(ff) : null);
+    await keepFactbook(pack);
+  } catch (e) { packNote = `Not installed: ${e.message}.`; }
+  packBusy = false; renderPacks();
+}
+async function keepFactbook(pack) {
+  await store.writePack('factbook', pack);
+  const i = useFactbook(pack); packNote = `Installed: ${i.count} countries${pack.profiles ? ', with the full profiles' : ''}.`; status(packNote);
+}
+async function removeFactbook() { await store.removePack('factbook'); useFactbook(null); packNote = 'Removed. The 14-country sample answers again.'; renderPacks(); }
+// a .gcudat opened with the paperclip: the factbook, or its full profiles for the factbook already installed
+async function openPackFile(name, bytes) {
+  const p = await readGcudat(bytes);
+  if (p.manifest.name === 'factbook') return keepFactbook(await factbookFromGcudat(bytes));
+  if (p.manifest.name === 'factbook-full') {
+    const cur = await store.readPack('factbook'); if (!cur) throw new Error('install the factbook pack first; these are its full profiles');
+    return keepFactbook({ ...cur, profiles: await factbookProfiles(bytes) });
+  }
+  throw new Error(`golem has no use for the ${p.manifest.name} pack yet`);
+}
+function factbookItem() {
+  const i = factbookInfo();
+  const state = i.kind === 'sample' ? 'The 14-country sample ships with golem.' : `Installed: version ${escHtml(i.version)}, ${i.count} countries${i.profiles ? ', with the full profiles' : ''}. Kept on this device.`;
+  const acts = i.kind === 'sample'
+    ? `<button class="btn go" type="button" id="fb-install">Install from the library (2.8 MB)</button><button class="btn" type="button" id="fb-install-full">With full profiles (5.1 MB)</button>`
+    : `${i.profiles ? '' : '<button class="btn" type="button" id="fb-install-full">Add the full profiles (5.1 MB)</button>'}<button class="btn" type="button" id="fb-remove">Remove</button>`;
+  return `<p>${state} Installing makes one request to the library for its list and one per pack; a .gcudat file opened with the paperclip installs with none.</p><div class="opts">${store && store.kind === 'idb' ? acts : '<span class="sub">This browser gives golem no IndexedDB, so a pack cannot be kept.</span>'}${packNote ? `<span class="sub">${escHtml(packNote)}</span>` : ''}</div>`;
+}
 function renderPacks() {
   const lab = { live: 'installed', samp: 'sample', plan: 'not wired' };
   let h = '<h1 class="vhead">Packs and this device</h1><div class="sub">golem knows what its installed packs hold. These are the gcu-library entries plus packs worth adding.</div><div class="lbl">Library</div>';
-  PACKS.forEach(([id, name, meta, st, d]) => { h += `<div class="item"><h3>${escHtml(name)} <span class="tag ${st}">${lab[st]}</span></h3><p>${escHtml(d)}</p><div class="from">${escHtml(id)} · ${escHtml(meta)}</div></div>`; });
+  const fbi = factbookInfo();
+  PACKS.forEach(([id, name, meta, st, d]) => {
+    if (id === 'factbook') st = fbi.kind === 'sample' ? 'samp' : 'live';
+    if (id === 'factbook-full') st = fbi.kind === 'pack' && fbi.profiles ? 'live' : 'plan';
+    h += `<div class="item"><h3>${escHtml(name)} <span class="tag ${st}">${lab[st]}</span></h3><p>${escHtml(d)}</p>${id === 'factbook' ? factbookItem() : ''}<div class="from">${escHtml(id)} · ${escHtml(meta)}</div></div>`;
+  });
   const al = Object.entries(S.aliases);
   h += `<div class="lbl">On this device</div><div class="item"><h3>Taught words</h3><p>${al.length ? al.map(([k, v]) => `${escHtml(k)} → ${escHtml(v)}`).join('<br>') : 'None yet. Try “pop means population”.'}</p></div><div class="item"><h3>Notes</h3><p>${S.facts.length ? S.facts.map(escHtml).join('<br>') : 'None yet. Try “remember that …”.'}</p></div><div class="item"><h3>Open table</h3><p>${S.table ? `${escHtml(S.table.name)} · ${S.table.rows.length} rows · ${S.table.source === 'sample' ? 'sample data' : 'from your files'}` : 'None.'}</p></div><div class="item"><h3>Files on this device</h3><p>${Object.values(S.files).length ? Object.values(S.files).map(f => `${escHtml(f.name)} · ${(f.size / 1024).toFixed(0)} kB`).join('<br>') : 'None yet. Tap the paperclip to open a CSV.'}</p></div>`;
   h += appItem();
   $('v-packs').innerHTML = h;
+  for (const [id, fn] of [['fb-install', () => installFactbook(false)], ['fb-install-full', () => installFactbook(true)], ['fb-remove', removeFactbook]]) { const b = $(id); if (b) b.addEventListener('click', fn); }
   const ck = $('sw-check'), ap = $('sw-apply');
   if (ck) ck.addEventListener('click', checkUpdates);
   if (ap) ap.addEventListener('click', () => sw.applyUpdate());
@@ -26766,6 +27012,10 @@ $('attach').addEventListener('click', () => { if (awake) $('file').click(); });
 $('file').addEventListener('change', e => {
   const f = e.target.files && e.target.files[0]; if (!f) return;
   if (f.size > 20e6) { status('That file is over 20 MB. golem reads smaller tables for now.'); e.target.value = ''; return; }
+  if (/\.gcudat$/i.test(f.name)) {   // a pack: installed, not opened as a table
+    f.arrayBuffer().then(buf => openPackFile(f.name, new Uint8Array(buf))).then(() => renderPacks(), err => status(`Not installed: ${err.message}.`));
+    e.target.value = ''; return;
+  }
   if (/\.golem\.json$/i.test(f.name)) {   // a session exported from golem: it comes back as a session of its own
     f.text().then(t => { let s = null; try { s = importSession(JSON.parse(t)); } catch (err) { s = null; } if (!s) { status('That is not a golem session file.'); return; } renderStream(); renderDrawer(); status(`Imported "${s.name}".`); }, () => status('Could not read that file.'));
     e.target.value = ''; return;
@@ -26835,6 +27085,7 @@ if (shell.present) $('st-where').textContent = 'in the lead-acid shell';
 // the device's sessions come back from the store (moved from localStorage once, the first time), or two examples are seeded
 (async () => {
   store = await openStore();
+  const fb = await store.readPack('factbook').catch(() => null); if (fb) useFactbook(fb);   // before the sessions replay, so their cards read it
   const got = await store.load().catch(() => null);
   if (!(got && hydrate(got.state)) && !sessions().length) seedExamples();
   if (got && got.migrated) store.save(parts());

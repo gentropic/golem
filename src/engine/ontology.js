@@ -4,10 +4,9 @@
 import { FRAMES, LEXICON, S } from './core.js';
 import { UNIT_TABLE, COMPOUNDS, DIM, parseUnit, dimName } from './units.js';
 import { ELEMENT } from './table.js';
-import { FB, ODS, ODSA } from './knowledge.js';
+import { ODS, ODSA } from './knowledge.js';
 import { TIMESCALE } from './data/timescale.js';
 
-const FB_PT = { Australia: ['austrália', 'australia'], Brazil: ['brasil'], Canada: ['canadá', 'canada'], Chile: ['chile'], Germany: ['alemanha'], Indonesia: ['indonésia', 'indonesia'], Ireland: ['irlanda'], Japan: ['japão', 'japao'], Kazakhstan: ['cazaquistão', 'cazaquistao'], Mongolia: ['mongólia', 'mongolia'], Peru: ['peru'], Portugal: ['portugal'], 'South Africa': ['áfrica do sul', 'africa do sul'], Zambia: ['zâmbia', 'zambia'] };
 const uniq = a => [...new Set(a)];
 function variables() {
   const cols = S.table ? S.table.cols.filter(c => c.type === 'numeric' && !/^(from|to|x|y|z|east|north|elev)/i.test(c.name))
@@ -32,11 +31,6 @@ export function ontology(only) {
       { type: 'variable', needsId: true, words: variables(), generic: ['grade', 'grades', 'column', 'columns'],
         words_pt: variables(), generic_pt: ['teor', 'teores', 'coluna', 'colunas'] },
       { type: 'plot', words: { histogram: ['histogram', 'hist', 'distribution'] }, generic: ['plot', 'chart'], words_pt: { histogram: ['histograma'] }, generic_pt: ['gráfico', 'grafico'] },
-      { type: 'country', words: Object.fromEntries(FB.map(r => [r[0], [r[0].toLowerCase()]])), generic: ['country', 'countries', 'nation', 'nations'],
-        words_pt: Object.fromEntries(FB.map(r => [r[0], FB_PT[r[0]]])), generic_pt: ['país', 'pais', 'países', 'paises'] },
-      { type: 'property', words: { density: ['density'], hardness: ['hardness'], formula: ['formula'], streak: ['streak'], capital: ['capital'], population: ['population'], area: ['area'], 'population density': ['population density'] }, generic: ['property', 'value'],
-        words_pt: { density: ['densidade'], hardness: ['dureza'], formula: ['fórmula', 'formula'], streak: ['traço', 'traco'], capital: ['capital'], population: ['população', 'populacao'], area: ['área', 'area'], 'population density': ['densidade populacional', 'densidade de população'] }, generic_pt: ['propriedade', 'valor'] },
-      { type: 'filter', words: { landlocked: ['landlocked'] }, words_pt: { landlocked: ['sem litoral', 'sem costa'] } },
       { type: 'scale', words: { log: ['log', 'logarithmic', 'log scale'], linear: ['linear', 'linear scale'] }, words_pt: { log: ['log', 'logarítmica', 'logaritmica', 'escala log'], linear: ['linear', 'escala linear'] } },
       { type: 'term', words: terms, generic: ['term', 'word'], words_pt: { ...terms, 'hash table': ['hash table', 'tabela hash'], 'b-tree': ['b-tree', 'btree', 'árvore b', 'arvore b'] }, generic_pt: ['termo', 'palavra'] },
       { type: 'table', words: { 'assays.csv': ['assays.csv', 'assays', 'sample table', 'the sample', 'sample data'] }, generic: ['table', 'csv', 'data', 'file'], words_pt: { 'assays.csv': ['assays.csv', 'assays', 'tabela de amostra'] }, generic_pt: ['tabela', 'arquivo'] },
@@ -54,11 +48,11 @@ export function ontology(only) {
     shapes: LEXICON.shapes,
     fillers: ['golem', 'ok', 'okay', 'did i', 'have i', 'do i', 'did we', 'have we', 'instead', 'what about', 'how about', 'make it', 'make that', 'show it', 'show that', 'show me that', 'give it', 'put it', 'change it to', 'switch to', 'and now', 'now show'],
     units,
-    compounds: [{ mod: 'filter', heads: ['country'], attr: 'filter', echo: true }, { mod: 'scale', heads: ['plot'], attr: 'scale', echo: true }, ...LEXICON.compounds],
+    compounds: [{ mod: 'scale', heads: ['plot'], attr: 'scale', echo: true }, ...LEXICON.compounds],
     postmods: LEXICON.postmods,
     qmods: [{ head: 'timer', attr: 'duration', dims: ['time'] }, ...LEXICON.qmods],   // "a 30 minute timer"
     verbs: (only || FRAMES.filter(f => !f.amends && !f.session)).map(({ bind, tools, amends, session, ...f }) => f),
-    conditions: { subjects: ['variable', 'column'] },   // what a condition on rows may name: "cu > 0.5 and lith is BRX"
+    conditions: { subjects: ['variable', 'column', 'property'] },   // a table's columns, and the Factbook's fields   // what a condition on rows may name: "cu > 0.5 and lith is BRX"
     inherit: [],
     echoOrder: ['of', 'unit', 'by', 'scale', 'for', 'as'],
     roleLabels_pt: { of: 'de', unit: 'unidade', by: 'por', scale: 'escala', for: 'duração', as: 'como' },

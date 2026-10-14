@@ -3,6 +3,8 @@
 import { S } from '../engine/core.js';
 import { submit, flipSlot, answer, seedExamples, openFile, openBinary, preview } from '../engine/engine.js';
 import { completions } from '../engine/reading.js';
+import { useFactbook, factbookInfo } from '../engine/factbook.js';
+import { factbookFromGcudat, factbookProfiles, readGcudat } from '../engine/packs.js';
 import { BINARY } from '../engine/formats.js';
 import { setRunner, onJobDone } from '../engine/core.js';
 import { sessions, current, newSession, openSession, renameSession, deleteSession, searchHistory, parts, hydrate, onChange, exportSession, importSession } from '../engine/sessions.js';
@@ -97,14 +99,67 @@ function appItem() {
   return `<div class="item"><h3>This app</h3><p>Kept on this device and works offline. It looks for a new version only when you ask; that is one request to where golem came from.${at}</p>`
     + `<div class="opts">${update.ready ? '<button class="btn go" type="button" id="sw-apply">Reload to the new golem</button>' : '<button class="btn" type="button" id="sw-check">Check for updates</button>'}${update.note ? `<span class="sub">${escHtml(update.note)}</span>` : ''}</div></div>`;
 }
+// The Factbook pack (SPEC 13.8), installed on request: from gcu-library (one request for its registry, one per pack, each
+// checked against the registry's SHA-256) or from a .gcudat file opened with the paperclip. Kept by store.js under /packs/.
+const LIBRARY = 'https://gentropic.github.io/gcu-library/';
+let packNote = '', packBusy = false;
+const b64 = buf => { let s = ''; const a = new Uint8Array(buf); for (let i = 0; i < a.length; i++) s += String.fromCharCode(a[i]); return btoa(s); };
+async function fetchPack(entry) {
+  countRequest();
+  const r = await fetch(new URL(entry.url, LIBRARY)); if (!r.ok) throw new Error(`the library answered ${r.status} for ${entry.name}`);
+  const bytes = new Uint8Array(await r.arrayBuffer());
+  if (entry.integrity && crypto.subtle) { const want = entry.integrity.replace(/^sha256-/, ''), got = b64(await crypto.subtle.digest('SHA-256', bytes)); if (got !== want) throw new Error(`${entry.name} did not match the registry's checksum, so it was not installed`); }
+  return bytes;
+}
+async function installFactbook(full) {
+  if (packBusy) return; packBusy = true; packNote = 'Installing…'; renderPacks();
+  try {
+    countRequest();
+    const reg = await (await fetch(new URL('registry.json', LIBRARY))).json(), list = reg.packs || reg.entries || reg;
+    const find = n => (Array.isArray(list) ? list : Object.values(list)).find(e => e && e.name === n);
+    const fb = find('factbook'), ff = full ? find('factbook-full') : null; if (!fb || (full && !ff)) throw new Error('the library lists no factbook pack');
+    const pack = await factbookFromGcudat(await fetchPack(fb), ff ? await fetchPack(ff) : null);
+    await keepFactbook(pack);
+  } catch (e) { packNote = `Not installed: ${e.message}.`; }
+  packBusy = false; renderPacks();
+}
+async function keepFactbook(pack) {
+  await store.writePack('factbook', pack);
+  const i = useFactbook(pack); packNote = `Installed: ${i.count} countries${pack.profiles ? ', with the full profiles' : ''}.`; status(packNote);
+}
+async function removeFactbook() { await store.removePack('factbook'); useFactbook(null); packNote = 'Removed. The 14-country sample answers again.'; renderPacks(); }
+// a .gcudat opened with the paperclip: the factbook, or its full profiles for the factbook already installed
+async function openPackFile(name, bytes) {
+  const p = await readGcudat(bytes);
+  if (p.manifest.name === 'factbook') return keepFactbook(await factbookFromGcudat(bytes));
+  if (p.manifest.name === 'factbook-full') {
+    const cur = await store.readPack('factbook'); if (!cur) throw new Error('install the factbook pack first; these are its full profiles');
+    return keepFactbook({ ...cur, profiles: await factbookProfiles(bytes) });
+  }
+  throw new Error(`golem has no use for the ${p.manifest.name} pack yet`);
+}
+function factbookItem() {
+  const i = factbookInfo();
+  const state = i.kind === 'sample' ? 'The 14-country sample ships with golem.' : `Installed: version ${escHtml(i.version)}, ${i.count} countries${i.profiles ? ', with the full profiles' : ''}. Kept on this device.`;
+  const acts = i.kind === 'sample'
+    ? `<button class="btn go" type="button" id="fb-install">Install from the library (2.8 MB)</button><button class="btn" type="button" id="fb-install-full">With full profiles (5.1 MB)</button>`
+    : `${i.profiles ? '' : '<button class="btn" type="button" id="fb-install-full">Add the full profiles (5.1 MB)</button>'}<button class="btn" type="button" id="fb-remove">Remove</button>`;
+  return `<p>${state} Installing makes one request to the library for its list and one per pack; a .gcudat file opened with the paperclip installs with none.</p><div class="opts">${store && store.kind === 'idb' ? acts : '<span class="sub">This browser gives golem no IndexedDB, so a pack cannot be kept.</span>'}${packNote ? `<span class="sub">${escHtml(packNote)}</span>` : ''}</div>`;
+}
 function renderPacks() {
   const lab = { live: 'installed', samp: 'sample', plan: 'not wired' };
   let h = '<h1 class="vhead">Packs and this device</h1><div class="sub">golem knows what its installed packs hold. These are the gcu-library entries plus packs worth adding.</div><div class="lbl">Library</div>';
-  PACKS.forEach(([id, name, meta, st, d]) => { h += `<div class="item"><h3>${escHtml(name)} <span class="tag ${st}">${lab[st]}</span></h3><p>${escHtml(d)}</p><div class="from">${escHtml(id)} · ${escHtml(meta)}</div></div>`; });
+  const fbi = factbookInfo();
+  PACKS.forEach(([id, name, meta, st, d]) => {
+    if (id === 'factbook') st = fbi.kind === 'sample' ? 'samp' : 'live';
+    if (id === 'factbook-full') st = fbi.kind === 'pack' && fbi.profiles ? 'live' : 'plan';
+    h += `<div class="item"><h3>${escHtml(name)} <span class="tag ${st}">${lab[st]}</span></h3><p>${escHtml(d)}</p>${id === 'factbook' ? factbookItem() : ''}<div class="from">${escHtml(id)} · ${escHtml(meta)}</div></div>`;
+  });
   const al = Object.entries(S.aliases);
   h += `<div class="lbl">On this device</div><div class="item"><h3>Taught words</h3><p>${al.length ? al.map(([k, v]) => `${escHtml(k)} → ${escHtml(v)}`).join('<br>') : 'None yet. Try “pop means population”.'}</p></div><div class="item"><h3>Notes</h3><p>${S.facts.length ? S.facts.map(escHtml).join('<br>') : 'None yet. Try “remember that …”.'}</p></div><div class="item"><h3>Open table</h3><p>${S.table ? `${escHtml(S.table.name)} · ${S.table.rows.length} rows · ${S.table.source === 'sample' ? 'sample data' : 'from your files'}` : 'None.'}</p></div><div class="item"><h3>Files on this device</h3><p>${Object.values(S.files).length ? Object.values(S.files).map(f => `${escHtml(f.name)} · ${(f.size / 1024).toFixed(0)} kB`).join('<br>') : 'None yet. Tap the paperclip to open a CSV.'}</p></div>`;
   h += appItem();
   $('v-packs').innerHTML = h;
+  for (const [id, fn] of [['fb-install', () => installFactbook(false)], ['fb-install-full', () => installFactbook(true)], ['fb-remove', removeFactbook]]) { const b = $(id); if (b) b.addEventListener('click', fn); }
   const ck = $('sw-check'), ap = $('sw-apply');
   if (ck) ck.addEventListener('click', checkUpdates);
   if (ap) ap.addEventListener('click', () => sw.applyUpdate());
@@ -229,6 +284,10 @@ $('attach').addEventListener('click', () => { if (awake) $('file').click(); });
 $('file').addEventListener('change', e => {
   const f = e.target.files && e.target.files[0]; if (!f) return;
   if (f.size > 20e6) { status('That file is over 20 MB. golem reads smaller tables for now.'); e.target.value = ''; return; }
+  if (/\.gcudat$/i.test(f.name)) {   // a pack: installed, not opened as a table
+    f.arrayBuffer().then(buf => openPackFile(f.name, new Uint8Array(buf))).then(() => renderPacks(), err => status(`Not installed: ${err.message}.`));
+    e.target.value = ''; return;
+  }
   if (/\.golem\.json$/i.test(f.name)) {   // a session exported from golem: it comes back as a session of its own
     f.text().then(t => { let s = null; try { s = importSession(JSON.parse(t)); } catch (err) { s = null; } if (!s) { status('That is not a golem session file.'); return; } renderStream(); renderDrawer(); status(`Imported "${s.name}".`); }, () => status('Could not read that file.'));
     e.target.value = ''; return;
@@ -298,6 +357,7 @@ if (shell.present) $('st-where').textContent = 'in the lead-acid shell';
 // the device's sessions come back from the store (moved from localStorage once, the first time), or two examples are seeded
 (async () => {
   store = await openStore();
+  const fb = await store.readPack('factbook').catch(() => null); if (fb) useFactbook(fb);   // before the sessions replay, so their cards read it
   const got = await store.load().catch(() => null);
   if (!(got && hydrate(got.state)) && !sessions().length) seedExamples();
   if (got && got.migrated) store.save(parts());

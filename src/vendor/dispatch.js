@@ -1,7 +1,7 @@
 // ⚠ VENDORED — DO NOT EDIT. @gcu/dispatch, built from ../auditable/ext/dispatch/src/ by its own build.
 // Source of truth: gentropic/auditable ext/dispatch (local clone: ../auditable). Re-vendor by copying
 // ext/dispatch/index.js here after 'node ext/dispatch/build.js'. golem uses the grammar rung only:
-// createEngine, makeSession, ENGLISH, PORTUGUESE. At auditable f47d796a.
+// createEngine, makeSession, ENGLISH, PORTUGUESE. At auditable 3a7b253c.
 
 // ⚠ GENERATED FILE — DO NOT EDIT. Source: src/  Build: @gcu/build src/main.js
 // @gcu/dispatch — Session-trained natural-language → tool-call dispatch: a Snips-shaped resolver (averaged-perceptron intent + CRF-class slot tagger + gazetteers + deterministic per-kind assemblers) that trains IN THE BROWSER from the host session's own vocabulary in under a second. Tools are declarative (ten kinds) and a grammar rung (clause: case-grammar frames over an Earley chart with costed repairs, en + pt-BR) reads controlled commands before the learners see them; no shipped model, no network, explainable per decision — refusals return empty calls so the host degrades into its command palette. Born from an incubator where this beat a 26M finetuned transformer 50/52 to 3/24 on a frozen yardstick.
@@ -1002,6 +1002,8 @@ function buildGrammar(X) {
     let n = c; for (const m of l) { const r = X.compound(m, n); if (!r) return null; n = r; }
     return { kind: 'cmd', verb: null, args: [{ kind: 'np', list: [n] }, ...a], question: true };
   });
+  // "which countries have a population over 100 million" = "countries having a population over …": the question word, a thing, its arguments
+  rule('Question', 'WH NPList PPs', (_, l, a) => a.length ? { kind: 'cmd', verb: null, args: [{ kind: 'np', list: l }, ...a], question: true } : null);
   rule('Program', 'Cmd THEN Program', (c, _, p) => [c, ...p]);
   // a fragment (understand with { fragment: true }): what is left of a command when the rest is the session's last one —
   // "in feet", "and chile", "log scale", "where au > 1", "again but with 300 m". It is an 'again' the ellipsis completes.
@@ -1173,6 +1175,9 @@ function buildGrammar(X) {
   // a fraction said after the whole: "an hour and a half", "one and a half hours", "2 km and a quarter" (never a list)
   rule('Quantity', `Quantity CONJ:${X.and} FRAC`, (q, _, f) => q.unit ? { ...q, n: q.n + f.n } : null);
   rule('Quantity', `NUM CONJ:${X.and} FRAC UNIT`, (t, _, f, u) => ({ type: 'quantity', n: t.n + f.n, unit: u.unit, dim: u.dim }));
+  // a number with its multiplier: "100 million", "2.5 billion tonnes"
+  rule('Quantity', 'NUM MULT', (t, m) => ({ type: 'quantity', n: +(t.n * m.n).toPrecision(15), unit: null, dim: 'bare' }));
+  rule('Quantity', 'NUM MULT UNIT', (t, m, u) => ({ type: 'quantity', n: +(t.n * m.n).toPrecision(15), unit: u.unit, dim: u.dim }));
   rule('Quantity', 'DET UNIT', (d, u) => X.indefinite.includes(d.word) ? { type: 'quantity', n: 1, unit: u.unit, dim: u.dim } : null);   // "an hour", "um minuto"
   // conditions on rows, for roles of type 'cond': "cu > 0.5 and lith is BRX", "au between 1 and 2", "lith in BRX, GRD",
   // "cu is not blank", "not au above 1". A condition is one thing; "and" binds tighter than "or". The columns it may
@@ -1258,6 +1263,7 @@ const ENGLISH = {
     twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90, hundred: 100, 'a hundred': 100, dozen: 12, 'a dozen': 12, 'a couple of': 2, 'a few': 3,
     'half an': 0.5, 'half a': 0.5, half: 0.5, 'a quarter of an': 0.25, 'a quarter of a': 0.25, 'quarter of an': 0.25, 'quarter of a': 0.25, 'three quarters of an': 0.75, 'three quarters of a': 0.75 },
   fractions: { 'a half': 0.5, 'a quarter': 0.25, 'three quarters': 0.75 },
+  multipliers: { thousand: 1e3, million: 1e6, billion: 1e9, trillion: 1e12 },
   AMPM: "am|pm|a.m.|p.m.|o'clock",
   indefinite: ['a', 'an'], newRef: ['new'], firstRef: ['first'],
   phr: { new: 'new', last: 'last', every: 'every', except: 'except', fromRun: 'from run', above: 'above', below: 'below', atleast: 'at least', atmost: 'at most', equals: 'equal to', then: 'Then', assuming: 'assuming', of: 'of', hole: '___', than: 'than' },
@@ -1317,7 +1323,8 @@ function createEngine(ont, locale = ENGLISH) {
   for (const [w, c] of Object.entries(locale.clocks ?? {})) add(w, 'CLOCK', { h: c[0], mi: c[1] });
   if (locale.AMPM) add(locale.AMPM, 'AMPM');
   for (const [w, n] of Object.entries(locale.numbers ?? {})) add(w, 'NUM', { n });
-  for (const [w, n] of Object.entries(locale.fractions ?? {})) add(w, 'FRAC', { n });   // "and a half": only after a whole   // number words: "ninety", "half an", "a quarter of an"
+  for (const [w, n] of Object.entries(locale.fractions ?? {})) add(w, 'FRAC', { n });   // "and a half": only after a whole
+  for (const [w, n] of Object.entries(locale.multipliers ?? {})) add(w, 'MULT', { n });   // "100 million", "2.5 billion": only after a number   // number words: "ninety", "half an", "a quarter of an"
   const L = k => `${k}_${locale.code}`;   // ontology synonym column for this locale, falling back to the default column
   const col = (o, k) => o[L(k)] ?? o[k];
   // a frame may take a subject before its verb ("pop means population"): it binds as the role 'subject'
@@ -1492,7 +1499,7 @@ function createEngine(ont, locale = ENGLISH) {
   }
   const describeRepairs = (toks, repairs) => repairs.map(r => r.op === 'skip' ? `ignored "${r.word}"` : r.op === 'subst' ? `read "${r.word}" as "${r.to}"` : r.sym === 'LATE' ? 'read the arguments out of order' : `assumed ${r.sym === 'PREP' ? 'a preposition' : 'an article'} before "${toks[r.at]?.word ?? 'the end'}"`);
   // human names for the terminals the chart was waiting for
-  const EXPECT = { DOQ: 'a question word', EXIST: "'there'", NOT: "'not'", BLANK: "'blank'", FRAC: "'a half'", UNK: 'a word', NOUN: 'a thing', VERB: 'a verb', DET: 'an article', PREP: 'a preposition', NUM: 'a number', UNIT: 'a unit', IDENT: 'a name', CONJ: `'${locale.CONJ.split('|')[0]}'`, THEN: `'${locale.THEN.split('|')[0]}'`, COMMA: "','", QUANT: 'a quantifier', REF: `'${locale.REF.split('|')[0]}'`, PRON: 'a pronoun', REL: `'${locale.REL.split('|')[0]}'`, SUBJ: `'${locale.SUBJ.split('|')[0]}'`, TIME: 'a time', COMP: 'a comparative', WH: 'a question word', COP: `'${(locale.COP ?? 'is').split('|')[0]}'`, WHCOP: `'${(locale.WHCOP ?? 'what is').split('|')[0]}'`, EXCEPT: `'${locale.EXCEPT.split('|')[0]}'`, BUT: `'${locale.BUT.split('|')[0]}'`, AGAIN: `'${locale.AGAIN.split('|')[0]}'`, DAY: 'a date', MONTH: 'a date', DATE: 'a date', CLOCK: 'a clock time', AMPM: "'am' or 'pm'", COLON: "':'", LIT: 'a value', DEMO: `'${(locale.DEMO ?? 'this').split('|')[0]}'` };
+  const EXPECT = { MULT: "'million'", DOQ: 'a question word', EXIST: "'there'", NOT: "'not'", BLANK: "'blank'", FRAC: "'a half'", UNK: 'a word', NOUN: 'a thing', VERB: 'a verb', DET: 'an article', PREP: 'a preposition', NUM: 'a number', UNIT: 'a unit', IDENT: 'a name', CONJ: `'${locale.CONJ.split('|')[0]}'`, THEN: `'${locale.THEN.split('|')[0]}'`, COMMA: "','", QUANT: 'a quantifier', REF: `'${locale.REF.split('|')[0]}'`, PRON: 'a pronoun', REL: `'${locale.REL.split('|')[0]}'`, SUBJ: `'${locale.SUBJ.split('|')[0]}'`, TIME: 'a time', COMP: 'a comparative', WH: 'a question word', COP: `'${(locale.COP ?? 'is').split('|')[0]}'`, WHCOP: `'${(locale.WHCOP ?? 'what is').split('|')[0]}'`, EXCEPT: `'${locale.EXCEPT.split('|')[0]}'`, BUT: `'${locale.BUT.split('|')[0]}'`, AGAIN: `'${locale.AGAIN.split('|')[0]}'`, DAY: 'a date', MONTH: 'a date', DATE: 'a date', CLOCK: 'a clock time', AMPM: "'am' or 'pm'", COLON: "':'", LIT: 'a value', DEMO: `'${(locale.DEMO ?? 'this').split('|')[0]}'` };
   const expectName = sym => { const [cat, w] = sym.split(':'); if (cat === 'LATE' || cat === 'TEXT' || (cat === 'LIT' && !(ont.shapes ?? []).length)) return null; return w ? `'${w}'` : (EXPECT[cat] ?? cat); };
 
   // ---- binding ----
@@ -2116,6 +2123,7 @@ const PORTUGUESE = {
   numbers: { dois: 2, duas: 2, três: 3, tres: 3, quatro: 4, cinco: 5, seis: 6, sete: 7, oito: 8, nove: 9, dez: 10, onze: 11, doze: 12, quinze: 15, vinte: 20, trinta: 30, quarenta: 40, cinquenta: 50, sessenta: 60, noventa: 90, cem: 100,
     meia: 0.5, meio: 0.5, 'um quarto de': 0.25, 'uma dúzia de': 12 },
   fractions: { meia: 0.5, meio: 0.5, 'um quarto': 0.25 },
+  multipliers: { mil: 1e3, 'milhão': 1e6, milhao: 1e6, 'milhões': 1e6, milhoes: 1e6, 'bilhão': 1e9, bilhao: 1e9, 'bilhões': 1e9, bilhoes: 1e9 },
   indefinite: ['um', 'uma', 'uns', 'umas'], newRef: ['novo', 'nova'], firstRef: ['primeiro', 'primeira'],
   phr: { new: 'novo', last: 'último', every: 'todo', except: 'exceto', fromRun: 'da rodada', above: 'acima de', below: 'abaixo de', atleast: 'pelo menos', atmost: 'no máximo', equals: 'igual a', then: 'Depois', assuming: 'assumindo', of: 'de', hole: '___', than: 'que' },
   stem: w => { let x = w.normalize('NFD').replace(/[\u0300-\u036f]/g, '');

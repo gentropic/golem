@@ -15,7 +15,7 @@ tool({ name: 'mapdial', planned: true, skill: { group: 'Device', title: 'Map, di
 export const PACKS = [
   ['timescale', 'International Chronostratigraphic Chart', 'ICS 2023 · Macrostrat · CC BY 4.0', 'live', 'Every unit of the chart: bounds, rank, parents, neighbours, subdivisions.'],
   ['factbook', 'CIA World Factbook', '2.8 MB · CC0', 'samp', 'Records: lookup, convert, filter, rank.'],
-  ['factbook-full', 'Factbook, full profiles', '2.3 MB · CC0', 'plan', 'Deeper filters, such as exports and resources.'],
+  ['factbook-full', 'Factbook, full profiles', '2.3 MB · CC0', 'samp', 'Installed with the factbook when asked: which countries are landlocked, and their coastlines. More fields later.'],
   ['ods', 'Open Data Structures', '1.9 MB · CC BY 2.5', 'samp', 'Term index into the reader. Listings can run in adder.'],
   ['elements-of-style', 'The Elements of Style (1918)', '36 kB · public domain', 'live', 'Rules compiled into a text checker.'],
   ['rtow · rtnw · rtrol', 'Ray Tracing series', '11.5 MB · CC0', 'plan', 'Reader only until a term index is built.'],

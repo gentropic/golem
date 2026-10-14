@@ -61,199 +61,6 @@
       ]
     },
     {
-      "type": "country",
-      "words": {
-        "Australia": [
-          "australia"
-        ],
-        "Brazil": [
-          "brazil"
-        ],
-        "Canada": [
-          "canada"
-        ],
-        "Chile": [
-          "chile"
-        ],
-        "Germany": [
-          "germany"
-        ],
-        "Indonesia": [
-          "indonesia"
-        ],
-        "Ireland": [
-          "ireland"
-        ],
-        "Japan": [
-          "japan"
-        ],
-        "Kazakhstan": [
-          "kazakhstan"
-        ],
-        "Mongolia": [
-          "mongolia"
-        ],
-        "Peru": [
-          "peru"
-        ],
-        "Portugal": [
-          "portugal"
-        ],
-        "South Africa": [
-          "south africa"
-        ],
-        "Zambia": [
-          "zambia"
-        ]
-      },
-      "generic": [
-        "country",
-        "countries",
-        "nation",
-        "nations"
-      ],
-      "words_pt": {
-        "Australia": [
-          "austrália",
-          "australia"
-        ],
-        "Brazil": [
-          "brasil"
-        ],
-        "Canada": [
-          "canadá",
-          "canada"
-        ],
-        "Chile": [
-          "chile"
-        ],
-        "Germany": [
-          "alemanha"
-        ],
-        "Indonesia": [
-          "indonésia",
-          "indonesia"
-        ],
-        "Ireland": [
-          "irlanda"
-        ],
-        "Japan": [
-          "japão",
-          "japao"
-        ],
-        "Kazakhstan": [
-          "cazaquistão",
-          "cazaquistao"
-        ],
-        "Mongolia": [
-          "mongólia",
-          "mongolia"
-        ],
-        "Peru": [
-          "peru"
-        ],
-        "Portugal": [
-          "portugal"
-        ],
-        "South Africa": [
-          "áfrica do sul",
-          "africa do sul"
-        ],
-        "Zambia": [
-          "zâmbia",
-          "zambia"
-        ]
-      },
-      "generic_pt": [
-        "país",
-        "pais",
-        "países",
-        "paises"
-      ]
-    },
-    {
-      "type": "property",
-      "words": {
-        "density": [
-          "density"
-        ],
-        "hardness": [
-          "hardness"
-        ],
-        "formula": [
-          "formula"
-        ],
-        "streak": [
-          "streak"
-        ],
-        "capital": [
-          "capital"
-        ],
-        "population": [
-          "population"
-        ],
-        "area": [
-          "area"
-        ],
-        "population density": [
-          "population density"
-        ]
-      },
-      "generic": [
-        "property",
-        "value"
-      ],
-      "words_pt": {
-        "density": [
-          "densidade"
-        ],
-        "hardness": [
-          "dureza"
-        ],
-        "formula": [
-          "fórmula",
-          "formula"
-        ],
-        "streak": [
-          "traço",
-          "traco"
-        ],
-        "capital": [
-          "capital"
-        ],
-        "population": [
-          "população",
-          "populacao"
-        ],
-        "area": [
-          "área",
-          "area"
-        ],
-        "population density": [
-          "densidade populacional",
-          "densidade de população"
-        ]
-      },
-      "generic_pt": [
-        "propriedade",
-        "valor"
-      ]
-    },
-    {
-      "type": "filter",
-      "words": {
-        "landlocked": [
-          "landlocked"
-        ]
-      },
-      "words_pt": {
-        "landlocked": [
-          "sem litoral",
-          "sem costa"
-        ]
-      }
-    },
-    {
       "type": "scale",
       "words": {
         "log": [
@@ -2040,6 +1847,371 @@
         "intervals": [
           "intervalos",
           "sobreposições"
+        ]
+      }
+    },
+    {
+      "type": "country",
+      "exact": true,
+      "words": {
+        "Australia": [
+          "australia"
+        ],
+        "Brazil": [
+          "brazil"
+        ],
+        "Canada": [
+          "canada"
+        ],
+        "Chile": [
+          "chile"
+        ],
+        "Germany": [
+          "germany"
+        ],
+        "Indonesia": [
+          "indonesia"
+        ],
+        "Ireland": [
+          "ireland"
+        ],
+        "Japan": [
+          "japan"
+        ],
+        "Kazakhstan": [
+          "kazakhstan"
+        ],
+        "Mongolia": [
+          "mongolia"
+        ],
+        "Peru": [
+          "peru"
+        ],
+        "Portugal": [
+          "portugal"
+        ],
+        "South Africa": [
+          "south africa"
+        ],
+        "Zambia": [
+          "zambia"
+        ]
+      },
+      "generic": [
+        "country",
+        "countries",
+        "nation",
+        "nations",
+        "territory",
+        "territories"
+      ],
+      "words_pt": {
+        "Australia": [
+          "australia"
+        ],
+        "Brazil": [
+          "brazil",
+          "brasil"
+        ],
+        "Canada": [
+          "canada"
+        ],
+        "Chile": [
+          "chile"
+        ],
+        "Germany": [
+          "germany",
+          "alemanha"
+        ],
+        "Indonesia": [
+          "indonesia"
+        ],
+        "Ireland": [
+          "ireland",
+          "irlanda"
+        ],
+        "Japan": [
+          "japan",
+          "japao"
+        ],
+        "Kazakhstan": [
+          "kazakhstan",
+          "cazaquistao"
+        ],
+        "Mongolia": [
+          "mongolia"
+        ],
+        "Peru": [
+          "peru"
+        ],
+        "Portugal": [
+          "portugal"
+        ],
+        "South Africa": [
+          "south africa",
+          "africa do sul"
+        ],
+        "Zambia": [
+          "zambia"
+        ]
+      },
+      "generic_pt": [
+        "país",
+        "pais",
+        "países",
+        "paises"
+      ]
+    },
+    {
+      "type": "region",
+      "exact": true,
+      "words": {
+        "south-america": [
+          "south america"
+        ],
+        "europe": [
+          "europe"
+        ],
+        "africa": [
+          "africa"
+        ],
+        "australia-oceania": [
+          "oceania",
+          "australia and oceania"
+        ],
+        "central-america-n-caribbean": [
+          "central america",
+          "the caribbean",
+          "caribbean",
+          "central america and the caribbean"
+        ],
+        "antarctica": [
+          "antarctica"
+        ],
+        "central-asia": [
+          "central asia"
+        ],
+        "middle-east": [
+          "the middle east",
+          "middle east"
+        ],
+        "north-america": [
+          "north america"
+        ],
+        "east-n-southeast-asia": [
+          "east asia",
+          "southeast asia",
+          "east and southeast asia"
+        ],
+        "south-asia": [
+          "south asia"
+        ]
+      },
+      "words_pt": {
+        "south-america": [
+          "américa do sul",
+          "america do sul"
+        ],
+        "europe": [
+          "europa"
+        ],
+        "africa": [
+          "áfrica",
+          "africa"
+        ],
+        "australia-oceania": [
+          "oceania"
+        ],
+        "central-america-n-caribbean": [
+          "américa central",
+          "caribe"
+        ],
+        "antarctica": [
+          "antártida"
+        ],
+        "central-asia": [
+          "ásia central"
+        ],
+        "middle-east": [
+          "oriente médio"
+        ],
+        "north-america": [
+          "américa do norte"
+        ],
+        "east-n-southeast-asia": [
+          "sudeste asiático",
+          "leste asiático"
+        ],
+        "south-asia": [
+          "sul da ásia"
+        ]
+      }
+    },
+    {
+      "type": "property",
+      "words": {
+        "capital": [
+          "capital",
+          "capital city"
+        ],
+        "population": [
+          "population",
+          "inhabitants",
+          "number of people"
+        ],
+        "area": [
+          "area",
+          "land area",
+          "size"
+        ],
+        "population density": [
+          "population density"
+        ],
+        "gdp": [
+          "gdp",
+          "gdp ppp",
+          "economy",
+          "economic output"
+        ],
+        "gdppc": [
+          "gdp per capita",
+          "gdp per person",
+          "gdp per head",
+          "income per person"
+        ],
+        "government": [
+          "government",
+          "government type",
+          "form of government",
+          "political system"
+        ],
+        "region": [
+          "region",
+          "continent"
+        ],
+        "background": [
+          "background",
+          "history",
+          "overview"
+        ],
+        "location": [
+          "location",
+          "coordinates"
+        ],
+        "coastline": [
+          "coastline",
+          "coast"
+        ]
+      },
+      "generic": [
+        "property",
+        "value"
+      ],
+      "words_pt": {
+        "capital": [
+          "capital"
+        ],
+        "population": [
+          "população",
+          "populacao"
+        ],
+        "area": [
+          "área",
+          "area"
+        ],
+        "population density": [
+          "densidade populacional",
+          "densidade de população"
+        ],
+        "gdp": [
+          "pib"
+        ],
+        "gdppc": [
+          "pib per capita"
+        ],
+        "government": [
+          "governo"
+        ],
+        "region": [
+          "região",
+          "regiao"
+        ],
+        "background": [
+          "história",
+          "historia"
+        ],
+        "location": [
+          "localização"
+        ],
+        "coastline": [
+          "litoral",
+          "costa"
+        ]
+      },
+      "generic_pt": [
+        "propriedade",
+        "valor"
+      ]
+    },
+    {
+      "type": "filter",
+      "words": {
+        "landlocked": [
+          "landlocked"
+        ]
+      },
+      "words_pt": {
+        "landlocked": [
+          "sem litoral",
+          "sem costa"
+        ]
+      }
+    },
+    {
+      "type": "rank",
+      "words": {
+        "largest": [
+          "largest",
+          "biggest"
+        ],
+        "smallest": [
+          "smallest"
+        ],
+        "populous": [
+          "most populous",
+          "most populated"
+        ],
+        "unpopulous": [
+          "least populous",
+          "least populated"
+        ],
+        "dense": [
+          "most densely populated",
+          "densest"
+        ],
+        "richest": [
+          "richest",
+          "wealthiest"
+        ],
+        "poorest": [
+          "poorest"
+        ]
+      },
+      "words_pt": {
+        "largest": [
+          "maiores"
+        ],
+        "smallest": [
+          "menores"
+        ],
+        "populous": [
+          "mais populosos"
+        ],
+        "richest": [
+          "mais ricos"
+        ],
+        "poorest": [
+          "mais pobres"
         ]
       }
     },
@@ -7578,14 +7750,6 @@
   ],
   "compounds": [
     {
-      "mod": "filter",
-      "heads": [
-        "country"
-      ],
-      "attr": "filter",
-      "echo": true
-    },
-    {
       "mod": "scale",
       "heads": [
         "plot"
@@ -7600,6 +7764,22 @@
         "column"
       ],
       "attr": "stat",
+      "echo": true
+    },
+    {
+      "mod": "filter",
+      "heads": [
+        "country"
+      ],
+      "attr": "filter",
+      "echo": true
+    },
+    {
+      "mod": "rank",
+      "heads": [
+        "country"
+      ],
+      "attr": "rank",
       "echo": true
     },
     {
@@ -7836,6 +8016,13 @@
     },
     {
       "head": "sample",
+      "attr": "limit",
+      "dims": [
+        "bare"
+      ]
+    },
+    {
+      "head": "country",
       "attr": "limit",
       "dims": [
         "bare"
@@ -8706,51 +8893,6 @@
       "label_pt": "Verificar intervalos"
     },
     {
-      "name": "lookup",
-      "label": "Look up",
-      "words": [
-        "lookup",
-        "look up",
-        "get",
-        "find"
-      ],
-      "elidable": true,
-      "theme": [
-        "property"
-      ],
-      "required": [
-        "theme",
-        "of"
-      ],
-      "roles": {
-        "of": {
-          "preps": [
-            "of",
-            "for"
-          ],
-          "types": [
-            "country"
-          ]
-        },
-        "unit": {
-          "preps": [
-            "in",
-            "as"
-          ],
-          "types": [
-            "unit"
-          ]
-        }
-      },
-      "words_pt": [
-        "consultar",
-        "consulta",
-        "buscar",
-        "busca"
-      ],
-      "label_pt": "Consultar"
-    },
-    {
       "name": "define",
       "label": "Define",
       "words": [
@@ -8776,39 +8918,6 @@
         "descreve"
       ],
       "label_pt": "Definir"
-    },
-    {
-      "name": "list",
-      "label": "List",
-      "words": [
-        "list",
-        "rank"
-      ],
-      "elidable": true,
-      "theme": [
-        "country"
-      ],
-      "required": [
-        "theme"
-      ],
-      "roles": {
-        "by": {
-          "preps": [
-            "by",
-            "sort"
-          ],
-          "types": [
-            "property"
-          ]
-        }
-      },
-      "words_pt": [
-        "listar",
-        "lista",
-        "ordenar",
-        "ordena"
-      ],
-      "label_pt": "Listar"
     },
     {
       "name": "lint",
@@ -8841,6 +8950,108 @@
         "confira"
       ],
       "label_pt": "Revisar"
+    },
+    {
+      "name": "lookup",
+      "label": "Look up",
+      "words": [
+        "lookup",
+        "look up",
+        "get",
+        "find"
+      ],
+      "elidable": true,
+      "theme": [
+        "property"
+      ],
+      "required": [
+        "theme",
+        "of"
+      ],
+      "roles": {
+        "of": {
+          "preps": [
+            "of",
+            "for",
+            "in"
+          ],
+          "types": [
+            "country"
+          ]
+        },
+        "unit": {
+          "preps": [
+            "in",
+            "as"
+          ],
+          "types": [
+            "unit"
+          ]
+        }
+      },
+      "words_pt": [
+        "consultar",
+        "consulta",
+        "buscar",
+        "busca"
+      ],
+      "label_pt": "Consultar"
+    },
+    {
+      "name": "list",
+      "label": "List",
+      "words": [
+        "list",
+        "rank",
+        "show",
+        "show me",
+        "which are the"
+      ],
+      "elidable": true,
+      "theme": [
+        "country"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {
+        "by": {
+          "preps": [
+            "by",
+            "sort"
+          ],
+          "types": [
+            "property"
+          ]
+        },
+        "in": {
+          "preps": [
+            "in",
+            "of",
+            "from"
+          ],
+          "types": [
+            "region"
+          ]
+        },
+        "where": {
+          "preps": [
+            "where",
+            "with",
+            "having"
+          ],
+          "types": [
+            "cond"
+          ]
+        }
+      },
+      "words_pt": [
+        "listar",
+        "lista",
+        "ordenar",
+        "ordena"
+      ],
+      "label_pt": "Listar"
     },
     {
       "name": "timer",
@@ -11472,7 +11683,8 @@
   "conditions": {
     "subjects": [
       "variable",
-      "column"
+      "column",
+      "property"
     ]
   },
   "inherit": [],
