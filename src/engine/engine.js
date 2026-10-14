@@ -31,7 +31,7 @@ import { bindingsOf, runSteps } from './recipes.js';
 import { tableFromText } from './table.js';
 import { convertBinary } from './formats.js';
 import './notes.js';
-import { norm, grammar, context, taught, sessionRead, readingOf } from './reading.js';
+import { norm, grammar, context, taught, sessionRead, readingOf, guessRead } from './reading.js';
 import { current, newSession, renameSession, touch } from './sessions.js';
 
 export function addCard(raw, r, ms) {
@@ -50,6 +50,13 @@ export function flipSlot(c, key) {
 // an open question answered by option index
 export function answer(c, i) {
   const o = c.res.ask && c.res.ask.options[i]; if (!o) return null;
+  // a guess picked: the card becomes that tool's card, still marked as a guess (the rung is kept with the session)
+  if (c.tool === 'guess') {
+    const k = c.args.cands[o.value], from = c.args.cands.length;
+    c.tool = k.tool; c.args = JSON.parse(JSON.stringify(k.args)); rerun(c);
+    if (c.res) c.res.trace.unshift(`guess: read as ${k.echo}${k.changes.length ? ' (' + k.changes.join('; ') + ')' : ''}, picked from ${from}`);
+    return o;
+  }
   c.res.ask.set(c.args, o.value); rerun(c); return o;
 }
 export function undo() {
@@ -76,6 +83,7 @@ export function submit(raw) {
     if (Array.isArray(many) && many.length > 1) { last.res.ask.set(last.args, many); rerun(last); return { kind: 'answered', card: last, label: many.join(', ') }; }
     // an option by its label, as the card wrote it; "yes" when there is only one
     const os = last.res.ask.options, o = os.find(x => x.label.toLowerCase() === q) || os.find(x => x.label.length >= 3 && (x.label.toLowerCase().startsWith(q) || q.includes(x.label.toLowerCase()))) || (os.length === 1 && s && s.session === 'yes' ? os[0] : null);
+    if (o && last.tool === 'guess') { answer(last, os.indexOf(o)); return { kind: 'answered', card: last, label: o.label }; }
     if (o) { last.res.ask.set(last.args, o.value); rerun(last); return { kind: 'answered', card: last, label: o.label }; }
     if (last.res.ask.parse) { const v = last.res.ask.parse(text); if (v != null) { last.res.ask.set(last.args, v); rerun(last); return { kind: 'answered', card: last, label: Array.isArray(v) ? v.join(', ') : String(v) }; } }
   }
@@ -85,7 +93,7 @@ export function submit(raw) {
   // a saved recipe by name: replayed with the new subjects into a session of its own (a batch on every table is a card)
   if (s && s.session === 'recipe') return runRecipe(S.recipes[s.name], s.rest);
   // a whole command first; then what amends the last card ("in feet", "2 sentences"); then the words taught on this device
-  const r = grammar(text, q, 'grammar', raw) || context(q, last, raw) || taught(text, q, raw) || { tool: 'none', args: { q }, rung: 'none', res: T.none({ q }) };
+  const r = grammar(text, q, 'grammar', raw) || context(q, last, raw) || taught(text, q, raw) || guessRead(raw) || { tool: 'none', args: { q }, rung: 'none', res: T.none({ q }) };
   return { kind: 'card', card: addCard(raw, r, performance.now() - t0) };
 }
 

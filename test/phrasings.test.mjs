@@ -108,3 +108,21 @@ test('preview: the reading as you type, dry — no card, no state, the same orde
   assert.ok(g.completions('mean cu by l').some(c => c.word === 'lith'));
   assert.ok(g.completions('2 km in ').every(c => c.kind === 'unit'), 'units of the same dimension');
 });
+
+test('guess: no exact reading offers repaired readings, runs none until one is picked, and keeps the mark', () => {
+  g.reset(); pin(); g.newSession();
+  const c = g.submit('population mongolia').card;
+  assert.equal(c.tool, 'guess'); assert.equal(c.rung, 'guess');
+  assert.deepEqual(c.res.ask.options.map(o => o.label), ['Look up population; of mongolia']);
+  assert.ok(g.textOf(c).includes('assumed a preposition'), 'the card says what the reading changed');
+  assert.equal(g.S.cards.length, 1, 'nothing ran');
+  g.answer(c, 0);
+  assert.equal(c.tool, 'fact'); assert.equal(c.rung, 'guess'); assert.equal(c.args.country, 'mongolia');
+  assert.match(c.res.trace[0], /^guess: read as Look up population/);
+  const saved = JSON.parse(JSON.stringify(g.serialize()));
+  assert.ok(JSON.stringify(saved).includes('"rung":"guess"'), 'the mark travels with the session');
+  // typed: "yes" picks the only offer; off-topic lines draw none
+  const d = g.submit('gimme histogram cu').card; assert.equal(d.tool, 'guess');
+  assert.equal(g.submit('yes').kind, 'answered'); assert.equal(d.tool, 'hist');
+  for (const q of ['banana', 'what is the weather like in perth', 'tell me a joke', 'who are you']) assert.equal(g.submit(q).card.rung, 'none', q);
+});

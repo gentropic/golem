@@ -183,6 +183,14 @@ await page.fill('#q', ''); await page.waitForTimeout(150);
 const cleared = await page.isHidden('#pv') && await page.isHidden('#sg');
 console.log(`${cleared ? 'ok  ' : 'FAIL'} an empty composer shows no reading and no completions`);
 if (!cleared) failed++;
+// a guess: offered with the warning mark, nothing runs until the reading is tapped, then the card is that tool's
+await page.fill('#q', 'population mongolia'); await page.press('#q', 'Enter'); await page.waitForTimeout(150);
+const gcard = page.locator('#stream .card').last();
+const offered = await gcard.getAttribute('data-rung') === 'guess' && (await gcard.locator('[data-act="answer"]').count()) === 1;
+await gcard.locator('[data-act="answer"]').first().click(); await page.waitForTimeout(150);
+const after = page.locator('#stream .card').last(), picked = await after.getAttribute('data-rung') === 'guess' && (await after.textContent()).includes('Mongolia');
+console.log(`${offered && picked ? 'ok  ' : 'FAIL'} no exact reading offers a guess, marked, and runs it only when tapped`);
+if (!(offered && picked)) failed++;
 errors.forEach(e => console.log('FAIL ' + e));
 await browser.close();
 if (failed || !nameOk || kept !== 22 || overflow > 0 || errors.length) { console.log('\nsmoke test failed'); process.exit(1); }

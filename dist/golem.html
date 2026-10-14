@@ -139,7 +139,7 @@ button{cursor:pointer}
 
 /* a turn: the query, then golem's readout */
 .card{display:grid;gap:10px;min-width:0;--rc:var(--au-info)}
-.card[data-rung="context"]{--rc:var(--au-selected)} .card[data-rung="taught"]{--rc:var(--au-success)} .card[data-rung="none"]{--rc:var(--au-error)}
+.card[data-rung="context"]{--rc:var(--au-selected)} .card[data-rung="taught"]{--rc:var(--au-success)} .card[data-rung="none"]{--rc:var(--au-error)} .card[data-rung="guess"]{--rc:var(--au-warn)}
 .q{justify-self:end;max-width:min(88%,600px);background:var(--au-surface-raised);border:1px solid var(--au-border);border-radius:12px 12px 3px 12px;padding:8px 13px;font:14px/1.45 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere}
 .reply{border-left:2px solid var(--rc);padding:0 0 0 14px;display:grid;gap:6px;min-width:0}
 .chead{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;font:11px var(--mono);color:var(--au-fg-soft)}
@@ -149,6 +149,7 @@ button{cursor:pointer}
 .rung.context{color:var(--au-selected);background:var(--au-selected-soft)}
 .rung.taught{color:var(--au-success);background:var(--au-success-soft)}
 .rung.none{color:var(--au-error);background:var(--au-error-soft)}
+.rung.guess{color:var(--au-warn);background:var(--au-warn-soft)}
 .read{display:flex;flex-wrap:wrap;align-items:center;gap:4px 5px;font-size:13.5px;color:var(--au-fg-muted)}
 .read .lbl{margin-right:2px}
 .slot{font:12px var(--mono);background:var(--au-surface-raised);border:1px solid var(--au-border);border-radius:2px;padding:1px 6px;color:var(--au-fg)}
@@ -291,9 +292,9 @@ svg text{font:10px var(--mono);fill:var(--au-fg-muted)}
           <p>Each answer shows which rung read the query and what it was read as. Dashed slots are ambiguous readings: tap one to flip it and the answer recomputes. The line down the left of an answer has the rung's colour.</p>
           <ol>
             <li><span class="rung context">context</span> An open question from golem, or an amendment of the last answer: <code>in feet</code>, <code>log scale</code>, <code>and chile</code>, <code>why</code>, <code>undo</code>.</li>
-            <li><span class="rung grammar">grammar</span> The controlled-English parse: the clause grammar of <code>@gcu/dispatch</code>, then rules for free text, dates and orientations.</li>
+            <li><span class="rung grammar">grammar</span> The controlled-English parse: the clause grammar of <code>@gcu/dispatch</code>, then the parser for arithmetic. While you type, the line under the box shows what it would read.</li>
             <li><span class="rung taught">taught</span> Phrases you taught on this device: <code>dens means density</code>.</li>
-            <li>The dispatch CRF, for loose phrasing. Not wired yet.</li>
+            <li><span class="rung guess">guess</span> Nothing read it exactly, so it offers readings that change it slightly (an ignored word, an assumed preposition) and says what each changed. None runs until you pick one.</li>
             <li><span class="rung none">no reading</span> It stops, shows the nearest skills, and offers to learn the word it did not know.</li>
           </ol>
           <p>Open <b>plan</b> under an answer to see every step that produced it.</p>
@@ -19088,7 +19089,7 @@ const __m49 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/dispatch, built from ../auditable/ext/dispatch/src/ by its own build.
 // Source of truth: gentropic/auditable ext/dispatch (local clone: ../auditable). Re-vendor by copying
 // ext/dispatch/index.js here after 'node ext/dispatch/build.js'. golem uses the grammar rung only:
-// createEngine, makeSession, ENGLISH, PORTUGUESE. At auditable 7b49e0b9.
+// createEngine, makeSession, ENGLISH, PORTUGUESE. At auditable f47d796a.
 
 // ⚠ GENERATED FILE — DO NOT EDIT. Source: src/  Build: @gcu/build src/main.js
 // @gcu/dispatch — Session-trained natural-language → tool-call dispatch: a Snips-shaped resolver (averaged-perceptron intent + CRF-class slot tagger + gazetteers + deterministic per-kind assemblers) that trains IN THE BROWSER from the host session's own vocabulary in under a second. Tools are declarative (ten kinds) and a grammar rung (clause: case-grammar frames over an Earley chart with costed repairs, en + pt-BR) reads controlled commands before the learners see them; no shipped model, no network, explainable per decision — refusals return empty calls so the host degrades into its command palette. Born from an incubator where this beat a 26M finetuned transformer 50/52 to 3/24 on a frozen yardstick.
@@ -20373,13 +20374,18 @@ const ENGLISH = {
 //
 // See SPEC.md "The grammar rung" for the pipeline, the verdicts and the ceiling.
 
-function dl(a, b) { // Damerau-Levenshtein
+function dl(a, b, max = Infinity) { // Damerau-Levenshtein; past max (a whole row above it) the answer is only "more than max"
   const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
   for (let j = 1; j <= b.length; j++) d[0][j] = j;
-  for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) {
-    const c = a[i - 1] === b[j - 1] ? 0 : 1;
-    d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + c);
-    if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+  for (let i = 1; i <= a.length; i++) {
+    let low = Infinity;
+    for (let j = 1; j <= b.length; j++) {
+      const c = a[i - 1] === b[j - 1] ? 0 : 1;
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + c);
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+      if (d[i][j] < low) low = d[i][j];
+    }
+    if (low > max + 1) return max + 1;
   }
   return d[a.length][b.length];
 }
@@ -20414,8 +20420,11 @@ function createEngine(ont, locale = ENGLISH) {
   for (const u of ont.units) add(col(u, 'words').join('|'), 'UNIT', { dim: u.dim, unit: u.unit });
   for (const w of col(ont, 'fillers') ?? []) if (!LEX[w]) add(w, 'FILLER');   // host words that carry nothing ("golem" in "hey golem")
   const MULTI = Object.keys(LEX).filter(k => k.includes(' ')).map(k => k.split(' ')).sort((a, b) => b.length - a.length);
+  const MULTI_AT = new Map(); for (const mw of MULTI) { if (!MULTI_AT.has(mw[0])) MULTI_AT.set(mw[0], []); MULTI_AT.get(mw[0]).push(mw); }   // by first word (matched as typed), longest first
   const SINGLE = Object.keys(LEX).filter(k => !k.includes(' '));
+  const BY_LEN = [], TYPO = new Map(), RANK = new Map(SINGLE.map((k, i) => [k, i]));   // candidates keep the lexicon's order   // typo-repair targets by length: an edit distance of t only reaches words within t letters
   const CONTENT = new Set(Object.keys(LEX).filter(k => LEX[k].some(s => ['NOUN', 'VERB', 'UNIT'].includes(s.cat) && !s.exact)));
+  for (const k of SINGLE) if (k.length > 2 && CONTENT.has(k)) (BY_LEN[k.length] ??= []).push(k);
   const STEMS = {};   // stem → senses of content words, so inflected forms nobody listed still resolve
   for (const k of CONTENT) if (!k.includes(' ')) (STEMS[locale.stem(k)] ??= []).push(...LEX[k].filter(s => ['NOUN', 'VERB', 'UNIT'].includes(s.cat) && !s.exact).map(s => ({ ...s, lexeme: k })));
   const NEEDS_ID = new Set(ont.nouns.filter(n => n.needsId).map(n => n.type));
@@ -20495,9 +20504,9 @@ function createEngine(ont, locale = ENGLISH) {
         toks.push(at({ word: text.slice(raw[i].s, raw[span.k].e).toLowerCase(), senses: types.map(type => ({ cat: 'LIT', type, value: text.slice(raw[i].s, raw[span.k].e) })) }, i, span.k + 1)); i = span.k + 1; continue; }
       let hit = null;
       let mwPlural = false;
-      for (const mw of MULTI) if (mw.every((w, k) => raw[i + k]?.w === w || (k === mw.length - 1 && raw[i + k] && locale.stem(raw[i + k].w) === locale.stem(w) && LEX[mw.join(' ')].some(x => x.cat === 'NOUN')))) { hit = mw; mwPlural = locale.plural(raw[i + mw.length - 1].w); break; }
+      for (const mw of MULTI_AT.get(raw[i].w) ?? []) if (mw.every((w, k) => raw[i + k]?.w === w || (k === mw.length - 1 && raw[i + k] && locale.stem(raw[i + k].w) === locale.stem(w) && LEX[mw.join(' ')].some(x => x.cat === 'NOUN')))) { hit = mw; mwPlural = locale.plural(raw[i + mw.length - 1].w); break; }
       if (hit && hit.length > 1) for (let j = 1; j < hit.length; j++) {
-        const over = MULTI.find(mw => mw.length > hit.length - j && mw.every((x, k) => raw[i + j + k]?.w === x));
+        const over = (MULTI_AT.get(raw[i + j]?.w) ?? []).find(mw => mw.length > hit.length - j && mw.every((x, k) => raw[i + j + k]?.w === x));
         if (over && raw.slice(i, i + j).every(r => LEX[r.w])) { hit = null; break; }
       }
       if (hit) { const w = hit.join(' '); if (LEX[w][0].cat !== 'FILLER') toks.push(at({ word: w, senses: mwPlural ? LEX[w].map(x => x.cat === 'NOUN' ? { ...x, plural: true } : x) : LEX[w] }, i, i + hit.length)); i += hit.length; continue; }
@@ -20518,7 +20527,8 @@ function createEngine(ont, locale = ENGLISH) {
       const st = STEMS[locale.stem(w)];
       if (st) { const plural = locale.plural(w); toks.push(at({ word: w, senses: st.map(s => ({ ...s, plural })), stemmed: true }, i0, i)); continue; }
       const tol = w.length < 7 ? 1 : 2;
-      const cands = SINGLE.filter(k => k.length > 2 && CONTENT.has(k) && dl(w, k) <= tol);   // never repair into a function word
+      let cands = TYPO.get(w);   // never repair into a function word; once per word
+      if (!cands) { cands = []; for (let L = w.length - tol; L <= w.length + tol; L++) for (const k of BY_LEN[L] ?? []) if (dl(w, k, tol) <= tol) cands.push(k); cands.sort((x, y) => RANK.get(x) - RANK.get(y)); if (TYPO.size > 5000) TYPO.clear(); TYPO.set(w, cands); }
       if (cands.length === 1) { notes.push(`read "${w}" as "${cands[0]}"`); toks.push(at({ word: cands[0], senses: LEX[cands[0]], repaired: w }, i0, i)); continue; }
       if (cands.length > 1) notes.push(`"${w}" could be ${cands.map(c => `"${c}"`).join(' / ')} — not guessing`);
       unknown.push(w); toks.push(at({ word: w, senses: [{ cat: 'UNK' }] }, i0, i));
@@ -20967,7 +20977,7 @@ function createEngine(ont, locale = ENGLISH) {
     diag.repairs = describeRepairs(toks, rawRepairs);
     // a repair that discarded words it does not know is a guess, not an understanding: ask, showing what it would do
     const droppedUnknown = rawRepairs.filter(r => r.op === 'skip' && toks[r.at].senses.every(x => x.cat === 'UNK')).map(r => `"${r.word}"`);
-    if (droppedUnknown.length) return { status: 'clarify', reasons: [`did not understand ${droppedUnknown.join(', ')} — ignore ${droppedUnknown.length > 1 ? 'them' : 'it'}?`], partial: cmds.map(echo), repaired: true, diag };
+    if (droppedUnknown.length) return { status: 'clarify', reasons: [`did not understand ${droppedUnknown.join(', ')} — ignore ${droppedUnknown.length > 1 ? 'them' : 'it'}?`], partial: cmds.map(echo), commands: cmds, repaired: true, diag };   // the commands it would make, for a host that asks before acting
     diag.notes.push(...clean[0].flatMap(r => r.notes), ...diag.repairs);
     session.last = cmds.at(-1); session.history.push(...cmds);
     return { status: 'ok', commands: cmds, echo: cmds.map(echo).join(` ${P.then}: `), repaired: diag.repairs.length > 0, diag };
@@ -21380,6 +21390,41 @@ function taught(text, q, raw) {
 }
 function lev(a, b) { const d = Array.from({ length: a.length + 1 }, (_, i) => [i]); for (let j = 1; j <= b.length; j++) d[0][j] = j; for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] !== b[j - 1])); return d[a.length][b.length]; }
 
+/* ── rung 4: no exact reading; the grammar's repair pass offers readings that change the text slightly ── */
+// Repairs are costed: an ignored word, an assumed preposition, an argument out of order, a one-letter slip. Within a
+// budget of 3, the cheapest readings a tool takes (up to three) are offered on a "guess" card, each with what it
+// changed. None runs until it is picked: a tap, or typing its words. Measured on 31 natural misses (14 Oct 2026):
+// the right reading was offered first in 13, only wrong ones in 1; 1 of 20 off-topic lines drew an offer.
+// (A statistical model trained from the frames was tried as well and added one hit and one wrong offer for 3 s of
+// training; dispatch keeps it as an experiment, golem does not use it.)
+const GUESS_BUDGET = 3;
+function guessesOf(raw) {
+  const E = clauseEngine(), r = E.understand(raw, clauseSession(), { repair: { budget: GUESS_BUDGET } });
+  const cmds = r.status === 'ok' ? r.commands.slice(0, 1) : r.status === 'clarify' && r.repaired && r.commands ? r.commands.slice(0, 1) : r.status === 'ambiguous' ? (r.alternatives || []).map(a => a[0]) : [];
+  const changes = (r.diag && r.diag.repairs) || [];
+  const out = [], seen = new Set();
+  for (const c of cmds) {
+    const b = bindOf(c); if (!b) continue;
+    const k = JSON.stringify(b); if (seen.has(k)) continue; seen.add(k);
+    out.push({ tool: b.tool, args: b.args, echo: E.echo(c).replace(/\.$/, ''), changes });
+  }
+  return out.slice(0, 3);
+}
+function guessRead(raw) {
+  const cands = guessesOf(raw); if (!cands.length) return null;
+  const args = { q: raw, cands }, res = runTool('guess', args);
+  return res ? { tool: 'guess', args, rung: 'guess', res } : null;
+}
+tool({
+  name: 'guess',
+  run: a => ({
+    read: ['no exact reading of', { v: a.q }],
+    body: [{ t: 'note', text: `I could not read that as written. ${a.cands.length > 1 ? 'Each reading below changes it' : 'The reading below changes it'} slightly; pick one to run it, or rephrase. I do not run a guess on my own.` },
+      { t: 'list', items: a.cands.map(c => `${c.echo}: ${c.changes.length ? c.changes.join('; ') : 'one of several exact readings'}`) }],
+    ask: { prompt: a.cands.length > 1 ? 'Run one of these?' : 'Run it?', options: a.cands.map((c, i) => ({ label: c.echo, value: i })), set: () => {} },
+    trace: ['grammar: no exact reading', `repair (budget ${GUESS_BUDGET}): ${a.cands.length} reading${a.cands.length > 1 ? 's' : ''} a tool takes`, ...a.cands.map(c => `offer: ${c.echo} — ${c.changes.join('; ') || 'as written'}`), 'wait: nothing runs until one is picked']
+  })
+});
 /* ── rung 5: nothing read the query. Say so, show the nearest skills, offer to learn the unknown word ── */
 tool({
   name: 'none',
@@ -21449,7 +21494,7 @@ function sessionRead(raw) {
   if (r.status !== 'ok') return null;
   const cmd = r.commands[0], f = frames.find(x => x.name === cmd.verb), b = f && f.bind(cmd); return b ? { ...b, echo: r.echo.replace(/\.$/, '') } : null;
 }
-  return { norm, clauseEngine, clauseRead, grammar, commandOf, context, readingOf, completions, taught, sessionRead };
+  return { norm, clauseEngine, clauseRead, grammar, commandOf, context, readingOf, completions, taught, guessesOf, guessRead, sessionRead };
 })();
 
 /* ==== src/engine/sessions.js ==== */
@@ -21550,7 +21595,7 @@ const { DOCTEXT } = __m41;
 const { bindingsOf, runSteps } = __m42;
 const { tableFromText } = __m13;
 const { convertBinary } = __m45;
-const { norm, grammar, context, taught, sessionRead, readingOf } = __m50;
+const { norm, grammar, context, taught, sessionRead, readingOf, guessRead } = __m50;
 const { current, newSession, renameSession, touch } = __m51;
 // The entry point: submit(raw) reads a request and returns what happened. Cards are recomputed in
 // place by rerun(); answers and slot flips go through it, so args stay the only state that matters.
@@ -21571,6 +21616,13 @@ function flipSlot(c, key) {
 // an open question answered by option index
 function answer(c, i) {
   const o = c.res.ask && c.res.ask.options[i]; if (!o) return null;
+  // a guess picked: the card becomes that tool's card, still marked as a guess (the rung is kept with the session)
+  if (c.tool === 'guess') {
+    const k = c.args.cands[o.value], from = c.args.cands.length;
+    c.tool = k.tool; c.args = JSON.parse(JSON.stringify(k.args)); rerun(c);
+    if (c.res) c.res.trace.unshift(`guess: read as ${k.echo}${k.changes.length ? ' (' + k.changes.join('; ') + ')' : ''}, picked from ${from}`);
+    return o;
+  }
   c.res.ask.set(c.args, o.value); rerun(c); return o;
 }
 function undo() {
@@ -21597,6 +21649,7 @@ function submit(raw) {
     if (Array.isArray(many) && many.length > 1) { last.res.ask.set(last.args, many); rerun(last); return { kind: 'answered', card: last, label: many.join(', ') }; }
     // an option by its label, as the card wrote it; "yes" when there is only one
     const os = last.res.ask.options, o = os.find(x => x.label.toLowerCase() === q) || os.find(x => x.label.length >= 3 && (x.label.toLowerCase().startsWith(q) || q.includes(x.label.toLowerCase()))) || (os.length === 1 && s && s.session === 'yes' ? os[0] : null);
+    if (o && last.tool === 'guess') { answer(last, os.indexOf(o)); return { kind: 'answered', card: last, label: o.label }; }
     if (o) { last.res.ask.set(last.args, o.value); rerun(last); return { kind: 'answered', card: last, label: o.label }; }
     if (last.res.ask.parse) { const v = last.res.ask.parse(text); if (v != null) { last.res.ask.set(last.args, v); rerun(last); return { kind: 'answered', card: last, label: Array.isArray(v) ? v.join(', ') : String(v) }; } }
   }
@@ -21606,7 +21659,7 @@ function submit(raw) {
   // a saved recipe by name: replayed with the new subjects into a session of its own (a batch on every table is a card)
   if (s && s.session === 'recipe') return runRecipe(S.recipes[s.name], s.rest);
   // a whole command first; then what amends the last card ("in feet", "2 sentences"); then the words taught on this device
-  const r = grammar(text, q, 'grammar', raw) || context(q, last, raw) || taught(text, q, raw) || { tool: 'none', args: { q }, rung: 'none', res: T.none({ q }) };
+  const r = grammar(text, q, 'grammar', raw) || context(q, last, raw) || taught(text, q, raw) || guessRead(raw) || { tool: 'none', args: { q }, rung: 'none', res: T.none({ q }) };
   return { kind: 'card', card: addCard(raw, r, performance.now() - t0) };
 }
 
@@ -22312,7 +22365,7 @@ const { conversions, equalArea } = __m4;
 
 const escHtml = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const pad = n => String(n).padStart(2, '0');
-const RUNG = { grammar: 'grammar', context: 'context', taught: 'taught', none: 'no reading' };
+const RUNG = { grammar: 'grammar', context: 'context', taught: 'taught', guess: 'guess', none: 'no reading' };
 
 /* ── plots: equal-area stereonet, histogram bars, a curve with a reference line ── */
 // a direction-cosine vector to the net: bearing projects to a disc of radius √2 with north up; the net has radius R and y down

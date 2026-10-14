@@ -130,7 +130,7 @@ button{cursor:pointer}
 
 /* a turn: the query, then golem's readout */
 .card{display:grid;gap:10px;min-width:0;--rc:var(--au-info)}
-.card[data-rung="context"]{--rc:var(--au-selected)} .card[data-rung="taught"]{--rc:var(--au-success)} .card[data-rung="none"]{--rc:var(--au-error)}
+.card[data-rung="context"]{--rc:var(--au-selected)} .card[data-rung="taught"]{--rc:var(--au-success)} .card[data-rung="none"]{--rc:var(--au-error)} .card[data-rung="guess"]{--rc:var(--au-warn)}
 .q{justify-self:end;max-width:min(88%,600px);background:var(--au-surface-raised);border:1px solid var(--au-border);border-radius:12px 12px 3px 12px;padding:8px 13px;font:14px/1.45 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere}
 .reply{border-left:2px solid var(--rc);padding:0 0 0 14px;display:grid;gap:6px;min-width:0}
 .chead{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;font:11px var(--mono);color:var(--au-fg-soft)}
@@ -140,6 +140,7 @@ button{cursor:pointer}
 .rung.context{color:var(--au-selected);background:var(--au-selected-soft)}
 .rung.taught{color:var(--au-success);background:var(--au-success-soft)}
 .rung.none{color:var(--au-error);background:var(--au-error-soft)}
+.rung.guess{color:var(--au-warn);background:var(--au-warn-soft)}
 .read{display:flex;flex-wrap:wrap;align-items:center;gap:4px 5px;font-size:13.5px;color:var(--au-fg-muted)}
 .read .lbl{margin-right:2px}
 .slot{font:12px var(--mono);background:var(--au-surface-raised);border:1px solid var(--au-border);border-radius:2px;padding:1px 6px;color:var(--au-fg)}
@@ -280,9 +281,9 @@ svg text{font:10px var(--mono);fill:var(--au-fg-muted)}
           <p>Each answer shows which rung read the query and what it was read as. Dashed slots are ambiguous readings: tap one to flip it and the answer recomputes. The line down the left of an answer has the rung's colour.</p>
           <ol>
             <li><span class="rung context">context</span> An open question from golem, or an amendment of the last answer: <code>in feet</code>, <code>log scale</code>, <code>and chile</code>, <code>why</code>, <code>undo</code>.</li>
-            <li><span class="rung grammar">grammar</span> The controlled-English parse: the clause grammar of <code>@gcu/dispatch</code>, then rules for free text, dates and orientations.</li>
+            <li><span class="rung grammar">grammar</span> The controlled-English parse: the clause grammar of <code>@gcu/dispatch</code>, then the parser for arithmetic. While you type, the line under the box shows what it would read.</li>
             <li><span class="rung taught">taught</span> Phrases you taught on this device: <code>dens means density</code>.</li>
-            <li>The dispatch CRF, for loose phrasing. Not wired yet.</li>
+            <li><span class="rung guess">guess</span> Nothing read it exactly, so it offers readings that change it slightly (an ignored word, an assumed preposition) and says what each changed. None runs until you pick one.</li>
             <li><span class="rung none">no reading</span> It stops, shows the nearest skills, and offers to learn the word it did not know.</li>
           </ol>
           <p>Open <b>plan</b> under an answer to see every step that produced it.</p>

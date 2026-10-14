@@ -40,7 +40,7 @@ Sections 1 to 11 describe the target. Section 12 says what the mock does today. 
    1 context    open question, amendment, meta-intent         │
    2 grammar    controlled-English parse (clause)             │  first rung that
    3 taught     device lexicon rewrites, then grammar again   │  produces a reading
-   4 statistical  @gcu/dispatch, gated by margin + assembly   │  wins
+   4 guess      the grammar's repair pass, offered; runs on a tap  │  wins
    5 none       stop, nearest skills, offer to learn          │
      ▼                                                        │
  reading = { tool, args, rung, amends? } ◀────────────────────┘
@@ -65,14 +65,14 @@ Sections 1 to 11 describe the target. Section 12 says what the mock does today. 
 | 1 `context` | An open question on the last card; an amendment of the last card (`in feet`, `log scale`, `and chile`); a meta-intent (`why`, `undo`, `again`) | Session frames read first; amendments after rung 2, as the tool's amendment frames or a fragment of the last card's clause command |
 | 2 `grammar` | The controlled-English parser ("clause": Earley parsing with costed repairs, ontology as data, locale banks). Lives in `auditable/ext/dispatch/src/grammar/` since 8 Oct 2026. Reads imperatives, bare phrases ("density of chalcopyrite", "2 km in miles") and closed questions ("what is …", "which … are …"), with free text, dates, clock times, token shapes and politeness around them; open questions stay out of scope by design | The vendored parser over golem's frames, then the expression parsers for arithmetic |
 | 3 `taught` | Phrases the user taught on this device, applied as rewrites before a second grammar pass | Implemented in `taught()` |
-| 4 statistical | `@gcu/dispatch`: perceptron intent, structured-perceptron slots, per-kind assembly, `REFUSE` as a first-class intent | **Not in the mock** |
+| 4 `guess` | The grammar's costed repair pass (an ignored word, an assumed preposition, an argument out of order, a one-letter slip), budget 3: up to three readings a tool takes, offered on a card with what each changed | Implemented in `guessRead()` since 14 Oct 2026. A statistical dispatcher trained from the frames was built and measured first (`auditable/ext/dispatch/bench/loose.mjs`) and is not used: see section 13, step 4 |
 | 5 `none` | Nothing. Show nearest skills and a teach suggestion | Implemented in `T.none` |
 
 Rules:
 
 - A rung either returns a complete reading or nothing. No rung returns a partial reading for a later rung to finish.
-- Rung 4 is accepted only when dispatch's gate passes: intent margin above threshold and assembly succeeded. Otherwise fall to rung 5.
-- The rung is shown on the card. In Switchboard terms: grammar is `info`, context is `selected`, taught is `success`, none is `error`. The statistical rung needs its own mark; `warn` is the natural choice because its readings deserve a second look.
+- Rung 4 never answers by itself. Its card offers readings, each one the grammar made and a tool takes, and runs none until one is picked (a tap, or typing its words; "yes" when there is one). The picked card is that tool's card and keeps the `guess` mark in the session. Off-topic text draws no offer, and the rung falls to 5.
+- The rung is shown on the card. In Switchboard terms: grammar is `info`, context is `selected`, taught is `success`, guess is `warn`, none is `error`.
 
 ### Meta-intents
 
@@ -326,7 +326,7 @@ Default to the user-confirms route: the app then requests no dangerous permissio
 
 **Simulated:** all device hand-offs. The timer counts down in the page.
 
-**Absent:** rung 4 (the statistical dispatcher), multi-step planning (one declared step per condition today), real packs, pt-BR in the shell.
+**Absent:** a statistical dispatcher (rung 4 is the grammar's repair pass, offered), multi-step planning (one declared step per condition today), real packs, pt-BR in the shell.
 
 **Declarations** (since 8 Oct 2026): every tool is one declaration (`tool()` in `src/engine/core.js`) carrying its session-name topic and its catalog row; verb frames (`frame()`), amendment frames (`amend()`) and session frames (`session()`) say how a parsed command becomes a tool call, an amended card or a session action. The Skills tab, session names and the ontology derive from them.
 
@@ -359,7 +359,7 @@ In order. Each step leaves something that runs.
 1. **Engine/shell split.** Done 8 Oct 2026: `src/engine/` with structured results, `src/shell/` rendering them, Node tests for the engine and the browser smoke test for the shell.
 2. **Tool declarations as data.** Done 8 Oct 2026: `tool()` and `frame()` declarations; the catalog, amendments, session names and the ontology derive from them. The ontology they produce is JSON.
 3. **Real grammar.** Done 13 Oct 2026: every tool, amendment and session command is read by clause frames; the regex readers are gone. The grammar gained free-text slots (after a verb, a preposition, a colon; a subject before the verb), dates and clock times, token shapes (one piece or several, case-sensitive where they need it), comparisons, number words, fragments for amendments, exact proper names, and fillers, each with a corpus case (`bench/golem-slots.mjs`, `bench/golem-fragments.mjs`). History, before 13 Oct: the clause parser is vendored and reads first; the regex rules read what it cannot yet. To finish, the grammar needs free-text roles, dates, orientations and amendments through ellipsis (listed in `ext/dispatch/SPEC.md`), then the regex rules go. The parser is now the grammar rung of `@gcu/dispatch` (`ext/dispatch/src/grammar/`). clause reads imperatives, bare phrases and closed questions against an ontology; `ext/dispatch/bench/golem.json` is the starting ontology for golem's register and `ext/dispatch/bench/golem-corpus.mjs` its hand corpus. Still outside the grammar and needing their own reading: free-text arguments (`remember that …`, `check: …`, `X means Y`, event titles), absolute dates and clock times, orientations like `270/60`, and arithmetic (a token-shape check routes it to the expression parser). Amendments (`in feet`, `and chile`) can move into clause's ellipsis machinery.
-4. **Rung 4.** Generate dispatch tool declarations and a corpus from golem's tool declarations, train on start, gate on margin and assembly.
+4. **Rung 4.** Done 14 Oct 2026, differently from the plan. The plan was a statistical dispatcher trained from golem's declarations. It was built (`auditable/ext/dispatch/bench/loose.mjs`: sentences generated from the frames, an intent perceptron and a THEME/ARG tagger on the grammar's tokens, guesses rewritten for the grammar to read; 3.4 s to train) and measured on 31 natural phrasings the grammar misses: it read 1. The grammar's own repair pass, offered rather than trusted, put the right reading first for 13, offered only wrong ones for 1, and drew an offer from 1 of 20 off-topic lines. Rung 4 is that offer (`guess`, `warn`, nothing runs until picked). The statistical model waits for real corrections to train on. Also on 14 Oct: the composer shows the reading as you type (`preview()`, dry) and completions from the grammar (`completions()`).
 5. **Real packages under the tools.** Checked 8 Oct 2026 (`test/oracle.test.mjs`, against the sibling clone): golem's conversions, thickness factor, equal-area projection and summary statistics reproduce `@gcu/units`, `@gcu/bearing` and `@gcu/sadpan`. `bearing` and `sadpan` are vendored and in use under the field and table tools. `units` is vendored for its DCDMA core and sieve tables only: its conversion factors are rounded to six figures where golem's are exact, it lacks troy and avoirdupois ounces, imperial pressure, temperature and square miles, and its `core.sampleMass` throws (`PI` undefined); golem keeps its own conversion table and sample-mass arithmetic until the package is fixed upstream, and the oracle test says when that happens. Still to check: `@gcu/recon` for table typing, `@gcu/plot`, `@gcu/librarian` for definitions.
 6. **Planner.** Preconditions and effects on the declarations; replace `needData()` and the key's hand-coded questions.
 7. **Real files.** Begun 8 Oct 2026: a CSV or TSV through the file picker (the lead-acid shell routes `<input type=file>` to the system picker), typed by `@gcu/recon`, with table questions in controlled English (conditions are the grammar's since 14 Oct 2026) (`SPEC-skills` A2: aggregates, where, by, length weighting, a below-detection policy, counts, lists, distinct values, correlation, interval checks) and the file's columns as parser nouns. `.dm`, xlsx and Parquet followed (8 and 11 Oct 2026). Still to do: files over 20 MB through `@gcu/sluice`.
@@ -378,6 +378,6 @@ In order. Each step leaves something that runs.
 4. **clause and dispatch: one package or two?** Decided 8 Oct 2026: one package. The grammar is a rung of `@gcu/dispatch`, under `ext/dispatch/src/grammar/`.
 5. **Output English.** Answers are currently hand-written templates. A controlled output grammar would make them uniform, and gin was the intended basis, but gin does not exist yet, so nothing here depends on it.
 6. **Calendar default.** User-confirms (no permission) is specified. Decide whether silent insert is ever offered.
-7. **Statistical-rung badge and threshold.** How a dispatch reading is marked, and where the margin gate sits.
+7. **Statistical-rung badge and threshold.** Decided 14 Oct 2026: a reading golem was not sure of is marked `guess` in `warn` and runs only when picked; the threshold question went away with the statistical model (the repair pass's budget, 3, is the gate).
 8. **First-release scope.** Which groups from section 6 ship first. The Compute, Field and Device groups work without any file handling.
 9. **Pack licences.** Every proposed pack in section 7.

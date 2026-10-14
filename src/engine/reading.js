@@ -157,6 +157,41 @@ export function taught(text, q, raw) {
 }
 function lev(a, b) { const d = Array.from({ length: a.length + 1 }, (_, i) => [i]); for (let j = 1; j <= b.length; j++) d[0][j] = j; for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] !== b[j - 1])); return d[a.length][b.length]; }
 
+/* ── rung 4: no exact reading; the grammar's repair pass offers readings that change the text slightly ── */
+// Repairs are costed: an ignored word, an assumed preposition, an argument out of order, a one-letter slip. Within a
+// budget of 3, the cheapest readings a tool takes (up to three) are offered on a "guess" card, each with what it
+// changed. None runs until it is picked: a tap, or typing its words. Measured on 31 natural misses (14 Oct 2026):
+// the right reading was offered first in 13, only wrong ones in 1; 1 of 20 off-topic lines drew an offer.
+// (A statistical model trained from the frames was tried as well and added one hit and one wrong offer for 3 s of
+// training; dispatch keeps it as an experiment, golem does not use it.)
+const GUESS_BUDGET = 3;
+export function guessesOf(raw) {
+  const E = clauseEngine(), r = E.understand(raw, clauseSession(), { repair: { budget: GUESS_BUDGET } });
+  const cmds = r.status === 'ok' ? r.commands.slice(0, 1) : r.status === 'clarify' && r.repaired && r.commands ? r.commands.slice(0, 1) : r.status === 'ambiguous' ? (r.alternatives || []).map(a => a[0]) : [];
+  const changes = (r.diag && r.diag.repairs) || [];
+  const out = [], seen = new Set();
+  for (const c of cmds) {
+    const b = bindOf(c); if (!b) continue;
+    const k = JSON.stringify(b); if (seen.has(k)) continue; seen.add(k);
+    out.push({ tool: b.tool, args: b.args, echo: E.echo(c).replace(/\.$/, ''), changes });
+  }
+  return out.slice(0, 3);
+}
+export function guessRead(raw) {
+  const cands = guessesOf(raw); if (!cands.length) return null;
+  const args = { q: raw, cands }, res = runTool('guess', args);
+  return res ? { tool: 'guess', args, rung: 'guess', res } : null;
+}
+tool({
+  name: 'guess',
+  run: a => ({
+    read: ['no exact reading of', { v: a.q }],
+    body: [{ t: 'note', text: `I could not read that as written. ${a.cands.length > 1 ? 'Each reading below changes it' : 'The reading below changes it'} slightly; pick one to run it, or rephrase. I do not run a guess on my own.` },
+      { t: 'list', items: a.cands.map(c => `${c.echo}: ${c.changes.length ? c.changes.join('; ') : 'one of several exact readings'}`) }],
+    ask: { prompt: a.cands.length > 1 ? 'Run one of these?' : 'Run it?', options: a.cands.map((c, i) => ({ label: c.echo, value: i })), set: () => {} },
+    trace: ['grammar: no exact reading', `repair (budget ${GUESS_BUDGET}): ${a.cands.length} reading${a.cands.length > 1 ? 's' : ''} a tool takes`, ...a.cands.map(c => `offer: ${c.echo} — ${c.changes.join('; ') || 'as written'}`), 'wait: nothing runs until one is picked']
+  })
+});
 /* ── rung 5: nothing read the query. Say so, show the nearest skills, offer to learn the unknown word ── */
 tool({
   name: 'none',

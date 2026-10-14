@@ -1,7 +1,7 @@
 // ⚠ VENDORED — DO NOT EDIT. @gcu/dispatch, built from ../auditable/ext/dispatch/src/ by its own build.
 // Source of truth: gentropic/auditable ext/dispatch (local clone: ../auditable). Re-vendor by copying
 // ext/dispatch/index.js here after 'node ext/dispatch/build.js'. golem uses the grammar rung only:
-// createEngine, makeSession, ENGLISH, PORTUGUESE. At auditable 7b49e0b9.
+// createEngine, makeSession, ENGLISH, PORTUGUESE. At auditable f47d796a.
 
 // ⚠ GENERATED FILE — DO NOT EDIT. Source: src/  Build: @gcu/build src/main.js
 // @gcu/dispatch — Session-trained natural-language → tool-call dispatch: a Snips-shaped resolver (averaged-perceptron intent + CRF-class slot tagger + gazetteers + deterministic per-kind assemblers) that trains IN THE BROWSER from the host session's own vocabulary in under a second. Tools are declarative (ten kinds) and a grammar rung (clause: case-grammar frames over an Earley chart with costed repairs, en + pt-BR) reads controlled commands before the learners see them; no shipped model, no network, explainable per decision — refusals return empty calls so the host degrades into its command palette. Born from an incubator where this beat a 26M finetuned transformer 50/52 to 3/24 on a frozen yardstick.
@@ -1286,13 +1286,18 @@ const ENGLISH = {
 //
 // See SPEC.md "The grammar rung" for the pipeline, the verdicts and the ceiling.
 
-function dl(a, b) { // Damerau-Levenshtein
+function dl(a, b, max = Infinity) { // Damerau-Levenshtein; past max (a whole row above it) the answer is only "more than max"
   const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
   for (let j = 1; j <= b.length; j++) d[0][j] = j;
-  for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) {
-    const c = a[i - 1] === b[j - 1] ? 0 : 1;
-    d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + c);
-    if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+  for (let i = 1; i <= a.length; i++) {
+    let low = Infinity;
+    for (let j = 1; j <= b.length; j++) {
+      const c = a[i - 1] === b[j - 1] ? 0 : 1;
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + c);
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+      if (d[i][j] < low) low = d[i][j];
+    }
+    if (low > max + 1) return max + 1;
   }
   return d[a.length][b.length];
 }
@@ -1327,8 +1332,11 @@ function createEngine(ont, locale = ENGLISH) {
   for (const u of ont.units) add(col(u, 'words').join('|'), 'UNIT', { dim: u.dim, unit: u.unit });
   for (const w of col(ont, 'fillers') ?? []) if (!LEX[w]) add(w, 'FILLER');   // host words that carry nothing ("golem" in "hey golem")
   const MULTI = Object.keys(LEX).filter(k => k.includes(' ')).map(k => k.split(' ')).sort((a, b) => b.length - a.length);
+  const MULTI_AT = new Map(); for (const mw of MULTI) { if (!MULTI_AT.has(mw[0])) MULTI_AT.set(mw[0], []); MULTI_AT.get(mw[0]).push(mw); }   // by first word (matched as typed), longest first
   const SINGLE = Object.keys(LEX).filter(k => !k.includes(' '));
+  const BY_LEN = [], TYPO = new Map(), RANK = new Map(SINGLE.map((k, i) => [k, i]));   // candidates keep the lexicon's order   // typo-repair targets by length: an edit distance of t only reaches words within t letters
   const CONTENT = new Set(Object.keys(LEX).filter(k => LEX[k].some(s => ['NOUN', 'VERB', 'UNIT'].includes(s.cat) && !s.exact)));
+  for (const k of SINGLE) if (k.length > 2 && CONTENT.has(k)) (BY_LEN[k.length] ??= []).push(k);
   const STEMS = {};   // stem → senses of content words, so inflected forms nobody listed still resolve
   for (const k of CONTENT) if (!k.includes(' ')) (STEMS[locale.stem(k)] ??= []).push(...LEX[k].filter(s => ['NOUN', 'VERB', 'UNIT'].includes(s.cat) && !s.exact).map(s => ({ ...s, lexeme: k })));
   const NEEDS_ID = new Set(ont.nouns.filter(n => n.needsId).map(n => n.type));
@@ -1408,9 +1416,9 @@ function createEngine(ont, locale = ENGLISH) {
         toks.push(at({ word: text.slice(raw[i].s, raw[span.k].e).toLowerCase(), senses: types.map(type => ({ cat: 'LIT', type, value: text.slice(raw[i].s, raw[span.k].e) })) }, i, span.k + 1)); i = span.k + 1; continue; }
       let hit = null;
       let mwPlural = false;
-      for (const mw of MULTI) if (mw.every((w, k) => raw[i + k]?.w === w || (k === mw.length - 1 && raw[i + k] && locale.stem(raw[i + k].w) === locale.stem(w) && LEX[mw.join(' ')].some(x => x.cat === 'NOUN')))) { hit = mw; mwPlural = locale.plural(raw[i + mw.length - 1].w); break; }
+      for (const mw of MULTI_AT.get(raw[i].w) ?? []) if (mw.every((w, k) => raw[i + k]?.w === w || (k === mw.length - 1 && raw[i + k] && locale.stem(raw[i + k].w) === locale.stem(w) && LEX[mw.join(' ')].some(x => x.cat === 'NOUN')))) { hit = mw; mwPlural = locale.plural(raw[i + mw.length - 1].w); break; }
       if (hit && hit.length > 1) for (let j = 1; j < hit.length; j++) {
-        const over = MULTI.find(mw => mw.length > hit.length - j && mw.every((x, k) => raw[i + j + k]?.w === x));
+        const over = (MULTI_AT.get(raw[i + j]?.w) ?? []).find(mw => mw.length > hit.length - j && mw.every((x, k) => raw[i + j + k]?.w === x));
         if (over && raw.slice(i, i + j).every(r => LEX[r.w])) { hit = null; break; }
       }
       if (hit) { const w = hit.join(' '); if (LEX[w][0].cat !== 'FILLER') toks.push(at({ word: w, senses: mwPlural ? LEX[w].map(x => x.cat === 'NOUN' ? { ...x, plural: true } : x) : LEX[w] }, i, i + hit.length)); i += hit.length; continue; }
@@ -1431,7 +1439,8 @@ function createEngine(ont, locale = ENGLISH) {
       const st = STEMS[locale.stem(w)];
       if (st) { const plural = locale.plural(w); toks.push(at({ word: w, senses: st.map(s => ({ ...s, plural })), stemmed: true }, i0, i)); continue; }
       const tol = w.length < 7 ? 1 : 2;
-      const cands = SINGLE.filter(k => k.length > 2 && CONTENT.has(k) && dl(w, k) <= tol);   // never repair into a function word
+      let cands = TYPO.get(w);   // never repair into a function word; once per word
+      if (!cands) { cands = []; for (let L = w.length - tol; L <= w.length + tol; L++) for (const k of BY_LEN[L] ?? []) if (dl(w, k, tol) <= tol) cands.push(k); cands.sort((x, y) => RANK.get(x) - RANK.get(y)); if (TYPO.size > 5000) TYPO.clear(); TYPO.set(w, cands); }
       if (cands.length === 1) { notes.push(`read "${w}" as "${cands[0]}"`); toks.push(at({ word: cands[0], senses: LEX[cands[0]], repaired: w }, i0, i)); continue; }
       if (cands.length > 1) notes.push(`"${w}" could be ${cands.map(c => `"${c}"`).join(' / ')} — not guessing`);
       unknown.push(w); toks.push(at({ word: w, senses: [{ cat: 'UNK' }] }, i0, i));
@@ -1880,7 +1889,7 @@ function createEngine(ont, locale = ENGLISH) {
     diag.repairs = describeRepairs(toks, rawRepairs);
     // a repair that discarded words it does not know is a guess, not an understanding: ask, showing what it would do
     const droppedUnknown = rawRepairs.filter(r => r.op === 'skip' && toks[r.at].senses.every(x => x.cat === 'UNK')).map(r => `"${r.word}"`);
-    if (droppedUnknown.length) return { status: 'clarify', reasons: [`did not understand ${droppedUnknown.join(', ')} — ignore ${droppedUnknown.length > 1 ? 'them' : 'it'}?`], partial: cmds.map(echo), repaired: true, diag };
+    if (droppedUnknown.length) return { status: 'clarify', reasons: [`did not understand ${droppedUnknown.join(', ')} — ignore ${droppedUnknown.length > 1 ? 'them' : 'it'}?`], partial: cmds.map(echo), commands: cmds, repaired: true, diag };   // the commands it would make, for a host that asks before acting
     diag.notes.push(...clean[0].flatMap(r => r.notes), ...diag.repairs);
     session.last = cmds.at(-1); session.history.push(...cmds);
     return { status: 'ok', commands: cmds, echo: cmds.map(echo).join(` ${P.then}: `), repaired: diag.repairs.length > 0, diag };

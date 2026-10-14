@@ -4,7 +4,7 @@ import { conversions, equalArea } from '../vendor/bearing.js';
 
 export const escHtml = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 export const pad = n => String(n).padStart(2, '0');
-const RUNG = { grammar: 'grammar', context: 'context', taught: 'taught', none: 'no reading' };
+const RUNG = { grammar: 'grammar', context: 'context', taught: 'taught', guess: 'guess', none: 'no reading' };
 
 /* ── plots: equal-area stereonet, histogram bars, a curve with a reference line ── */
 // a direction-cosine vector to the net: bearing projects to a disc of radius √2 with north up; the net has radius R and y down
