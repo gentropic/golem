@@ -41,6 +41,11 @@ check(await page.locator('#stream .card').count() === 2 && /25 c in f/.test(awai
 const listed = await page.evaluate(() => document.querySelectorAll('#dlist .srow').length);
 check(listed >= 4, `the branch is a session of its own in the sidebar (${listed} listed)`);
 
+// a file dropped on the window opens as the paperclip would
+await page.evaluate(() => { const dt = new DataTransfer(); dt.items.add(new File(['hole,cu\nA,0.5\nB,0.9\n'], 'dropped.csv', { type: 'text/csv' })); window.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, cancelable: true })); });
+await page.waitForTimeout(400);
+check(/dropped\.csv/.test(await page.locator('#stream .card').last().textContent()), 'a file dropped on the window opens');
+
 // no width scrolls sideways (the composer's hint once pushed the column past the window between 860 and 950 px), and a
 // histogram is a chart drawn by plot
 await ask('open assays.csv'); await ask('histogram of cu');

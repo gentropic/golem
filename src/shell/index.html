@@ -212,6 +212,8 @@ svg text{font:10px var(--mono);fill:var(--au-fg-muted)}
 .dock{padding:6px max(16px,calc((100% - 780px) / 2)) 10px;display:grid;gap:6px;min-width:0}
 @media (min-width:1600px){.view{padding-left:calc((100% - 900px) / 2);padding-right:calc((100% - 900px) / 2)}.dock{padding-left:calc((100% - 900px) / 2);padding-right:calc((100% - 900px) / 2)}}
 .composer{background:var(--au-surface-raised);border:1px solid var(--au-rule);border-radius:12px;padding:10px 8px 8px 14px;display:grid;grid-template-columns:minmax(0,1fr);gap:4px;transition:border-color var(--dur) var(--ease)}
+html[data-drop] .composer{border-color:var(--au-action);box-shadow:0 0 0 3px var(--au-action-soft)}
+html[data-drop] .composer::after{content:"Drop to open";font:12px var(--mono);color:var(--au-action)}
 .composer:focus-within{border-color:var(--au-action)}
 .composer textarea{width:100%;background:none;border:0;outline:0;padding:2px 4px 2px 0;font:15px/1.45 var(--mono);resize:none;max-height:40vh;overflow:auto;min-height:24px}
 .composer textarea::placeholder{color:var(--au-fg-soft)}

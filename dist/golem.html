@@ -226,6 +226,8 @@ svg text{font:10px var(--mono);fill:var(--au-fg-muted)}
 .dock{padding:6px max(16px,calc((100% - 780px) / 2)) 10px;display:grid;gap:6px;min-width:0}
 @media (min-width:1600px){.view{padding-left:calc((100% - 900px) / 2);padding-right:calc((100% - 900px) / 2)}.dock{padding-left:calc((100% - 900px) / 2);padding-right:calc((100% - 900px) / 2)}}
 .composer{background:var(--au-surface-raised);border:1px solid var(--au-rule);border-radius:12px;padding:10px 8px 8px 14px;display:grid;grid-template-columns:minmax(0,1fr);gap:4px;transition:border-color var(--dur) var(--ease)}
+html[data-drop] .composer{border-color:var(--au-action);box-shadow:0 0 0 3px var(--au-action-soft)}
+html[data-drop] .composer::after{content:"Drop to open";font:12px var(--mono);color:var(--au-action)}
 .composer:focus-within{border-color:var(--au-action)}
 .composer textarea{width:100%;background:none;border:0;outline:0;padding:2px 4px 2px 0;font:15px/1.45 var(--mono);resize:none;max-height:40vh;overflow:auto;min-height:24px}
 .composer textarea::placeholder{color:var(--au-fg-soft)}
@@ -30002,29 +30004,41 @@ document.addEventListener('keydown', e => {
 });
 // a file from the picker (the lead-acid shell routes <input type=file> to the system picker): text in, a card out
 $('attach').addEventListener('click', () => { if (awake) $('file').click(); });
-$('file').addEventListener('change', e => {
-  const f = e.target.files && e.target.files[0]; if (!f) return;
+$('file').addEventListener('change', e => { const f = e.target.files && e.target.files[0]; if (f) openPicked(f); e.target.value = ''; });
+// a file from the paperclip, dropped on the window, or shared to the app ("Open with golem"): one way in
+function openPicked(f) {
+  if (!awake) return status('Asleep. Tap wake at the top right.');
+  if (!ready) return status('Opening your sessions…');
   if (f.size > STREAM_OVER) {   // a text table too large to hold: kept as it is, typed from its head, scanned per question
-    if (!/\.(csv|tsv|txt)$/i.test(f.name)) { status(`That file is over 20 MB. golem streams large CSV and TSV tables; a ${f.name.split('.').pop()} that large is not read.`); e.target.value = ''; return; }
+    if (!/\.(csv|tsv|txt)$/i.test(f.name)) { status(`That file is over 20 MB. golem streams large CSV and TSV tables; a ${f.name.split('.').pop()} that large is not read.`); return; }
     f.slice(0, 1 << 20).text().then(async head => {
       const o = openStreamed(f.name, f.size, head); if (o.kind !== 'card') { show(o); return; }
       BIG[o.hash] = f; show(o); status(`Opened ${f.name} as a stream.`);
       await putBlob(o.hash, f).catch(() => status(`${f.name} could not be kept on this device; it works until the page closes.`));
     }, () => status('Could not read that file.'));
-    e.target.value = ''; return;
+    return;
   }
   if (/\.gcudat$/i.test(f.name)) {   // a pack: installed, not opened as a table
     f.arrayBuffer().then(buf => openPackFile(f.name, new Uint8Array(buf))).then(() => renderPacks(), err => status(`Not installed: ${err.message}.`));
-    e.target.value = ''; return;
+    return;
   }
   if (/\.golem\.json$/i.test(f.name)) {   // a session exported from golem: it comes back as a session of its own
     f.text().then(t => { let s = null; try { s = importSession(JSON.parse(t)); } catch (err) { s = null; } if (!s) { status('That is not a golem session file.'); return; } renderStream(); renderDrawer(); status(`Imported "${s.name}".`); }, () => status('Could not read that file.'));
-    e.target.value = ''; return;
+    return;
   }
   if (BINARY.test(f.name)) f.arrayBuffer().then(buf => openBinary(f.name, buf)).then(o => { show(o); if (o.kind === 'card') status(`Opened ${f.name}.`); }, () => status('Could not read that file.'));
   else f.text().then(text => { show(openFile(f.name, text)); status(`Opened ${f.name}.`); }, () => status('Could not read that file.'));
-  e.target.value = '';
-});
+}
+// dropped on the window (a desktop browser)
+window.addEventListener('dragover', e => { if (e.dataTransfer && [...e.dataTransfer.types].includes('Files')) { e.preventDefault(); document.documentElement.dataset.drop = '1'; } });
+window.addEventListener('dragleave', e => { if (!e.relatedTarget) delete document.documentElement.dataset.drop; });
+window.addEventListener('drop', e => { delete document.documentElement.dataset.drop; const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if (!f) return; e.preventDefault(); openPicked(f); });
+// shared to the app or opened with it (lead-acid's intake): a file opens as the paperclip would; shared text goes in the box
+if (inApp) shell.intake(async d => {
+  if (d.kind === 'text' || (d.text && !d.token)) { const q = $('q'); q.value = String(d.text || ''); q.dispatchEvent(new Event('input')); q.focus(); status('Shared text is in the box: press Enter to run it.'); return; }
+  try { const bytes = await d.blob.arrayBuffer(); const until = () => ready ? openPicked(new File([bytes], d.name || 'shared', { type: d.mime || '' })) : setTimeout(until, 100); until(); }
+  catch (e) { status(`Could not read the shared file: ${e.message}`); }
+}).catch(() => {});
 document.querySelector('.tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) showTab(b.dataset.tab); });
 document.querySelector('.sfoot').addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (b) { showTab(b.dataset.tab); closeDrawer(); } });
 $('starts').addEventListener('click', e => { const b = e.target.closest('[data-q]'); if (b) run(b.dataset.q); });

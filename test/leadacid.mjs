@@ -58,6 +58,19 @@ const n0 = await page.evaluate(() => window.__bench.spoken.length);
 await page.fill('#q', '25 c in f'); await page.press('#q', 'Enter'); await page.waitForTimeout(300);
 check((await page.evaluate(() => window.__bench.spoken.slice(-1)[0].text)).includes('77') && (await page.evaluate(() => window.__bench.spoken.length)) === n0 + 1, 'with "read every answer aloud" a new card is spoken');
 
+// "Open with golem": a CSV shared to the running app opens as a table, as the paperclip would; shared text goes in the box
+await page.evaluate(() => {
+  const csv = 'hole,from,to,cu\nA,0,1,0.5\nA,1,2,0.7\nB,0,1,1.1\n', bytes = new TextEncoder().encode(csv);
+  window.__bench.files['share:assays-mine.csv'] = bytes;
+  window.__bench.intake([{ kind: 'file', token: 'share:assays-mine.csv', name: 'assays-mine.csv', size: bytes.length, mime: 'text/csv' }]);
+});
+await page.waitForTimeout(600);
+const shared = await page.locator('#stream .card').last().textContent();
+check(/assays-mine\.csv/.test(shared) && /3 samples|3 rows/.test(shared), `a CSV shared to the app opens as a table (${shared.replace(/\s+/g, ' ').slice(0, 80)})`);
+await page.evaluate(() => window.__bench.intake([{ kind: 'text', text: 'mean cu by hole' }])); await page.waitForTimeout(300);
+check(await page.inputValue('#q') === 'mean cu by hole', 'shared text goes into the box, not run');
+await page.fill('#q', '');
+
 // the app has no network permission: no service worker, no library buttons, packs through the paperclip
 await page.evaluate(() => document.querySelector('[data-tab="packs"]').click()); await page.waitForTimeout(200);
 const drawer = await page.textContent('#v-packs');

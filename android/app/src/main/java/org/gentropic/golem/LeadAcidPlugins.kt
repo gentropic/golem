@@ -5,6 +5,7 @@ import org.gentropic.leadacid.PluginFactory
 import org.gentropic.leadacid.intent.IntentHandoff
 import org.gentropic.leadacid.speech.Speech
 import org.gentropic.leadacid.tts.Tts
+import org.gentropic.leadacid.intake.Intake
 
 /** The plugin factories, for the modules app/leadacid.gradle.kts depends on (`fs` and `shell` are always there). */
-val leadAcidPlugins: List<PluginFactory> = listOf(IntentHandoff, Speech, Tts)
+val leadAcidPlugins: List<PluginFactory> = listOf(IntentHandoff, Speech, Tts, Intake)
