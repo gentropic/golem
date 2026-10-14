@@ -54,7 +54,7 @@ If Playwright has no browser installed, run `npx playwright install chromium` or
 
 ### The web app
 
-[gentropic.org/golem](https://gentropic.org/golem/) is the org site (`gentropic/gentropic.github.io`, a public repo) serving `golem/`: `dist/golem.html`, the worker, the manifest, the icons, and an `index.html` that sends the folder's address on to `golem.html`. `npm run deploy` builds and copies those files into a clone of the site beside this one (`../gentropic.github.io`); committing and pushing the site publishes them. The served `golem.html` is the whole app, readable source included.
+[gentropic.org/golem](https://gentropic.org/golem/) is this repo's GitHub Pages site (the org's custom domain over `gentropic.github.io/golem`). `.github/workflows/pages.yml` publishes the committed build on every push to `main` that changes `dist/`: `golem.html`, the worker, the manifest, the icons, and an `index.html` that sends the folder's address on to `golem.html`. Nothing is built in CI; `dist/` is committed with the source change that produced it.
 
 ### The Android app
 
