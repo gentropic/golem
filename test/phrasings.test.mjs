@@ -90,3 +90,21 @@ test('conditions: or, not, between, in, blank reach sift as written; a word agai
   const h = g.submit('histogram of cu where lith is BRX').card;
   assert.equal(h.tool, 'hist'); assert.ok(!refusal(h)); assert.ok(g.textOf(h).includes('where'));
 });
+
+test('preview: the reading as you type, dry — no card, no state, the same order as submit', () => {
+  g.reset(); pin(); g.newSession();
+  const p = q => g.preview(q);
+  assert.deepEqual(p('2 km in'), { rung: 'partial', echo: 'Convert 2 km; unit ___' });
+  assert.equal(p('2 km in miles').rung, 'grammar');
+  assert.equal(p('14 * cos(22)').echo, 'expression: 14 * cos(22)');
+  assert.equal(p('undo').rung, 'context');
+  assert.equal(p('zzz'), null, 'what would be no reading shows nothing');
+  g.submit('2 km in miles');
+  const before = JSON.stringify(g.serialize());
+  assert.match(p('in feet').echo, /^amends #01: Convert 2 km; unit ft$/);
+  assert.equal(JSON.stringify(g.serialize()), before, 'nothing changed');
+  assert.equal(g.S.cards.length, 1);
+  g.submit('open assays.csv');
+  assert.ok(g.completions('mean cu by l').some(c => c.word === 'lith'));
+  assert.ok(g.completions('2 km in ').every(c => c.kind === 'unit'), 'units of the same dimension');
+});

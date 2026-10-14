@@ -191,6 +191,15 @@ svg text{font:10px var(--mono);fill:var(--au-fg-muted)}
 .composer:focus-within{border-color:var(--au-action)}
 .composer textarea{width:100%;background:none;border:0;outline:0;padding:2px 4px 2px 0;font:15px/1.45 var(--mono);resize:none;max-height:40vh;overflow:auto;min-height:24px}
 .composer textarea::placeholder{color:var(--au-fg-soft)}
+/* what golem would read, as you type (dry: nothing runs), and what may come next */
+.pv{display:flex;align-items:baseline;gap:7px;font:11.5px/1.4 var(--mono);color:var(--au-fg-muted);min-width:0;padding-right:4px}
+.pv i{flex:none;width:7px;height:7px;border-radius:50%;background:var(--pc,var(--au-fg-soft));transform:translateY(-1px)}
+.pv span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.pv[data-rung="grammar"]{--pc:var(--au-info)} .pv[data-rung="context"]{--pc:var(--au-selected)} .pv[data-rung="taught"]{--pc:var(--au-success)} .pv[data-rung="ambiguous"]{--pc:var(--au-warn)}
+.pv[data-rung="partial"] i{background:none;box-shadow:inset 0 0 0 1.5px var(--au-fg-soft)}
+.sg{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:1px 0 2px} .sg::-webkit-scrollbar{display:none}
+.sg .chip{padding:2px 9px;font-size:11.5px;color:var(--au-fg-muted)} .sg .chip:first-child{border-color:var(--au-rule);color:var(--au-fg)}
+.pv[hidden],.sg[hidden]{display:none}
 .crow{display:flex;align-items:center;gap:6px}
 .crow .grow{flex:1;font:11px var(--mono);color:var(--au-fg-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .send{width:34px;height:34px;border-radius:8px;border:0;background:var(--au-action);color:var(--au-surface-bright);display:grid;place-items:center;padding:0;flex:none}
@@ -313,10 +322,12 @@ svg text{font:10px var(--mono);fill:var(--au-fg-muted)}
 
     <div class="dock">
       <form class="composer" id="f" autocomplete="off">
-        <textarea id="q" rows="1" placeholder="Ask, compute, or act" aria-label="Query" enterkeyhint="go"></textarea>
+        <textarea id="q" rows="1" placeholder="Ask, compute, or act" aria-label="Query" enterkeyhint="go" aria-describedby="pv" spellcheck="false" autocapitalize="off"></textarea>
+        <div class="pv" id="pv" hidden><i aria-hidden="true"></i><span></span></div>
+        <div class="sg" id="sg" hidden aria-label="Completions"></div>
         <div class="crow">
           <button class="ibtn" id="attach" type="button" title="Open a file: a table, a drawing or a document" aria-label="Open a file"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M15 8.5l-6 6a3.5 3.5 0 0 1-5-5l6.5-6.5a2.3 2.3 0 0 1 3.3 3.3L7.4 12.6a1.1 1.1 0 0 1-1.6-1.6L11.5 5.3"/></svg></button><input type="file" id="file" accept=".csv,.tsv,.txt,.md,.markdown,.html,.htm,.xlsx,.xlsm,.dm,.parquet,.dxf,.yaml,.yml,.wkt,.geojson,text/csv,text/tab-separated-values,text/plain" hidden>
-          <span class="grow"><span class="only-wide">Enter runs · Shift+Enter for a new line · ↑ for earlier queries</span></span>
+          <span class="grow"><span class="only-wide">Enter runs · Tab completes · Shift+Enter for a new line · ↑ for earlier queries</span></span>
           <button class="send" id="send" type="submit" aria-label="Run" title="Run"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 13V3M3.5 7.5L8 3l4.5 4.5"/></svg></button>
         </div>
       </form>

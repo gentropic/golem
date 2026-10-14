@@ -1,7 +1,8 @@
 // The shell: wiring, tabs, the session drawer, storage, and the sleep switch. Everything that touches
 // the DOM or the browser lives here or in render.js; the engine never does.
 import { S } from '../engine/core.js';
-import { submit, flipSlot, answer, seedExamples, openFile, openBinary } from '../engine/engine.js';
+import { submit, flipSlot, answer, seedExamples, openFile, openBinary, preview } from '../engine/engine.js';
+import { completions } from '../engine/reading.js';
 import { BINARY } from '../engine/formats.js';
 import { setRunner, onJobDone } from '../engine/core.js';
 import { sessions, current, newSession, openSession, renameSession, deleteSession, searchHistory, serialize, hydrate, onChange } from '../engine/sessions.js';
@@ -136,21 +137,46 @@ setRunner('python', req => new Promise(done => {
 }));
 onJobDone(c => { replaceCard(c); });
 
-$('f').addEventListener('submit', e => { e.preventDefault(); const v = $('q').value; $('q').value = ''; grow(); run(v); });
+$('f').addEventListener('submit', e => { e.preventDefault(); const v = $('q').value; $('q').value = ''; grow(); updatePreview(); run(v); });
 function grow() { const q = $('q'); q.style.height = 'auto'; q.style.height = Math.min(q.scrollHeight, window.innerHeight * 0.4) + 'px'; }
 $('q').addEventListener('input', grow);
 let recall = -1;
 $('q').addEventListener('keydown', e => {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); recall = -1; $('f').requestSubmit(); return; }
+  // Tab takes the first completion, only while a word is half typed: otherwise Tab moves on, as it should
+  if (e.key === 'Tab' && !e.shiftKey && !$('sg').hidden && /\S$/.test($('q').value)) { const b = $('sg').querySelector('[data-w]'); if (b) { e.preventDefault(); complete(b.dataset.w); return; } }
   const q = $('q'), past = S.cards.map(c => c.raw);
   if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey && past.length && (q.value === '' || recall >= 0) && !q.value.includes('\n')) {
     const i = e.key === 'ArrowUp' ? (recall < 0 ? past.length - 1 : Math.max(0, recall - 1)) : recall < 0 ? -1 : recall + 1;
     if (e.key === 'ArrowDown' && recall < 0) return;
-    e.preventDefault(); recall = i < past.length ? i : -1; q.value = recall < 0 ? '' : past[recall]; grow();
+    e.preventDefault(); recall = i < past.length ? i : -1; q.value = recall < 0 ? '' : past[recall]; grow(); updatePreview();
     q.setSelectionRange(q.value.length, q.value.length);
   }
 });
 $('q').addEventListener('input', () => { recall = -1; });
+// As you type: what golem would read (the echo, dry: nothing runs), and what may come next. A reading that would be
+// "no reading" shows nothing; the card says that, with reasons, when it is run.
+let pvTimer = 0;
+function updatePreview() {
+  clearTimeout(pvTimer);
+  pvTimer = setTimeout(() => {
+    const v = $('q').value, pv = $('pv'), sg = $('sg');
+    let p = null, c = [];
+    if (awake && v.trim()) { try { p = preview(v); } catch (e) { p = null; } if (!v.includes('\n')) c = completions(v); }
+    pv.hidden = !p;
+    if (p) {
+      pv.dataset.rung = p.rung;
+      const text = p.rung === 'ambiguous' ? `${p.readings.length} readings: ${p.readings.join(' | ')}` : p.rung === 'partial' ? `so far: ${p.echo}` : p.echo;
+      pv.querySelector('span').textContent = text; pv.title = text;
+    }
+    sg.hidden = !c.length;
+    sg.innerHTML = c.map(x => `<button type="button" class="chip" data-w="${escHtml(x.word)}" title="${escHtml(x.kind.replace(/^role:/, ''))}">${escHtml(x.word)}</button>`).join('');
+  }, 90);
+}
+function complete(w) { const q = $('q'); q.value = q.value.replace(/\S*$/, '') + w + ' '; grow(); q.focus(); q.setSelectionRange(q.value.length, q.value.length); updatePreview(); }
+$('q').addEventListener('input', updatePreview);
+$('sg').addEventListener('mousedown', e => e.preventDefault());   // the textarea keeps the focus
+$('sg').addEventListener('click', e => { const b = e.target.closest('[data-w]'); if (b) complete(b.dataset.w); });
 function newBlank() { newSession(); renderStream(); renderDrawer(); closeDrawer(); status('New session.'); $('q').focus(); }
 const typing = el => el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
 document.addEventListener('keydown', e => {

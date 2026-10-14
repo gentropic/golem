@@ -88,10 +88,11 @@ function changed(card, before, after) {
   return args;
 }
 // a fragment of the last command: "in feet", "and chile", "log scale", "by lith", "where au > 1", "tomorrow"
-function fragmentRead(raw, last) {
+function fragmentRead(raw, last, dry) {
   const base = commandOf(last); if (!base) return null;
   const s = makeSession([]); s.last = base;
   const { r, b } = verdictOf(raw, s, { fragment: true }); if (!b || b.tool !== last.tool) return null;
+  if (dry) return { amends: last.id, echo: r.echo };
   const before = bindOf(base), args = changed(last, before && before.tool === last.tool ? before.args : null, b.args);
   const res = runTool(last.tool, args); if (!res) return null;
   res.trace.unshift(`clause: amends #${String(last.id).padStart(2, '0')}: ${r.echo}`);
@@ -104,7 +105,7 @@ function amendEngine(tool) {
   if (!amendEngines[tool] || amendEngines[tool].key !== key) amendEngines[tool] = { key, frames, E: createEngine(o, ENGLISH) };
   return amendEngines[tool];
 }
-function amendRead(raw, last) {
+function amendRead(raw, last, dry) {
   const { frames, E } = amendEngine(last.tool);
   // a leading "and" joins the amendment to the card ("and median"); the tokenizer says where the rest starts
   const { toks } = E.tokenize(raw, { names: {} }); const text = toks.length > 1 && toks[0].senses.some(x => x.cat === 'CONJ') ? raw.slice(toks[1].s) : raw;
@@ -114,6 +115,7 @@ function amendRead(raw, last) {
   let r = E.understand(text, makeSession([])), hit = pick(r);
   for (const f of frames) { if (hit) break; const s = makeSession([]); s.last = { verb: f.name, theme: [], roles: {} }; const rf = E.understand(text, s, { fragment: true }); hit = pick(rf); if (hit) r = rf; }
   if (!hit) return null;
+  if (dry) return { amends: last.id, echo: r.echo || r.readings[0] };
   const res = runTool(hit.tool, hit.args); if (!res) return null;
   res.trace.unshift(`clause: amends #${String(last.id).padStart(2, '0')}: ${(r.echo || r.readings[0]).replace(/\.$/, '')}`);
   return { tool: hit.tool, args: hit.args, rung: 'context', amends: last.id, res, cmd: hit.tool === last.tool ? commandOf(last) : null };
@@ -123,6 +125,27 @@ export function context(q, last, raw) {
   // the tool's own amendments are the more specific reading, so they go first; then the last command with a part changed
   return amendRead(raw || q, last) || fragmentRead(raw || q, last);
 }
+/* ── reading as you type: the same order as submit(), dry — nothing runs, nothing is added ── */
+// → { rung, echo, amends? } when the text reads whole; { rung: 'partial', echo } when it reads so far (a hole where the
+// rest goes); { rung: 'ambiguous', readings } when several readings survive and no tool settles it; null otherwise.
+// It may promise a reading the tool then refuses (a value out of range); it never hides one submit() would find.
+const clean = e => e.replace(/\.$/, '');
+export function readingOf(raw, last) {
+  if (!raw.trim()) return null;
+  const v = verdictOf(raw, clauseSession());
+  if (v.b) return { rung: 'grammar', echo: clean(v.r.echo) };
+  const x = expressionOf(raw); if (x && (calcOf(x) || estimateOf(x))) return { rung: 'grammar', echo: `expression: ${x}` };
+  const a = last && (amendRead(raw, last, true) || fragmentRead(raw, last, true)); if (a) return { rung: 'context', echo: `amends #${String(a.amends).padStart(2, '0')}: ${clean(a.echo)}`, amends: a.amends };
+  if (Object.keys(S.aliases).length) {
+    let t2 = ' ' + raw + ' '; Object.entries(S.aliases).forEach(([k, w]) => { t2 = t2.replace(new RegExp('(?<=\\s)' + k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?=\\s)', 'gi'), w); });
+    if (t2.trim() !== raw.trim()) { const t = verdictOf(t2.trim(), clauseSession()); if (t.b) return { rung: 'taught', echo: clean(t.r.echo) }; }
+  }
+  if (v.r.status === 'ambiguous') return { rung: 'ambiguous', readings: v.r.readings.map(clean) };
+  const p = clauseEngine().preview(raw, makeSession([]));
+  return p && !p.complete ? { rung: 'partial', echo: clean(p.echo) } : null;
+}
+// what may come next, from the grammar and the frames: role words, things of the open roles' types, verbs
+export const completions = (raw, n = 6) => { try { return clauseEngine().suggest(raw, makeSession([]), n); } catch (e) { return []; } };
 /* ── rung 3: taught words rewrite the query, then the grammar reads it again ── */
 export function taught(text, q, raw) {
   let q2 = ' ' + q + ' ', t2 = ' ' + text + ' ';
@@ -201,5 +224,5 @@ export function sessionRead(raw) {
   if (!sessionEngine || sessionEngine.key !== key) sessionEngine = { key, E: createEngine(o, ENGLISH) };
   const r = sessionEngine.E.understand(raw, makeSession([]));
   if (r.status !== 'ok') return null;
-  const cmd = r.commands[0], f = frames.find(x => x.name === cmd.verb); return f ? f.bind(cmd) : null;
+  const cmd = r.commands[0], f = frames.find(x => x.name === cmd.verb), b = f && f.bind(cmd); return b ? { ...b, echo: r.echo.replace(/\.$/, '') } : null;
 }

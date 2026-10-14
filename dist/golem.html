@@ -200,6 +200,15 @@ svg text{font:10px var(--mono);fill:var(--au-fg-muted)}
 .composer:focus-within{border-color:var(--au-action)}
 .composer textarea{width:100%;background:none;border:0;outline:0;padding:2px 4px 2px 0;font:15px/1.45 var(--mono);resize:none;max-height:40vh;overflow:auto;min-height:24px}
 .composer textarea::placeholder{color:var(--au-fg-soft)}
+/* what golem would read, as you type (dry: nothing runs), and what may come next */
+.pv{display:flex;align-items:baseline;gap:7px;font:11.5px/1.4 var(--mono);color:var(--au-fg-muted);min-width:0;padding-right:4px}
+.pv i{flex:none;width:7px;height:7px;border-radius:50%;background:var(--pc,var(--au-fg-soft));transform:translateY(-1px)}
+.pv span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.pv[data-rung="grammar"]{--pc:var(--au-info)} .pv[data-rung="context"]{--pc:var(--au-selected)} .pv[data-rung="taught"]{--pc:var(--au-success)} .pv[data-rung="ambiguous"]{--pc:var(--au-warn)}
+.pv[data-rung="partial"] i{background:none;box-shadow:inset 0 0 0 1.5px var(--au-fg-soft)}
+.sg{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:1px 0 2px} .sg::-webkit-scrollbar{display:none}
+.sg .chip{padding:2px 9px;font-size:11.5px;color:var(--au-fg-muted)} .sg .chip:first-child{border-color:var(--au-rule);color:var(--au-fg)}
+.pv[hidden],.sg[hidden]{display:none}
 .crow{display:flex;align-items:center;gap:6px}
 .crow .grow{flex:1;font:11px var(--mono);color:var(--au-fg-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .send{width:34px;height:34px;border-radius:8px;border:0;background:var(--au-action);color:var(--au-surface-bright);display:grid;place-items:center;padding:0;flex:none}
@@ -324,10 +333,12 @@ svg text{font:10px var(--mono);fill:var(--au-fg-muted)}
 
     <div class="dock">
       <form class="composer" id="f" autocomplete="off">
-        <textarea id="q" rows="1" placeholder="Ask, compute, or act" aria-label="Query" enterkeyhint="go"></textarea>
+        <textarea id="q" rows="1" placeholder="Ask, compute, or act" aria-label="Query" enterkeyhint="go" aria-describedby="pv" spellcheck="false" autocapitalize="off"></textarea>
+        <div class="pv" id="pv" hidden><i aria-hidden="true"></i><span></span></div>
+        <div class="sg" id="sg" hidden aria-label="Completions"></div>
         <div class="crow">
           <button class="ibtn" id="attach" type="button" title="Open a file: a table, a drawing or a document" aria-label="Open a file"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M15 8.5l-6 6a3.5 3.5 0 0 1-5-5l6.5-6.5a2.3 2.3 0 0 1 3.3 3.3L7.4 12.6a1.1 1.1 0 0 1-1.6-1.6L11.5 5.3"/></svg></button><input type="file" id="file" accept=".csv,.tsv,.txt,.md,.markdown,.html,.htm,.xlsx,.xlsm,.dm,.parquet,.dxf,.yaml,.yml,.wkt,.geojson,text/csv,text/tab-separated-values,text/plain" hidden>
-          <span class="grow"><span class="only-wide">Enter runs · Shift+Enter for a new line · ↑ for earlier queries</span></span>
+          <span class="grow"><span class="only-wide">Enter runs · Tab completes · Shift+Enter for a new line · ↑ for earlier queries</span></span>
           <button class="send" id="send" type="submit" aria-label="Run" title="Run"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 13V3M3.5 7.5L8 3l4.5 4.5"/></svg></button>
         </div>
       </form>
@@ -19077,7 +19088,7 @@ const __m49 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/dispatch, built from ../auditable/ext/dispatch/src/ by its own build.
 // Source of truth: gentropic/auditable ext/dispatch (local clone: ../auditable). Re-vendor by copying
 // ext/dispatch/index.js here after 'node ext/dispatch/build.js'. golem uses the grammar rung only:
-// createEngine, makeSession, ENGLISH, PORTUGUESE. At auditable 25d300d5.
+// createEngine, makeSession, ENGLISH, PORTUGUESE. At auditable 7b49e0b9.
 
 // ⚠ GENERATED FILE — DO NOT EDIT. Source: src/  Build: @gcu/build src/main.js
 // @gcu/dispatch — Session-trained natural-language → tool-call dispatch: a Snips-shaped resolver (averaged-perceptron intent + CRF-class slot tagger + gazetteers + deterministic per-kind assemblers) that trains IN THE BROWSER from the host session's own vocabulary in under a second. Tools are declarative (ten kinds) and a grammar rung (clause: case-grammar frames over an Earley chart with costed repairs, en + pt-BR) reads controlled commands before the learners see them; no shipped model, no network, explainable per decision — refusals return empty calls so the host degrades into its command palette. Born from an incubator where this beat a 26M finetuned transformer 50/52 to 3/24 on a frozen yardstick.
@@ -20977,8 +20988,23 @@ function createEngine(ont, locale = ENGLISH) {
     if (C.furthest < toks.length) return [];                             // already broken; nothing sensible follows
     const exp = new Set(C.expected());
     const verbTok = [...toks].reverse().find(t => t.senses.some(s => s.cat === 'VERB'));
-    const F = verbTok ? VERBS[verbTok.senses.find(s => s.cat === 'VERB').verb] : null;
-    const F0 = F ?? (toks.some(t => t.senses.some(s => s.cat === 'AGAIN')) && session.last ? VERBS[session.last.verb] : null);
+    // the frames in play, merged: every verb the verb word can be, and, when no verb was said (or the verb word is also a
+    // thing: "mean"), the elidable frames whose theme takes a thing typed before the first preposition ("mean cu by …")
+    const elided = () => {
+      const head = toks.slice(0, Math.max(0, toks.findIndex(t => t.senses.some(s => s.cat === 'PREP'))) || toks.length);
+      const types = new Set(head.flatMap(t => t.senses.flatMap(s => s.cat === 'NOUN' || s.cat === 'LIT' ? [s.type] : s.cat === 'NUM' ? ['quantity:*', 'quantity:bare'] : [])));
+      return ont.verbs.filter(v => v.elidable && (v.theme ?? []).some(t => types.has(t) || (t.startsWith('quantity:') && types.has('quantity:*')))).map(v => VERBS[v.name]);
+    };
+    const merge = fs => {
+      if (!fs.length) return null;
+      const roles = {};
+      for (const v of fs) for (const [k, r] of Object.entries(v.roles)) roles[k] = roles[k] ? { preps: [...new Set([...roles[k].preps, ...r.preps])], types: [...new Set([...roles[k].types, ...r.types])] } : r;
+      return { theme: [...new Set(fs.flatMap(v => v.theme))], roles };
+    };
+    const verbFrames = verbTok ? verbTok.senses.filter(s => s.cat === 'VERB').map(s => VERBS[s.verb]) : [];
+    const again = toks.some(t => t.senses.some(s => s.cat === 'AGAIN')) && session.last ? VERBS[session.last.verb] : null;
+    const F0 = again ?? merge(!verbTok ? elided() : verbTok.senses.some(s => s.cat === 'NOUN') ? [...elided(), ...verbFrames] : verbFrames);   // a thing first: its frames lead
+    const made = session.objects.length > 0;   // relative times, comparatives and relative clauses pick out things the session made
     // roles already used in this clause (approximate: by preposition canon since the verb)
     const since = verbTok ? toks.lastIndexOf(verbTok) : 0;
     const usedCanon = toks.slice(since).flatMap(t => t.senses.filter(s => s.cat === 'PREP').flatMap(s => s.canon));
@@ -20993,16 +21019,21 @@ function createEngine(ont, locale = ENGLISH) {
       const roles = Object.entries(F0.roles).filter(([, r]) => r.preps.some(p => lastPrep.canon.includes(p)));
       for (const [, r] of roles) {
         for (const o of objectsOf(r.types)) push(nameOf(o), 'object');
-        for (const t of r.types) { if (t.startsWith('quantity')) { const u = ont.units.find(u => u.dim === t.split(':')[1]); push(`200 ${u ? col(u, 'words')[0] : ''}`.trim(), 'value'); } else for (const w of wordsOf(t)) push(w, 'value'); }
+        for (const t of r.types) {
+          if (t === 'unit') { const dim = toks.flatMap(x => x.senses.filter(y => y.cat === 'UNIT')).map(y => y.dim)[0]; if (dim) for (const u of ont.units.filter(u => u.dim === dim)) push(col(u, 'words')[0], 'unit'); continue; }
+          if (t === 'date') { for (const w of Object.keys(locale.days ?? {}).sort((a, b) => (typeof locale.days[b] === 'object') - (typeof locale.days[a] === 'object'))) push(w, 'date'); continue; }
+          if (t === 'clock') { for (const w of ['9:00', ...Object.keys(locale.clocks ?? {})]) push(w, 'clock'); continue; }
+          if (t === 'cond') { for (const ct of ont.conditions?.subjects ?? []) for (const w of Object.keys(col(NOUNS[ct] ?? {}, 'words') ?? {}).map(v => valueName(ct, v))) push(w, 'value'); continue; }
+          if (t.startsWith('quantity')) { const u = ont.units.find(u => u.dim === t.split(':')[1]); push(`200 ${u ? col(u, 'words')[0] : ''}`.trim(), 'value'); } else for (const w of wordsOf(t)) push(w, 'value'); }
       }
     } else if (F0 && (exp.has('NOUN') || exp.has('DET')) && (since === toks.length - 1 || (inList && !lastPrep))) {   // theme position (or continuing the theme list)
       for (const t of F0.theme) { for (const o of objectsOf([t])) push(nameOf(o), 'object'); for (const w of wordsOf(t)) push(w, 'value'); }
       if (F0.theme.includes('*')) for (const o of session.objects.filter(o => o.name)) push(o.name, 'object');
     }
     if (exp.has('PREP') && F0) for (const [k, r] of open) for (const p of surfacePreps(r.preps[0])) push(p, `role:${roleLabel(k)}`);
-    if (exp.has('TIME')) for (const w of Object.keys(locale.times).slice(0, 4)) push(w, 'time');
-    if (exp.has('COMP')) for (const w of Object.keys(locale.comps).slice(0, 2)) push(w, 'comparative');
-    if (exp.has('SUBJ') || exp.has('REL')) push(locale.SUBJ.split('|')[0], 'relative');
+    if (exp.has('TIME') && made) for (const w of Object.keys(locale.times).slice(0, 4)) push(w, 'time');
+    if (exp.has('COMP') && made) for (const w of Object.keys(locale.comps).slice(0, 2)) push(w, 'comparative');
+    if ((exp.has('SUBJ') || exp.has('REL')) && made) push(locale.SUBJ.split('|')[0], 'relative');
     if (exp.has('CONJ')) push(locale.CONJ.split('|')[0], 'and');
     if (exp.has('THEN')) push(locale.THEN.split('|')[0], 'then');
     if (exp.has('EXCEPT')) push(locale.EXCEPT.split('|')[0], 'except');
@@ -21280,10 +21311,11 @@ function changed(card, before, after) {
   return args;
 }
 // a fragment of the last command: "in feet", "and chile", "log scale", "by lith", "where au > 1", "tomorrow"
-function fragmentRead(raw, last) {
+function fragmentRead(raw, last, dry) {
   const base = commandOf(last); if (!base) return null;
   const s = makeSession([]); s.last = base;
   const { r, b } = verdictOf(raw, s, { fragment: true }); if (!b || b.tool !== last.tool) return null;
+  if (dry) return { amends: last.id, echo: r.echo };
   const before = bindOf(base), args = changed(last, before && before.tool === last.tool ? before.args : null, b.args);
   const res = runTool(last.tool, args); if (!res) return null;
   res.trace.unshift(`clause: amends #${String(last.id).padStart(2, '0')}: ${r.echo}`);
@@ -21296,7 +21328,7 @@ function amendEngine(tool) {
   if (!amendEngines[tool] || amendEngines[tool].key !== key) amendEngines[tool] = { key, frames, E: createEngine(o, ENGLISH) };
   return amendEngines[tool];
 }
-function amendRead(raw, last) {
+function amendRead(raw, last, dry) {
   const { frames, E } = amendEngine(last.tool);
   // a leading "and" joins the amendment to the card ("and median"); the tokenizer says where the rest starts
   const { toks } = E.tokenize(raw, { names: {} }); const text = toks.length > 1 && toks[0].senses.some(x => x.cat === 'CONJ') ? raw.slice(toks[1].s) : raw;
@@ -21306,6 +21338,7 @@ function amendRead(raw, last) {
   let r = E.understand(text, makeSession([])), hit = pick(r);
   for (const f of frames) { if (hit) break; const s = makeSession([]); s.last = { verb: f.name, theme: [], roles: {} }; const rf = E.understand(text, s, { fragment: true }); hit = pick(rf); if (hit) r = rf; }
   if (!hit) return null;
+  if (dry) return { amends: last.id, echo: r.echo || r.readings[0] };
   const res = runTool(hit.tool, hit.args); if (!res) return null;
   res.trace.unshift(`clause: amends #${String(last.id).padStart(2, '0')}: ${(r.echo || r.readings[0]).replace(/\.$/, '')}`);
   return { tool: hit.tool, args: hit.args, rung: 'context', amends: last.id, res, cmd: hit.tool === last.tool ? commandOf(last) : null };
@@ -21315,6 +21348,27 @@ function context(q, last, raw) {
   // the tool's own amendments are the more specific reading, so they go first; then the last command with a part changed
   return amendRead(raw || q, last) || fragmentRead(raw || q, last);
 }
+/* ── reading as you type: the same order as submit(), dry — nothing runs, nothing is added ── */
+// → { rung, echo, amends? } when the text reads whole; { rung: 'partial', echo } when it reads so far (a hole where the
+// rest goes); { rung: 'ambiguous', readings } when several readings survive and no tool settles it; null otherwise.
+// It may promise a reading the tool then refuses (a value out of range); it never hides one submit() would find.
+const clean = e => e.replace(/\.$/, '');
+function readingOf(raw, last) {
+  if (!raw.trim()) return null;
+  const v = verdictOf(raw, clauseSession());
+  if (v.b) return { rung: 'grammar', echo: clean(v.r.echo) };
+  const x = expressionOf(raw); if (x && (calcOf(x) || estimateOf(x))) return { rung: 'grammar', echo: `expression: ${x}` };
+  const a = last && (amendRead(raw, last, true) || fragmentRead(raw, last, true)); if (a) return { rung: 'context', echo: `amends #${String(a.amends).padStart(2, '0')}: ${clean(a.echo)}`, amends: a.amends };
+  if (Object.keys(S.aliases).length) {
+    let t2 = ' ' + raw + ' '; Object.entries(S.aliases).forEach(([k, w]) => { t2 = t2.replace(new RegExp('(?<=\\s)' + k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?=\\s)', 'gi'), w); });
+    if (t2.trim() !== raw.trim()) { const t = verdictOf(t2.trim(), clauseSession()); if (t.b) return { rung: 'taught', echo: clean(t.r.echo) }; }
+  }
+  if (v.r.status === 'ambiguous') return { rung: 'ambiguous', readings: v.r.readings.map(clean) };
+  const p = clauseEngine().preview(raw, makeSession([]));
+  return p && !p.complete ? { rung: 'partial', echo: clean(p.echo) } : null;
+}
+// what may come next, from the grammar and the frames: role words, things of the open roles' types, verbs
+const completions = (raw, n = 6) => { try { return clauseEngine().suggest(raw, makeSession([]), n); } catch (e) { return []; } };
 /* ── rung 3: taught words rewrite the query, then the grammar reads it again ── */
 function taught(text, q, raw) {
   let q2 = ' ' + q + ' ', t2 = ' ' + text + ' ';
@@ -21393,9 +21447,9 @@ function sessionRead(raw) {
   if (!sessionEngine || sessionEngine.key !== key) sessionEngine = { key, E: createEngine(o, ENGLISH) };
   const r = sessionEngine.E.understand(raw, makeSession([]));
   if (r.status !== 'ok') return null;
-  const cmd = r.commands[0], f = frames.find(x => x.name === cmd.verb); return f ? f.bind(cmd) : null;
+  const cmd = r.commands[0], f = frames.find(x => x.name === cmd.verb), b = f && f.bind(cmd); return b ? { ...b, echo: r.echo.replace(/\.$/, '') } : null;
 }
-  return { norm, clauseEngine, clauseRead, grammar, commandOf, context, taught, sessionRead };
+  return { norm, clauseEngine, clauseRead, grammar, commandOf, context, readingOf, completions, taught, sessionRead };
 })();
 
 /* ==== src/engine/sessions.js ==== */
@@ -21496,7 +21550,7 @@ const { DOCTEXT } = __m41;
 const { bindingsOf, runSteps } = __m42;
 const { tableFromText } = __m13;
 const { convertBinary } = __m45;
-const { norm, grammar, context, taught, sessionRead } = __m50;
+const { norm, grammar, context, taught, sessionRead, readingOf } = __m50;
 const { current, newSession, renameSession, touch } = __m51;
 // The entry point: submit(raw) reads a request and returns what happened. Cards are recomputed in
 // place by rerun(); answers and slot flips go through it, so args stay the only state that matters.
@@ -21556,6 +21610,19 @@ function submit(raw) {
   return { kind: 'card', card: addCard(raw, r, performance.now() - t0) };
 }
 
+// What the composer would do with this text, without doing it: submit()'s order, dry. → { rung, echo } or null.
+function preview(raw) {
+  raw = raw.trim(); if (!raw) return null;
+  const text = norm(raw), q = text.toLowerCase(), last = S.cards[S.cards.length - 1];
+  const s = sessionRead(raw);
+  if (s && ['new', 'drawer', 'rename', 'undo', 'again', 'recipe'].includes(s.session)) return { rung: 'context', echo: s.echo };
+  if (last && last.res.ask) {
+    const os = last.res.ask.options, o = os.find(x => x.label.toLowerCase() === q) || os.find(x => x.label.length >= 3 && (x.label.toLowerCase().startsWith(q) || q.includes(x.label.toLowerCase()))) || (os.length === 1 && s && s.session === 'yes' ? os[0] : null);
+    if (o) return { rung: 'context', echo: `answers #${String(last.id).padStart(2, '0')}: ${o.label}` };
+  }
+  return readingOf(raw, last);
+}
+
 // run a recipe: a new session named after it and its bindings, one card per step, stopping at the first
 // step that does not read, with a card that says which and why
 function runRecipe(recipe, rest) {
@@ -21608,7 +21675,7 @@ function seedExamples() {
   newSession(true); ['open assays.csv', 'histogram of cu', 'log scale', 'histogram of au'].forEach(x => submit(x));
   newSession(true); ['0.35 oz per short ton in g/t', 'true thickness of a 14 m intercept, hole 270/60, bedding 045/30', 'remind me to send the samples to the lab on friday at 9', 'pop of mongolia'].forEach(x => submit(x));
 }
-  return { addCard, rerun, flipSlot, answer, undo, submit, hashOf, openFile, openBinary, seedExamples };
+  return { addCard, rerun, flipSlot, answer, undo, submit, preview, hashOf, openFile, openBinary, seedExamples };
 })();
 
 /* ==== src/vendor/leadacid.js ==== */
@@ -22354,7 +22421,8 @@ function figImage(ctx, x, y, w, h, cols, rows, b64) {
 /* ==== src/shell/main.js ==== */
 const __m55 = (() => {
 const { S } = __m0;
-const { submit, flipSlot, answer, seedExamples, openFile, openBinary } = __m52;
+const { submit, flipSlot, answer, seedExamples, openFile, openBinary, preview } = __m52;
+const { completions } = __m50;
 const { BINARY } = __m45;
 const { setRunner, onJobDone } = __m0;
 const { sessions, current, newSession, openSession, renameSession, deleteSession, searchHistory, serialize, hydrate, onChange } = __m51;
@@ -22491,21 +22559,46 @@ setRunner('python', req => new Promise(done => {
 }));
 onJobDone(c => { replaceCard(c); });
 
-$('f').addEventListener('submit', e => { e.preventDefault(); const v = $('q').value; $('q').value = ''; grow(); run(v); });
+$('f').addEventListener('submit', e => { e.preventDefault(); const v = $('q').value; $('q').value = ''; grow(); updatePreview(); run(v); });
 function grow() { const q = $('q'); q.style.height = 'auto'; q.style.height = Math.min(q.scrollHeight, window.innerHeight * 0.4) + 'px'; }
 $('q').addEventListener('input', grow);
 let recall = -1;
 $('q').addEventListener('keydown', e => {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); recall = -1; $('f').requestSubmit(); return; }
+  // Tab takes the first completion, only while a word is half typed: otherwise Tab moves on, as it should
+  if (e.key === 'Tab' && !e.shiftKey && !$('sg').hidden && /\S$/.test($('q').value)) { const b = $('sg').querySelector('[data-w]'); if (b) { e.preventDefault(); complete(b.dataset.w); return; } }
   const q = $('q'), past = S.cards.map(c => c.raw);
   if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey && past.length && (q.value === '' || recall >= 0) && !q.value.includes('\n')) {
     const i = e.key === 'ArrowUp' ? (recall < 0 ? past.length - 1 : Math.max(0, recall - 1)) : recall < 0 ? -1 : recall + 1;
     if (e.key === 'ArrowDown' && recall < 0) return;
-    e.preventDefault(); recall = i < past.length ? i : -1; q.value = recall < 0 ? '' : past[recall]; grow();
+    e.preventDefault(); recall = i < past.length ? i : -1; q.value = recall < 0 ? '' : past[recall]; grow(); updatePreview();
     q.setSelectionRange(q.value.length, q.value.length);
   }
 });
 $('q').addEventListener('input', () => { recall = -1; });
+// As you type: what golem would read (the echo, dry: nothing runs), and what may come next. A reading that would be
+// "no reading" shows nothing; the card says that, with reasons, when it is run.
+let pvTimer = 0;
+function updatePreview() {
+  clearTimeout(pvTimer);
+  pvTimer = setTimeout(() => {
+    const v = $('q').value, pv = $('pv'), sg = $('sg');
+    let p = null, c = [];
+    if (awake && v.trim()) { try { p = preview(v); } catch (e) { p = null; } if (!v.includes('\n')) c = completions(v); }
+    pv.hidden = !p;
+    if (p) {
+      pv.dataset.rung = p.rung;
+      const text = p.rung === 'ambiguous' ? `${p.readings.length} readings: ${p.readings.join(' | ')}` : p.rung === 'partial' ? `so far: ${p.echo}` : p.echo;
+      pv.querySelector('span').textContent = text; pv.title = text;
+    }
+    sg.hidden = !c.length;
+    sg.innerHTML = c.map(x => `<button type="button" class="chip" data-w="${escHtml(x.word)}" title="${escHtml(x.kind.replace(/^role:/, ''))}">${escHtml(x.word)}</button>`).join('');
+  }, 90);
+}
+function complete(w) { const q = $('q'); q.value = q.value.replace(/\S*$/, '') + w + ' '; grow(); q.focus(); q.setSelectionRange(q.value.length, q.value.length); updatePreview(); }
+$('q').addEventListener('input', updatePreview);
+$('sg').addEventListener('mousedown', e => e.preventDefault());   // the textarea keeps the focus
+$('sg').addEventListener('click', e => { const b = e.target.closest('[data-w]'); if (b) complete(b.dataset.w); });
 function newBlank() { newSession(); renderStream(); renderDrawer(); closeDrawer(); status('New session.'); $('q').focus(); }
 const typing = el => el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
 document.addEventListener('keydown', e => {

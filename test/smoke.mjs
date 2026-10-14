@@ -171,6 +171,18 @@ const hidden = !(await side()); await page.keyboard.press('Control+b'); await pa
 const back = await side();
 console.log(`${shown && hidden && back ? 'ok  ' : 'FAIL'} Ctrl+B hides and shows the sidebar on a wide screen`);
 if (!(shown && hidden && back)) failed++;
+// as you type: the reading so far, then whole; Tab takes the first completion while a word is half typed
+await page.fill('#q', ''); await page.click('#q'); await page.keyboard.type('2 km in m', { delay: 5 }); await page.waitForTimeout(250);
+const firstChip = await page.getAttribute('#sg .chip', 'data-w');
+await page.keyboard.press('Tab'); await page.waitForTimeout(250);
+const pvText = await page.textContent('#pv span'), pvRung = await page.getAttribute('#pv', 'data-rung'), typed = await page.inputValue('#q');
+const pvOk = typed === `2 km in ${firstChip} ` && pvRung === 'grammar' && pvText.startsWith('Convert 2 km; unit');
+console.log(`${pvOk ? 'ok  ' : 'FAIL'} the composer shows the reading as you type and Tab completes (${JSON.stringify(typed)} → ${pvText})`);
+if (!pvOk) failed++;
+await page.fill('#q', ''); await page.waitForTimeout(150);
+const cleared = await page.isHidden('#pv') && await page.isHidden('#sg');
+console.log(`${cleared ? 'ok  ' : 'FAIL'} an empty composer shows no reading and no completions`);
+if (!cleared) failed++;
 errors.forEach(e => console.log('FAIL ' + e));
 await browser.close();
 if (failed || !nameOk || kept !== 22 || overflow > 0 || errors.length) { console.log('\nsmoke test failed'); process.exit(1); }

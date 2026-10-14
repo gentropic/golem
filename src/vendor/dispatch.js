@@ -1,7 +1,7 @@
 // ⚠ VENDORED — DO NOT EDIT. @gcu/dispatch, built from ../auditable/ext/dispatch/src/ by its own build.
 // Source of truth: gentropic/auditable ext/dispatch (local clone: ../auditable). Re-vendor by copying
 // ext/dispatch/index.js here after 'node ext/dispatch/build.js'. golem uses the grammar rung only:
-// createEngine, makeSession, ENGLISH, PORTUGUESE. At auditable 25d300d5.
+// createEngine, makeSession, ENGLISH, PORTUGUESE. At auditable 7b49e0b9.
 
 // ⚠ GENERATED FILE — DO NOT EDIT. Source: src/  Build: @gcu/build src/main.js
 // @gcu/dispatch — Session-trained natural-language → tool-call dispatch: a Snips-shaped resolver (averaged-perceptron intent + CRF-class slot tagger + gazetteers + deterministic per-kind assemblers) that trains IN THE BROWSER from the host session's own vocabulary in under a second. Tools are declarative (ten kinds) and a grammar rung (clause: case-grammar frames over an Earley chart with costed repairs, en + pt-BR) reads controlled commands before the learners see them; no shipped model, no network, explainable per decision — refusals return empty calls so the host degrades into its command palette. Born from an incubator where this beat a 26M finetuned transformer 50/52 to 3/24 on a frozen yardstick.
@@ -1901,8 +1901,23 @@ function createEngine(ont, locale = ENGLISH) {
     if (C.furthest < toks.length) return [];                             // already broken; nothing sensible follows
     const exp = new Set(C.expected());
     const verbTok = [...toks].reverse().find(t => t.senses.some(s => s.cat === 'VERB'));
-    const F = verbTok ? VERBS[verbTok.senses.find(s => s.cat === 'VERB').verb] : null;
-    const F0 = F ?? (toks.some(t => t.senses.some(s => s.cat === 'AGAIN')) && session.last ? VERBS[session.last.verb] : null);
+    // the frames in play, merged: every verb the verb word can be, and, when no verb was said (or the verb word is also a
+    // thing: "mean"), the elidable frames whose theme takes a thing typed before the first preposition ("mean cu by …")
+    const elided = () => {
+      const head = toks.slice(0, Math.max(0, toks.findIndex(t => t.senses.some(s => s.cat === 'PREP'))) || toks.length);
+      const types = new Set(head.flatMap(t => t.senses.flatMap(s => s.cat === 'NOUN' || s.cat === 'LIT' ? [s.type] : s.cat === 'NUM' ? ['quantity:*', 'quantity:bare'] : [])));
+      return ont.verbs.filter(v => v.elidable && (v.theme ?? []).some(t => types.has(t) || (t.startsWith('quantity:') && types.has('quantity:*')))).map(v => VERBS[v.name]);
+    };
+    const merge = fs => {
+      if (!fs.length) return null;
+      const roles = {};
+      for (const v of fs) for (const [k, r] of Object.entries(v.roles)) roles[k] = roles[k] ? { preps: [...new Set([...roles[k].preps, ...r.preps])], types: [...new Set([...roles[k].types, ...r.types])] } : r;
+      return { theme: [...new Set(fs.flatMap(v => v.theme))], roles };
+    };
+    const verbFrames = verbTok ? verbTok.senses.filter(s => s.cat === 'VERB').map(s => VERBS[s.verb]) : [];
+    const again = toks.some(t => t.senses.some(s => s.cat === 'AGAIN')) && session.last ? VERBS[session.last.verb] : null;
+    const F0 = again ?? merge(!verbTok ? elided() : verbTok.senses.some(s => s.cat === 'NOUN') ? [...elided(), ...verbFrames] : verbFrames);   // a thing first: its frames lead
+    const made = session.objects.length > 0;   // relative times, comparatives and relative clauses pick out things the session made
     // roles already used in this clause (approximate: by preposition canon since the verb)
     const since = verbTok ? toks.lastIndexOf(verbTok) : 0;
     const usedCanon = toks.slice(since).flatMap(t => t.senses.filter(s => s.cat === 'PREP').flatMap(s => s.canon));
@@ -1917,16 +1932,21 @@ function createEngine(ont, locale = ENGLISH) {
       const roles = Object.entries(F0.roles).filter(([, r]) => r.preps.some(p => lastPrep.canon.includes(p)));
       for (const [, r] of roles) {
         for (const o of objectsOf(r.types)) push(nameOf(o), 'object');
-        for (const t of r.types) { if (t.startsWith('quantity')) { const u = ont.units.find(u => u.dim === t.split(':')[1]); push(`200 ${u ? col(u, 'words')[0] : ''}`.trim(), 'value'); } else for (const w of wordsOf(t)) push(w, 'value'); }
+        for (const t of r.types) {
+          if (t === 'unit') { const dim = toks.flatMap(x => x.senses.filter(y => y.cat === 'UNIT')).map(y => y.dim)[0]; if (dim) for (const u of ont.units.filter(u => u.dim === dim)) push(col(u, 'words')[0], 'unit'); continue; }
+          if (t === 'date') { for (const w of Object.keys(locale.days ?? {}).sort((a, b) => (typeof locale.days[b] === 'object') - (typeof locale.days[a] === 'object'))) push(w, 'date'); continue; }
+          if (t === 'clock') { for (const w of ['9:00', ...Object.keys(locale.clocks ?? {})]) push(w, 'clock'); continue; }
+          if (t === 'cond') { for (const ct of ont.conditions?.subjects ?? []) for (const w of Object.keys(col(NOUNS[ct] ?? {}, 'words') ?? {}).map(v => valueName(ct, v))) push(w, 'value'); continue; }
+          if (t.startsWith('quantity')) { const u = ont.units.find(u => u.dim === t.split(':')[1]); push(`200 ${u ? col(u, 'words')[0] : ''}`.trim(), 'value'); } else for (const w of wordsOf(t)) push(w, 'value'); }
       }
     } else if (F0 && (exp.has('NOUN') || exp.has('DET')) && (since === toks.length - 1 || (inList && !lastPrep))) {   // theme position (or continuing the theme list)
       for (const t of F0.theme) { for (const o of objectsOf([t])) push(nameOf(o), 'object'); for (const w of wordsOf(t)) push(w, 'value'); }
       if (F0.theme.includes('*')) for (const o of session.objects.filter(o => o.name)) push(o.name, 'object');
     }
     if (exp.has('PREP') && F0) for (const [k, r] of open) for (const p of surfacePreps(r.preps[0])) push(p, `role:${roleLabel(k)}`);
-    if (exp.has('TIME')) for (const w of Object.keys(locale.times).slice(0, 4)) push(w, 'time');
-    if (exp.has('COMP')) for (const w of Object.keys(locale.comps).slice(0, 2)) push(w, 'comparative');
-    if (exp.has('SUBJ') || exp.has('REL')) push(locale.SUBJ.split('|')[0], 'relative');
+    if (exp.has('TIME') && made) for (const w of Object.keys(locale.times).slice(0, 4)) push(w, 'time');
+    if (exp.has('COMP') && made) for (const w of Object.keys(locale.comps).slice(0, 2)) push(w, 'comparative');
+    if ((exp.has('SUBJ') || exp.has('REL')) && made) push(locale.SUBJ.split('|')[0], 'relative');
     if (exp.has('CONJ')) push(locale.CONJ.split('|')[0], 'and');
     if (exp.has('THEN')) push(locale.THEN.split('|')[0], 'then');
     if (exp.has('EXCEPT')) push(locale.EXCEPT.split('|')[0], 'except');

@@ -31,7 +31,7 @@ import { bindingsOf, runSteps } from './recipes.js';
 import { tableFromText } from './table.js';
 import { convertBinary } from './formats.js';
 import './notes.js';
-import { norm, grammar, context, taught, sessionRead } from './reading.js';
+import { norm, grammar, context, taught, sessionRead, readingOf } from './reading.js';
 import { current, newSession, renameSession, touch } from './sessions.js';
 
 export function addCard(raw, r, ms) {
@@ -87,6 +87,19 @@ export function submit(raw) {
   // a whole command first; then what amends the last card ("in feet", "2 sentences"); then the words taught on this device
   const r = grammar(text, q, 'grammar', raw) || context(q, last, raw) || taught(text, q, raw) || { tool: 'none', args: { q }, rung: 'none', res: T.none({ q }) };
   return { kind: 'card', card: addCard(raw, r, performance.now() - t0) };
+}
+
+// What the composer would do with this text, without doing it: submit()'s order, dry. → { rung, echo } or null.
+export function preview(raw) {
+  raw = raw.trim(); if (!raw) return null;
+  const text = norm(raw), q = text.toLowerCase(), last = S.cards[S.cards.length - 1];
+  const s = sessionRead(raw);
+  if (s && ['new', 'drawer', 'rename', 'undo', 'again', 'recipe'].includes(s.session)) return { rung: 'context', echo: s.echo };
+  if (last && last.res.ask) {
+    const os = last.res.ask.options, o = os.find(x => x.label.toLowerCase() === q) || os.find(x => x.label.length >= 3 && (x.label.toLowerCase().startsWith(q) || q.includes(x.label.toLowerCase()))) || (os.length === 1 && s && s.session === 'yes' ? os[0] : null);
+    if (o) return { rung: 'context', echo: `answers #${String(last.id).padStart(2, '0')}: ${o.label}` };
+  }
+  return readingOf(raw, last);
 }
 
 // run a recipe: a new session named after it and its bindings, one card per step, stopping at the first
