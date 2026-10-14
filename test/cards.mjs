@@ -41,6 +41,14 @@ check(await page.locator('#stream .card').count() === 2 && /25 c in f/.test(awai
 const listed = await page.evaluate(() => document.querySelectorAll('#dlist .srow').length);
 check(listed >= 4, `the branch is a session of its own in the sidebar (${listed} listed)`);
 
+// no width scrolls sideways (the composer's hint once pushed the column past the window between 860 and 950 px), and a
+// histogram is a chart drawn by plot
+await ask('open assays.csv'); await ask('histogram of cu');
+check(await page.evaluate(() => { const c = document.querySelector('#stream .card:last-child canvas[data-chart]'); return !!c && c.width > 0; }), 'a histogram is drawn as a chart');
+const wide = [];
+for (const w of [390, 700, 870, 900, 1200, 1700]) { await page.setViewportSize({ width: w, height: 900 }); await page.waitForTimeout(250); const sw = await page.evaluate(() => document.documentElement.scrollWidth); if (sw > w) wide.push(`${w}: ${sw}`); }
+check(!wide.length, `nothing scrolls sideways from 390 to 1700 px${wide.length ? ' (' + wide.join(', ') + ')' : ''}`);
+
 errors.forEach(e => console.log('FAIL page error: ' + e));
 await browser.close();
 if (failed || errors.length) { console.log('\ncards test failed'); process.exit(1); }

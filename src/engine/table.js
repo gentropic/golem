@@ -183,7 +183,7 @@ tool({
     return {
       read,
       body: [
-        { t: 'bars', label: `Histogram of ${c.name}`, bins, ticks: [0, .5, 1].map(t => fmt(inv(lo + t * (hi - lo)), 2)) },
+        { t: 'bars', label: `Histogram of ${c.name}`, bins, ticks: [0, .5, 1].map(t => fmt(inv(lo + t * (hi - lo)), 2)), lo: inv(lo), hi: inv(hi), log: !!a.log, xlabel: unit ? `${c.name} (${unit})` : c.name, ylabel: 'samples' },
         { t: 'kv', rows: [['n', String(st.n)], ['mean', `${fmt(st.mean, 3)} ${unit}`], ['median', `${fmt(st.med, 3)} ${unit}`], ['cv', fmt(st.sd / st.mean, 3)], ['range', `${fmt(st.min, 3)} to ${fmt(st.max, 3)} ${unit}`]] },
         { t: 'src', text: `@gcu/sadpan · vendored · sample-count weighted · ${srcLine(S.table)}` }
       ],

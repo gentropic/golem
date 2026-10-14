@@ -141,7 +141,7 @@ function streamedHist(a) {
   if (r === null || r.error) return noRunner(read, T0);
   if (r.n < 2) return { read, body: [{ t: 'note', kind: 'err', text: `${c.name} has ${r.n} positive value${r.n === 1 ? '' : 's'}; nothing to bin.` }], trace: ['scan: too few values'] };
   const inv = x => a.log ? Math.pow(10, x) : x, unit = c.unit || '';
-  return { read, body: [{ t: 'bars', label: `Histogram of ${c.name}`, bins: r.bins, ticks: [0, .5, 1].map(t => fmt(inv(r.lo + t * (r.hi - r.lo)), 2)) },
+  return { read, body: [{ t: 'bars', label: `Histogram of ${c.name}`, bins: r.bins, ticks: [0, .5, 1].map(t => fmt(inv(r.lo + t * (r.hi - r.lo)), 2)), lo: inv(r.lo), hi: inv(r.hi), log: !!a.log, xlabel: unit ? `${c.name} (${unit})` : c.name, ylabel: 'rows' },
     { t: 'kv', rows: [['n', r.n.toLocaleString('en-US')], ['mean', `${fmt(r.stats.mean, 3)} ${unit}`], ['median ≈', `${fmt(r.stats.median, 3)} ${unit} (t-digest)`], ['range', `${fmt(r.stats.min, 3)} to ${fmt(r.stats.max, 3)} ${unit}`]] }, srcOf(T0)],
     trace: [`scan ${T0.name}: ${r.rows.toLocaleString('en-US')} rows, two passes (range, then 18 ${a.log ? 'log10' : 'linear'} bins) in ${(r.ms / 1000).toFixed(1)} s`] };
 }

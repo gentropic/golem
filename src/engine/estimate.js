@@ -156,7 +156,7 @@ tool({
       body: [
         { t: 'big', v: fmt(p50, 4), unit: `${out.unit || ''} median (50th percentile)`.trim() },
         { t: 'kv', rows: [['mean', `${fmt(mean, 4)}${unit}${exact != null ? ` (exact ${fmt(exact, 5)}: the mean of a product or sum of independent inputs)` : ''}`], ['10th percentile', `${fmt(p10, 4)}${unit}`], ['90th percentile', `${fmt(p90, 4)}${unit}`], ['spread', `sd ${fmt(sd, 3)}${unit}, cv ${fmt(sd / Math.abs(mean), 3)}`]] },
-        { t: 'bars', label: `${RUNS.toLocaleString('en-GB')} runs${unit}`, bins, ticks: [fmt(lo, 3), fmt((lo + hi) / 2, 3), fmt(hi, 3)] },
+        { t: 'bars', label: `${RUNS.toLocaleString('en-GB')} runs${unit}`, bins, ticks: [fmt(lo, 3), fmt((lo + hi) / 2, 3), fmt(hi, 3)], lo, hi, xlabel: out.unit ? `value (${out.unit})` : 'value', ylabel: 'runs', marks: [[p10, '10th'], [p50, 'median'], [p90, '90th']] },
         { t: 'list', items: ctx.inputs },
         { t: 'sub', text: `Inputs are drawn independently. ${RUNS.toLocaleString('en-GB')} runs from seed ${a.seed}; the same seed gives the same numbers again. Percentiles are percentiles: the 10th is the low end.` }
       ],

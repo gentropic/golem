@@ -84,7 +84,8 @@ tool({
   run: a => {
     const all = rows().filter(r => same(r.activity, a.activity) && inPeriod(r.date, a.period));
     const read = [{ v: a.agg }, 'of', { v: a.activity }, a.unit ? { v: 'in ' + a.unit } : '', { v: periodText(a.period), key: 'period', alts: [{ kind: 'period', which: 'this', unit: 'week' }, { kind: 'period', which: 'this', unit: 'month' }, { kind: 'period', which: 'last', unit: 'month' }, { kind: 'period', which: 'this', unit: 'year' }, { kind: 'all' }], cur: a.period }].filter(Boolean);
-    if (!all.length) return { read, body: [{ t: 'note', text: `Nothing logged as ${a.activity} ${periodText(a.period)}.` }, SRC], trace: ['log.filter → 0 rows'] };
+    if (!all.length) return { read, body: [{ t: 'note', text: `Nothing logged as ${a.activity} ${periodText(a.period)}.` },
+      ...(rows().some(r => r.activity === a.activity) ? [] : [{ t: 'lbl', text: 'log one' }, { t: 'chips', items: [{ weight: 'log weight 78.4 kg', sleep: 'log 7.5 h sleep', steps: 'log 8000 steps', water: 'log 2 l water' }[a.activity] || `log 5 km ${a.activity}`] }]), SRC], trace: ['log.filter → 0 rows'] };
     let u = a.unit ? unitOf(a.unit) : null;
     if (!u && a.agg !== 'count') { const first = all.find(r => r.unit && unitOf(r.unit)); u = first ? unitOf(first.unit) : null; }
     const usable = a.agg === 'count' ? all : all.filter(r => r.value != null && (u ? (unitOf(r.unit) && unitOf(r.unit).dim === u.dim) : r.unit == null));
@@ -113,7 +114,10 @@ frame({
 });
 // asking: "how many km did i run this month", "how often did i run this month", "total run in miles this month",
 // "mean weight by week", "mean weight since 1 oct". The activities are what the log holds, matched as written.
-noun(() => { const acts = [...new Set(rows().map(r => r.activity))]; return acts.length ? { type: 'activity', exact: true, words: Object.fromEntries(acts.map(a => [a, [a]])), words_pt: Object.fromEntries(acts.map(a => [a, [a]])) } : null; });
+// the usual ones read before anything is logged ("mean weight by week" on a new device says the log is empty, rather
+// than not reading at all)
+const USUAL = ['run', 'walk', 'ride', 'swim', 'hike', 'weight', 'sleep', 'steps', 'water'];
+noun(() => { const acts = [...new Set([...USUAL, ...rows().map(r => r.activity)])]; return { type: 'activity', exact: true, words: Object.fromEntries(acts.map(a => [a, [a]])), words_pt: Object.fromEntries(acts.map(a => [a, [a]])) }; });
 noun({ type: 'period', words: { 'this week': ['this week'], 'last week': ['last week'], 'this month': ['this month'], 'last month': ['last month'], 'this year': ['this year'], 'last year': ['last year'], today: ['today'], yesterday: ['yesterday'], all: ['ever', 'all time', 'in all time', 'over all time'] },
   words_pt: { 'this week': ['esta semana', 'essa semana'], 'last week': ['semana passada'], 'this month': ['este mês', 'esse mês'], 'last month': ['mês passado'], 'this year': ['este ano'], 'last year': ['ano passado'], today: ['hoje'], yesterday: ['ontem'] } });
 noun({ type: 'logby', words: { week: ['week', 'weeks'], month: ['month', 'months'], day: ['day', 'days'], activity: ['activity'] }, words_pt: { week: ['semana'], month: ['mês'], day: ['dia'], activity: ['atividade'] } });

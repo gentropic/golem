@@ -1,6 +1,7 @@
 // Rendering. The engine hands over plain blocks; this is the only file that turns them into markup.
 import { fmt } from '../engine/core.js';
 import { conversions, equalArea } from '../vendor/bearing.js';
+import { Figure } from '../vendor/plot.js';
 
 export const escHtml = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 export const pad = n => String(n).padStart(2, '0');
@@ -31,6 +32,28 @@ function svgBars(b) {
   b.ticks.forEach((t, i) => { const f = i / (b.ticks.length - 1); s += `<text x="${(x0 + f * (W - x0 - 6)).toFixed(1)}" y="${H + 14}" text-anchor="${f === 0 ? 'start' : f === 1 ? 'end' : 'middle'}">${escHtml(t)}</text>`; });
   return s + '</svg>';
 }
+/* ── charts: a histogram block drawn by @gcu/plot ── */
+// The block stays plain data; the drawing reads the theme's tokens when it happens, so a theme change or a new width
+// redraws it (drawCharts). Each bin is a bar of its own, centred between its edges, so a log axis gets them right.
+const chartLabel = b => `${b.label}: ${b.bins.length} bins from ${fmt(b.lo, 3)} to ${fmt(b.hi, 3)}${b.log ? ', log scale' : ''}, the tallest ${Math.max(...b.bins)} ${b.ylabel || ''}`.trim();
+export function drawChart(cv) {
+  const b = JSON.parse(cv.dataset.chart), css = getComputedStyle(document.documentElement), tok = n => css.getPropertyValue(n).trim();
+  const host = cv.closest('.ans') || cv.parentElement, W = Math.max(260, Math.min(560, (host && host.clientWidth) || 560)), H = Math.round(W * 0.42) + 30;
+  const fig = new Figure(1, 1, { figsize: [W, H], facecolor: 'rgba(0,0,0,0)' }), ax = fig.axes[0];
+  ax._bgcolor = 'rgba(0,0,0,0)'; ax._textColor = tok('--au-fg-muted'); ax._gridColor = tok('--au-border'); ax._frameColor = tok('--au-rule');
+  const n = b.bins.length, edge = i => b.log ? b.lo * Math.pow(b.hi / b.lo, i / n) : b.lo + (b.hi - b.lo) * i / n, color = tok('--au-info');
+  for (let i = 0; i < n; i++) { const e0 = edge(i), e1 = edge(i + 1); if (b.bins[i]) ax.bar([(e0 + e1) / 2], [b.bins[i]], { width: (e1 - e0) * 0.94, color }); }
+  if (b.log) ax.set_xscale('log');
+  ax.set_xlim(b.lo, b.hi);
+  if (b.marks) ax.set_ylim(0, Math.max(...b.bins) * 1.14);
+  for (const [x, name] of b.marks || []) { ax.axvline(x, { color: tok('--au-action'), linestyle: '--', linewidth: 1 }); ax.text(x, Math.max(...b.bins) * 1.02, name, { color: tok('--au-action'), fontsize: 10, ha: 'center' }); }
+  if (b.xlabel) ax.set_xlabel(b.xlabel); if (b.ylabel) ax.set_ylabel(b.ylabel);
+  ax.grid(true);
+  const dpr = window.devicePixelRatio || 1;
+  cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);   // the CSS sizes it (the column's width, its aspect kept)
+  fig.draw(cv.getContext('2d'), { dpr });
+}
+export function drawCharts(root) { (root || document).querySelectorAll('canvas[data-chart]').forEach(cv => { try { drawChart(cv); } catch (e) { cv.replaceWith(Object.assign(document.createElement('div'), { className: 'note err', textContent: `The chart could not be drawn: ${e.message}` })); } }); }
 function svgCurve(b) {
   const W = 340, H = 150, x0 = 38, X = x => x0 + x / b.xmax * (W - x0 - 10), Y = y => H - y / b.ymax * (H - 10);
   let s = `<svg viewBox="0 0 ${W} ${H + 24}" width="${W}" height="${H + 24}" role="img" aria-label="${escHtml(b.label)}"><path class="ax" d="M${x0} 6V${H}H${W - 6}"/>`;
@@ -60,7 +83,7 @@ function blockHtml(b) {
     case 'actions': return `<div class="opts">${b.items.map(i => i.href ? `<a class="btn" href="${escHtml(i.href)}" target="_blank" rel="noopener">${escHtml(i.label)}</a>`
       : `<button class="btn${i.go ? ' go' : ''}" type="button" data-act="${escHtml(i.act)}"${i.msg ? ` data-msg="${escHtml(i.msg)}"` : ''}${i.send ? ` data-send="${escHtml(JSON.stringify(i.send))}"` : ''}>${escHtml(i.label)}</button>`).join('')}</div>`;
     case 'net': return svgNet(b);
-    case 'bars': return svgBars(b);
+    case 'bars': return b.lo != null ? `<figure class="chart"><canvas data-chart="${escHtml(JSON.stringify(b))}" role="img" aria-label="${escHtml(chartLabel(b))}"></canvas></figure>` : svgBars(b);
     case 'figure': return `<figure class="fig"><canvas data-fig width="${+b.w || 400}" height="${+b.h || 300}" role="img" aria-label="${escHtml(b.label || 'Figure')}"></canvas><figcaption>${escHtml(b.label || 'Figure')}</figcaption></figure>`;
     case 'curve': return svgCurve(b);
     default: return `<div class="note err">unknown block ${escHtml(b.t)}</div>`;

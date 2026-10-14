@@ -6792,6 +6792,68 @@
       }
     },
     {
+      "type": "activity",
+      "exact": true,
+      "words": {
+        "run": [
+          "run"
+        ],
+        "walk": [
+          "walk"
+        ],
+        "ride": [
+          "ride"
+        ],
+        "swim": [
+          "swim"
+        ],
+        "hike": [
+          "hike"
+        ],
+        "weight": [
+          "weight"
+        ],
+        "sleep": [
+          "sleep"
+        ],
+        "steps": [
+          "steps"
+        ],
+        "water": [
+          "water"
+        ]
+      },
+      "words_pt": {
+        "run": [
+          "run"
+        ],
+        "walk": [
+          "walk"
+        ],
+        "ride": [
+          "ride"
+        ],
+        "swim": [
+          "swim"
+        ],
+        "hike": [
+          "hike"
+        ],
+        "weight": [
+          "weight"
+        ],
+        "sleep": [
+          "sleep"
+        ],
+        "steps": [
+          "steps"
+        ],
+        "water": [
+          "water"
+        ]
+      }
+    },
+    {
       "type": "period",
       "words": {
         "this week": [

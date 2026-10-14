@@ -13,7 +13,7 @@ import { sessions, current, newSession, openSession, renameSession, deleteSessio
 import { openStore, putBlob, getBlob } from './store.js';
 import { skills, PACKS, STARTERS } from '../engine/skills.js';
 import { shell } from '../vendor/leadacid.js';
-import { escHtml, pad, cardEl } from './render.js';
+import { escHtml, pad, cardEl, drawCharts } from './render.js';
 import { registerGcuSw } from '../vendor/sw-register.js';
 
 const $ = id => document.getElementById(id);
@@ -39,7 +39,7 @@ setInterval(tick, 500);
 function renderBar() { $('sname').textContent = current().name; }
 function renderStream(focus) {
   $('stream').innerHTML = '';
-  S.cards.forEach(c => $('stream').appendChild(cardEl(c)));
+  S.cards.forEach(c => $('stream').appendChild(cardEl(c))); drawCharts($('stream'));
   $('exlbl').hidden = !current().example; welcome(); tick(); renderBar(); renderPacks(); showTab('ask');
   const el = focus && $('stream').querySelector(`[data-id="${focus}"]`);
   if (el) el.scrollIntoView({ block: 'start' }); else $('v-ask').scrollTop = S.cards.length > 1 ? $('v-ask').scrollHeight : 0;
@@ -86,6 +86,7 @@ function replaceCard(c, focusKey) {
   const open = !!old.querySelector('details.trace[open]'), fresh = cardEl(c);
   old.dataset.rung = fresh.dataset.rung; old.replaceChildren(...fresh.childNodes);
   if (fresh.dataset.pinned) old.dataset.pinned = '1'; else delete old.dataset.pinned;
+  drawCharts(old);
   if (open) old.querySelector('details.trace').open = true;
   if (focusKey) { const s = old.querySelector(`.slot[data-key="${focusKey}"]`); if (s) s.focus({ preventScroll: true }); }
 }
@@ -105,7 +106,7 @@ function show(o) {
     case 'undo': { const el = $('stream').querySelector(`[data-id="${o.card.id}"]`); if (el) el.remove(); welcome(); status(`Removed #${pad(o.card.id)}: ${o.card.raw}`); break; }
     case 'nothing': status(o.msg); break;
     case 'card': {
-      const el = cardEl(o.card); $('stream').appendChild(el); welcome(); showTab('ask'); el.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+      const el = cardEl(o.card); $('stream').appendChild(el); drawCharts(el); welcome(); showTab('ask'); el.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
       // for a screen reader: what was read and the start of the answer, once
       const ans = el.querySelector('.ans'), read = el.querySelector('.read');
       $('sr').textContent = `#${pad(o.card.id)}, ${(read ? read.innerText : o.card.raw).replace(/\s+/g, ' ')}. ${ans ? ans.innerText.replace(/\s+/g, ' ').slice(0, 220) : ''}`;
@@ -299,7 +300,10 @@ onChange(() => { renderBar(); persist(); if (!$('hq').value.trim() && ren == nul
 /* ── theme: auto follows the system; a choice is kept on this device ── */
 const THEMES = ['auto', 'light', 'dark'];
 let theme = 'auto';
-function applyTheme(t) { if (t === 'auto') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = t; $('theme-k').textContent = t; }
+function applyTheme(t) { if (t === 'auto') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = t; $('theme-k').textContent = t; drawCharts(); }
+// charts read the theme's colours and the column's width when drawn: draw them again when either changes
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => drawCharts());
+let redrawT; window.addEventListener('resize', () => { clearTimeout(redrawT); redrawT = setTimeout(() => drawCharts(), 150); });
 try { const t = localStorage.getItem(THEME); if (THEMES.includes(t)) theme = t; } catch (e) { /* storage is optional */ }
 applyTheme(theme);
 $('theme').addEventListener('click', () => { theme = THEMES[(THEMES.indexOf(theme) + 1) % 3]; applyTheme(theme); try { localStorage.setItem(THEME, theme); } catch (e) { /* storage is optional */ } });

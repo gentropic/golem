@@ -46,7 +46,10 @@ test('log questions: sums in a unit, counts, means by week; an activity never lo
   const rows = mw.res.body.find(b => b.t === 'table').rows;
   assert.equal(rows.length, 2); assert.equal(rows[0][1], '78.4'); assert.equal(rows[1][1], '78');
   assert.equal(card('mean weight since 1 oct').res.value, 78);
-  assert.notEqual(card('how many km did i swim this month').tool, 'logQuery', 'never logged: not read by the log');
+  // a usual activity never logged reads, says so and offers one to log; an unusual one is still not a reading
+  const swim = card('how many km did i swim this month');
+  assert.equal(swim.tool, 'logQuery'); assert.match(g.textOf(swim), /Nothing logged as swim this month[\s\S]*log 5 km swim/);
+  assert.notEqual(card('how many km did i paddle this month').tool, 'logQuery', 'never logged and not a usual activity: not read by the log');
   unpin();
 });
 

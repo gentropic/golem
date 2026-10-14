@@ -201,13 +201,14 @@ svg text{font:10px var(--mono);fill:var(--au-fg-muted)}
 .ax{stroke:var(--au-rule);fill:none} .grid{stroke:var(--au-border-soft);fill:none}
 .barfill{fill:var(--au-info)} .pt{fill:var(--au-action)} .ln{stroke:var(--au-info);fill:none;stroke-width:1.6}
 .ln2{stroke:var(--au-action);fill:none;stroke-dasharray:4 3} .pole{fill:var(--au-info)} .netbg{fill:var(--au-surface-raised);stroke:var(--au-rule)}
+.chart{margin:4px 0;min-width:0}.chart canvas{display:block;width:100%;max-width:560px;height:auto}
 .fig{margin:4px 0}.fig canvas{display:block;width:100%;max-width:560px;height:auto;border-radius:var(--r);border:1px solid var(--au-rule)}.fig figcaption{font:12px var(--mono);color:var(--au-fg-muted);margin-top:4px}
 .hbars{display:grid;grid-template-columns:auto 1fr auto;gap:4px 8px;align-items:center;margin:2px 0;font:12px var(--mono);max-width:560px} .hbars .hb{display:contents} .hbars .hk{color:var(--au-fg-muted);white-space:nowrap;max-width:9em;overflow:hidden;text-overflow:ellipsis} .hbars .hbar{height:10px;background:var(--au-surface-raised);border-radius:2px;overflow:hidden} .hbars .hbar i{display:block;height:100%;background:var(--au-info)} .hbars .hv{text-align:right}
 
 /* the composer */
 .dock{padding:6px max(16px,calc((100% - 780px) / 2)) 10px;display:grid;gap:6px;min-width:0}
 @media (min-width:1600px){.view{padding-left:calc((100% - 900px) / 2);padding-right:calc((100% - 900px) / 2)}.dock{padding-left:calc((100% - 900px) / 2);padding-right:calc((100% - 900px) / 2)}}
-.composer{background:var(--au-surface-raised);border:1px solid var(--au-rule);border-radius:12px;padding:10px 8px 8px 14px;display:grid;gap:4px;transition:border-color var(--dur) var(--ease)}
+.composer{background:var(--au-surface-raised);border:1px solid var(--au-rule);border-radius:12px;padding:10px 8px 8px 14px;display:grid;grid-template-columns:minmax(0,1fr);gap:4px;transition:border-color var(--dur) var(--ease)}
 .composer:focus-within{border-color:var(--au-action)}
 .composer textarea{width:100%;background:none;border:0;outline:0;padding:2px 4px 2px 0;font:15px/1.45 var(--mono);resize:none;max-height:40vh;overflow:auto;min-height:24px}
 .composer textarea::placeholder{color:var(--au-fg-soft)}
@@ -221,7 +222,7 @@ svg text{font:10px var(--mono);fill:var(--au-fg-muted)}
 .sg .chip{padding:2px 9px;font-size:11.5px;color:var(--au-fg-muted)} .sg .chip:first-child{border-color:var(--au-rule);color:var(--au-fg)}
 .pv[hidden],.sg[hidden]{display:none}
 .crow{display:flex;align-items:center;gap:6px}
-.crow .grow{flex:1;font:11px var(--mono);color:var(--au-fg-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.crow .grow{flex:1;min-width:0;font:11px var(--mono);color:var(--au-fg-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .send{width:34px;height:34px;border-radius:8px;border:0;background:var(--au-action);color:var(--au-surface-bright);display:grid;place-items:center;padding:0;flex:none}
 .send svg{stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
 #status{font:11px var(--mono);color:var(--au-fg-muted);min-height:15px;text-align:center}
