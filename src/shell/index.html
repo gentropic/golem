@@ -176,6 +176,21 @@ th{font:700 10.5px var(--mono);letter-spacing:.07em;text-transform:uppercase;col
 th,td{padding:5px 10px;border-bottom:1px solid var(--au-border-soft);vertical-align:top}
 tr:last-child td{border-bottom:0}
 td.n,th.n{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.cfoot{display:flex;flex-wrap:wrap;align-items:flex-start;gap:4px 12px}
+.cfoot details.trace{flex:1 1 auto;min-width:0}
+.cfoot details.trace[open]{flex-basis:100%;order:2}
+.cacts{display:flex;gap:2px;margin-left:auto;opacity:.55;transition:opacity var(--dur) var(--ease)}
+.card:hover .cacts,.card:focus-within .cacts,.card:focus .cacts{opacity:1}
+@media (hover:none){.cacts{opacity:1}}
+.cact{background:none;border:0;padding:2px 6px;border-radius:4px;font:11px var(--mono);color:var(--au-fg-soft);cursor:pointer}
+.cact:hover{color:var(--au-fg);background:var(--au-surface-bright)}
+.cact[aria-pressed="true"]{color:var(--au-action)}
+.card:focus{outline:none}
+.card:focus-visible .reply,.card:focus .reply{box-shadow:-2px 0 0 0 var(--rc), -4px 0 0 0 var(--au-focus, var(--au-action))}
+.card[data-pinned] .chead::before{content:'pinned';font:600 10px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--au-action)}
+.pins{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 18px;padding-bottom:12px;border-bottom:1px solid var(--au-border)}
+.pins .lbl{margin:0 4px 0 0}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 details.trace summary{font:11px var(--mono);color:var(--au-fg-soft);cursor:pointer;width:max-content}
 details.trace summary:hover{color:var(--au-fg-muted)}
 details.trace ol{margin:6px 0 2px;padding-left:20px;font:12px/1.5 var(--mono);color:var(--au-fg-muted);overflow-wrap:anywhere}
@@ -191,6 +206,7 @@ svg text{font:10px var(--mono);fill:var(--au-fg-muted)}
 
 /* the composer */
 .dock{padding:6px max(16px,calc((100% - 780px) / 2)) 10px;display:grid;gap:6px;min-width:0}
+@media (min-width:1600px){.view{padding-left:calc((100% - 900px) / 2);padding-right:calc((100% - 900px) / 2)}.dock{padding-left:calc((100% - 900px) / 2);padding-right:calc((100% - 900px) / 2)}}
 .composer{background:var(--au-surface-raised);border:1px solid var(--au-rule);border-radius:12px;padding:10px 8px 8px 14px;display:grid;gap:4px;transition:border-color var(--dur) var(--ease)}
 .composer:focus-within{border-color:var(--au-action)}
 .composer textarea{width:100%;background:none;border:0;outline:0;padding:2px 4px 2px 0;font:15px/1.45 var(--mono);resize:none;max-height:40vh;overflow:auto;min-height:24px}
@@ -273,7 +289,9 @@ svg text{font:10px var(--mono);fill:var(--au-fg-muted)}
         <div class="starts" id="starts"></div>
       </div>
       <div class="lbl" id="exlbl" hidden>Example session</div>
-      <div id="stream"></div>
+      <div class="pins" id="pins" hidden></div>
+      <div id="stream" role="feed" aria-label="Questions and answers"></div>
+      <div class="sr" id="sr" aria-live="polite"></div>
     </div>
     <div class="view" id="v-skills" hidden></div>
     <div class="view" id="v-packs" hidden></div>

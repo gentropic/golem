@@ -70,14 +70,16 @@ function blockHtml(b) {
 /* ── a card ── */
 export function cardEl(c) {
   const el = document.createElement('article');
-  el.className = 'card'; el.dataset.id = c.id; el.dataset.rung = c.rung;
-  const r = c.res, read = r.read.map(x => typeof x === 'string' ? escHtml(x) : x.alts ? `<button class="slot" type="button" data-act="slot" data-key="${x.key}" title="Tap to change this reading">${escHtml(x.v)}</button>` : `<span class="slot">${escHtml(x.v)}</span>`).join(' ');
+  el.className = 'card'; el.dataset.id = c.id; el.dataset.rung = c.rung; el.tabIndex = -1;
+  el.setAttribute('aria-label', `#${pad(c.id)}: ${c.raw}`); if (c.pinned) el.dataset.pinned = '1';
+  const r = c.res, read = r.read.map(x => typeof x === 'string' ? escHtml(x) : x.alts ? `<button class="slot" type="button" data-act="slot" data-key="${x.key}" title="Tap to change this reading" aria-label="${escHtml(x.v)}: tap to read it another way">${escHtml(x.v)}</button>` : `<span class="slot">${escHtml(x.v)}</span>`).join(' ');
   const ask = r.ask ? `<div class="note">${escHtml(r.ask.prompt)}</div>${r.ask.options.length ? `<div class="opts">${r.ask.options.map((o, i) => `<button class="btn" type="button" data-act="answer" data-i="${i}">${escHtml(o.label)}</button>`).join('')}${r.ask.parse ? '<span class="sub">or type it</span>' : ''}</div>` : ''}` : '';
   el.innerHTML = `<div class="q">${escHtml(c.raw)}</div>
     <div class="reply"><div class="chead"><span class="rung ${c.rung}">${RUNG[c.rung]}</span><span>#${pad(c.id)}</span>${c.amends ? `<span>from #${pad(c.amends)}</span>` : ''}<span class="ms">${c.ms < 10 ? c.ms.toFixed(1) : Math.round(c.ms)} ms</span></div>
     ${read ? `<div class="read"><span class="lbl">read as</span> ${read}</div>` : ''}
     <div class="ans">${r.body.map(blockHtml).join('')}${ask}</div>
-    <details class="trace"><summary>plan · ${r.trace.length} step${r.trace.length === 1 ? '' : 's'}</summary><ol>${r.trace.map(t => `<li>${escHtml(t)}</li>`).join('')}</ol></details></div>`;
+    <div class="cfoot"><details class="trace"><summary>how · ${r.trace.length} step${r.trace.length === 1 ? '' : 's'}</summary><ol>${r.trace.map(t => `<li>${escHtml(t)}</li>`).join('')}</ol></details>
+    <span class="cacts"><button class="cact" type="button" data-act="copyans" title="Copy the answer (c)">copy</button><button class="cact" type="button" data-act="edit" title="Put this question back in the box to change it (e)">edit</button><button class="cact" type="button" data-act="pin" aria-pressed="${!!c.pinned}" title="Keep this card at the top of the session (p)">${c.pinned ? 'pinned' : 'pin'}</button><button class="cact" type="button" data-act="branch" title="A new session with the cards up to this one">branch</button></span></div></div>`;
   const figs = r.body.filter(b => b.t === 'figure');
   el.querySelectorAll('canvas[data-fig]').forEach((cv, i) => { try { drawFigure(cv, figs[i]); } catch (e) { cv.replaceWith(Object.assign(document.createElement('div'), { className: 'note err', textContent: `The figure could not be drawn: ${e.message}` })); } });
   return el;

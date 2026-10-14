@@ -190,6 +190,21 @@ th{font:700 10.5px var(--mono);letter-spacing:.07em;text-transform:uppercase;col
 th,td{padding:5px 10px;border-bottom:1px solid var(--au-border-soft);vertical-align:top}
 tr:last-child td{border-bottom:0}
 td.n,th.n{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.cfoot{display:flex;flex-wrap:wrap;align-items:flex-start;gap:4px 12px}
+.cfoot details.trace{flex:1 1 auto;min-width:0}
+.cfoot details.trace[open]{flex-basis:100%;order:2}
+.cacts{display:flex;gap:2px;margin-left:auto;opacity:.55;transition:opacity var(--dur) var(--ease)}
+.card:hover .cacts,.card:focus-within .cacts,.card:focus .cacts{opacity:1}
+@media (hover:none){.cacts{opacity:1}}
+.cact{background:none;border:0;padding:2px 6px;border-radius:4px;font:11px var(--mono);color:var(--au-fg-soft);cursor:pointer}
+.cact:hover{color:var(--au-fg);background:var(--au-surface-bright)}
+.cact[aria-pressed="true"]{color:var(--au-action)}
+.card:focus{outline:none}
+.card:focus-visible .reply,.card:focus .reply{box-shadow:-2px 0 0 0 var(--rc), -4px 0 0 0 var(--au-focus, var(--au-action))}
+.card[data-pinned] .chead::before{content:'pinned';font:600 10px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--au-action)}
+.pins{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 18px;padding-bottom:12px;border-bottom:1px solid var(--au-border)}
+.pins .lbl{margin:0 4px 0 0}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 details.trace summary{font:11px var(--mono);color:var(--au-fg-soft);cursor:pointer;width:max-content}
 details.trace summary:hover{color:var(--au-fg-muted)}
 details.trace ol{margin:6px 0 2px;padding-left:20px;font:12px/1.5 var(--mono);color:var(--au-fg-muted);overflow-wrap:anywhere}
@@ -205,6 +220,7 @@ svg text{font:10px var(--mono);fill:var(--au-fg-muted)}
 
 /* the composer */
 .dock{padding:6px max(16px,calc((100% - 780px) / 2)) 10px;display:grid;gap:6px;min-width:0}
+@media (min-width:1600px){.view{padding-left:calc((100% - 900px) / 2);padding-right:calc((100% - 900px) / 2)}.dock{padding-left:calc((100% - 900px) / 2);padding-right:calc((100% - 900px) / 2)}}
 .composer{background:var(--au-surface-raised);border:1px solid var(--au-rule);border-radius:12px;padding:10px 8px 8px 14px;display:grid;gap:4px;transition:border-color var(--dur) var(--ease)}
 .composer:focus-within{border-color:var(--au-action)}
 .composer textarea{width:100%;background:none;border:0;outline:0;padding:2px 4px 2px 0;font:15px/1.45 var(--mono);resize:none;max-height:40vh;overflow:auto;min-height:24px}
@@ -289,7 +305,9 @@ svg text{font:10px var(--mono);fill:var(--au-fg-muted)}
         <div class="starts" id="starts"></div>
       </div>
       <div class="lbl" id="exlbl" hidden>Example session</div>
-      <div id="stream"></div>
+      <div class="pins" id="pins" hidden></div>
+      <div id="stream" role="feed" aria-label="Questions and answers"></div>
+      <div class="sr" id="sr" aria-live="polite"></div>
     </div>
     <div class="view" id="v-skills" hidden></div>
     <div class="view" id="v-packs" hidden></div>
@@ -21801,7 +21819,7 @@ const onChange = fn => { listeners.push(fn); };
 const changed = () => listeners.forEach(f => f());
 
 // what a session keeps of a card: enough to recompute it, and nothing else
-const spec = c => ({ id: c.id, raw: c.raw, tool: c.tool, args: c.args, rung: c.rung, amends: c.amends, ms: c.ms });
+const spec = c => ({ id: c.id, raw: c.raw, tool: c.tool, args: c.args, rung: c.rung, amends: c.amends, ms: c.ms, ...(c.pinned ? { pinned: true } : {}) });
 
 // what a card contributes to its session's name: [label, weight], from the tool's declaration
 function tagOf(c) { const d = toolByName(c.tool); return d && d.topic ? d.topic(c.args) : null; }
@@ -21851,6 +21869,14 @@ function deleteSession(id) {
   if (cur && cur.id === id) { if (SS.length) load([...SS].sort((x, y) => y.updated - x.updated)[0]); else newSession(); }
   changed();
 }
+// a pinned card stays at hand at the top of its session; the pin is part of the session's plan, so it travels with it
+function pinCard(c) { if (c.pinned) delete c.pinned; else c.pinned = true; cur.updated = Date.now(); changed(); return !!c.pinned; }
+// a new session with this session's cards up to and including one: the same plan, recomputed, to go another way from there
+function branchSession(cardId) {
+  const from = cur, keep = from.cards.filter(c => c.id <= cardId).map(spec);
+  const s = { id: ++sid, name: 'New session', auto: true, example: false, created: Date.now(), updated: Date.now(), cards: keep };
+  SS.push(s); load(s); s.name = autoName(S.cards) + (autoName(S.cards) === from.name ? ' (branch)' : ''); changed(); return s;
+}
 // substring match over what was typed, across every session
 function searchHistory(q) {
   q = q.trim().toLowerCase(); const hits = [];
@@ -21895,7 +21921,7 @@ function hydrate(d) {
 function reset() {
   SS = []; cur = null; sid = 0; S.cards = []; S.n = 0; S.aliases = {}; S.facts = []; S.files = {}; S.tables = {}; S.recipes = {}; S.table = null; S.clause = null; clearResults();
 }
-  return { onChange, spec, tagOf, autoName, touch, load, openSession, newSession, renameSession, deleteSession, searchHistory, sessions, current, serialize, parts, exportSession, importSession, hydrate, reset };
+  return { onChange, spec, tagOf, autoName, touch, load, openSession, newSession, renameSession, deleteSession, pinCard, branchSession, searchHistory, sessions, current, serialize, parts, exportSession, importSession, hydrate, reset };
 })();
 
 /* ==== src/vendor/sluice/accumulator.js ==== */
@@ -27366,14 +27392,16 @@ function blockHtml(b) {
 /* ── a card ── */
 function cardEl(c) {
   const el = document.createElement('article');
-  el.className = 'card'; el.dataset.id = c.id; el.dataset.rung = c.rung;
-  const r = c.res, read = r.read.map(x => typeof x === 'string' ? escHtml(x) : x.alts ? `<button class="slot" type="button" data-act="slot" data-key="${x.key}" title="Tap to change this reading">${escHtml(x.v)}</button>` : `<span class="slot">${escHtml(x.v)}</span>`).join(' ');
+  el.className = 'card'; el.dataset.id = c.id; el.dataset.rung = c.rung; el.tabIndex = -1;
+  el.setAttribute('aria-label', `#${pad(c.id)}: ${c.raw}`); if (c.pinned) el.dataset.pinned = '1';
+  const r = c.res, read = r.read.map(x => typeof x === 'string' ? escHtml(x) : x.alts ? `<button class="slot" type="button" data-act="slot" data-key="${x.key}" title="Tap to change this reading" aria-label="${escHtml(x.v)}: tap to read it another way">${escHtml(x.v)}</button>` : `<span class="slot">${escHtml(x.v)}</span>`).join(' ');
   const ask = r.ask ? `<div class="note">${escHtml(r.ask.prompt)}</div>${r.ask.options.length ? `<div class="opts">${r.ask.options.map((o, i) => `<button class="btn" type="button" data-act="answer" data-i="${i}">${escHtml(o.label)}</button>`).join('')}${r.ask.parse ? '<span class="sub">or type it</span>' : ''}</div>` : ''}` : '';
   el.innerHTML = `<div class="q">${escHtml(c.raw)}</div>
     <div class="reply"><div class="chead"><span class="rung ${c.rung}">${RUNG[c.rung]}</span><span>#${pad(c.id)}</span>${c.amends ? `<span>from #${pad(c.amends)}</span>` : ''}<span class="ms">${c.ms < 10 ? c.ms.toFixed(1) : Math.round(c.ms)} ms</span></div>
     ${read ? `<div class="read"><span class="lbl">read as</span> ${read}</div>` : ''}
     <div class="ans">${r.body.map(blockHtml).join('')}${ask}</div>
-    <details class="trace"><summary>plan · ${r.trace.length} step${r.trace.length === 1 ? '' : 's'}</summary><ol>${r.trace.map(t => `<li>${escHtml(t)}</li>`).join('')}</ol></details></div>`;
+    <div class="cfoot"><details class="trace"><summary>how · ${r.trace.length} step${r.trace.length === 1 ? '' : 's'}</summary><ol>${r.trace.map(t => `<li>${escHtml(t)}</li>`).join('')}</ol></details>
+    <span class="cacts"><button class="cact" type="button" data-act="copyans" title="Copy the answer (c)">copy</button><button class="cact" type="button" data-act="edit" title="Put this question back in the box to change it (e)">edit</button><button class="cact" type="button" data-act="pin" aria-pressed="${!!c.pinned}" title="Keep this card at the top of the session (p)">${c.pinned ? 'pinned' : 'pin'}</button><button class="cact" type="button" data-act="branch" title="A new session with the cards up to this one">branch</button></span></div></div>`;
   const figs = r.body.filter(b => b.t === 'figure');
   el.querySelectorAll('canvas[data-fig]').forEach((cv, i) => { try { drawFigure(cv, figs[i]); } catch (e) { cv.replaceWith(Object.assign(document.createElement('div'), { className: 'note err', textContent: `The figure could not be drawn: ${e.message}` })); } });
   return el;
@@ -27495,7 +27523,7 @@ const { factbookFromGcudat, factbookProfiles, readGcudat, compileOds, compileStr
 const { useBook, bookInfo } = __m17;
 const { BINARY } = __m47;
 const { setRunner, onJobDone } = __m0;
-const { sessions, current, newSession, openSession, renameSession, deleteSession, searchHistory, parts, hydrate, onChange, exportSession, importSession } = __m53;
+const { sessions, current, newSession, openSession, renameSession, deleteSession, searchHistory, parts, hydrate, onChange, exportSession, importSession, pinCard, branchSession } = __m53;
 const { openStore, putBlob, getBlob } = __m61;
 const { skills, PACKS, STARTERS } = __m49;
 const { shell } = __m62;
@@ -27532,11 +27560,48 @@ function renderStream(focus) {
   const el = focus && $('stream').querySelector(`[data-id="${focus}"]`);
   if (el) el.scrollIntoView({ block: 'start' }); else $('v-ask').scrollTop = S.cards.length > 1 ? $('v-ask').scrollHeight : 0;
 }
-function welcome() { $('welcome').hidden = S.cards.length > 0; }
+function welcome() { $('welcome').hidden = S.cards.length > 0; renderPins(); }
+// the pinned cards of this session, a tap away at the top of the stream
+function renderPins() {
+  const pins = S.cards.filter(c => c.pinned);
+  $('pins').hidden = !pins.length;
+  $('pins').innerHTML = pins.length ? `<span class="lbl">pinned</span>${pins.map(c => `<button class="chip" type="button" data-goto="${c.id}">#${pad(c.id)} ${escHtml(c.raw.length > 40 ? c.raw.slice(0, 39) + '…' : c.raw)}</button>`).join('')}` : '';
+}
+const cardOf = id => $('stream').querySelector(`.card[data-id="${id}"]`);
+function copyText(text, where) {
+  const fail = () => { const p = document.createElement('pre'); p.textContent = text; (where || $('stream')).appendChild(p); status('Copy was blocked here. The text is shown so you can select it.'); };
+  try { navigator.clipboard.writeText(text).then(() => status('Copied.'), fail); } catch (err) { fail(); }
+}
+// a card's own actions, from its footer or the keyboard: copy the answer, edit the question, pin, branch
+function cardAction(c, act) {
+  const el = cardOf(c.id);
+  // the answer as a person would paste it: the tool's own copy text, or what the card shows minus sources and buttons
+  const answerText = () => el ? [...el.querySelector('.ans').children].filter(n => !n.matches('.src, .opts')).map(n => n.innerText.trim()).filter(Boolean).join('\n') : '';
+  if (act === 'copyans') copyText(c.res.copy || answerText(), el && el.querySelector('.ans'));
+  else if (act === 'edit') { const q = $('q'); q.value = c.raw; q.dispatchEvent(new Event('input')); q.focus(); q.setSelectionRange(q.value.length, q.value.length); status('Back in the box: change it and press Enter. The answer comes as a new card.'); }
+  else if (act === 'pin') { const on = pinCard(c); replaceCard(c); renderPins(); status(on ? `Pinned #${pad(c.id)}.` : `Unpinned #${pad(c.id)}.`); }
+  else if (act === 'branch') { const s = branchSession(c.id); renderStream(); renderDrawer(); status(`A new session, "${s.name}", with the cards up to #${pad(c.id)}.`); }
+}
+// moving between cards from the keyboard: j / k or the arrows when the box is not focused; c, e, p act on the focused card;
+// / or Escape goes back to the box
+document.addEventListener('keydown', e => {
+  const t = e.target, typing = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  // handled here, the event stops: the general Escape below would send the focus straight back to the box
+  if (typing) { if (e.key === 'Escape' && t.id === 'q' && !t.value && S.cards.length && !$('sg').children.length) { e.preventDefault(); e.stopImmediatePropagation(); cardOf(S.cards[S.cards.length - 1].id).focus(); } return; }
+  if ($('v-ask').hidden || $('app').classList.contains('nav')) return;
+  const cards = [...$('stream').querySelectorAll('.card')], at = cards.indexOf(t.closest ? t.closest('.card') : null);
+  const go = i => { const el = cards[Math.max(0, Math.min(cards.length - 1, i))]; if (el) { el.focus(); el.scrollIntoView({ block: 'nearest' }); } };
+  if (e.key === 'j' || e.key === 'ArrowDown') { if (!cards.length) return; e.preventDefault(); go(at < 0 ? cards.length - 1 : at + 1); }
+  else if (e.key === 'k' || e.key === 'ArrowUp') { if (!cards.length) return; e.preventDefault(); go(at < 0 ? cards.length - 1 : at - 1); }
+  else if (e.key === '/' || e.key === 'Escape') { e.preventDefault(); $('q').focus(); }
+  else if (at >= 0 && { c: 1, e: 1, p: 1 }[e.key]) { e.preventDefault(); const c = S.cards.find(x => x.id === +cards[at].dataset.id); if (c) cardAction(c, { c: 'copyans', e: 'edit', p: 'pin' }[e.key]); }
+});
 function replaceCard(c, focusKey) {
   const old = $('stream').querySelector(`[data-id="${c.id}"]`); if (!old) return;
   const open = !!old.querySelector('details.trace[open]'), fresh = cardEl(c);
   old.dataset.rung = fresh.dataset.rung; old.replaceChildren(...fresh.childNodes);
+  if (fresh.dataset.pinned) old.dataset.pinned = '1'; else delete old.dataset.pinned;
   if (open) old.querySelector('details.trace').open = true;
   if (focusKey) { const s = old.querySelector(`.slot[data-key="${focusKey}"]`); if (s) s.focus({ preventScroll: true }); }
 }
@@ -27555,7 +27620,13 @@ function show(o) {
     case 'answered': replaceCard(o.card); status(`Answered #${pad(o.card.id)}: ${o.label}`); break;
     case 'undo': { const el = $('stream').querySelector(`[data-id="${o.card.id}"]`); if (el) el.remove(); welcome(); status(`Removed #${pad(o.card.id)}: ${o.card.raw}`); break; }
     case 'nothing': status(o.msg); break;
-    case 'card': { const el = cardEl(o.card); $('stream').appendChild(el); welcome(); showTab('ask'); el.scrollIntoView({ block: 'start', behavior: 'smooth' }); break; }
+    case 'card': {
+      const el = cardEl(o.card); $('stream').appendChild(el); welcome(); showTab('ask'); el.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+      // for a screen reader: what was read and the start of the answer, once
+      const ans = el.querySelector('.ans'), read = el.querySelector('.read');
+      $('sr').textContent = `#${pad(o.card.id)}, ${(read ? read.innerText : o.card.raw).replace(/\s+/g, ' ')}. ${ans ? ans.innerText.replace(/\s+/g, ' ').slice(0, 220) : ''}`;
+      break;
+    }
   }
   tick(); renderPacks();
 }
@@ -27846,6 +27917,7 @@ document.querySelector('.sfoot').addEventListener('click', e => { const b = e.ta
 $('starts').addEventListener('click', e => { const b = e.target.closest('[data-q]'); if (b) run(b.dataset.q); });
 $('v-skills').addEventListener('click', e => { const b = e.target.closest('[data-q]'); if (b) run(b.dataset.q); });
 $('v-packs').addEventListener('click', e => { const b = e.target.closest('[data-pk-install],[data-pk-remove]'); if (!b) return; if (b.dataset.pkInstall) installBook(b.dataset.pkInstall); else removeBook(b.dataset.pkRemove); });
+$('pins').addEventListener('click', e => { const b = e.target.closest('[data-goto]'); const el = b && cardOf(+b.dataset.goto); if (el) { el.scrollIntoView({ block: 'start' }); el.focus({ preventScroll: true }); } });
 $('stream').addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if (!b) return;
   const c = S.cards.find(x => x.id === +b.closest('.card').dataset.id), act = b.dataset.act;
@@ -27854,6 +27926,7 @@ $('stream').addEventListener('click', e => {
   if (act === 'slot') { flipSlot(c, b.dataset.key); replaceCard(c, b.dataset.key); }
   else if (act === 'answer') { answer(c, +b.dataset.i); replaceCard(c); }
   else if (act === 'skills') showTab('skills');
+  else if (['copyans', 'edit', 'pin', 'branch'].includes(act)) cardAction(c, act);
   else if (act === 'handoff') {
     // inside lead-acid: the allowlisted intent, the other app opens for the person to confirm; in a browser: what it would do
     const say = (text, kind) => { const n = document.createElement('div'); n.className = 'note ' + kind; n.textContent = text; b.replaceWith(n); };

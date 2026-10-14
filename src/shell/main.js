@@ -9,7 +9,7 @@ import { factbookFromGcudat, factbookProfiles, readGcudat, compileOds, compileSt
 import { useBook, bookInfo } from '../engine/books.js';
 import { BINARY } from '../engine/formats.js';
 import { setRunner, onJobDone } from '../engine/core.js';
-import { sessions, current, newSession, openSession, renameSession, deleteSession, searchHistory, parts, hydrate, onChange, exportSession, importSession } from '../engine/sessions.js';
+import { sessions, current, newSession, openSession, renameSession, deleteSession, searchHistory, parts, hydrate, onChange, exportSession, importSession, pinCard, branchSession } from '../engine/sessions.js';
 import { openStore, putBlob, getBlob } from './store.js';
 import { skills, PACKS, STARTERS } from '../engine/skills.js';
 import { shell } from '../vendor/leadacid.js';
@@ -44,11 +44,48 @@ function renderStream(focus) {
   const el = focus && $('stream').querySelector(`[data-id="${focus}"]`);
   if (el) el.scrollIntoView({ block: 'start' }); else $('v-ask').scrollTop = S.cards.length > 1 ? $('v-ask').scrollHeight : 0;
 }
-function welcome() { $('welcome').hidden = S.cards.length > 0; }
+function welcome() { $('welcome').hidden = S.cards.length > 0; renderPins(); }
+// the pinned cards of this session, a tap away at the top of the stream
+function renderPins() {
+  const pins = S.cards.filter(c => c.pinned);
+  $('pins').hidden = !pins.length;
+  $('pins').innerHTML = pins.length ? `<span class="lbl">pinned</span>${pins.map(c => `<button class="chip" type="button" data-goto="${c.id}">#${pad(c.id)} ${escHtml(c.raw.length > 40 ? c.raw.slice(0, 39) + '…' : c.raw)}</button>`).join('')}` : '';
+}
+const cardOf = id => $('stream').querySelector(`.card[data-id="${id}"]`);
+function copyText(text, where) {
+  const fail = () => { const p = document.createElement('pre'); p.textContent = text; (where || $('stream')).appendChild(p); status('Copy was blocked here. The text is shown so you can select it.'); };
+  try { navigator.clipboard.writeText(text).then(() => status('Copied.'), fail); } catch (err) { fail(); }
+}
+// a card's own actions, from its footer or the keyboard: copy the answer, edit the question, pin, branch
+function cardAction(c, act) {
+  const el = cardOf(c.id);
+  // the answer as a person would paste it: the tool's own copy text, or what the card shows minus sources and buttons
+  const answerText = () => el ? [...el.querySelector('.ans').children].filter(n => !n.matches('.src, .opts')).map(n => n.innerText.trim()).filter(Boolean).join('\n') : '';
+  if (act === 'copyans') copyText(c.res.copy || answerText(), el && el.querySelector('.ans'));
+  else if (act === 'edit') { const q = $('q'); q.value = c.raw; q.dispatchEvent(new Event('input')); q.focus(); q.setSelectionRange(q.value.length, q.value.length); status('Back in the box: change it and press Enter. The answer comes as a new card.'); }
+  else if (act === 'pin') { const on = pinCard(c); replaceCard(c); renderPins(); status(on ? `Pinned #${pad(c.id)}.` : `Unpinned #${pad(c.id)}.`); }
+  else if (act === 'branch') { const s = branchSession(c.id); renderStream(); renderDrawer(); status(`A new session, "${s.name}", with the cards up to #${pad(c.id)}.`); }
+}
+// moving between cards from the keyboard: j / k or the arrows when the box is not focused; c, e, p act on the focused card;
+// / or Escape goes back to the box
+document.addEventListener('keydown', e => {
+  const t = e.target, typing = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  // handled here, the event stops: the general Escape below would send the focus straight back to the box
+  if (typing) { if (e.key === 'Escape' && t.id === 'q' && !t.value && S.cards.length && !$('sg').children.length) { e.preventDefault(); e.stopImmediatePropagation(); cardOf(S.cards[S.cards.length - 1].id).focus(); } return; }
+  if ($('v-ask').hidden || $('app').classList.contains('nav')) return;
+  const cards = [...$('stream').querySelectorAll('.card')], at = cards.indexOf(t.closest ? t.closest('.card') : null);
+  const go = i => { const el = cards[Math.max(0, Math.min(cards.length - 1, i))]; if (el) { el.focus(); el.scrollIntoView({ block: 'nearest' }); } };
+  if (e.key === 'j' || e.key === 'ArrowDown') { if (!cards.length) return; e.preventDefault(); go(at < 0 ? cards.length - 1 : at + 1); }
+  else if (e.key === 'k' || e.key === 'ArrowUp') { if (!cards.length) return; e.preventDefault(); go(at < 0 ? cards.length - 1 : at - 1); }
+  else if (e.key === '/' || e.key === 'Escape') { e.preventDefault(); $('q').focus(); }
+  else if (at >= 0 && { c: 1, e: 1, p: 1 }[e.key]) { e.preventDefault(); const c = S.cards.find(x => x.id === +cards[at].dataset.id); if (c) cardAction(c, { c: 'copyans', e: 'edit', p: 'pin' }[e.key]); }
+});
 function replaceCard(c, focusKey) {
   const old = $('stream').querySelector(`[data-id="${c.id}"]`); if (!old) return;
   const open = !!old.querySelector('details.trace[open]'), fresh = cardEl(c);
   old.dataset.rung = fresh.dataset.rung; old.replaceChildren(...fresh.childNodes);
+  if (fresh.dataset.pinned) old.dataset.pinned = '1'; else delete old.dataset.pinned;
   if (open) old.querySelector('details.trace').open = true;
   if (focusKey) { const s = old.querySelector(`.slot[data-key="${focusKey}"]`); if (s) s.focus({ preventScroll: true }); }
 }
@@ -67,7 +104,13 @@ function show(o) {
     case 'answered': replaceCard(o.card); status(`Answered #${pad(o.card.id)}: ${o.label}`); break;
     case 'undo': { const el = $('stream').querySelector(`[data-id="${o.card.id}"]`); if (el) el.remove(); welcome(); status(`Removed #${pad(o.card.id)}: ${o.card.raw}`); break; }
     case 'nothing': status(o.msg); break;
-    case 'card': { const el = cardEl(o.card); $('stream').appendChild(el); welcome(); showTab('ask'); el.scrollIntoView({ block: 'start', behavior: 'smooth' }); break; }
+    case 'card': {
+      const el = cardEl(o.card); $('stream').appendChild(el); welcome(); showTab('ask'); el.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+      // for a screen reader: what was read and the start of the answer, once
+      const ans = el.querySelector('.ans'), read = el.querySelector('.read');
+      $('sr').textContent = `#${pad(o.card.id)}, ${(read ? read.innerText : o.card.raw).replace(/\s+/g, ' ')}. ${ans ? ans.innerText.replace(/\s+/g, ' ').slice(0, 220) : ''}`;
+      break;
+    }
   }
   tick(); renderPacks();
 }
@@ -358,6 +401,7 @@ document.querySelector('.sfoot').addEventListener('click', e => { const b = e.ta
 $('starts').addEventListener('click', e => { const b = e.target.closest('[data-q]'); if (b) run(b.dataset.q); });
 $('v-skills').addEventListener('click', e => { const b = e.target.closest('[data-q]'); if (b) run(b.dataset.q); });
 $('v-packs').addEventListener('click', e => { const b = e.target.closest('[data-pk-install],[data-pk-remove]'); if (!b) return; if (b.dataset.pkInstall) installBook(b.dataset.pkInstall); else removeBook(b.dataset.pkRemove); });
+$('pins').addEventListener('click', e => { const b = e.target.closest('[data-goto]'); const el = b && cardOf(+b.dataset.goto); if (el) { el.scrollIntoView({ block: 'start' }); el.focus({ preventScroll: true }); } });
 $('stream').addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if (!b) return;
   const c = S.cards.find(x => x.id === +b.closest('.card').dataset.id), act = b.dataset.act;
@@ -366,6 +410,7 @@ $('stream').addEventListener('click', e => {
   if (act === 'slot') { flipSlot(c, b.dataset.key); replaceCard(c, b.dataset.key); }
   else if (act === 'answer') { answer(c, +b.dataset.i); replaceCard(c); }
   else if (act === 'skills') showTab('skills');
+  else if (['copyans', 'edit', 'pin', 'branch'].includes(act)) cardAction(c, act);
   else if (act === 'handoff') {
     // inside lead-acid: the allowlisted intent, the other app opens for the person to confirm; in a browser: what it would do
     const say = (text, kind) => { const n = document.createElement('div'); n.className = 'note ' + kind; n.textContent = text; b.replaceWith(n); };

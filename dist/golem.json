@@ -11643,6 +11643,36 @@
       "label_pt": "Ensinar"
     },
     {
+      "name": "abilities",
+      "label": "What I can do",
+      "words": [
+        "what can you do",
+        "what can i ask",
+        "what do you do",
+        "what can i do here",
+        "what are your skills",
+        "what skills do you have",
+        "help",
+        "skills",
+        "list the skills",
+        "list skills",
+        "show the skills",
+        "show me what you can do",
+        "what else can you do"
+      ],
+      "theme": [],
+      "required": [],
+      "roles": {},
+      "words_pt": [
+        "o que você faz",
+        "o que voce faz",
+        "o que você sabe fazer",
+        "ajuda",
+        "habilidades"
+      ],
+      "label_pt": "O que sei fazer"
+    },
+    {
       "name": "export",
       "label": "Export",
       "words": [

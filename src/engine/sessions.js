@@ -10,7 +10,7 @@ export const onChange = fn => { listeners.push(fn); };
 const changed = () => listeners.forEach(f => f());
 
 // what a session keeps of a card: enough to recompute it, and nothing else
-export const spec = c => ({ id: c.id, raw: c.raw, tool: c.tool, args: c.args, rung: c.rung, amends: c.amends, ms: c.ms });
+export const spec = c => ({ id: c.id, raw: c.raw, tool: c.tool, args: c.args, rung: c.rung, amends: c.amends, ms: c.ms, ...(c.pinned ? { pinned: true } : {}) });
 
 // what a card contributes to its session's name: [label, weight], from the tool's declaration
 export function tagOf(c) { const d = toolByName(c.tool); return d && d.topic ? d.topic(c.args) : null; }
@@ -59,6 +59,14 @@ export function deleteSession(id) {
   SS = SS.filter(x => x.id !== id);
   if (cur && cur.id === id) { if (SS.length) load([...SS].sort((x, y) => y.updated - x.updated)[0]); else newSession(); }
   changed();
+}
+// a pinned card stays at hand at the top of its session; the pin is part of the session's plan, so it travels with it
+export function pinCard(c) { if (c.pinned) delete c.pinned; else c.pinned = true; cur.updated = Date.now(); changed(); return !!c.pinned; }
+// a new session with this session's cards up to and including one: the same plan, recomputed, to go another way from there
+export function branchSession(cardId) {
+  const from = cur, keep = from.cards.filter(c => c.id <= cardId).map(spec);
+  const s = { id: ++sid, name: 'New session', auto: true, example: false, created: Date.now(), updated: Date.now(), cards: keep };
+  SS.push(s); load(s); s.name = autoName(S.cards) + (autoName(S.cards) === from.name ? ' (branch)' : ''); changed(); return s;
 }
 // substring match over what was typed, across every session
 export function searchHistory(q) {
