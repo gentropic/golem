@@ -7,10 +7,12 @@
   "license": "MIT",
   "scripts": {
     "build": "node build.mjs",
+    "android": "node build.mjs && lead-acid build",
     "test:engine": "node --test test/engine.test.mjs test/files.test.mjs test/structure.test.mjs test/timescale.test.mjs test/sample.test.mjs test/explain.test.mjs test/convert.test.mjs test/calendar.test.mjs test/estimate.test.mjs test/chem.test.mjs test/text.test.mjs test/forms.test.mjs test/log.test.mjs test/places.test.mjs test/formats.test.mjs test/apply.test.mjs test/python.test.mjs test/interchange.test.mjs test/docs.test.mjs test/recipes.test.mjs test/phrasings.test.mjs test/factbook.test.mjs test/books.test.mjs test/stream.test.mjs test/oracle.test.mjs",
     "test": "node build.mjs && node --test test/engine.test.mjs test/files.test.mjs test/structure.test.mjs test/timescale.test.mjs test/sample.test.mjs test/explain.test.mjs test/convert.test.mjs test/calendar.test.mjs test/estimate.test.mjs test/chem.test.mjs test/text.test.mjs test/forms.test.mjs test/log.test.mjs test/places.test.mjs test/formats.test.mjs test/apply.test.mjs test/python.test.mjs test/interchange.test.mjs test/docs.test.mjs test/recipes.test.mjs test/phrasings.test.mjs test/factbook.test.mjs test/books.test.mjs test/stream.test.mjs test/oracle.test.mjs && node test/smoke.mjs && node test/pwa.mjs && node test/storage.mjs && node test/packs.mjs && node test/large.mjs && node test/leadacid.mjs"
   },
   "devDependencies": {
+    "@gcu/lead-acid": "^0.1.0",
     "playwright": "^1.64.0"
   }
 }

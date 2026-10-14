@@ -54,10 +54,11 @@ If Playwright has no browser installed, run `npx playwright install chromium` or
 
 ### The Android app
 
-`android/` is golem inside the lead-acid shell, written by lead-acid's `init` (`lead-acid.json` holds its id, artifact and plugins: `intent`, for the calendar, timer and alarm hand-offs). It builds the same `dist/golem.html`, copied in at every build. It needs a clone of lead-acid beside this one until `@gcu/lead-acid` is on npm, the Android SDK, and a JDK 17 (Android Studio's works; the command finds it):
+`android/` is golem inside the lead-acid shell, written by lead-acid's `init` (`lead-acid.json` holds its id, artifact and plugins: `intent`, for the calendar, timer and alarm hand-offs). It builds the same `dist/golem.html`, copied in at every build, against `@gcu/lead-acid` from npm (a devDependency). It needs the Android SDK and a JDK 17 (Android Studio's works; the command finds it):
 
 ```sh
-npm run build && node ../lead-acid/cli.mjs build    # → android/app/build/outputs/apk/debug/app-debug.apk
+npm install
+npm run android        # the page, then the APK: android/app/build/outputs/apk/debug/app-debug.apk
 adb install -r android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
