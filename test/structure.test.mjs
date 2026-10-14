@@ -63,7 +63,7 @@ test('declination from wmm: NOAA\'s first test point, a bearing, and the open qu
   assert.equal(c.tool, 'declination'); near(c.res.value, 1.2815, 1e-3, 'declination at 80N 0E, 2025.0');
   const b = card('045 magnetic to true at 80, 0 on 2025-01-01'); near(b.res.value, 46.2815, 1e-3, 'magnetic to true');
   const t = card('045 true to magnetic at 80, 0 on 2025-01-01'); near(t.res.value, 43.7185, 1e-3, 'true to magnetic');
-  assert.ok(g.textOf(card('declination here')).includes('Where?'));
+  assert.ok(g.textOf(card('declination here')).includes('give coordinates'), 'outside the app: no position, so coordinates');
   assert.ok(g.textOf(card('045 magnetic to grid at 80, 0')).includes('Grid north'));
   const far = card('declination at 80, 0 on 2040-01-01'); assert.ok(g.textOf(far).includes('outside'), 'a date outside the model window is flagged');
 });

@@ -219,6 +219,9 @@ svg text{font:10px var(--mono);fill:var(--au-fg-muted)}
 .barfill{fill:var(--au-info)} .pt{fill:var(--au-action)} .ln{stroke:var(--au-info);fill:none;stroke-width:1.6}
 .ln2{stroke:var(--au-action);fill:none;stroke-dasharray:4 3} .pole{fill:var(--au-info)} .netbg{fill:var(--au-surface-raised);stroke:var(--au-rule)}
 .chart{margin:4px 0;min-width:0}.chart canvas{display:block;width:100%;max-width:560px;height:auto}
+.capture{display:grid;gap:8px;border:1px dashed var(--au-rule);border-radius:var(--r);padding:12px 14px}.capture .how{margin:0;color:var(--au-fg-muted)}
+.capture .live{font:600 28px/1.1 var(--mono);letter-spacing:.01em}.capture .live small{font:12px var(--mono);color:var(--au-fg-soft);margin-left:8px}
+html:not([data-app]) .capture .live,html:not([data-app]) .capture .opts{display:none}
 .fig{margin:4px 0}.fig canvas{display:block;width:100%;max-width:560px;height:auto;border-radius:var(--r);border:1px solid var(--au-rule)}.fig figcaption{font:12px var(--mono);color:var(--au-fg-muted);margin-top:4px}
 .hbars{display:grid;grid-template-columns:auto 1fr auto;gap:4px 8px;align-items:center;margin:2px 0;font:12px var(--mono);max-width:560px} .hbars .hb{display:contents} .hbars .hk{color:var(--au-fg-muted);white-space:nowrap;max-width:9em;overflow:hidden;text-overflow:ellipsis} .hbars .hbar{height:10px;background:var(--au-surface-raised);border-radius:2px;overflow:hidden} .hbars .hbar i{display:block;height:100%;background:var(--au-info)} .hbars .hv{text-align:right}
 
@@ -12533,11 +12536,13 @@ tool({
   skill: { group: 'Field', title: 'Magnetic declination', on: '@gcu/wmm', about: 'The World Magnetic Model at a place and date, and magnetic to true bearings.', examples: ['declination at -19.92, -43.94', '045 magnetic to true at -19.92, -43.94'] },
   topic: () => ['Declination', 2],
   run: a => {
-    if (a.here) return { read: ['declination', { v: 'here' }], body: [whereNote], trace: ['no place: device location is off and no coordinates were given'] };
+    // "here": in the app the card asks for one position fix (lead-acid's gnss, asked for on the tap), kept in args
+    if (a.here) return { read: ['declination', { v: 'here' }], capture: { kind: 'position', set: (args, v) => { delete args.here; args.lat = +(+v.lat).toFixed(5); args.lon = +(+v.lon).toFixed(5); args.fix = { acc: v.acc == null ? null : Math.round(+v.acc), at: +v.at || 0 }; } },
+      body: [{ t: 'capture', kind: 'position', how: 'One position fix from the phone, kept with this card. Nothing is sent anywhere.' }, { t: 'sub', text: 'Outside the app there is no position: give coordinates, as in "declination at -19.92, -43.94".' }], trace: ['wait: a position from the phone (lead-acid gnss), or coordinates'] };
     if (Math.abs(a.lat) > 90 || Math.abs(a.lon) > 180) return null;
     const { d, f } = decl(a);
     return {
-      read: ['declination at', { v: `${a.lat}, ${a.lon}` }, 'on', { v: fmtDate(d) }], value: f.decl,
+      read: ['declination at', { v: `${a.lat}, ${a.lon}` }, ...(a.fix ? [{ v: `here, ±${a.fix.acc == null ? '?' : a.fix.acc} m` }] : []), 'on', { v: fmtDate(d) }], value: f.decl,
       body: [{ t: 'big', v: `${fmt(Math.abs(f.decl), 3)}° ${dirWord(f.decl)}`, unit: 'declination' },
         ...(f.valid ? [] : [{ t: 'note', kind: 'err', text: `${fmtDate(d)} is outside ${MODEL}'s window (${VALID_FROM} to ${VALID_TO}); the value is extrapolated and may be off.` }]),
         { t: 'kv', rows: [['inclination', `${fmt(f.incl, 3)}°`], ['total intensity', `${fmt(f.f, 5)} nT`], ['horizontal', `${fmt(f.h, 5)} nT`], ['annual change', `${fmt(f.ddot, 3)}°/year in declination`]] }, SRC(f)],
@@ -12581,8 +12586,88 @@ frame({
   return {  };
 })();
 
-/* ==== src/engine/data/timescale.js ==== */
+/* ==== src/engine/field.js ==== */
 const __m22 = (() => {
+const { tool, frame, noun, fmt, p3, p2, S, clock } = __m0;
+const { compass, conversions } = __m5;
+const { field } = __m20;
+const { fmtDate } = __m4;
+// Field capture (SPEC 13, the field skills): a plane or a line measured with the phone, as a compass-clinometer is
+// used. The card asks for a reading (res.capture); inside the lead-acid app the shell streams the phone's fused
+// orientation and, when the person takes the reading, hands the device angles back through capture() in engine.js,
+// which writes them into args. From then on the card is plain arithmetic over args, like any other: bearing's compass
+// functions turn the angles into dip direction/dip or trend/plunge. North is magnetic as measured; with a saved home,
+// golem corrects it to true with the World Magnetic Model and keeps the correction in args, so a replay agrees.
+
+const ACC = { 3: 'high', 2: 'medium', 1: 'low', 0: 'unreliable: move the phone in a figure of eight to calibrate', '-1': 'no contact with the sensor' };
+const KIND = { plane: { label: 'plane', unit: 'dip direction/dip' }, line: { label: 'line', unit: 'trend/plunge' } };
+const ori = (a, b) => `${p3(a)}/${p2(b)}`;
+// The device's angles (W3C deviceorientation) to a plane or a line, from bearing's own rotation matrix and conversions.
+// Not bearing's compass.planeFromDeviceOrientation / lineFromDeviceOrientation: they flip the vertical axis although
+// bearing's frame is east, north, up, so their answers point the opposite way (a phone facing north with its top edge
+// raised 30° reads 000/30; the plane dips 180/30). Checked by hand in test/field.test.mjs; reported for bearing.js.
+// plane: the screen's normal (the device z axis); line: the phone's long edge (the device y axis). Lower hemisphere.
+const fromDevice = (what, alpha, beta, gamma) => { const R = compass.deviceOrientationMatrix(alpha, beta, gamma); return what === 'line' ? conversions.dcosToLine([R[1], R[4], R[7]]) : conversions.dcosToPlane([R[2], R[5], R[8]]); };
+
+// what the setter freezes at the moment of the reading: the declination at home, if a home is saved
+function declAt(ms) {
+  const home = (S.tables.places ? S.tables.places.rows : []).find(r => r.name === 'home'); if (!home) return null;
+  const f = field(home.lat, home.lon, { date: ms ? new Date(ms) : clock.now() });
+  return { decl: f.decl, lat: home.lat, lon: home.lon };
+}
+
+tool({
+  name: 'measure',
+  skill: { group: 'Field', title: 'Compass capture', on: 'lead-acid sensor · @gcu/bearing', about: 'Measure a plane or a line with the phone, as with a compass-clinometer: lay its back on the plane, or its long edge along the line, and take the reading. In the app only; magnetic north, or true with a saved home.', examples: ['measure bedding', 'measure a lineation'] },
+  topic: a => [a.what === 'line' ? 'Line measured' : 'Plane measured', 2],
+  run: a => {
+    const k = KIND[a.what] || KIND.plane, name = a.name || k.label;
+    const read = ['measure', { v: name }, 'with the phone'];
+    const capture = { kind: a.what === 'line' ? 'line' : 'plane', set: (args, v) => { args.reading = { alpha: +v.alpha, beta: +v.beta, gamma: +v.gamma, acc: v.acc == null ? null : +v.acc, spread: v.spread == null ? null : +v.spread, at: +v.at || 0 }; const d = declAt(args.reading.at); if (d) args.north = d; else delete args.north; } };
+    if (!a.reading) return {
+      read, capture,
+      body: [{ t: 'capture', kind: capture.kind, how: a.what === 'line' ? 'Lay the phone\'s long edge along the line and hold it still.' : 'Lay the phone\'s back flat on the plane, screen up, and hold it still.' },
+        { t: 'sub', text: 'Measuring needs the golem app on a phone: the browser does not give golem the fused compass. Elsewhere, type the plane, as in "plane 045/30".' }],
+      trace: ['wait: a reading from the phone (lead-acid sensor, rotation vector)']
+    };
+    const r = a.reading, [n1, m2] = fromDevice(a.what, r.alpha, r.beta, r.gamma), m1 = ((n1 % 360) + 360) % 360, corr = a.north ? a.north.decl : 0, t1 = ((m1 + corr) % 360 + 360) % 360;
+    const when = r.at ? new Date(r.at) : null;
+    const rows = [['north', a.north ? `true: corrected by ${fmt(Math.abs(corr), 3)}° ${corr < 0 ? 'west' : 'east'} (WMM at home, ${fmt(a.north.lat, 5)}, ${fmt(a.north.lon, 5)})` : 'magnetic, as the phone measured it. Save a home ("home is -19.92, -43.94") and golem corrects to true'],
+      ...(a.north ? [['as measured', `${ori(m1, m2)} magnetic`]] : []),
+      ['compass accuracy', ACC[r.acc] || 'not reported'], ...(r.spread != null ? [['steadiness', `±${fmt(r.spread, 2)}° over the last second`]] : []),
+      ...(when ? [['taken', `${fmtDate(when)}, ${String(when.getHours()).padStart(2, '0')}:${String(when.getMinutes()).padStart(2, '0')}`]] : [])];
+    const net = a.what === 'line' ? { t: 'net', planes: [], lines: [{ tr: t1, pl: m2, label: name }] } : { t: 'net', planes: [{ dd: t1, dip: m2 }], lines: [] };
+    return {
+      read: ['measured', { v: name }, 'with the phone'], value: [t1, m2],
+      body: [{ t: 'big', v: ori(t1, m2), unit: `${k.unit}${a.north ? ' (true)' : ' (magnetic)'}` }, net, { t: 'kv', rows },
+        ...(r.acc != null && r.acc < 2 ? [{ t: 'note', kind: 'err', text: 'The phone reported its compass as low or unreliable when this was taken: move it in a figure of eight, away from steel, and measure again.' }] : []),
+        { t: 'src', text: `@gcu/bearing · vendored · the device orientation matrix, ${a.what === 'line' ? 'its long edge' : 'its screen normal'} to the lower hemisphere · the phone's fused rotation vector` }],
+      trace: [`device orientation α ${fmt(r.alpha, 5)}°, β ${fmt(r.beta, 5)}°, γ ${fmt(r.gamma, 5)}° (accuracy ${r.acc})`, `bearing: device ${a.what === 'line' ? 'y axis' : 'z axis'} in east, north, up → ${ori(m1, m2)} magnetic`, a.north ? `+ declination ${fmt(corr, 5)}° (WMM at home) → ${ori(t1, m2)} true` : 'north: magnetic (no home saved)'],
+      py: `bearing.from_device("${a.what === 'line' ? 'line' : 'plane'}", ${fmt(r.alpha, 6)}, ${fmt(r.beta, 6)}, ${fmt(r.gamma, 6)})${a.north ? ` + ${fmt(corr, 6)}  # declination` : ''}`
+    };
+  }
+});
+
+// "measure bedding", "measure a plane", "take a reading of this joint", "measure the lineation", "compass": the noun is what
+// was measured, and says whether it is a plane or a line
+const LINES = new Set(['line', 'lineation', 'fold axis', 'striation']);
+const forms = w => [w, 'a ' + w, 'the ' + w, 'this ' + w];
+noun({ type: 'measurable', words: { plane: [...forms('plane'), 'surface'], bedding: forms('bedding'), foliation: forms('foliation'), cleavage: forms('cleavage'), joint: forms('joint'), fault: forms('fault'), contact: forms('contact'), vein: forms('vein'),
+    line: forms('line'), lineation: forms('lineation'), 'fold axis': forms('fold axis'), striation: [...forms('striation'), ...forms('slickenline')] },
+  words_pt: { plane: ['plano'], bedding: ['acamamento'], foliation: ['foliação'], joint: ['fratura'], fault: ['falha'], contact: ['contato'], vein: ['veio'], line: ['linha'], lineation: ['lineação'], 'fold axis': ['eixo de dobra'], striation: ['estria'] } });
+frame({
+  name: 'measure', label: 'Measure', words: ['measure', 'take a reading of', 'take a reading', 'capture', 'clino', 'compass', 'measure with the phone'], theme: ['measurable'], required: [],
+  roles: {}, words_pt: ['mede', 'medir', 'mede com o celular'], label_pt: 'Medir',
+  bind: c => {
+    const v = c.theme[0] ? c.theme[0].value : 'plane';
+    return { tool: 'measure', args: { what: LINES.has(v) ? 'line' : 'plane', ...(v !== 'plane' && v !== 'line' ? { name: v } : {}) } };
+  }
+});
+  return { fromDevice };
+})();
+
+/* ==== src/engine/data/timescale.js ==== */
+const __m23 = (() => {
 // The International Chronostratigraphic Chart as a records pack: one row per unit, five ranks.
 // Source: ICS (Cohen, Finney, Gibbard & Fan 2013; updated chart) as served by Macrostrat
 // (macrostrat.org/api/v2/defs/intervals?timescale_id=11, CC BY 4.0), fetched 8 Oct 2026. The Hadean is
@@ -12767,9 +12852,9 @@ const TIMESCALE = [
 })();
 
 /* ==== src/engine/timescale.js ==== */
-const __m23 = (() => {
+const __m24 = (() => {
 const { tool, frame, noun, unit, fmt } = __m0;
-const { TIMESCALE, TIMESCALE_SOURCE } = __m22;
+const { TIMESCALE, TIMESCALE_SOURCE } = __m23;
 // The geologic timescale: the ICS chart as a records pack (data/timescale.js). Ages, bounds, ranks,
 // what a unit sits in, what came before and after, what it is subdivided into, and which unit an age
 // in Ma falls in. Lookups only; the chart is the answer.
@@ -12869,7 +12954,7 @@ noun({ type: 'chron', words: Object.fromEntries(Object.keys(RETIRED).map(k => [k
 })();
 
 /* ==== src/engine/sample.js ==== */
-const __m24 = (() => {
+const __m25 = (() => {
 const { tool, frame, noun, compound, qmod, postmod, unit, fmt } = __m0;
 const { parseUnit } = __m2;
 const { core, sieve } = __m1;
@@ -13009,7 +13094,7 @@ frame({
 })();
 
 /* ==== src/engine/explain.js ==== */
-const __m25 = (() => {
+const __m26 = (() => {
 const { tool, frame, amend, noun, shape, clock, fmt } = __m0;
 // Explainers: formal notation parsed and described, one row per piece. Cron schedules, epoch times,
 // chmod modes, URLs and ECMAScript regular expressions. Each member has a recogniser so a bare
@@ -13384,7 +13469,7 @@ amend({ tools: ['explain'], name: 'explainas', label: 'Explain as', words: [], e
 })();
 
 /* ==== src/vendor/parquet.js ==== */
-const __m26 = (() => {
+const __m27 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/parquet, Parquet read and write over vendored hyparquet and hyparquet-writer, pure JS, minified by its own build, copied from ../auditable/ext/parquet/index.js at auditable 5fa5f72e (MIT; hyparquet MIT).
 // Re-vendor by copying that file here.
 
@@ -13393,9 +13478,9 @@ const e=["BOOLEAN","INT32","INT64","INT96","FLOAT","DOUBLE","BYTE_ARRAY","FIXED_
 })();
 
 /* ==== src/engine/convert.js ==== */
-const __m27 = (() => {
+const __m28 = (() => {
 const { S, tool, frame, amend, noun, fmt } = __m0;
-const { writeParquet } = __m26;
+const { writeParquet } = __m27;
 // Conversions that need no file format reader: hashes, text encodings both ways, and the open table
 // as CSV, TSV or JSON with a save action. Format readers (xlsx, dm, parquet) are the second pass.
 
@@ -13552,7 +13637,7 @@ for (const op of ['encode', 'decode']) amend({ tools: ['encode'], name: `op${op}
 })();
 
 /* ==== src/vendor/plan-calendar.js ==== */
-const __m28 = (() => {
+const __m29 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/plan's calendar engine and Brazilian holidays, copied from
 // ../auditable/ext/plan/src/calendar.js and src/holidays-br.js (MIT). The scheduling half of the package is not here.
 // Re-vendor by copying those two files here again and keeping the single export block at the end.
@@ -13909,10 +13994,10 @@ function brazilMunicipalities() {
 })();
 
 /* ==== src/engine/calendar.js ==== */
-const __m29 = (() => {
+const __m30 = (() => {
 const { S, tool, frame, amend, noun, shape, postmod, unit, clock, iso } = __m0;
 const { findDate, findTime, today, day0, fmtDate, dateWords } = __m4;
-const { isWorkingDay, addWorkingDays, brazilCalendar, federalHolidays } = __m28;
+const { isWorkingDay, addWorkingDays, brazilCalendar, federalHolidays } = __m29;
 // Working days and rosters over @gcu/plan's calendar engine (vendored), and time zones through Intl.
 // The calendar is a slot and is always shown: Brazil's federal holidays, or weekdays only.
 
@@ -14145,7 +14230,7 @@ amend({ tools: ['workdays'], name: 'workcal', label: 'Calendar', words: [], elid
 })();
 
 /* ==== src/engine/estimate.js ==== */
-const __m30 = (() => {
+const __m31 = (() => {
 const { amend, noun, tool, fmt } = __m0;
 const { U } = __m2;
 // Estimates with ranges: arithmetic over intervals by simulation, units carried through, the seed kept
@@ -14320,7 +14405,7 @@ amend({ tools: ['estimate'], name: 'estdist', label: 'Distribution', words: ['as
 })();
 
 /* ==== src/engine/data/elements.js ==== */
-const __m31 = (() => {
+const __m32 = (() => {
 // The elements with their standard atomic weights, abridged to five significant figures.
 // Source: IUPAC Commission on Isotopic Abundances and Atomic Weights (CIAAW), Standard Atomic Weights 2024
 // (ciaaw.org/atomic-weights.htm, the 2021 report with Gd, Lu and Zr revised in 2024), cross-checked against
@@ -14365,9 +14450,9 @@ const ELEMENTS = [
 })();
 
 /* ==== src/engine/chem.js ==== */
-const __m32 = (() => {
+const __m33 = (() => {
 const { tool, frame, noun, shape, postmod, fmt } = __m0;
-const { ELEMENTS, ELEMENTS_SOURCE } = __m31;
+const { ELEMENTS, ELEMENTS_SOURCE } = __m32;
 const { UNIT_TABLE } = __m2;
 // Molar mass, conversion factors and element fractions from a parsed formula over the IUPAC weights;
 // the periodic table lookup. No mineral names: the minerals pack is not here, so a formula is required.
@@ -14526,7 +14611,7 @@ frame({
 })();
 
 /* ==== src/engine/text.js ==== */
-const __m33 = (() => {
+const __m34 = (() => {
 const { tool, frame, amend, noun, qmod, fmt } = __m0;
 // Text tools over a pasted payload: counts and readability, extracted key sentences, and a diff.
 // The payload is what follows the first colon, or every line after the first of a multi-line input;
@@ -14672,7 +14757,7 @@ amend({ tools: ['diff'], name: 'diffunit', label: 'Diff by', words: [], elidable
 })();
 
 /* ==== src/engine/forms.js ==== */
-const __m34 = (() => {
+const __m35 = (() => {
 const { tool, frame, amend, noun } = __m0;
 // The form card: a tool that still needs answers asks for them one at a time; each answer lands in
 // args and is an editable slot, and the result recomputes when any changes. The decision matrix is the
@@ -14749,10 +14834,10 @@ amend({ tools: ['decide'], name: 'score', label: 'Score', words: ['is', 'scores'
 })();
 
 /* ==== src/engine/econ.js ==== */
-const __m35 = (() => {
+const __m36 = (() => {
 const { tool, frame, noun, shape, postmod, qmod, fmt } = __m0;
-const { ELEMENTS } = __m31;
-const { numberAsk, firstNeed } = __m34;
+const { ELEMENTS } = __m32;
+const { numberAsk, firstNeed } = __m35;
 // Sampling theory and mine economics as declared formulas. Every term is a slot; a term the person did
 // not give is asked for, with the conventional value offered first and never applied on its own. Prices
 // are always the person's input. No geostatistics here: these are formulas over given numbers.
@@ -14916,7 +15001,7 @@ frame({
 })();
 
 /* ==== src/engine/log.js ==== */
-const __m36 = (() => {
+const __m37 = (() => {
 const { S, tool, frame, amend, noun, fmt, iso } = __m0;
 const { parseUnit, dimName } = __m2;
 const { findDate, today, fmtDate, dateWords } = __m4;
@@ -15065,7 +15150,7 @@ amend({ tools: ['logAdd'], name: 'logfix', label: 'Correct', words: ['that was',
 })();
 
 /* ==== src/engine/places.js ==== */
-const __m37 = (() => {
+const __m38 = (() => {
 const { S, tool, frame, amend, noun, shape, postmod, fmt, rad, deg } = __m0;
 // Places, distance and UTM. A place is coordinates in the request or a name saved on this device
 // ("home is -19.92, -43.94"); there is no gazetteer and device location is off, so an unknown name is
@@ -15231,11 +15316,11 @@ amend({ tools: ['utm'], name: 'utmband', label: 'Band', words: [], elidable: tru
 })();
 
 /* ==== src/engine/sky.js ==== */
-const __m38 = (() => {
+const __m39 = (() => {
 const { tool, frame, amend, noun, compound, fmt, rad, deg, iso } = __m0;
 const { findDate, today, fmtDate, dateWords } = __m4;
-const { zonesOf, offsetOf } = __m29;
-const { placeOf } = __m37;
+const { zonesOf, offsetOf } = __m30;
+const { placeOf } = __m38;
 // The sun by NOAA's solar position equations (after Meeus), and the moon's phase from the mean
 // synodic cycle, labelled with its accuracy. Times are given in the place's zone when the place name
 // has one, else in UTC and the card says so.
@@ -15317,7 +15402,7 @@ amend({ tools: ['sun'], name: 'sunzone', label: 'Zone', words: [], elidable: tru
 })();
 
 /* ==== src/engine/apply.js ==== */
-const __m39 = (() => {
+const __m40 = (() => {
 const { S, tool, fmt, rad, deg, p3, p2 } = __m0;
 const { whereOf } = __m14;
 const { evaluatePredicate, predicateToString } = __m13;
@@ -15384,7 +15469,7 @@ tool({
 })();
 
 /* ==== src/vendor/ipynb.js ==== */
-const __m40 = (() => {
+const __m41 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/ipynb, copied from ../auditable/ext/ipynb/index.js (MIT). golem uses importNotebook
 // for its import-substitution table only (numpy → natra, pandas → sadpan, …). Re-vendor by copying that file here.
 
@@ -15933,9 +16018,9 @@ function exportNotebook(cells, opts = {}) {
 })();
 
 /* ==== src/engine/python.js ==== */
-const __m41 = (() => {
+const __m42 = (() => {
 const { tool, frame, amend, result, fmt } = __m0;
-const { importNotebook } = __m40;
+const { importNotebook } = __m41;
 // Run and trace Python with adder, on the device. The tool itself stays synchronous: a first run returns a
 // "running" card carrying a job, the runner (a Web Worker in the page, adder in-process in the tests)
 // answers later, and the card is recomputed from the kept result. Replay reruns the code, which is
@@ -16005,7 +16090,7 @@ amend({ tools: ['python'], name: 'pytraceoff', label: 'Run', words: ['no trace',
 })();
 
 /* ==== src/vendor/librarian.js ==== */
-const __m42 = (() => {
+const __m43 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/librarian, the in-process text search (BM25F, fuzzy expansion, snippets, did-you-mean), copied from ../auditable/ext/librarian/index.js at auditable 5fa5f72e (MIT).
 // Re-vendor by copying that file here.
 
@@ -17281,9 +17366,9 @@ const Librarian = {
 })();
 
 /* ==== src/engine/docs.js ==== */
-const __m43 = (() => {
+const __m44 = (() => {
 const { S, tool, frame, amend, noun, postmod } = __m0;
-const { Librarian } = __m42;
+const { Librarian } = __m43;
 // Search my documents (A7). Markdown, plain text and HTML opened with the paperclip are kept on the device,
 // cut into passages (by heading, then by paragraph) and indexed by @gcu/librarian. A search returns
 // passages verbatim with the matched words marked; golem never rewrites them. The index is derived
@@ -17436,9 +17521,9 @@ amend({ tools: ['docPassage'], name: 'docstep', label: 'Passage', words: [], eli
 })();
 
 /* ==== src/engine/recipes.js ==== */
-const __m44 = (() => {
+const __m45 = (() => {
 const { S, tool, frame, noun, session, runTool } = __m0;
-const { listOf } = __m34;
+const { listOf } = __m35;
 // Recipes (A9): a session's plan saved under a name, with the subjects that may change between runs.
 // A recipe is stored as card specs, plain JSON like a session; running it replays every step with the
 // new subjects into a new session, and stops at the first step that no longer reads. Nothing is skipped
@@ -17632,7 +17717,7 @@ session({
 })();
 
 /* ==== src/vendor/sheet.js ==== */
-const __m45 = (() => {
+const __m46 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sheet, copied from ../auditable/ext/sheet/index.js (built from its src/ by @gcu/build, MIT).
 // Re-vendor by copying that file here. Reading is asynchronous (DecompressionStream), so golem converts at open time, not in a tool.
 
@@ -18864,7 +18949,7 @@ const sheet = {
 })();
 
 /* ==== src/vendor/dm.js ==== */
-const __m46 = (() => {
+const __m47 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/dm, the read-only Datamine .dm reader, copied from ../auditable/ext/dm/index.js (MIT).
 // Re-vendor by copying that file here.
 
@@ -19140,10 +19225,10 @@ function readDM(buffer) {
 })();
 
 /* ==== src/engine/formats.js ==== */
-const __m47 = (() => {
-const { sheet } = __m45;
-const { readDM } = __m46;
-const { readParquet, parquetInfo } = __m26;
+const __m48 = (() => {
+const { sheet } = __m46;
+const { readDM } = __m47;
+const { readParquet, parquetInfo } = __m27;
 // Binary table formats, converted to text when a file is opened: xlsx through @gcu/sheet (one text per
 // sheet), Datamine .dm through @gcu/dm, Parquet through @gcu/parquet. Tools stay synchronous and the device keeps the converted text,
 // so a session replays from it. What did not carry over is said on the card.
@@ -19194,7 +19279,7 @@ async function convertBinary(name, buffer) {
 })();
 
 /* ==== src/engine/notes.js ==== */
-const __m48 = (() => {
+const __m49 = (() => {
 const { S, tool, frame } = __m0;
 // Notes and taught words. Both belong to the device and are shared by every session.
 const textOf = c => c.theme[0] && c.theme[0].type === 'text' ? c.theme[0].value : null;
@@ -19245,14 +19330,13 @@ frame({
 })();
 
 /* ==== src/engine/skills.js ==== */
-const __m49 = (() => {
+const __m50 = (() => {
 const { TOOLS, tool, frame } = __m0;
 // The catalog: skills derived from the declarations, planned skills named here, and the packs golem
 // knows about. Examples feed the Skills tab, the "nearest skills" suggestions and the teach vocabulary.
 
 // skills named but not built: a row in the catalog, nothing in the tool table
 tool({ name: 'algebra', planned: true, skill: { group: 'Compute', title: 'Step-by-step algebra', on: 'new package', about: 'Solve and show the derivation. The monorepo has no symbolic algebra yet.', examples: [] } });
-tool({ name: 'compass', planned: true, skill: { group: 'Field', title: 'Compass capture', on: 'lead-acid sensors', about: 'Measure a plane with the phone and add it to a set by voice or text.', examples: [] } });
 tool({ name: 'munsell', planned: true, skill: { group: 'Field', title: 'Munsell from camera', on: '@gcu/swatch', about: 'Point at a rock, get the nearest chip.', examples: [] } });
 tool({ name: 'kinematic', planned: true, skill: { group: 'Field', title: 'Kinematic check', on: 'daylight', about: 'Planar, wedge and toppling tests against a slope face.', examples: [] } });
 tool({ name: 'transform', planned: true, skill: { group: 'Table', title: 'Transform by example', on: 'new package', about: 'Show two examples (BH-001A → 1) and it derives the rule for the column.', examples: [] } });
@@ -19310,11 +19394,11 @@ const SUGGESTIONS = ['pop means population', 'histogram of cu', 'log scale', 'po
 })();
 
 /* ==== src/engine/ontology.js ==== */
-const __m50 = (() => {
+const __m51 = (() => {
 const { FRAMES, LEXICON, S } = __m0;
 const { UNIT_TABLE, COMPOUNDS, DIM, parseUnit, dimName } = __m2;
 const { ELEMENT } = __m14;
-const { TIMESCALE } = __m22;
+const { TIMESCALE } = __m23;
 // The clause ontology, assembled from what golem knows: units from the conversion table, nouns from the
 // sample packs, verb frames from the declarations. Inert data; the build writes it to dist/golem.json.
 // Portuguese synonyms are listed here by hand until packs carry them in their golem facet.
@@ -19373,7 +19457,7 @@ function ontology(only) {
 })();
 
 /* ==== src/vendor/dispatch.js ==== */
-const __m51 = (() => {
+const __m52 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/dispatch, built from ../auditable/ext/dispatch/src/ by its own build.
 // Source of truth: gentropic/auditable ext/dispatch (local clone: ../auditable). Re-vendor by copying
 // ext/dispatch/index.js here after 'node ext/dispatch/build.js'. golem uses the grammar rung only:
@@ -21526,13 +21610,13 @@ const PORTUGUESE = {
 })();
 
 /* ==== src/engine/reading.js ==== */
-const __m52 = (() => {
+const __m53 = (() => {
 const { S, T, TOOLS, FRAMES, tool, frame, amend, session, noun, toolByName, runTool, iso } = __m0;
-const { examples, vocab } = __m49;
-const { ontology } = __m50;
+const { examples, vocab } = __m50;
+const { ontology } = __m51;
 const { calcOf } = __m3;
-const { estimateOf } = __m30;
-const { createEngine, makeSession, ENGLISH } = __m51;
+const { estimateOf } = __m31;
+const { createEngine, makeSession, ENGLISH } = __m52;
 // The reading ladder: context (amendments, meta-intents), grammar (the clause parser, then the regex
 // rules the declarations carry), taught words (device lexicon rewrites, then grammar again). Plus the
 // tools that talk about the session itself: none, why, export.
@@ -21817,7 +21901,7 @@ function sessionRead(raw) {
 })();
 
 /* ==== src/engine/sessions.js ==== */
-const __m53 = (() => {
+const __m54 = (() => {
 const { S, toolByName, runTool, startJobs, clearResults } = __m0;
 // Sessions: stored as plans (card specs), replayed on open, named from the tools that ran.
 // The shell persists whatever `serialize()` returns and feeds it back through `hydrate()`.
@@ -21936,7 +22020,7 @@ function reset() {
 })();
 
 /* ==== src/vendor/sluice/accumulator.js ==== */
-const __m54 = (() => {
+const __m55 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sluice src/accumulator.js, copied from ../auditable/ext/sluice/src/accumulator.js at auditable 3a7b253c.
 // golem vendors sluice's accumulator modules only (src/engine/stream.js): its runner builds expressions with new Function,
 // which golem does not ship outside the Python worker.
@@ -22104,7 +22188,7 @@ function weightedStats() {
 })();
 
 /* ==== src/vendor/sluice/tdigest.js ==== */
-const __m55 = (() => {
+const __m56 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sluice src/tdigest.js, copied from ../auditable/ext/sluice/src/tdigest.js at auditable 3a7b253c.
 // golem vendors sluice's accumulator modules only (src/engine/stream.js): its runner builds expressions with new Function,
 // which golem does not ship outside the Python worker.
@@ -22219,7 +22303,7 @@ function quantile(state, q) {
 })();
 
 /* ==== src/vendor/sluice/histogram.js ==== */
-const __m56 = (() => {
+const __m57 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sluice src/histogram.js, copied from ../auditable/ext/sluice/src/histogram.js at auditable 3a7b253c.
 // golem vendors sluice's accumulator modules only (src/engine/stream.js): its runner builds expressions with new Function,
 // which golem does not ship outside the Python worker.
@@ -22271,14 +22355,14 @@ function cumulativeFromTop(counts) {
 })();
 
 /* ==== src/engine/stream.js ==== */
-const __m57 = (() => {
+const __m58 = (() => {
 const { S, T, fmt, result } = __m0;
 const { colOf, whereSrc, tableFromText, openTable } = __m14;
 const { parsePredicate, evaluatePredicate, predicateToString } = __m13;
 const { NULL_SENTINELS } = __m12;
-const { weightedStats } = __m54;
-const { tdigest, quantile } = __m55;
-const { histogram } = __m56;
+const { weightedStats } = __m55;
+const { tdigest, quantile } = __m56;
+const { histogram } = __m57;
 // Tables too large to hold (SPEC 13.7): a CSV or TSV over 20 MB is typed from its first megabyte by recon, like any
 // table, and its questions are answered by scanning the whole file as a job, through @gcu/sluice's accumulators
 // (mergeable, never holding the rows): Welford and weighted moments, t-digest quantiles, histograms. The shell runs the
@@ -22439,16 +22523,16 @@ for (const k of ['apply', 'tableExport']) T[k] = a => S.table && S.table.streame
 })();
 
 /* ==== src/engine/engine.js ==== */
-const __m58 = (() => {
+const __m59 = (() => {
 const { S, T, runTool, toolByName, startJobs } = __m0;
 const { DOCUMENT } = __m10;
-const { DOCTEXT } = __m43;
-const { bindingsOf, runSteps } = __m44;
+const { DOCTEXT } = __m44;
+const { bindingsOf, runSteps } = __m45;
 const { tableFromText } = __m14;
-const { convertBinary } = __m47;
-const { norm, grammar, context, taught, sessionRead, readingOf, guessRead } = __m52;
-const { current, newSession, renameSession, touch } = __m53;
-const { streamedTable } = __m57;
+const { convertBinary } = __m48;
+const { norm, grammar, context, taught, sessionRead, readingOf, guessRead } = __m53;
+const { current, newSession, renameSession, touch } = __m54;
+const { streamedTable } = __m58;
 // The entry point: submit(raw) reads a request and returns what happened. Cards are recomputed in
 // place by rerun(); answers and slot flips go through it, so args stay the only state that matters.
 
@@ -22476,6 +22560,12 @@ function answer(c, i) {
     return o;
   }
   c.res.ask.set(c.args, o.value); rerun(c); return o;
+}
+// A reading from the device (a compass reading, a position) for a card that asked for one (res.capture): it goes into
+// the card's args through the tool's own setter, so the session keeps it and a replay shows it again, unmeasured.
+function capture(c, v) {
+  const k = c && c.res && c.res.capture; if (!k || v == null || typeof v !== 'object') return null;
+  k.set(c.args, JSON.parse(JSON.stringify(v))); rerun(c); touch(); return c;
 }
 function undo() {
   const c = S.cards.pop(); if (!c) return null;
@@ -22589,11 +22679,11 @@ function seedExamples() {
   newSession(true); ['open assays.csv', 'histogram of cu', 'log scale', 'histogram of au'].forEach(x => submit(x));
   newSession(true); ['0.35 oz per short ton in g/t', 'true thickness of a 14 m intercept, hole 270/60, bedding 045/30', 'remind me to send the samples to the lab on friday at 9', 'pop of mongolia'].forEach(x => submit(x));
 }
-  return { addCard, rerun, flipSlot, answer, undo, submit, preview, hashOf, openStreamed, openFile, openBinary, seedExamples };
+  return { addCard, rerun, flipSlot, answer, capture, undo, submit, preview, hashOf, openStreamed, openFile, openBinary, seedExamples };
 })();
 
 /* ==== src/engine/packs.js ==== */
-const __m59 = (() => {
+const __m60 = (() => {
 const { profilesOf } = __m16;
 // Packs as gcu-library ships them: a .gcudat is a gzipped tar holding gcudat.json (the manifest) and the data files
 // (gcu-library tools/build-gcudat.mjs). Read here with the platform's own gunzip (DecompressionStream, in browsers and
@@ -22700,7 +22790,7 @@ async function compileStrunk(bytes) {
 })();
 
 /* ==== src/vendor/vfs.js ==== */
-const __m60 = (() => {
+const __m61 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/vfs, copied from ../auditable/ext/vfs/index.js (built from its src/ by node ext/vfs/build.js), at
 // auditable 8837da6e. golem's shell keeps sessions, device state, files and packs in it over IndexedDB (src/shell/store.js).
 // golem constructs only IDBBackend and MemoryBackend; the network backends in this bundle (fetch, REST, Dropbox) are
@@ -26511,8 +26601,8 @@ function fromPicker(vfs, destPath, opts) {
 })();
 
 /* ==== src/shell/store.js ==== */
-const __m61 = (() => {
-const { VFS } = __m60;
+const __m62 = (() => {
+const { VFS } = __m61;
 // Where the device keeps golem (SPEC 13.9): @gcu/vfs over IndexedDB, one file per session, one per opened file, the
 // device state and a small meta file, so a session can be exported as itself and nothing has a size cap but the
 // browser's. Only what changed is written. When IndexedDB is not there, the whole state goes to localStorage as before;
@@ -26626,7 +26716,7 @@ function noStore() {
 })();
 
 /* ==== src/vendor/leadacid.js ==== */
-const __m62 = (() => {
+const __m63 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. The lead-acid shell shim, copied from ../auditable/ext/leadacid/index.js
 // (itself vendored from gentropic/lead-acid, lead-acid.js). Re-vendor by copying that file here.
 
@@ -27330,7 +27420,7 @@ function orientationFromRotationVector(v) {
 })();
 
 /* ==== src/vendor/plot.js ==== */
-const __m63 = (() => {
+const __m64 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/plot (matplotlib-shaped plotting; figures leave the worker as draw lists), copied from ../auditable/ext/plot/index.js at auditable 774234c3 (9 Oct 2026, MIT).
 // Loaded only inside the Python worker. Re-vendor by copying that file here.
 
@@ -29364,10 +29454,10 @@ if (typeof window !== 'undefined') {
 })();
 
 /* ==== src/shell/render.js ==== */
-const __m64 = (() => {
+const __m65 = (() => {
 const { fmt } = __m0;
 const { conversions, equalArea } = __m5;
-const { Figure } = __m63;
+const { Figure } = __m64;
 // Rendering. The engine hands over plain blocks; this is the only file that turns them into markup.
 
 const escHtml = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -29450,6 +29540,8 @@ function blockHtml(b) {
     case 'actions': return `<div class="opts">${b.items.map(i => i.href ? `<a class="btn" href="${escHtml(i.href)}" target="_blank" rel="noopener">${escHtml(i.label)}</a>`
       : `<button class="btn${i.go ? ' go' : ''}" type="button" data-act="${escHtml(i.act)}"${i.msg ? ` data-msg="${escHtml(i.msg)}"` : ''}${i.send ? ` data-send="${escHtml(JSON.stringify(i.send))}"` : ''}>${escHtml(i.label)}</button>`).join('')}</div>`;
     case 'net': return svgNet(b);
+    // a reading the card waits for: in the app, a live value and the button that takes it; in a browser, only the words
+    case 'capture': return `<div class="capture" data-kind="${escHtml(b.kind)}"><p class="how">${escHtml(b.how || '')}</p><div class="live" aria-live="off">${b.kind === 'position' ? 'no fix yet' : 'waiting for the compass…'}</div><div class="opts"><button class="btn go" type="button" data-act="take">${b.kind === 'position' ? 'Use my position' : 'Take reading'}</button></div></div>`;
     case 'bars': return b.lo != null ? `<figure class="chart"><canvas data-chart="${escHtml(JSON.stringify(b))}" role="img" aria-label="${escHtml(chartLabel(b))}"></canvas></figure>` : svgBars(b);
     case 'figure': return `<figure class="fig"><canvas data-fig width="${+b.w || 400}" height="${+b.h || 300}" role="img" aria-label="${escHtml(b.label || 'Figure')}"></canvas><figcaption>${escHtml(b.label || 'Figure')}</figcaption></figure>`;
     case 'curve': return svgCurve(b);
@@ -29503,7 +29595,7 @@ function figImage(ctx, x, y, w, h, cols, rows, b64) {
 })();
 
 /* ==== src/vendor/sw-register.js ==== */
-const __m65 = (() => {
+const __m66 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sw's page-side companion, copied from ../auditable/ext/sw/register.js (at auditable 8837da6e).
 
 // @gcu/sw — the page-side companion (ES module). Registration + persistent
@@ -29581,22 +29673,24 @@ function registerGcuSw(opts = {}) {
 })();
 
 /* ==== src/shell/main.js ==== */
-const __m66 = (() => {
+const __m67 = (() => {
 const { S } = __m0;
-const { submit, flipSlot, answer, seedExamples, openFile, openBinary, openStreamed, preview } = __m58;
-const { scanTable, STREAM_OVER } = __m57;
-const { completions } = __m52;
+const { submit, flipSlot, answer, capture, seedExamples, openFile, openBinary, openStreamed, preview } = __m59;
+const { scanTable, STREAM_OVER } = __m58;
+const { completions } = __m53;
+const { fromDevice } = __m22;
+const { conversions } = __m5;
 const { useFactbook, factbookInfo } = __m16;
-const { factbookFromGcudat, factbookProfiles, readGcudat, compileOds, compileStrunk } = __m59;
+const { factbookFromGcudat, factbookProfiles, readGcudat, compileOds, compileStrunk } = __m60;
 const { useBook, bookInfo } = __m17;
-const { BINARY } = __m47;
+const { BINARY } = __m48;
 const { setRunner, onJobDone } = __m0;
-const { sessions, current, newSession, openSession, renameSession, deleteSession, searchHistory, parts, hydrate, onChange, exportSession, importSession, pinCard, branchSession } = __m53;
-const { openStore, putBlob, getBlob } = __m61;
-const { skills, PACKS, STARTERS } = __m49;
-const { shell } = __m62;
-const { escHtml, pad, cardEl, drawCharts } = __m64;
-const { registerGcuSw } = __m65;
+const { sessions, current, newSession, openSession, renameSession, deleteSession, searchHistory, parts, hydrate, onChange, exportSession, importSession, pinCard, branchSession } = __m54;
+const { openStore, putBlob, getBlob } = __m62;
+const { skills, PACKS, STARTERS } = __m50;
+const { shell } = __m63;
+const { escHtml, pad, cardEl, drawCharts } = __m65;
+const { registerGcuSw } = __m66;
 // The shell: wiring, tabs, the session drawer, storage, and the sleep switch. Everything that touches
 // the DOM or the browser lives here or in render.js; the engine never does.
 
@@ -29623,7 +29717,7 @@ setInterval(tick, 500);
 function renderBar() { $('sname').textContent = current().name; }
 function renderStream(focus) {
   $('stream').innerHTML = '';
-  S.cards.forEach(c => $('stream').appendChild(cardEl(c))); drawCharts($('stream'));
+  S.cards.forEach(c => $('stream').appendChild(cardEl(c))); drawCharts($('stream')); armCaptures();
   $('exlbl').hidden = !current().example; welcome(); tick(); renderBar(); renderPacks(); showTab('ask');
   const el = focus && $('stream').querySelector(`[data-id="${focus}"]`);
   if (el) el.scrollIntoView({ block: 'start' }); else $('v-ask').scrollTop = S.cards.length > 1 ? $('v-ask').scrollHeight : 0;
@@ -29690,7 +29784,7 @@ function show(o) {
     case 'undo': { const el = $('stream').querySelector(`[data-id="${o.card.id}"]`); if (el) el.remove(); welcome(); status(`Removed #${pad(o.card.id)}: ${o.card.raw}`); break; }
     case 'nothing': status(o.msg); break;
     case 'card': {
-      const el = cardEl(o.card); $('stream').appendChild(el); drawCharts(el); welcome(); if (voice.all) say(el); showTab('ask'); el.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+      const el = cardEl(o.card); $('stream').appendChild(el); drawCharts(el); welcome(); armCaptures(); if (voice.all) say(el); showTab('ask'); el.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
       // for a screen reader: what was read and the start of the answer, once
       const ans = el.querySelector('.ans'), read = el.querySelector('.read');
       $('sr').textContent = `#${pad(o.card.id)}, ${(read ? read.innerText : o.card.raw).replace(/\s+/g, ' ')}. ${ans ? ans.innerText.replace(/\s+/g, ' ').slice(0, 220) : ''}`;
@@ -29778,6 +29872,60 @@ function voiceItem() {
   const hear = voice.hear ? 'The mic in the box listens with the phone\'s own recognizer, offline; what it hears goes into the box for you to check.' : 'No offline recognizer for English on this phone, so there is no mic.';
   const out = voice.say ? `Answers can be read aloud with the phone's offline voices.</p><div class="opts"><button class="btn${voice.all ? ' go' : ''}" type="button" id="say-all" aria-pressed="${voice.all}">${voice.all ? 'Reading every answer aloud' : 'Read every answer aloud'}</button></div>` : 'No offline voice for English, so nothing is read aloud.</p>';
   return `<div class="item"><h3>Voice</h3><p>${hear} ${out}</div>`;
+}
+/* ── field capture, in the app: the phone's fused orientation for a plane or a line, one position fix. A card that waits
+   for a reading (res.capture) shows it live; the reading taken goes into the card's args (capture() in the engine). ── */
+if (inApp) document.documentElement.dataset.app = '1';
+const ACCW = { 3: 'high', 2: 'medium', 1: 'low', 0: 'unreliable', '-1': 'no sensor' };
+let orient = null, samples = [];
+const pendingCaptures = () => S.cards.filter(c => c.res && c.res.capture && ['plane', 'line'].includes(c.res.capture.kind));
+const angle = (u, v) => Math.acos(Math.max(-1, Math.min(1, Math.abs(u[0] * v[0] + u[1] * v[1] + u[2] * v[2])))) * 180 / Math.PI;
+const vecOf = (what, al, be, ga) => { const [x, y] = fromDevice(what, al, be, ga); return what === 'line' ? conversions.lineToDcos(x, y) : conversions.planeToDcos(x, y); };
+// keep the compass running while a card on screen waits for a plane or a line, and only then
+async function armCaptures() {
+  if (!inApp) return;
+  const want = pendingCaptures().length > 0;
+  if (!want && orient) { orient.close(); orient = null; samples = []; return; }
+  if (!want || orient) { paintCaptures(); return; }
+  try {
+    orient = await shell.orientation({ rateHz: 20 });
+    orient.on(o => { samples.push({ alpha: o.alpha, beta: o.beta, gamma: o.gamma, acc: o.accuracy, t: Date.now() }); samples = samples.filter(s => s.t > Date.now() - 1000); paintCaptures(); })
+      .onClose(() => { orient = null; });
+  } catch (e) { orient = null; $('stream').querySelectorAll('.capture .live').forEach(l => { l.textContent = 'The compass is not available here.'; }); }
+}
+function paintCaptures() {
+  const s = samples[samples.length - 1];
+  for (const c of pendingCaptures()) {
+    const live = cardOf(c.id) && cardOf(c.id).querySelector('.capture .live'); if (!live || !s) continue;
+    const [x, y] = fromDevice(c.res.capture.kind, s.alpha, s.beta, s.gamma);
+    live.innerHTML = `${String(Math.round(((x % 360) + 360) % 360)).padStart(3, '0')}/${String(Math.round(y)).padStart(2, '0')}<small>magnetic · compass ${escHtml(ACCW[s.acc] || 'not reported')}</small>`;
+  }
+}
+// the steadiest reading of the last second: the sample nearest the others, and how far the farthest was
+function takeReading(c) {
+  const kind = c.res.capture.kind;
+  if (!samples.length) { status('No reading from the compass yet: hold the phone still a moment.'); return; }
+  const vs = samples.map(s => vecOf(kind, s.alpha, s.beta, s.gamma));
+  let best = 0, bestSum = Infinity;
+  vs.forEach((v, i) => { const sum = vs.reduce((a, w) => a + angle(v, w), 0); if (sum < bestSum) { bestSum = sum; best = i; } });
+  const s = samples[best], spread = Math.max(...vs.map(w => angle(vs[best], w)));
+  capture(c, { alpha: s.alpha, beta: s.beta, gamma: s.gamma, acc: s.acc, spread: Math.round(spread * 10) / 10, at: s.t });
+  replaceCard(c); armCaptures(); status(`Measured. ${spread > 2 ? 'The phone moved while measuring; hold it still for a steadier reading.' : ''}`.trim());
+}
+// one position fix: the first good one in 15 seconds, or the best of them
+async function takePosition(c) {
+  const live = cardOf(c.id) && cardOf(c.id).querySelector('.capture .live'), show = t => { if (live) live.textContent = t; };
+  let best = null, st = null;
+  try {
+    st = await shell.gnss.location({ minMs: 1000 }); show('Waiting for a fix…');
+    await new Promise(done => {
+      const stop = setTimeout(done, 15000);
+      st.on('fix', d => { const f = data(d); if (f.lat == null) return; if (!best || (f.acc != null && f.acc < best.acc)) best = f; show(`±${Math.round(f.acc)} m…`); if (f.acc != null && f.acc <= 20) { clearTimeout(stop); done(); } });
+    });
+  } catch (e) { show(''); status(e.status === 403 || (e.info && e.info.error === 'permission') ? 'Position needs the location permission: allow it in the dialog, or in the app\'s settings.' : `No position: ${e.message}`); return; }
+  finally { if (st) st.close(); }
+  if (!best) { show('No fix. Go where the sky is open and try again.'); return; }
+  capture(c, { lat: best.lat, lon: best.lon, acc: best.acc, at: best.t || Date.now() }); replaceCard(c); status(`Position taken, ±${Math.round(best.acc)} m.`);
 }
 function appItem() {
   if (inApp) return '<div class="item"><h3>This app</h3><p>Installed as an Android app through lead-acid. It has no network permission and checks for nothing: a new version comes as a new APK.</p></div>';
@@ -30055,6 +30203,7 @@ $('stream').addEventListener('click', e => {
   else if (act === 'skills') showTab('skills');
   else if (['copyans', 'edit', 'pin', 'branch'].includes(act)) cardAction(c, act);
   else if (act === 'say') say(b.closest('.card'));
+  else if (act === 'take' && c.res.capture) { if (c.res.capture.kind === 'position') takePosition(c); else takeReading(c); }
   else if (act === 'handoff') {
     // inside lead-acid: the allowlisted intent, the other app opens for the person to confirm; in a browser: what it would do
     const say = (text, kind) => { const n = document.createElement('div'); n.className = 'note ' + kind; n.textContent = text; b.replaceWith(n); };

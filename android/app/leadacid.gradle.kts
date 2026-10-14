@@ -6,6 +6,8 @@ dependencies {
     "implementation"(project(":plugin-speech"))
     "implementation"(project(":plugin-tts"))
     "implementation"(project(":plugin-intake"))
+    "implementation"(project(":plugin-sensor"))
+    "implementation"(project(":plugin-gnss"))
 }
 
 // The artifact, copied from the web build at every build (never committed under src/): dist/golem.html

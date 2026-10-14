@@ -6,6 +6,8 @@
     "intent",
     "speech",
     "tts",
-    "intake"
+    "intake",
+    "sensor",
+    "gnss"
   ]
 }

@@ -188,7 +188,7 @@ Status: **live** = works in `src/` today; **planned** = named, not built.
 | Field | Magnetic declination, magnetic and true bearings | `@gcu/wmm` vendored (8 Oct 2026); grid north needs UTM, planned | `@gcu/wmm` |
 | Field | Core and sample arithmetic: sample mass from core size, sieve sizes, specific gravity, recovery and RQD | `@gcu/units` vendored for its DCDMA and sieve tables (8 Oct 2026); the arithmetic is golem's | `@gcu/units` |
 | Field | Mineral identification key | removed 8 Oct 2026 until a mineral dataset with a clear licence is chosen | minerals pack; question choice could use `@gcu/learn` trees |
-| Field | Compass capture from phone sensors | planned | lead-acid sensor route (does not exist yet) |
+| Field | Compass capture from phone sensors | live in the app (14 Oct 2026): a plane or a line, magnetic or true with a home | lead-acid `sensor`, `@gcu/bearing`, `@gcu/wmm` |
 | Field | Colour from camera to Munsell | planned | swatch (not found under `ext/`) |
 | Field | Kinematic slope check | planned | daylight / `@gcu/bearing` |
 | Table | Open, type and validate a table | live (synthetic data) | `@gcu/recon`, `@gcu/sadpan`, `@gcu/sluice`, `@gcu/dm` |
@@ -285,9 +285,11 @@ Adding to the calendar needs no Google API and no network. golem fills the field
 | New contact | `ContactsContract.Intents.Insert` | none |
 | Share a result | `ACTION_SEND` | none |
 | Voice input | the lead-acid `speech` plugin: the phone's on-device recognizer only, never the networked one. In the app since 14 Oct 2026: the mic in the box fills it with what was heard, and the preview shows the reading; it runs on Enter, like anything typed. Not in a browser, whose speech services may send the audio away | `RECORD_AUDIO` (runtime, asked on the first tap) |
+| Compass capture | the lead-acid `sensor` plugin: the phone's fused rotation vector. "measure bedding" (a plane, a joint, a lineation…) shows the reading live and takes the steadiest of the last second; the angles go into the card's args, and bearing's matrix and conversions give dip direction/dip or trend/plunge (14 Oct 2026; bearing's own compass.planeFromDeviceOrientation reads 180° off, reported). Magnetic, or true with a saved home (WMM, kept in args) | none |
+| Position | the lead-acid `gnss` plugin: one fix on a tap ("declination here"), kept in the card; the plugin's background logger, its foreground service and notification are removed from golem's manifest | `ACCESS_FINE_LOCATION` (runtime, asked on the first tap) |
 | Voice output | the lead-acid `tts` plugin: the phone's offline voices only. A card's "say" reads what was read and the answer, without sources; "read every answer aloud" is a setting on the device | none |
 
-Default to the user-confirms route: the app then requests no dangerous permission but the microphone, and that one only when voice is first used.
+Default to the user-confirms route: the app then requests no dangerous permission but the microphone and location, each only when voice or a position is first used.
 
 **The intent route.** lead-acid's `intent` plugin (verified on the S24+, 2026) is the route this section asked for: `shell.intent.send(name, fields)` with `name` from a fixed allowlist (`calendar.insert`, `clock.timer`, `clock.alarm`, `map.view`, `dial`, `sendto`, `contact.insert`) and typed fields; the shell builds the intent itself, and the page never passes a raw action string or URI scheme.
 

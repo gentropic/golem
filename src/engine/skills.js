@@ -4,7 +4,6 @@ import { TOOLS, tool, frame } from './core.js';
 
 // skills named but not built: a row in the catalog, nothing in the tool table
 tool({ name: 'algebra', planned: true, skill: { group: 'Compute', title: 'Step-by-step algebra', on: 'new package', about: 'Solve and show the derivation. The monorepo has no symbolic algebra yet.', examples: [] } });
-tool({ name: 'compass', planned: true, skill: { group: 'Field', title: 'Compass capture', on: 'lead-acid sensors', about: 'Measure a plane with the phone and add it to a set by voice or text.', examples: [] } });
 tool({ name: 'munsell', planned: true, skill: { group: 'Field', title: 'Munsell from camera', on: '@gcu/swatch', about: 'Point at a rock, get the nearest chip.', examples: [] } });
 tool({ name: 'kinematic', planned: true, skill: { group: 'Field', title: 'Kinematic check', on: 'daylight', about: 'Planar, wedge and toppling tests against a slope face.', examples: [] } });
 tool({ name: 'transform', planned: true, skill: { group: 'Table', title: 'Transform by example', on: 'new package', about: 'Show two examples (BH-001A → 1) and it derives the rule for the column.', examples: [] } });

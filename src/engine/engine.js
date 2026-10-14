@@ -12,6 +12,7 @@ import './books.js';
 import './device.js';
 import './structure.js';
 import './geo.js';
+import './field.js';
 import './timescale.js';
 import './sample.js';
 import './explain.js';
@@ -61,6 +62,12 @@ export function answer(c, i) {
     return o;
   }
   c.res.ask.set(c.args, o.value); rerun(c); return o;
+}
+// A reading from the device (a compass reading, a position) for a card that asked for one (res.capture): it goes into
+// the card's args through the tool's own setter, so the session keeps it and a replay shows it again, unmeasured.
+export function capture(c, v) {
+  const k = c && c.res && c.res.capture; if (!k || v == null || typeof v !== 'object') return null;
+  k.set(c.args, JSON.parse(JSON.stringify(v))); rerun(c); touch(); return c;
 }
 export function undo() {
   const c = S.cards.pop(); if (!c) return null;

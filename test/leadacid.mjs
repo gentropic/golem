@@ -71,6 +71,17 @@ await page.evaluate(() => window.__bench.intake([{ kind: 'text', text: 'mean cu 
 check(await page.inputValue('#q') === 'mean cu by hole', 'shared text goes into the box, not run');
 await page.fill('#q', '');
 
+// field capture: a plane from the phone's fused orientation (the bench's synthetic rotation vector), and one position fix
+await page.fill('#q', 'measure bedding'); await page.press('#q', 'Enter'); await page.waitForTimeout(700);
+const cap = page.locator('#stream .card').last();
+check(/\d{3}\/\d{2}\s*magnetic/.test(await cap.locator('.capture .live').textContent()), `a card waiting for a plane shows the compass live (${(await cap.locator('.capture .live').textContent()).trim()})`);
+await cap.locator('[data-act="take"]').click(); await page.waitForTimeout(200);
+check(/measured bedding with the phone/.test(await cap.textContent()) && /dip direction\/dip \(magnetic\)/.test(await cap.textContent()) && !(await cap.locator('.capture').count()), 'Take reading turns it into the measured plane');
+await page.fill('#q', 'declination here'); await page.press('#q', 'Enter'); await page.waitForTimeout(200);
+const hereCard = page.locator('#stream .card').last();
+await hereCard.locator('[data-act="take"]').click(); await page.waitForTimeout(1600);
+check(/declination at -23\.52, -46\.19 here, ±5 m/.test(await hereCard.textContent()), `Use my position takes one fix into the card (${(await hereCard.locator('.read').textContent()).replace(/\s+/g, ' ')})`);
+
 // the app has no network permission: no service worker, no library buttons, packs through the paperclip
 await page.evaluate(() => document.querySelector('[data-tab="packs"]').click()); await page.waitForTimeout(200);
 const drawer = await page.textContent('#v-packs');

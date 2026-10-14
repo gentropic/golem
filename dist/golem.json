@@ -2368,6 +2368,123 @@
       }
     },
     {
+      "type": "measurable",
+      "words": {
+        "plane": [
+          "plane",
+          "a plane",
+          "the plane",
+          "this plane",
+          "surface"
+        ],
+        "bedding": [
+          "bedding",
+          "a bedding",
+          "the bedding",
+          "this bedding"
+        ],
+        "foliation": [
+          "foliation",
+          "a foliation",
+          "the foliation",
+          "this foliation"
+        ],
+        "cleavage": [
+          "cleavage",
+          "a cleavage",
+          "the cleavage",
+          "this cleavage"
+        ],
+        "joint": [
+          "joint",
+          "a joint",
+          "the joint",
+          "this joint"
+        ],
+        "fault": [
+          "fault",
+          "a fault",
+          "the fault",
+          "this fault"
+        ],
+        "contact": [
+          "contact",
+          "a contact",
+          "the contact",
+          "this contact"
+        ],
+        "vein": [
+          "vein",
+          "a vein",
+          "the vein",
+          "this vein"
+        ],
+        "line": [
+          "line",
+          "a line",
+          "the line",
+          "this line"
+        ],
+        "lineation": [
+          "lineation",
+          "a lineation",
+          "the lineation",
+          "this lineation"
+        ],
+        "fold axis": [
+          "fold axis",
+          "a fold axis",
+          "the fold axis",
+          "this fold axis"
+        ],
+        "striation": [
+          "striation",
+          "a striation",
+          "the striation",
+          "this striation",
+          "slickenline",
+          "a slickenline",
+          "the slickenline",
+          "this slickenline"
+        ]
+      },
+      "words_pt": {
+        "plane": [
+          "plano"
+        ],
+        "bedding": [
+          "acamamento"
+        ],
+        "foliation": [
+          "foliação"
+        ],
+        "joint": [
+          "fratura"
+        ],
+        "fault": [
+          "falha"
+        ],
+        "contact": [
+          "contato"
+        ],
+        "vein": [
+          "veio"
+        ],
+        "line": [
+          "linha"
+        ],
+        "lineation": [
+          "lineação"
+        ],
+        "fold axis": [
+          "eixo de dobra"
+        ],
+        "striation": [
+          "estria"
+        ]
+      }
+    },
+    {
       "type": "chronpart",
       "words": {
         "age": [
@@ -9566,6 +9683,30 @@
         }
       },
       "label_pt": "Rumo"
+    },
+    {
+      "name": "measure",
+      "label": "Measure",
+      "words": [
+        "measure",
+        "take a reading of",
+        "take a reading",
+        "capture",
+        "clino",
+        "compass",
+        "measure with the phone"
+      ],
+      "theme": [
+        "measurable"
+      ],
+      "required": [],
+      "roles": {},
+      "words_pt": [
+        "mede",
+        "medir",
+        "mede com o celular"
+      ],
+      "label_pt": "Medir"
     },
     {
       "name": "date",

@@ -83,6 +83,8 @@ function blockHtml(b) {
     case 'actions': return `<div class="opts">${b.items.map(i => i.href ? `<a class="btn" href="${escHtml(i.href)}" target="_blank" rel="noopener">${escHtml(i.label)}</a>`
       : `<button class="btn${i.go ? ' go' : ''}" type="button" data-act="${escHtml(i.act)}"${i.msg ? ` data-msg="${escHtml(i.msg)}"` : ''}${i.send ? ` data-send="${escHtml(JSON.stringify(i.send))}"` : ''}>${escHtml(i.label)}</button>`).join('')}</div>`;
     case 'net': return svgNet(b);
+    // a reading the card waits for: in the app, a live value and the button that takes it; in a browser, only the words
+    case 'capture': return `<div class="capture" data-kind="${escHtml(b.kind)}"><p class="how">${escHtml(b.how || '')}</p><div class="live" aria-live="off">${b.kind === 'position' ? 'no fix yet' : 'waiting for the compass…'}</div><div class="opts"><button class="btn go" type="button" data-act="take">${b.kind === 'position' ? 'Use my position' : 'Take reading'}</button></div></div>`;
     case 'bars': return b.lo != null ? `<figure class="chart"><canvas data-chart="${escHtml(JSON.stringify(b))}" role="img" aria-label="${escHtml(chartLabel(b))}"></canvas></figure>` : svgBars(b);
     case 'figure': return `<figure class="fig"><canvas data-fig width="${+b.w || 400}" height="${+b.h || 300}" role="img" aria-label="${escHtml(b.label || 'Figure')}"></canvas><figcaption>${escHtml(b.label || 'Figure')}</figcaption></figure>`;
     case 'curve': return svgCurve(b);

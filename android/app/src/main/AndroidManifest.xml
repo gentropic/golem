@@ -5,7 +5,14 @@
   and providers from the plugin modules it depends on. Requesting a permission
   HERE would be the smell: it belongs in a plugin.
 -->
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- golem takes one position fix, on a tap ("declination here"); it never logs in the background. The gnss plugin's
+         logger and what it needs are removed: no foreground service, no notification. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" tools:node="remove" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" tools:node="remove" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" tools:node="remove" />
 
     <application
         android:label="golem"
@@ -41,5 +48,6 @@
                 <data android:mimeType="image/vnd.dxf" />
             </intent-filter>
         </activity>
+        <service android:name="org.gentropic.leadacid.gnss.GnssLogService" tools:node="remove" />
     </application>
 </manifest>

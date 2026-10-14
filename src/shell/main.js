@@ -1,9 +1,11 @@
 // The shell: wiring, tabs, the session drawer, storage, and the sleep switch. Everything that touches
 // the DOM or the browser lives here or in render.js; the engine never does.
 import { S } from '../engine/core.js';
-import { submit, flipSlot, answer, seedExamples, openFile, openBinary, openStreamed, preview } from '../engine/engine.js';
+import { submit, flipSlot, answer, capture, seedExamples, openFile, openBinary, openStreamed, preview } from '../engine/engine.js';
 import { scanTable, STREAM_OVER } from '../engine/stream.js';
 import { completions } from '../engine/reading.js';
+import { fromDevice } from '../engine/field.js';
+import { conversions } from '../vendor/bearing.js';
 import { useFactbook, factbookInfo } from '../engine/factbook.js';
 import { factbookFromGcudat, factbookProfiles, readGcudat, compileOds, compileStrunk } from '../engine/packs.js';
 import { useBook, bookInfo } from '../engine/books.js';
@@ -39,7 +41,7 @@ setInterval(tick, 500);
 function renderBar() { $('sname').textContent = current().name; }
 function renderStream(focus) {
   $('stream').innerHTML = '';
-  S.cards.forEach(c => $('stream').appendChild(cardEl(c))); drawCharts($('stream'));
+  S.cards.forEach(c => $('stream').appendChild(cardEl(c))); drawCharts($('stream')); armCaptures();
   $('exlbl').hidden = !current().example; welcome(); tick(); renderBar(); renderPacks(); showTab('ask');
   const el = focus && $('stream').querySelector(`[data-id="${focus}"]`);
   if (el) el.scrollIntoView({ block: 'start' }); else $('v-ask').scrollTop = S.cards.length > 1 ? $('v-ask').scrollHeight : 0;
@@ -106,7 +108,7 @@ function show(o) {
     case 'undo': { const el = $('stream').querySelector(`[data-id="${o.card.id}"]`); if (el) el.remove(); welcome(); status(`Removed #${pad(o.card.id)}: ${o.card.raw}`); break; }
     case 'nothing': status(o.msg); break;
     case 'card': {
-      const el = cardEl(o.card); $('stream').appendChild(el); drawCharts(el); welcome(); if (voice.all) say(el); showTab('ask'); el.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+      const el = cardEl(o.card); $('stream').appendChild(el); drawCharts(el); welcome(); armCaptures(); if (voice.all) say(el); showTab('ask'); el.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
       // for a screen reader: what was read and the start of the answer, once
       const ans = el.querySelector('.ans'), read = el.querySelector('.read');
       $('sr').textContent = `#${pad(o.card.id)}, ${(read ? read.innerText : o.card.raw).replace(/\s+/g, ' ')}. ${ans ? ans.innerText.replace(/\s+/g, ' ').slice(0, 220) : ''}`;
@@ -194,6 +196,60 @@ function voiceItem() {
   const hear = voice.hear ? 'The mic in the box listens with the phone\'s own recognizer, offline; what it hears goes into the box for you to check.' : 'No offline recognizer for English on this phone, so there is no mic.';
   const out = voice.say ? `Answers can be read aloud with the phone's offline voices.</p><div class="opts"><button class="btn${voice.all ? ' go' : ''}" type="button" id="say-all" aria-pressed="${voice.all}">${voice.all ? 'Reading every answer aloud' : 'Read every answer aloud'}</button></div>` : 'No offline voice for English, so nothing is read aloud.</p>';
   return `<div class="item"><h3>Voice</h3><p>${hear} ${out}</div>`;
+}
+/* ── field capture, in the app: the phone's fused orientation for a plane or a line, one position fix. A card that waits
+   for a reading (res.capture) shows it live; the reading taken goes into the card's args (capture() in the engine). ── */
+if (inApp) document.documentElement.dataset.app = '1';
+const ACCW = { 3: 'high', 2: 'medium', 1: 'low', 0: 'unreliable', '-1': 'no sensor' };
+let orient = null, samples = [];
+const pendingCaptures = () => S.cards.filter(c => c.res && c.res.capture && ['plane', 'line'].includes(c.res.capture.kind));
+const angle = (u, v) => Math.acos(Math.max(-1, Math.min(1, Math.abs(u[0] * v[0] + u[1] * v[1] + u[2] * v[2])))) * 180 / Math.PI;
+const vecOf = (what, al, be, ga) => { const [x, y] = fromDevice(what, al, be, ga); return what === 'line' ? conversions.lineToDcos(x, y) : conversions.planeToDcos(x, y); };
+// keep the compass running while a card on screen waits for a plane or a line, and only then
+async function armCaptures() {
+  if (!inApp) return;
+  const want = pendingCaptures().length > 0;
+  if (!want && orient) { orient.close(); orient = null; samples = []; return; }
+  if (!want || orient) { paintCaptures(); return; }
+  try {
+    orient = await shell.orientation({ rateHz: 20 });
+    orient.on(o => { samples.push({ alpha: o.alpha, beta: o.beta, gamma: o.gamma, acc: o.accuracy, t: Date.now() }); samples = samples.filter(s => s.t > Date.now() - 1000); paintCaptures(); })
+      .onClose(() => { orient = null; });
+  } catch (e) { orient = null; $('stream').querySelectorAll('.capture .live').forEach(l => { l.textContent = 'The compass is not available here.'; }); }
+}
+function paintCaptures() {
+  const s = samples[samples.length - 1];
+  for (const c of pendingCaptures()) {
+    const live = cardOf(c.id) && cardOf(c.id).querySelector('.capture .live'); if (!live || !s) continue;
+    const [x, y] = fromDevice(c.res.capture.kind, s.alpha, s.beta, s.gamma);
+    live.innerHTML = `${String(Math.round(((x % 360) + 360) % 360)).padStart(3, '0')}/${String(Math.round(y)).padStart(2, '0')}<small>magnetic · compass ${escHtml(ACCW[s.acc] || 'not reported')}</small>`;
+  }
+}
+// the steadiest reading of the last second: the sample nearest the others, and how far the farthest was
+function takeReading(c) {
+  const kind = c.res.capture.kind;
+  if (!samples.length) { status('No reading from the compass yet: hold the phone still a moment.'); return; }
+  const vs = samples.map(s => vecOf(kind, s.alpha, s.beta, s.gamma));
+  let best = 0, bestSum = Infinity;
+  vs.forEach((v, i) => { const sum = vs.reduce((a, w) => a + angle(v, w), 0); if (sum < bestSum) { bestSum = sum; best = i; } });
+  const s = samples[best], spread = Math.max(...vs.map(w => angle(vs[best], w)));
+  capture(c, { alpha: s.alpha, beta: s.beta, gamma: s.gamma, acc: s.acc, spread: Math.round(spread * 10) / 10, at: s.t });
+  replaceCard(c); armCaptures(); status(`Measured. ${spread > 2 ? 'The phone moved while measuring; hold it still for a steadier reading.' : ''}`.trim());
+}
+// one position fix: the first good one in 15 seconds, or the best of them
+async function takePosition(c) {
+  const live = cardOf(c.id) && cardOf(c.id).querySelector('.capture .live'), show = t => { if (live) live.textContent = t; };
+  let best = null, st = null;
+  try {
+    st = await shell.gnss.location({ minMs: 1000 }); show('Waiting for a fix…');
+    await new Promise(done => {
+      const stop = setTimeout(done, 15000);
+      st.on('fix', d => { const f = data(d); if (f.lat == null) return; if (!best || (f.acc != null && f.acc < best.acc)) best = f; show(`±${Math.round(f.acc)} m…`); if (f.acc != null && f.acc <= 20) { clearTimeout(stop); done(); } });
+    });
+  } catch (e) { show(''); status(e.status === 403 || (e.info && e.info.error === 'permission') ? 'Position needs the location permission: allow it in the dialog, or in the app\'s settings.' : `No position: ${e.message}`); return; }
+  finally { if (st) st.close(); }
+  if (!best) { show('No fix. Go where the sky is open and try again.'); return; }
+  capture(c, { lat: best.lat, lon: best.lon, acc: best.acc, at: best.t || Date.now() }); replaceCard(c); status(`Position taken, ±${Math.round(best.acc)} m.`);
 }
 function appItem() {
   if (inApp) return '<div class="item"><h3>This app</h3><p>Installed as an Android app through lead-acid. It has no network permission and checks for nothing: a new version comes as a new APK.</p></div>';
@@ -471,6 +527,7 @@ $('stream').addEventListener('click', e => {
   else if (act === 'skills') showTab('skills');
   else if (['copyans', 'edit', 'pin', 'branch'].includes(act)) cardAction(c, act);
   else if (act === 'say') say(b.closest('.card'));
+  else if (act === 'take' && c.res.capture) { if (c.res.capture.kind === 'position') takePosition(c); else takeReading(c); }
   else if (act === 'handoff') {
     // inside lead-acid: the allowlisted intent, the other app opens for the person to confirm; in a browser: what it would do
     const say = (text, kind) => { const n = document.createElement('div'); n.className = 'note ' + kind; n.textContent = text; b.replaceWith(n); };

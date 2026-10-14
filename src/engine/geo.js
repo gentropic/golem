@@ -16,11 +16,13 @@ tool({
   skill: { group: 'Field', title: 'Magnetic declination', on: '@gcu/wmm', about: 'The World Magnetic Model at a place and date, and magnetic to true bearings.', examples: ['declination at -19.92, -43.94', '045 magnetic to true at -19.92, -43.94'] },
   topic: () => ['Declination', 2],
   run: a => {
-    if (a.here) return { read: ['declination', { v: 'here' }], body: [whereNote], trace: ['no place: device location is off and no coordinates were given'] };
+    // "here": in the app the card asks for one position fix (lead-acid's gnss, asked for on the tap), kept in args
+    if (a.here) return { read: ['declination', { v: 'here' }], capture: { kind: 'position', set: (args, v) => { delete args.here; args.lat = +(+v.lat).toFixed(5); args.lon = +(+v.lon).toFixed(5); args.fix = { acc: v.acc == null ? null : Math.round(+v.acc), at: +v.at || 0 }; } },
+      body: [{ t: 'capture', kind: 'position', how: 'One position fix from the phone, kept with this card. Nothing is sent anywhere.' }, { t: 'sub', text: 'Outside the app there is no position: give coordinates, as in "declination at -19.92, -43.94".' }], trace: ['wait: a position from the phone (lead-acid gnss), or coordinates'] };
     if (Math.abs(a.lat) > 90 || Math.abs(a.lon) > 180) return null;
     const { d, f } = decl(a);
     return {
-      read: ['declination at', { v: `${a.lat}, ${a.lon}` }, 'on', { v: fmtDate(d) }], value: f.decl,
+      read: ['declination at', { v: `${a.lat}, ${a.lon}` }, ...(a.fix ? [{ v: `here, ±${a.fix.acc == null ? '?' : a.fix.acc} m` }] : []), 'on', { v: fmtDate(d) }], value: f.decl,
       body: [{ t: 'big', v: `${fmt(Math.abs(f.decl), 3)}° ${dirWord(f.decl)}`, unit: 'declination' },
         ...(f.valid ? [] : [{ t: 'note', kind: 'err', text: `${fmtDate(d)} is outside ${MODEL}'s window (${VALID_FROM} to ${VALID_TO}); the value is extrapolated and may be off.` }]),
         { t: 'kv', rows: [['inclination', `${fmt(f.incl, 3)}°`], ['total intensity', `${fmt(f.f, 5)} nT`], ['horizontal', `${fmt(f.h, 5)} nT`], ['annual change', `${fmt(f.ddot, 3)}°/year in declination`]] }, SRC(f)],
