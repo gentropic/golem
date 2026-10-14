@@ -13,10 +13,28 @@ function variables() {
   return Object.fromEntries(cols.map(c => [c.name, uniq([c.name.toLowerCase(), ...(c.analyte ? [c.analyte.toLowerCase(), ELEMENT[c.analyte]] : [])].filter(Boolean))]));
 }
 
+// the units in Portuguese: the names a Brazilian geologist says, beside the symbols both languages share
+const UNITS_PT = { m: ['metro', 'metros'], km: ['quilômetro', 'quilômetros', 'quilometro', 'quilometros'], cm: ['centímetro', 'centímetros'], mm: ['milímetro', 'milímetros'],
+  ft: ['pé', 'pés'], inch: ['polegada', 'polegadas'], mi: ['milha', 'milhas'], yd: ['jarda', 'jardas'], g: ['grama', 'gramas'], kg: ['quilo', 'quilos', 'quilograma', 'quilogramas'],
+  t: ['tonelada', 'toneladas', 'tonelada métrica'], lb: ['libra', 'libras'], 'troy oz': ['onça troy', 'onças troy'], 'short ton': ['tonelada curta', 'toneladas curtas'], 'long ton': ['tonelada longa', 'toneladas longas'],
+  ct: ['quilate', 'quilates'], '%': ['por cento', 'porcento'], ha: ['hectare', 'hectares'], 'sq mi': ['milha quadrada', 'milhas quadradas'], 'km²': ['quilômetro quadrado', 'quilômetros quadrados'],
+  'm²': ['metro quadrado', 'metros quadrados'], L: ['litro', 'litros'], 'm³': ['metro cúbico', 'metros cúbicos'], gal: ['galão', 'galões'], bbl: ['barril', 'barris'], s: ['segundo', 'segundos'],
+  min: ['minuto', 'minutos'], h: ['hora', 'horas'], '°C': ['graus celsius', 'celsius'], '°F': ['graus fahrenheit', 'fahrenheit'], oz: ['onça', 'onças'],
+  'oz per short ton': ['onça por tonelada curta', 'onças por tonelada curta'], acre: ['acre', 'acres'] };
+// a chart unit's Portuguese names: the irregular ones by hand, the rest by the usual endings (Permian → permiano,
+// Eocene → eoceno, Paleozoic → paleozoico, Maastrichtian → maastrichtiano); with and without accents, and the English
+const CHRON_PT = { cretaceous: 'cretáceo', triassic: 'triássico', jurassic: 'jurássico', carboniferous: 'carbonífero', paleogene: 'paleógeno', neogene: 'neógeno', quaternary: 'quaternário',
+  phanerozoic: 'fanerozoico', archean: 'arqueano', hadean: 'hadeano', mississippian: 'mississipiano', pennsylvanian: 'pensilvaniano', ediacaran: 'ediacarano', cryogenian: 'criogeniano', tonian: 'toniano' };
+const fold = w => w.normalize('NFD').replace(/[̀-ͯ]/g, '');
+function chronPt(name) {
+  const w = name.toLowerCase(), pt = CHRON_PT[w] || w.replace(/ian$/, 'iano').replace(/an$/, 'ano').replace(/cene$/, 'ceno').replace(/zoic$/, 'zoico').replace(/ous$/, 'o');
+  return uniq([w, pt, fold(pt)]);
+}
+const withPt = u => UNITS_PT[u.unit] ? { ...u, words_pt: uniq([...u.words, ...UNITS_PT[u.unit]]) } : u;
 export function ontology(only) {
-  const units = UNIT_TABLE.map(x => ({ unit: x.name, dim: DIM[x.dim], words: uniq(x.words.map(w => w.toLowerCase())) }));
-  for (const w of COMPOUNDS) { const p = parseUnit(w); if (p) units.push({ unit: w, dim: dimName(p.dim), words: [w] }); }
-  units.push({ unit: 'oz', dim: 'mass', words: ['oz', 'ounce', 'ounces'] });   // troy or avoirdupois: the tool decides and shows the slot
+  const units = UNIT_TABLE.map(x => withPt({ unit: x.name, dim: DIM[x.dim], words: uniq(x.words.map(w => w.toLowerCase())) }));
+  for (const w of COMPOUNDS) { const p = parseUnit(w); if (p) units.push(withPt({ unit: w, dim: dimName(p.dim), words: [w] })); }
+  units.push(withPt({ unit: 'oz', dim: 'mass', words: ['oz', 'ounce', 'ounces'] }));   // troy or avoirdupois: the tool decides and shows the slot
   units.push({ unit: 'people per square mile', dim: 'population density', words: ['people per square mile', 'per square mile'], words_pt: ['pessoas por milha quadrada', 'por milha quadrada'] });
   // a unit a file adds keeps only the words the table does not already have: one word, one unit
   const have = new Set(units.flatMap(u => u.words));
@@ -39,7 +57,7 @@ export function ontology(only) {
       { type: 'timer', words: { timer: ['timer', 'countdown'] }, words_pt: { timer: ['timer', 'cronômetro', 'cronometro', 'temporizador', 'contagem'] } },
       // every unit of the chart, by name; the generic words let "what period is …" fail cleanly to the regex reader
       { type: 'chron', words: Object.fromEntries(TIMESCALE.map(u => [u.n, [u.n.toLowerCase()]])), generic: ['period', 'epoch', 'era', 'eon', 'stage', 'series', 'system'],
-        words_pt: Object.fromEntries(TIMESCALE.map(u => [u.n, [u.n.toLowerCase()]])), generic_pt: ['período', 'periodo', 'época', 'epoca', 'era', 'éon', 'eon', 'andar', 'idade'] },
+        words_pt: Object.fromEntries(TIMESCALE.map(u => [u.n, chronPt(u.n)])), generic_pt: ['período', 'periodo', 'época', 'epoca', 'era', 'éon', 'eon', 'andar', 'idade'] },
       ...LEXICON.nouns.map(n => typeof n === 'function' ? n() : n).filter(n => n && (!n.amend || only)).map(({ amend, ...n }) => n)
     ],
     shapes: LEXICON.shapes,

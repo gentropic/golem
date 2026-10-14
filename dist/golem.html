@@ -204,6 +204,7 @@ td.n,th.n{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-
 .cact.say{display:none}html[data-say] .cact.say{display:inline-block}
 .card:focus{outline:none}
 .card:focus-visible .reply,.card:focus .reply{box-shadow:-2px 0 0 0 var(--rc), -4px 0 0 0 var(--au-focus, var(--au-action))}
+html[lang="pt-BR"] .card[data-pinned] .chead::before{content:'fixado'}
 .card[data-pinned] .chead::before{content:'pinned';font:600 10px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--au-action)}
 .pins{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 18px;padding-bottom:12px;border-bottom:1px solid var(--au-border)}
 .pins .lbl{margin:0 4px 0 0}
@@ -230,6 +231,7 @@ html:not([data-app]) .capture .live,html:not([data-app]) .capture .opts{display:
 @media (min-width:1600px){.view{padding-left:calc((100% - 900px) / 2);padding-right:calc((100% - 900px) / 2)}.dock{padding-left:calc((100% - 900px) / 2);padding-right:calc((100% - 900px) / 2)}}
 .composer{background:var(--au-surface-raised);border:1px solid var(--au-rule);border-radius:12px;padding:10px 8px 8px 14px;display:grid;grid-template-columns:minmax(0,1fr);gap:4px;transition:border-color var(--dur) var(--ease)}
 html[data-drop] .composer{border-color:var(--au-action);box-shadow:0 0 0 3px var(--au-action-soft)}
+html[lang="pt-BR"][data-drop] .composer::after{content:"Solte para abrir"}
 html[data-drop] .composer::after{content:"Drop to open";font:12px var(--mono);color:var(--au-action)}
 .composer:focus-within{border-color:var(--au-action)}
 .composer textarea{width:100%;background:none;border:0;outline:0;padding:2px 4px 2px 0;font:15px/1.45 var(--mono);resize:none;max-height:40vh;overflow:auto;min-height:24px}
@@ -273,6 +275,7 @@ html[data-drop] .composer::after{content:"Drop to open";font:12px var(--mono);co
 .view > .lbl{margin-top:10px}
 .notes{display:grid;gap:26px;min-width:0}
 .notes section{display:grid;gap:8px;min-width:0}
+html:not([lang="pt-BR"]) .notes[data-lang="pt"],html[lang="pt-BR"] .notes[data-lang="en"]{display:none}
 .notes h2{margin:0;font:700 12px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--au-fg-muted);border-bottom:1px solid var(--au-rule);padding-bottom:5px}
 .notes p{margin:0}
 .notes ol,.notes ul{margin:0;padding-left:20px;display:grid;gap:5px}
@@ -286,43 +289,44 @@ html[data-drop] .composer::after{content:"Drop to open";font:12px var(--mono);co
 <div class="app" id="app">
   <div class="scrim" id="scrim"></div>
   <aside class="side" id="drawer" aria-label="Sessions and history">
-    <div class="brandrow"><span class="brand"><i aria-hidden="true"></i>golem</span><span class="grow"></span><button class="ibtn only-wide" id="fold" type="button" aria-label="Hide the sidebar" title="Hide the sidebar (Ctrl+B)"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect x="2" y="3" width="14" height="12" rx="2"/><path d="M7 3v12M12 7l-2 2 2 2"/></svg></button><button class="ibtn only-narrow" id="dclose" type="button" aria-label="Close the sidebar"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M4 4l10 10M14 4L4 14"/></svg></button></div>
-    <button class="newbtn" id="newsess" type="button"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v12M2 8h12"/></svg>New session<span class="k only-wide">Ctrl+Shift+O</span></button>
-    <input id="hq" type="search" placeholder="Search every session" aria-label="Search history" title="Search every session (Ctrl+K)">
+    <div class="brandrow"><span class="brand"><i aria-hidden="true"></i>golem</span><span class="grow"></span><button class="ibtn only-wide" id="fold" type="button" aria-label="Hide the sidebar" title="Hide the sidebar (Ctrl+B)" data-t-attr="aria-label title"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect x="2" y="3" width="14" height="12" rx="2"/><path d="M7 3v12M12 7l-2 2 2 2"/></svg></button><button class="ibtn only-narrow" id="dclose" type="button" aria-label="Close the sidebar" data-t-attr="aria-label"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M4 4l10 10M14 4L4 14"/></svg></button></div>
+    <button class="newbtn" id="newsess" type="button"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v12M2 8h12"/></svg><span data-t>New session</span><span class="k only-wide">Ctrl+Shift+O</span></button>
+    <input id="hq" type="search" placeholder="Search every session" aria-label="Search history" title="Search every session (Ctrl+K)" data-t-attr="placeholder aria-label title">
     <div class="dlist" id="dlist"></div>
     <nav class="sfoot" aria-label="golem">
-      <button class="navbtn only-wide" type="button" data-tab="skills"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12M2 8h12M2 13h7"/></svg>Skills</button>
-      <button class="navbtn only-wide" type="button" data-tab="packs"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 5l6-3 6 3-6 3-6-3zM2 5v6l6 3 6-3V5M8 8v6"/></svg>Packs and this device</button>
-      <button class="navbtn" type="button" data-tab="about"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M8 7v4M8 4.6v.1"/></svg>How golem reads</button>
-      <button class="navbtn" id="theme" type="button"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M8 2a6 6 0 0 0 0 12z" fill="currentColor"/></svg>Theme<span class="k" id="theme-k">auto</span></button>
+      <button class="navbtn only-wide" type="button" data-tab="skills"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12M2 8h12M2 13h7"/></svg><span data-t>Skills</span></button>
+      <button class="navbtn only-wide" type="button" data-tab="packs"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 5l6-3 6 3-6 3-6-3zM2 5v6l6 3 6-3V5M8 8v6"/></svg><span data-t>Packs and this device</span></button>
+      <button class="navbtn" type="button" data-tab="about"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M8 7v4M8 4.6v.1"/></svg><span data-t>How golem reads</span></button>
+      <button class="navbtn" id="theme" type="button"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M8 2a6 6 0 0 0 0 12z" fill="currentColor"/></svg><span data-t>Theme</span><span class="k" id="theme-k">auto</span></button>
+      <button class="navbtn" id="lang" type="button" title="English / Português"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M2 8h12M8 2c-2 2-2 10 0 12M8 2c2 2 2 10 0 12"/></svg><span data-t>Language</span><span class="k" id="lang-k">English</span></button>
     </nav>
   </aside>
 
   <main class="main" id="phone">
     <header class="top">
-      <button class="ibtn only-narrow" id="menu" type="button" aria-label="Sessions and history" title="Show the sidebar (Ctrl+B)"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M2 4h14M2 9h14M2 14h14"/></svg></button>
-      <div class="ttl"><button class="sbtn" id="sname" type="button" title="Sessions and history">New session</button><span class="stat"><b id="st-on">awake</b><span class="only-wide"> · <span id="st-where">on this device</span></span> · <span id="st-req" title="Requests golem has made to the network. Only installing a pack or checking for updates makes one.">0 requests</span></span></div>
-      <button class="ibtn only-narrow" id="newtop" type="button" aria-label="New session" title="New session (Ctrl+Shift+O)"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M9 3v12M3 9h12"/></svg></button>
-      <button class="power" id="power" type="button" title="Sleep: golem reads and runs nothing until you wake it" aria-pressed="false">sleep</button>
+      <button class="ibtn only-narrow" id="menu" type="button" aria-label="Sessions and history" title="Show the sidebar (Ctrl+B)" data-t-attr="aria-label title"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M2 4h14M2 9h14M2 14h14"/></svg></button>
+      <div class="ttl"><button class="sbtn" id="sname" type="button" title="Sessions and history" data-t-attr="title">New session</button><span class="stat"><b id="st-on">awake</b><span class="only-wide"> · <span id="st-where" data-t>on this device</span></span> · <span id="st-req" title="Requests golem has made to the network. Only installing a pack or checking for updates makes one." data-t-attr="title">0 requests</span></span></div>
+      <button class="ibtn only-narrow" id="newtop" type="button" aria-label="New session" title="New session (Ctrl+Shift+O)" data-t-attr="aria-label title"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M9 3v12M3 9h12"/></svg></button>
+      <button class="power" id="power" type="button" title="Sleep: golem reads and runs nothing until you wake it" data-t-attr="title" aria-pressed="false">sleep</button>
     </header>
 
     <div class="view" id="v-ask">
       <div class="welcome" id="welcome" hidden>
         <div class="mark"><i aria-hidden="true"></i>golem</div>
-        <p>Ask, compute, or act. Nothing here calls a model: every answer is a reading you can check and a tool that computes. If I cannot read something, I say so.</p>
-        <p class="hint">Tap one to start, or type below. A few sessions already run are under Examples in the sidebar.</p>
+        <p data-t>Ask, compute, or act. Nothing here calls a model: every answer is a reading you can check and a tool that computes. If I cannot read something, I say so.</p>
+        <p class="hint" data-t>Tap one to start, or type below. A few sessions already run are under Examples in the sidebar.</p>
         <div class="starts" id="starts"></div>
       </div>
-      <div class="lbl" id="exlbl" hidden>Example session</div>
+      <div class="lbl" id="exlbl" hidden data-t>Example session</div>
       <div class="pins" id="pins" hidden></div>
-      <div id="stream" role="feed" aria-label="Questions and answers"></div>
+      <div id="stream" role="feed" aria-label="Questions and answers" data-t-attr="aria-label"></div>
       <div class="sr" id="sr" aria-live="polite"></div>
     </div>
     <div class="view" id="v-skills" hidden></div>
     <div class="view" id="v-packs" hidden></div>
     <div class="view" id="v-about" hidden>
-      <h1 class="vhead">How golem reads</h1>
-      <div class="notes">
+      <h1 class="vhead" data-t>How golem reads</h1>
+      <div class="notes" data-lang="en">
         <section>
           <h2>A query, rung by rung</h2>
           <p>Each answer shows which rung read the query and what it was read as. Dashed slots are ambiguous readings: tap one to flip it and the answer recomputes. The line down the left of an answer has the rung's colour.</p>
@@ -333,7 +337,7 @@ html[data-drop] .composer::after{content:"Drop to open";font:12px var(--mono);co
             <li><span class="rung guess">guess</span> Nothing read it exactly, so it offers readings that change it slightly (an ignored word, an assumed preposition) and says what each changed. None runs until you pick one.</li>
             <li><span class="rung none">no reading</span> It stops, shows the nearest skills, and offers to learn the word it did not know.</li>
           </ol>
-          <p>Open <b>plan</b> under an answer to see every step that produced it.</p>
+          <p>Open <b>how</b> under an answer to see every step that produced it. Beside it, <b>copy</b> takes the answer, <b>edit</b> puts the question back in the box, <b>pin</b> keeps the card at the top of the session, and <b>branch</b> starts a new session from it. golem reads English and Portuguese, whichever the interface is set to first.</p>
         </section>
         <section>
           <h2>Sessions, history and names</h2>
@@ -345,17 +349,18 @@ html[data-drop] .composer::after{content:"Drop to open";font:12px var(--mono);co
           <h2>Keys</h2>
           <ul>
             <li><code>Enter</code> runs, <code>Shift+Enter</code> starts a new line, <code>↑</code> and <code>↓</code> on an empty line step through this session's queries.</li>
-            <li><code>/</code> or <code>Esc</code> puts the cursor in the box.</li>
+            <li><code>/</code> or <code>Esc</code> puts the cursor in the box; <code>Esc</code> in an empty box goes to the last card.</li>
+            <li>Between cards: <code>j</code> and <code>k</code> (or the arrows) move, <code>c</code> copies the answer, <code>e</code> edits the question, <code>p</code> pins.</li>
             <li><code>Ctrl+Shift+O</code> starts a new session, <code>Ctrl+K</code> searches every session (<code>Enter</code> opens the first), <code>Ctrl+B</code> shows or hides the sidebar. On a Mac, Cmd works for Ctrl.</li>
           </ul>
         </section>
         <section>
           <h2>Files</h2>
-          <p>The paperclip opens tables (CSV, TSV, xlsx, Parquet, Datamine .dm), drawings and geometry (DXF, WKT, GeoJSON, YAML) and documents (Markdown, text, HTML). Files stay on this device. Documents are searched by word: <code>find resurvey in my documents</code>.</p>
+          <p>The paperclip opens tables (CSV, TSV, xlsx, Parquet, Datamine .dm), drawings and geometry (DXF, WKT, GeoJSON, YAML) and documents (Markdown, text, HTML); so does a file dropped on the window, or shared to the app. Files stay on this device. Documents are searched by word: <code>find resurvey in my documents</code>.</p>
         </section>
         <section>
-          <h2>Hand-offs on Android</h2>
-          <p>In the lead-acid shell, golem fills in an event, a timer or a message and hands it to the app you already use; that app asks you to confirm. Nothing goes through a Google API or the network. In a browser the hand-off is simulated.</p>
+          <h2>On Android</h2>
+          <p>In the lead-acid app, golem fills in an event, a timer or an alarm and hands it to the app you already use; that app asks you to confirm. It measures a plane or a line with the phone's compass (<code>measure bedding</code>), takes a position when you ask (<code>declination here</code>), listens with the phone's own offline recognizer and reads answers aloud with its offline voices. Nothing goes through a Google API or the network.</p>
         </section>
         <section>
           <h2>What is real here</h2>
@@ -366,26 +371,70 @@ html[data-drop] .composer::after{content:"Drop to open";font:12px var(--mono);co
           </ul>
         </section>
       </div>
+      <div class="notes" data-lang="pt" lang="pt-BR">
+        <section>
+          <h2>Uma pergunta, degrau a degrau</h2>
+          <p>Cada resposta mostra que degrau leu a pergunta e como ela foi lida. As lacunas tracejadas são leituras ambíguas: toque numa para trocar, e a resposta é recalculada. A linha à esquerda da resposta tem a cor do degrau.</p>
+          <ol>
+            <li><span class="rung context">contexto</span> Uma pergunta em aberto do golem, ou um ajuste da última resposta: <code>em pés</code>, <code>escala log</code>, <code>e chile</code>, <code>por quê</code>, <code>desfaz</code>.</li>
+            <li><span class="rung grammar">gramática</span> A leitura controlada, em português ou inglês: a gramática de orações do <code>@gcu/dispatch</code>, e depois o leitor de aritmética. Enquanto você escreve, a linha embaixo da caixa mostra o que seria lido.</li>
+            <li><span class="rung taught">ensinado</span> Expressões que você ensinou neste aparelho: <code>dens means density</code>.</li>
+            <li><span class="rung guess">palpite</span> Nada leu exatamente, então ele oferece leituras que mudam um pouco o texto (uma palavra deixada de lado, uma preposição suposta) e diz o que cada uma mudou. Nenhuma roda até você escolher.</li>
+            <li><span class="rung none">sem leitura</span> Ele para, mostra as habilidades mais próximas e se oferece para aprender a palavra que não conhecia.</li>
+          </ol>
+          <p>Abra <b>como</b> embaixo de uma resposta para ver cada passo que a produziu. Ao lado, <b>copiar</b> pega a resposta, <b>editar</b> põe a pergunta de volta na caixa, <b>fixar</b> mantém o cartão no topo da sessão e <b>ramificar</b> começa uma sessão nova a partir dele. As respostas das ferramentas ainda estão em inglês.</p>
+        </section>
+        <section>
+          <h2>Sessões, histórico e nomes</h2>
+          <p>Uma sessão é guardada como o seu plano: a lista de chamadas de ferramentas e seus argumentos. Abrir uma sessão refaz o plano, então o histórico custa poucas centenas de bytes e as respostas antigas continuam reproduzíveis. A busca na barra lateral olha todas as sessões.</p>
+          <p>Os nomes são calculados a partir das ferramentas que rodaram, e param de mudar quando você dá um nome: <code>chama esta sessão de laboratório sexta</code>.</p>
+        </section>
+        <section>
+          <h2>Teclas</h2>
+          <ul>
+            <li><code>Enter</code> roda, <code>Shift+Enter</code> quebra a linha, <code>↑</code> e <code>↓</code> numa linha vazia percorrem as perguntas desta sessão.</li>
+            <li><code>/</code> ou <code>Esc</code> põe o cursor na caixa; <code>Esc</code> com a caixa vazia vai para o último cartão.</li>
+            <li>Entre cartões: <code>j</code> e <code>k</code> (ou as setas) navegam, <code>c</code> copia a resposta, <code>e</code> edita a pergunta, <code>p</code> fixa.</li>
+            <li><code>Ctrl+Shift+O</code> começa uma sessão nova, <code>Ctrl+K</code> busca em todas as sessões, <code>Ctrl+B</code> mostra ou esconde a barra lateral. No Mac, Cmd faz o papel de Ctrl.</li>
+          </ul>
+        </section>
+        <section>
+          <h2>Arquivos</h2>
+          <p>O clipe abre tabelas (CSV, TSV, xlsx, Parquet, Datamine .dm), desenhos e geometria (DXF, WKT, GeoJSON, YAML) e documentos (Markdown, texto, HTML); um arquivo solto na janela, ou compartilhado com o app, também abre. Os arquivos ficam neste aparelho.</p>
+        </section>
+        <section>
+          <h2>No Android</h2>
+          <p>No app lead-acid, o golem preenche um evento, um cronômetro ou um alarme e entrega ao app que você já usa; esse app pede a sua confirmação. Ele mede um plano ou uma linha com a bússola do celular (<code>mede o acamamento</code>), pega uma posição quando você pede (<code>declinação aqui</code>), ouve com o reconhecedor offline do próprio celular e lê as respostas com as vozes offline dele. Nada passa por uma API do Google nem pela rede.</p>
+        </section>
+        <section>
+          <h2>O que é real aqui</h2>
+          <ul>
+            <li>Calculado na página: unidades, aritmética, datas, geologia estrutural e o estereograma, tabelas e gráficos, conversões, busca em documentos, Python num worker, toda a leitura, o ensino e os ajustes.</li>
+            <li>Dados de amostra vêm marcados como amostra: <code>assays.csv</code> é sintético, e os números dos países são uma amostra arredondada.</li>
+            <li>Fora do escopo, de propósito: texto livre para o qual ninguém escreveu um caminho, como redações, tradução livre, resumos com palavras próprias e conversa fiada. O golem diz que não tem leitura.</li>
+          </ul>
+        </section>
+      </div>
     </div>
 
     <div class="dock">
       <form class="composer" id="f" autocomplete="off">
-        <textarea id="q" rows="1" placeholder="Ask, compute, or act" aria-label="Query" enterkeyhint="go" aria-describedby="pv" spellcheck="false" autocapitalize="off"></textarea>
+        <textarea id="q" rows="1" placeholder="Ask, compute, or act" aria-label="Query" data-t-attr="placeholder aria-label" enterkeyhint="go" aria-describedby="pv" spellcheck="false" autocapitalize="off"></textarea>
         <div class="pv" id="pv" hidden><i aria-hidden="true"></i><span></span></div>
-        <div class="sg" id="sg" hidden aria-label="Completions"></div>
+        <div class="sg" id="sg" hidden aria-label="Completions" data-t-attr="aria-label"></div>
         <div class="crow">
-          <button class="ibtn" id="attach" type="button" title="Open a file: a table, a drawing or a document" aria-label="Open a file"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M15 8.5l-6 6a3.5 3.5 0 0 1-5-5l6.5-6.5a2.3 2.3 0 0 1 3.3 3.3L7.4 12.6a1.1 1.1 0 0 1-1.6-1.6L11.5 5.3"/></svg></button><input type="file" id="file" accept=".golem.json,.json,.gcudat,.csv,.tsv,.txt,.md,.markdown,.html,.htm,.xlsx,.xlsm,.dm,.parquet,.dxf,.yaml,.yml,.wkt,.geojson,text/csv,text/tab-separated-values,text/plain" hidden>
-          <button class="ibtn mic" id="mic" type="button" hidden title="Speak a question: the phone's own recognizer, offline" aria-label="Speak a question" aria-pressed="false"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect x="6.5" y="2" width="5" height="9" rx="2.5"/><path d="M4 8.5a5 5 0 0 0 10 0M9 13.5V16"/></svg></button>
-          <span class="grow"><span class="only-wide">Enter runs · Tab completes · Shift+Enter for a new line · ↑ for earlier queries</span></span>
-          <button class="send" id="send" type="submit" aria-label="Run" title="Run"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 13V3M3.5 7.5L8 3l4.5 4.5"/></svg></button>
+          <button class="ibtn" id="attach" type="button" title="Open a file: a table, a drawing or a document" aria-label="Open a file" data-t-attr="title aria-label"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M15 8.5l-6 6a3.5 3.5 0 0 1-5-5l6.5-6.5a2.3 2.3 0 0 1 3.3 3.3L7.4 12.6a1.1 1.1 0 0 1-1.6-1.6L11.5 5.3"/></svg></button><input type="file" id="file" accept=".golem.json,.json,.gcudat,.csv,.tsv,.txt,.md,.markdown,.html,.htm,.xlsx,.xlsm,.dm,.parquet,.dxf,.yaml,.yml,.wkt,.geojson,text/csv,text/tab-separated-values,text/plain" hidden>
+          <button class="ibtn mic" id="mic" type="button" hidden title="Speak a question: the phone's own recognizer, offline" aria-label="Speak a question" data-t-attr="title aria-label" aria-pressed="false"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect x="6.5" y="2" width="5" height="9" rx="2.5"/><path d="M4 8.5a5 5 0 0 0 10 0M9 13.5V16"/></svg></button>
+          <span class="grow"><span class="only-wide" data-t>Enter runs · Tab completes · Shift+Enter for a new line · ↑ for earlier queries</span></span>
+          <button class="send" id="send" type="submit" aria-label="Run" title="Run" data-t-attr="aria-label title"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 13V3M3.5 7.5L8 3l4.5 4.5"/></svg></button>
         </div>
       </form>
-      <div id="status" aria-live="polite" data-hint="No model runs here. golem reads what you type, or says it cannot."></div>
+      <div id="status" aria-live="polite" data-hint="No model runs here. golem reads what you type, or says it cannot." data-t-attr="data-hint"></div>
     </div>
     <nav class="tabs" role="tablist">
-      <button role="tab" data-tab="ask" aria-selected="true">Ask</button>
-      <button role="tab" data-tab="skills" aria-selected="false">Skills</button>
-      <button role="tab" data-tab="packs" aria-selected="false">Packs</button>
+      <button role="tab" data-tab="ask" aria-selected="true" data-t>Ask</button>
+      <button role="tab" data-tab="skills" aria-selected="false" data-t>Skills</button>
+      <button role="tab" data-tab="packs" aria-selected="false" data-t>Packs</button>
     </nav>
   </main>
 </div>
@@ -1088,7 +1137,20 @@ function easter(y) {
   return new Date(y, mo - 1, da);
 }
 const MOVABLE = { easter: 0, 'easter sunday': 0, 'good friday': -2, carnival: -47, 'carnival tuesday': -47, 'carnival monday': -48, 'ash wednesday': -46, 'corpus christi': 60, 'palm sunday': -7, 'pentecost': 49, 'whit sunday': 49, 'ascension': 39 };
+// A date or a time the grammar read in Portuguese, put in the words the patterns below know: month and weekday names,
+// hoje/amanhã/ontem, "de" between the parts, "às 9", "14h30". Word by word over a value already read, not a reader.
+const PT_WORDS = { janeiro: 'january', fevereiro: 'february', março: 'march', marco: 'march', abril: 'april', maio: 'may', junho: 'june', julho: 'july', agosto: 'august', setembro: 'september', outubro: 'october', novembro: 'november', dezembro: 'december',
+  domingo: 'sunday', segunda: 'monday', 'segunda-feira': 'monday', terça: 'tuesday', terca: 'tuesday', 'terça-feira': 'tuesday', quarta: 'wednesday', 'quarta-feira': 'wednesday', quinta: 'thursday', 'quinta-feira': 'thursday',
+  sexta: 'friday', 'sexta-feira': 'friday', sábado: 'saturday', sabado: 'saturday', hoje: 'today', amanhã: 'tomorrow', amanha: 'tomorrow', ontem: 'yesterday', natal: 'christmas', páscoa: 'easter', pascoa: 'easter', carnaval: 'carnival',
+  próxima: 'next', proxima: 'next', próximo: 'next', proximo: 'next', às: 'at', as: 'at', ao: 'at', meio: 'noon', 'meio-dia': 'noon' };
+function enDate(s) {
+  if (!/[a-zà-ú]/i.test(s)) return s;
+  return String(s).toLowerCase().split(/(\s+)/).map(t => PT_WORDS[t] ?? t).join('')
+    .replace(/\b(\d{1,2}) de ([a-z]+)/g, '$1 $2').replace(/\b([a-z]+) de (\d{4})\b/g, '$1 $2').replace(/\b(na|no|em|dia|no dia)\s+(?=\d|[a-z]+day\b)/g, '')
+    .replace(/\b(\d{1,2})h(\d\d)?\b/g, (_, h, mi) => `at ${h}:${mi || '00'}`).replace(/\bat at\b/g, 'at').replace(/\bmeio dia\b/g, 'noon');
+}
 function findDate(s, opt = {}) {
+  s = enDate(s);
   const now = today(), back = !!opt.back;
   const add = n => new Date(now.getFullYear(), now.getMonth(), now.getDate() + n);
   const md = (d, mo, y) => { let dt = new Date(y ? +y : now.getFullYear(), mo, d); if (!y && !back && dt < now) dt = new Date(now.getFullYear() + 1, mo, d); if (!y && back && dt > now) dt = new Date(now.getFullYear() - 1, mo, d); return dt; };
@@ -1115,6 +1177,7 @@ function findDate(s, opt = {}) {
   return null;
 }
 function findTime(s) {
+  s = enDate(s);
   let m = /\b(?:at )?noon\b/.exec(s);
   if (m) return { h: 12, mi: 0, m };
   m = /\bat (\d{1,2})(?::(\d\d))? ?(am|pm)?\b/.exec(s) || /\b(\d{1,2}):(\d\d) ?(am|pm)?\b/.exec(s) || /\b(\d{1,2})() ?(am|pm)\b/.exec(s);
@@ -1167,7 +1230,7 @@ onDate('daysUntil', ['days until', 'days till', 'days to', 'days before', 'days 
 onDate('whenIs', ['when is', 'when was', 'when will be', 'when does', 'when falls', 'what date is', 'what date was'], ['quando é', 'quando e', 'quando foi', 'quando cai', 'que data é'], 'When is');
 onDate('weekday', ['what day is', 'what day was', 'what day will be', 'what weekday is', 'what weekday was', 'what day of the week is', 'what day of the week was', 'which day is', 'what day does', 'what day', 'what weekday', 'which day'],
   ['que dia é', 'que dia e', 'que dia foi', 'que dia da semana é', 'que dia cai', 'em que dia cai'], 'Weekday');
-  return { day0, today, fmtDate, easter, findDate, findTime, dateWords };
+  return { day0, today, fmtDate, easter, enDate, findDate, findTime, dateWords };
 })();
 
 /* ==== src/vendor/bearing.js ==== */
@@ -11723,7 +11786,8 @@ const ALIAS = { 'United States': ['usa', 'u.s.', 'united states of america'], 'U
   DRC: ['democratic republic of the congo', 'dr congo', 'congo kinshasa', 'congo'], 'Congo (Brazzaville)': ['republic of the congo', 'congo brazzaville', 'congo'] };
 const display = lang => { try { return new Intl.DisplayNames([lang], { type: 'region' }); } catch (e) { return null; } };
 const EN = display('en'), PT = display('pt');
-function formsOf(name) { const n = fold(name), out = [n]; const nb = n.replace(/\s*\(.*\)\s*/g, ' ').trim(); if (nb !== n) out.push(nb); for (const x of [...out]) if (/^the /.test(x)) out.push(x.slice(4)); return out; }
+// folded and as written: "mongolia" and "mongólia" (the parser matches what was typed, accents and all)
+function formsOf(name) { const n = fold(name), w = name.toLowerCase().replace(/[’`]/g, "'").replace(/\s+/g, ' ').trim(), out = w !== n ? [n, w] : [n]; const nb = n.replace(/\s*\(.*\)\s*/g, ' ').trim(); if (nb !== n) out.push(nb); for (const x of [...out]) if (/^the /.test(x)) out.push(x.slice(4)); return out; }
 function wordsOf(r, D) {
   const out = new Set(formsOf(r.name)); for (const a of (D === EN ? ALIAS[r.name] : null) || []) out.add(fold(a));
   if (D && r.iso2) { let d = null; try { d = D.of(r.iso2.toUpperCase()); } catch (e) { d = null; } if (d && d.toUpperCase() !== r.iso2.toUpperCase()) for (const f of formsOf(d)) out.add(f); }
@@ -12925,13 +12989,13 @@ tool({
 frame({
   name: 'date', label: 'Date', words: ['how old is', 'when was', 'when is', 'date', 'age of'], elidable: true,
   theme: ['chron'], required: ['theme'], roles: {},
-  words_pt: ['quando foi', 'idade de', 'datar', 'data'], label_pt: 'Datar',
+  words_pt: ['quando foi', 'idade de', 'idade do', 'idade da', 'qual a idade de', 'qual a idade do', 'qual a idade da', 'qual é a idade do', 'qual é a idade da', 'datar', 'data'], label_pt: 'Datar',
   bind: c => { const t = c.theme[0]; return t && t.value ? { tool: 'timescale', args: { unit: t.value } } : null; }
 });
 /* ── what reads the rest: duration, before and after, subdivisions, an age in Ma ── */
 const unitArg = c => c.theme[0] && c.theme[0].value;
 for (const [name, words, ask, words_pt] of [
-  ['chronlength', ['how long was', 'how long is', 'how long did', 'duration of', 'length of', 'how long did it last'], 'duration', ['quanto durou', 'duração de']],
+  ['chronlength', ['how long was', 'how long is', 'how long did', 'duration of', 'length of', 'how long did it last'], 'duration', ['quanto durou', 'quanto tempo durou', 'quanto tempo dura', 'duração de', 'duração do', 'duração da', 'qual a duração do', 'qual a duração da']],
   ['chronbefore', ['what came before', 'what comes before', 'what was before', 'which came before', 'what is before', 'before'], 'before', ['o que veio antes de', 'antes de']],
   ['chronafter', ['what came after', 'what comes after', 'what was after', 'which came after', 'what is after', 'after'], 'after', ['o que veio depois de', 'depois de']]
 ]) frame({ name, label: 'Timescale', words, theme: ['chron'], required: ['theme'], roles: {}, words_pt, label_pt: 'Escala do tempo', bind: c => unitArg(c) ? { tool: 'timescale', args: { unit: unitArg(c), ask } } : null });
@@ -14174,7 +14238,7 @@ frame({
 noun(() => {
   const names = [...new Set([...ZONES.filter(z => !/^Etc\//.test(z) && z.includes('/')).map(cityOf), ...Object.keys(ALIAS), ...HERE.filter(w => w !== 'me'), 'home', ...(S.tables.places ? S.tables.places.rows.map(r => r.name) : [])])];
   const words = Object.fromEntries(names.map(n => [n, [n]]));
-  return { type: 'place', exact: true, words, generic: ['place'], words_pt: words, generic_pt: ['lugar'] };
+  return { type: 'place', exact: true, words, generic: ['place'], words_pt: { ...words, here: ['here', 'aqui', 'onde estou', 'minha localização'] }, generic_pt: ['lugar'] };
 });
 shape({ type: 'place', re: String.raw`(?:utc|gmt)\s?[+-]\d{1,2}(?::?\d{2})?` });   // "utc+8", "gmt-3"
 // "what time is 9 am in sao paulo in perth", "when it is 9am in sao paulo, what time is it in perth"
@@ -19389,8 +19453,15 @@ const STARTERS = [
   ['Units and numbers', [['Convert a grade', '0.35 oz per short ton in g/t'], ['With uncertainty', '2.7 ± 0.1 t/m3 * 1.35 Mm3'], ['Run some Python', 'run this: sum(x * x for x in range(10))']]],
   ['Every day', [['Set a reminder', 'remind me to send the samples to the lab on friday at 9'], ['Two time zones', '9am sao paulo in perth'], ['What can you do?', 'what can you do']]],
 ];
+// the same, for the Portuguese interface: each one reads in Portuguese (test/portuguese.test.mjs)
+const STARTERS_PT = [
+  ['No campo', [['Espessura verdadeira', 'espessura verdadeira de 14 m, furo 270/60, acamamento 045/30'], ['Declinação', 'declinação em -19.92, -43.94'], ['Medir com o celular', 'mede o acamamento']]],
+  ['Laboratório e tabelas', [['Uma tabela para testar (dados de amostra)', 'abre assays.csv'], ['Massa molar', 'massa molar de CuFeS2'], ['Histograma', 'histograma de cu']]],
+  ['Unidades e números', [['Converter', 'converte 5 km para milhas'], ['Temperatura', '25 graus celsius em fahrenheit'], ['Dias úteis', 'quantos dias úteis até 20 de dezembro']]],
+  ['Dia a dia', [['Lembrete', 'me lembra de mandar as amostras pro laboratório na sexta às 9'], ['Que horas são', 'que horas são em perth'], ['O que você faz?', 'o que você faz']]],
+];
 const SUGGESTIONS = ['pop means population', 'histogram of cu', 'log scale', 'population density of mongolia in people per square mile', 'and chile', 'set a timer for 5 min', 'what is a skiplist', 'why', 'export as script', 'undo'];
-  return { PACKS, skills, examples, vocab, STARTERS, SUGGESTIONS };
+  return { PACKS, skills, examples, vocab, STARTERS, STARTERS_PT, SUGGESTIONS };
 })();
 
 /* ==== src/engine/ontology.js ==== */
@@ -19410,10 +19481,28 @@ function variables() {
   return Object.fromEntries(cols.map(c => [c.name, uniq([c.name.toLowerCase(), ...(c.analyte ? [c.analyte.toLowerCase(), ELEMENT[c.analyte]] : [])].filter(Boolean))]));
 }
 
+// the units in Portuguese: the names a Brazilian geologist says, beside the symbols both languages share
+const UNITS_PT = { m: ['metro', 'metros'], km: ['quilômetro', 'quilômetros', 'quilometro', 'quilometros'], cm: ['centímetro', 'centímetros'], mm: ['milímetro', 'milímetros'],
+  ft: ['pé', 'pés'], inch: ['polegada', 'polegadas'], mi: ['milha', 'milhas'], yd: ['jarda', 'jardas'], g: ['grama', 'gramas'], kg: ['quilo', 'quilos', 'quilograma', 'quilogramas'],
+  t: ['tonelada', 'toneladas', 'tonelada métrica'], lb: ['libra', 'libras'], 'troy oz': ['onça troy', 'onças troy'], 'short ton': ['tonelada curta', 'toneladas curtas'], 'long ton': ['tonelada longa', 'toneladas longas'],
+  ct: ['quilate', 'quilates'], '%': ['por cento', 'porcento'], ha: ['hectare', 'hectares'], 'sq mi': ['milha quadrada', 'milhas quadradas'], 'km²': ['quilômetro quadrado', 'quilômetros quadrados'],
+  'm²': ['metro quadrado', 'metros quadrados'], L: ['litro', 'litros'], 'm³': ['metro cúbico', 'metros cúbicos'], gal: ['galão', 'galões'], bbl: ['barril', 'barris'], s: ['segundo', 'segundos'],
+  min: ['minuto', 'minutos'], h: ['hora', 'horas'], '°C': ['graus celsius', 'celsius'], '°F': ['graus fahrenheit', 'fahrenheit'], oz: ['onça', 'onças'],
+  'oz per short ton': ['onça por tonelada curta', 'onças por tonelada curta'], acre: ['acre', 'acres'] };
+// a chart unit's Portuguese names: the irregular ones by hand, the rest by the usual endings (Permian → permiano,
+// Eocene → eoceno, Paleozoic → paleozoico, Maastrichtian → maastrichtiano); with and without accents, and the English
+const CHRON_PT = { cretaceous: 'cretáceo', triassic: 'triássico', jurassic: 'jurássico', carboniferous: 'carbonífero', paleogene: 'paleógeno', neogene: 'neógeno', quaternary: 'quaternário',
+  phanerozoic: 'fanerozoico', archean: 'arqueano', hadean: 'hadeano', mississippian: 'mississipiano', pennsylvanian: 'pensilvaniano', ediacaran: 'ediacarano', cryogenian: 'criogeniano', tonian: 'toniano' };
+const fold = w => w.normalize('NFD').replace(/[̀-ͯ]/g, '');
+function chronPt(name) {
+  const w = name.toLowerCase(), pt = CHRON_PT[w] || w.replace(/ian$/, 'iano').replace(/an$/, 'ano').replace(/cene$/, 'ceno').replace(/zoic$/, 'zoico').replace(/ous$/, 'o');
+  return uniq([w, pt, fold(pt)]);
+}
+const withPt = u => UNITS_PT[u.unit] ? { ...u, words_pt: uniq([...u.words, ...UNITS_PT[u.unit]]) } : u;
 function ontology(only) {
-  const units = UNIT_TABLE.map(x => ({ unit: x.name, dim: DIM[x.dim], words: uniq(x.words.map(w => w.toLowerCase())) }));
-  for (const w of COMPOUNDS) { const p = parseUnit(w); if (p) units.push({ unit: w, dim: dimName(p.dim), words: [w] }); }
-  units.push({ unit: 'oz', dim: 'mass', words: ['oz', 'ounce', 'ounces'] });   // troy or avoirdupois: the tool decides and shows the slot
+  const units = UNIT_TABLE.map(x => withPt({ unit: x.name, dim: DIM[x.dim], words: uniq(x.words.map(w => w.toLowerCase())) }));
+  for (const w of COMPOUNDS) { const p = parseUnit(w); if (p) units.push(withPt({ unit: w, dim: dimName(p.dim), words: [w] })); }
+  units.push(withPt({ unit: 'oz', dim: 'mass', words: ['oz', 'ounce', 'ounces'] }));   // troy or avoirdupois: the tool decides and shows the slot
   units.push({ unit: 'people per square mile', dim: 'population density', words: ['people per square mile', 'per square mile'], words_pt: ['pessoas por milha quadrada', 'por milha quadrada'] });
   // a unit a file adds keeps only the words the table does not already have: one word, one unit
   const have = new Set(units.flatMap(u => u.words));
@@ -19436,7 +19525,7 @@ function ontology(only) {
       { type: 'timer', words: { timer: ['timer', 'countdown'] }, words_pt: { timer: ['timer', 'cronômetro', 'cronometro', 'temporizador', 'contagem'] } },
       // every unit of the chart, by name; the generic words let "what period is …" fail cleanly to the regex reader
       { type: 'chron', words: Object.fromEntries(TIMESCALE.map(u => [u.n, [u.n.toLowerCase()]])), generic: ['period', 'epoch', 'era', 'eon', 'stage', 'series', 'system'],
-        words_pt: Object.fromEntries(TIMESCALE.map(u => [u.n, [u.n.toLowerCase()]])), generic_pt: ['período', 'periodo', 'época', 'epoca', 'era', 'éon', 'eon', 'andar', 'idade'] },
+        words_pt: Object.fromEntries(TIMESCALE.map(u => [u.n, chronPt(u.n)])), generic_pt: ['período', 'periodo', 'época', 'epoca', 'era', 'éon', 'eon', 'andar', 'idade'] },
       ...LEXICON.nouns.map(n => typeof n === 'function' ? n() : n).filter(n => n && (!n.amend || only)).map(({ amend, ...n }) => n)
     ],
     shapes: LEXICON.shapes,
@@ -21616,17 +21705,26 @@ const { examples, vocab } = __m50;
 const { ontology } = __m51;
 const { calcOf } = __m3;
 const { estimateOf } = __m31;
-const { createEngine, makeSession, ENGLISH } = __m52;
+const { createEngine, makeSession, ENGLISH, PORTUGUESE } = __m52;
 // The reading ladder: context (amendments, meta-intents), grammar (the clause parser, then the regex
 // rules the declarations carry), taught words (device lexicon rewrites, then grammar again). Plus the
 // tools that talk about the session itself: none, why, export.
 
+// The languages golem reads, the person's first: a phrase reads in whichever it is in ("converte 5 km para mi" or
+// "convert 5 km to mi"), and a tie goes to the person's. The shell sets it (the device's language, or the choice).
+const LOCALES = { en: ENGLISH, pt: PORTUGUESE };
+let order = ['en', 'pt'];
+function setLanguage(l) { order = l === 'pt' ? ['pt', 'en'] : ['en', 'pt']; }
+const language = () => order[0];
+// an engine per language over the same ontology, rebuilt when the ontology changes
+function enginesFor(cache, o) { const key = JSON.stringify(o); if (cache.key !== key) { cache.key = key; cache.E = {}; } return loc => cache.E[loc] || (cache.E[loc] = createEngine(o, LOCALES[loc])); }
+
 const norm = s => s.trim().replace(/\s+/g, ' ').replace(/[?.!]+$/, '');
 
 /* ── rung 2, first half: the clause parser over golem's ontology ── */
-let clause = null, clauseFor = null;
+const clauses = {};
 // rebuilt whenever what it reads changes: the open table's columns, kept files, saved places, logged activities
-const clauseEngine = () => { const o = ontology(), key = JSON.stringify(o); if (!clause || clauseFor !== key) { clause = createEngine(o, ENGLISH); clauseFor = key; } return clause; };
+const clauseEngine = (loc = order[0]) => enginesFor(clauses, ontology())(loc);
 const clauseSession = () => makeSession([]);   // no memory of its own: what came before is the cards', read by the context rung
 // The parser's verdict on a text, then the frame's bind(): a frame may answer { tool, args }, or
 // { clarify } when the reading is whole but a value is missing, which becomes a clarify verdict too.
@@ -21634,8 +21732,17 @@ const clauseSession = () => makeSession([]);   // no memory of its own: what cam
 // When the grammar finds several readings, each is bound: if exactly one names a tool that takes it, that is the
 // reading ("python" is a verb and a format; only the verb has a tool for "python\n<code>"), and the trace says so.
 const bindOf = cmd => { const f = FRAMES.find(x => x.name === cmd.verb), b = f && f.bind(cmd); return b && !b.clarify ? b : null; };
+// in the person's language, then the other; the first that binds a tool is the reading, else the person's verdict. The
+// other language counts only as written: its typo repairs would turn an English word into a Portuguese one ("decode"
+// into "decide") ahead of the rungs that read it as meant
+const repaired = r => (r.diag && r.diag.notes || []).some(n => /^read ".*" as ".*"$/.test(n)) || (r.diag && r.diag.repairs && r.diag.repairs.length > 0);
 function verdictOf(text, session, opts, engine) {
-  let r = (engine || clauseEngine()).understand(text, session, opts);
+  if (engine) return verdictIn(engine, text, session, opts);
+  const first = verdictIn(clauseEngine(order[0]), text, session, opts); if (first.b) return first;
+  const second = verdictIn(clauseEngine(order[1]), text, session, opts); return second.b && !repaired(second.r) ? second : first;
+}
+function verdictIn(E, text, session, opts) {
+  let r = E.understand(text, session, opts);
   if (r.status === 'ambiguous' && r.alternatives) {
     const bound = r.alternatives.map((cmds, k) => ({ cmds, echo: r.readings[k], b: bindOf(cmds[0]) })).filter(x => x.b);
     const takers = bound.filter((x, i) => bound.findIndex(y => JSON.stringify(y.b) === JSON.stringify(x.b)) === i);   // the same call twice is one reading
@@ -21715,11 +21822,15 @@ function fragmentRead(raw, last, dry) {
 let amendEngines = {};
 function amendEngine(tool) {
   const frames = FRAMES.filter(f => f.amends && (f.amends.includes(tool) || f.amends.includes('*'))), o = ontology(frames), key = JSON.stringify(o);
-  if (!amendEngines[tool] || amendEngines[tool].key !== key) amendEngines[tool] = { key, frames, E: createEngine(o, ENGLISH) };
-  return amendEngines[tool];
+  const cache = amendEngines[tool] || (amendEngines[tool] = {});
+  return { frames, at: enginesFor(cache, o) };
 }
 function amendRead(raw, last, dry) {
-  const { frames, E } = amendEngine(last.tool);
+  for (const loc of order) { const r = amendIn(raw, last, dry, loc, loc !== order[0]); if (r) return r; }
+  return null;
+}
+function amendIn(raw, last, dry, loc, exact) {
+  const { frames, at } = amendEngine(last.tool), E = at(loc);
   // a leading "and" joins the amendment to the card ("and median"); the tokenizer says where the rest starts
   const { toks } = E.tokenize(raw, { names: {} }); const text = toks.length > 1 && toks[0].senses.some(x => x.cat === 'CONJ') ? raw.slice(toks[1].s) : raw;
   const take = cmd => { const f = frames.find(x => x.name === cmd.verb), out = f && f.bind(cmd, last.args, last); return out ? { tool: out.tool || last.tool, args: out.args } : null; };
@@ -21727,7 +21838,7 @@ function amendRead(raw, last, dry) {
   // with its verb ("trace it", "assume normal"), or as a fragment of one of the frames ("in milliseconds", "by character")
   let r = E.understand(text, makeSession([])), hit = pick(r);
   for (const f of frames) { if (hit) break; const s = makeSession([]); s.last = { verb: f.name, theme: [], roles: {} }; const rf = E.understand(text, s, { fragment: true }); hit = pick(rf); if (hit) r = rf; }
-  if (!hit) return null;
+  if (!hit || (exact && repaired(r))) return null;
   if (dry) return { amends: last.id, echo: r.echo || r.readings[0] };
   const res = runTool(hit.tool, hit.args); if (!res) return null;
   res.trace.unshift(`clause: amends #${String(last.id).padStart(2, '0')}: ${(r.echo || r.readings[0]).replace(/\.$/, '')}`);
@@ -21889,15 +22000,17 @@ session({ name: 'rename', label: 'Name session', words: ['name this session', 'n
 session({ name: 'undo', label: 'Undo', words: ['undo', 'undo that', 'take that back', 'scratch that', 'remove that', 'never mind'], theme: [], required: [], roles: {}, words_pt: ['desfaz', 'desfazer'], label_pt: 'Desfazer', bind: () => ({ session: 'undo' }) });
 session({ name: 'again', label: 'Again', words: ['again', 'repeat', 'rerun', 'do it again', 'repeat that', 'one more time', 'run it again'], theme: [], required: [], roles: {}, words_pt: ['de novo', 'repete'], label_pt: 'De novo', bind: () => ({ session: 'again' }) });
 session({ name: 'yes', label: 'Yes', words: ['yes', 'ok', 'okay', 'sure', 'do it', 'go', 'go ahead', 'yes please', 'yep', 'yeah', 'please do', 'that one'], theme: [], required: [], roles: {}, words_pt: ['sim', 'pode', 'isso'], label_pt: 'Sim', bind: () => ({ session: 'yes' }) });
-let sessionEngine = null;
+const sessionEngines = {};
 function sessionRead(raw) {
-  const frames = FRAMES.filter(f => f.session), o = ontology(frames), key = JSON.stringify(o);
-  if (!sessionEngine || sessionEngine.key !== key) sessionEngine = { key, E: createEngine(o, ENGLISH) };
-  const r = sessionEngine.E.understand(raw, makeSession([]));
-  if (r.status !== 'ok') return null;
-  const cmd = r.commands[0], f = frames.find(x => x.name === cmd.verb), b = f && f.bind(cmd); return b ? { ...b, echo: r.echo.replace(/\.$/, '') } : null;
+  const frames = FRAMES.filter(f => f.session), at = enginesFor(sessionEngines, ontology(frames));
+  for (const loc of order) {
+    const r = at(loc).understand(raw, makeSession([]));
+    if (r.status !== 'ok' || (loc !== order[0] && repaired(r))) continue;
+    const cmd = r.commands[0], f = frames.find(x => x.name === cmd.verb), b = f && f.bind(cmd); if (b) return { ...b, echo: r.echo.replace(/\.$/, '') };
+  }
+  return null;
 }
-  return { norm, clauseEngine, clauseRead, grammar, commandOf, context, readingOf, completions, taught, guessesOf, guessRead, sessionRead };
+  return { setLanguage, language, norm, clauseEngine, clauseRead, grammar, commandOf, context, readingOf, completions, taught, guessesOf, guessRead, sessionRead };
 })();
 
 /* ==== src/engine/sessions.js ==== */
@@ -29453,11 +29566,119 @@ if (typeof window !== 'undefined') {
   return { subplots, plot, scatter, imshow, hist, bar, cmap, Figure, Axes, LinearScale, getCmap, pltAdder, replay, recordingContext };
 })();
 
-/* ==== src/shell/render.js ==== */
+/* ==== src/shell/i18n.js ==== */
 const __m65 = (() => {
+// The interface in English or Brazilian Portuguese. golem's own words (the page, the sidebar, the composer, the cards'
+// frame, the messages) go through t(); the English is the key, so a sentence not translated yet shows in English and a
+// placeholder ({name}) is filled in after the lookup. What a tool answers is the tool's, in English for now.
+let cur = 'en';
+const uiLang = () => cur;
+function setUiLang(l) {
+  cur = l === 'pt' ? 'pt' : 'en';
+  if (typeof document !== 'undefined') document.documentElement.lang = cur === 'pt' ? 'pt-BR' : 'en';
+}
+function t(s, v) {
+  let out = cur === 'pt' && PT[s] != null ? PT[s] : s;
+  if (v) out = out.replace(/\{(\w+)\}/g, (m, k) => v[k] != null ? String(v[k]) : m);
+  return out;
+}
+// one word, singular or plural by n: t(plural(n, 'card', 'cards'))
+const plural = (n, one, many) => n === 1 ? one : many;
+// the page's own text: elements marked data-t (their markup is the key) and data-t-attr ("placeholder title aria-label")
+function applyStatic(root) {
+  root.querySelectorAll('[data-t]').forEach(el => { if (el.dataset.tEn == null) el.dataset.tEn = el.innerHTML; el.innerHTML = t(el.dataset.tEn); });
+  root.querySelectorAll('[data-t-attr]').forEach(el => {
+    for (const a of el.dataset.tAttr.split(' ')) { const k = 'tEn' + a.replace(/(^|-)(\w)/g, (m, d, c) => c.toUpperCase()); if (el.dataset[k] == null) el.dataset[k] = el.getAttribute(a) || ''; el.setAttribute(a, t(el.dataset[k])); }
+  });
+}
+
+const PT = {
+  // the page
+  'New session': 'Nova sessão', 'Search every session': 'Buscar em todas as sessões', 'Search history': 'Buscar no histórico', 'Search every session (Ctrl+K)': 'Buscar em todas as sessões (Ctrl+K)',
+  'Skills': 'Habilidades', 'Packs and this device': 'Pacotes e este aparelho', 'How golem reads': 'Como o golem lê', 'Theme': 'Tema', 'Language': 'Idioma', 'auto': 'auto', 'light': 'claro', 'dark': 'escuro',
+  'Hide the sidebar': 'Esconder a barra lateral', 'Hide the sidebar (Ctrl+B)': 'Esconder a barra lateral (Ctrl+B)', 'Close the sidebar': 'Fechar a barra lateral', 'Sessions and history': 'Sessões e histórico',
+  'Show the sidebar (Ctrl+B)': 'Mostrar a barra lateral (Ctrl+B)', 'New session (Ctrl+Shift+O)': 'Nova sessão (Ctrl+Shift+O)', 'awake': 'acordado', 'asleep': 'dormindo', 'on this device': 'neste aparelho',
+  'in the lead-acid shell': 'no app lead-acid', 'sleep': 'dormir', 'wake': 'acordar', 'Sleep: golem reads and runs nothing until you wake it': 'Dormir: o golem não lê nem roda nada até você acordá-lo',
+  'Requests golem has made to the network. Only installing a pack or checking for updates makes one.': 'Pedidos que o golem fez à rede. Só instalar um pacote ou buscar atualizações faz um.',
+  '{n} request': '{n} pedido', '{n} requests': '{n} pedidos',
+  'Ask, compute, or act. Nothing here calls a model: every answer is a reading you can check and a tool that computes. If I cannot read something, I say so.': 'Pergunte, calcule ou peça uma ação. Nada aqui chama um modelo: cada resposta é uma leitura que você pode conferir e uma ferramenta que calcula. Se eu não consigo ler algo, eu digo.',
+  'Tap one to start, or type below. A few sessions already run are under Examples in the sidebar.': 'Toque em um para começar, ou escreva abaixo. Algumas sessões já feitas estão em Exemplos, na barra lateral.',
+  'Example session': 'Sessão de exemplo', 'Questions and answers': 'Perguntas e respostas', 'Ask, compute, or act': 'Pergunte, calcule ou peça', 'Query': 'Pergunta', 'Completions': 'Sugestões',
+  'Open a file: a table, a drawing or a document': 'Abrir um arquivo: uma tabela, um desenho ou um documento', 'Open a file': 'Abrir um arquivo', 'Run': 'Rodar',
+  'Speak a question: the phone\'s own recognizer, offline': 'Falar uma pergunta: o reconhecedor do próprio celular, offline', 'Speak a question': 'Falar uma pergunta',
+  'Enter runs · Tab completes · Shift+Enter for a new line · ↑ for earlier queries': 'Enter roda · Tab completa · Shift+Enter quebra a linha · ↑ volta às anteriores',
+  'No model runs here. golem reads what you type, or says it cannot.': 'Nenhum modelo roda aqui. O golem lê o que você escreve, ou diz que não consegue.',
+  'Ask': 'Perguntar', 'Packs': 'Pacotes', 'Drop to open': 'Solte para abrir',
+  // the welcome's groups
+  'In the field': 'No campo', 'Lab and tables': 'Laboratório e tabelas', 'Units and numbers': 'Unidades e números', 'Every day': 'Dia a dia',
+  // the cards' frame
+  'grammar': 'gramática', 'context': 'contexto', 'taught': 'ensinado', 'guess': 'palpite', 'no reading': 'sem leitura', 'read as': 'lido como', 'how': 'como', 'step': 'passo', 'steps': 'passos', 'from #{n}': 'de #{n}',
+  'copy': 'copiar', 'edit': 'editar', 'pin': 'fixar', 'pinned': 'fixado', 'branch': 'ramificar', 'say': 'falar', 'or type it': 'ou escreva',
+  'Copy the answer (c)': 'Copiar a resposta (c)', 'Put this question back in the box to change it (e)': 'Pôr esta pergunta de volta na caixa para mudá-la (e)', 'Keep this card at the top of the session (p)': 'Manter este cartão no topo da sessão (p)',
+  'A new session with the cards up to this one': 'Uma sessão nova com os cartões até este', 'Read this answer aloud, with the phone\'s offline voice': 'Ler esta resposta em voz alta, com a voz offline do celular',
+  'Tap to change this reading': 'Toque para mudar esta leitura', '{v}: tap to read it another way': '{v}: toque para ler de outro jeito',
+  'Use my position': 'Usar minha posição', 'Take reading': 'Medir', 'no fix yet': 'sem posição ainda', 'waiting for the compass…': 'esperando a bússola…', 'The chart could not be drawn: {e}': 'Não consegui desenhar o gráfico: {e}',
+  // messages
+  'Copied.': 'Copiado.', 'Copy was blocked here. The text is shown so you can select it.': 'Copiar foi bloqueado aqui. O texto está à mostra para você selecionar.',
+  'Back in the box: change it and press Enter. The answer comes as a new card.': 'De volta na caixa: mude e aperte Enter. A resposta vem num cartão novo.',
+  'Pinned #{n}.': '#{n} fixado.', 'Unpinned #{n}.': '#{n} solto.', 'A new session, "{name}", with the cards up to #{n}.': 'Uma sessão nova, "{name}", com os cartões até #{n}.',
+  'Opening your sessions…': 'Abrindo suas sessões…', 'Asleep. Tap wake at the top right.': 'Dormindo. Toque em acordar, no canto de cima.', 'New session.': 'Sessão nova.', 'Session named “{name}”.': 'Sessão chamada “{name}”.',
+  'Answered #{n}: {label}': '#{n} respondido: {label}', 'Removed #{n}: {raw}': '#{n} removido: {raw}', 'Awake.': 'Acordado.', 'Asleep. Nothing runs until you wake it.': 'Dormindo. Nada roda até você acordá-lo.',
+  'Saved {name} to Downloads.': '{name} salvo em Downloads.', 'Not saved: {e}': 'Não salvo: {e}', 'Saved {name}.': '{name} salvo.',
+  'Listening. Tap the mic again to stop.': 'Ouvindo. Toque no microfone de novo para parar.', 'Heard. The reading is under the box; press Enter to run it.': 'Ouvi. A leitura está embaixo da caixa; aperte Enter para rodar.',
+  'Nothing heard.': 'Não ouvi nada.', 'The recognizer stopped: {code}.': 'O reconhecedor parou: {code}.', 'Voice needs the microphone: allow it in the dialog, or in the app\'s settings.': 'A voz precisa do microfone: permita na caixa de diálogo, ou nas configurações do app.',
+  'This phone has no offline recognizer for {lang}. Its language pack for offline speech is in the system settings.': 'Este celular não tem reconhecedor offline para {lang}. O pacote de idioma para fala offline fica nas configurações do sistema.',
+  'Voice failed: {e}': 'A voz falhou: {e}', 'No offline voice for {lang} on this phone.': 'Não há voz offline para {lang} neste celular.', 'Could not speak: {e}': 'Não consegui falar: {e}',
+  'The compass is not available here.': 'A bússola não está disponível aqui.', 'No reading from the compass yet: hold the phone still a moment.': 'Nenhuma leitura da bússola ainda: segure o celular parado um instante.',
+  'Measured.': 'Medido.', 'Measured. The phone moved while measuring; hold it still for a steadier reading.': 'Medido. O celular se mexeu durante a medida; segure parado para uma leitura mais firme.',
+  'Waiting for a fix…': 'Esperando uma posição…', 'Position needs the location permission: allow it in the dialog, or in the app\'s settings.': 'A posição precisa da permissão de localização: permita na caixa de diálogo, ou nas configurações do app.',
+  'No position: {e}': 'Sem posição: {e}', 'No fix. Go where the sky is open and try again.': 'Sem posição. Vá para onde o céu está aberto e tente de novo.', 'Position taken, ±{m} m.': 'Posição registrada, ±{m} m.',
+  'magnetic · compass {acc}': 'magnético · bússola {acc}', 'high': 'alta', 'medium': 'média', 'low': 'baixa', 'unreliable': 'não confiável', 'no sensor': 'sem sensor', 'not reported': 'não informada',
+  'That file is over 20 MB. golem streams large CSV and TSV tables; a {ext} that large is not read.': 'Esse arquivo passa de 20 MB. O golem lê CSV e TSV grandes aos poucos; um {ext} desse tamanho não é lido.',
+  'Opened {name} as a stream.': '{name} aberto aos poucos (stream).', '{name} could not be kept on this device; it works until the page closes.': 'Não consegui guardar {name} neste aparelho; funciona até a página fechar.',
+  'Could not read that file.': 'Não consegui ler esse arquivo.', 'Not installed: {e}.': 'Não instalado: {e}.', 'That is not a golem session file.': 'Isso não é um arquivo de sessão do golem.', 'Imported "{name}".': '"{name}" importada.',
+  'Opened {name}.': '{name} aberto.', 'Shared text is in the box: press Enter to run it.': 'O texto compartilhado está na caixa: aperte Enter para rodar.', 'Could not read the shared file: {e}': 'Não consegui ler o arquivo compartilhado: {e}',
+  'Checking…': 'Verificando…', 'No worker controls this page yet. Reload once, then check again.': 'Nenhum worker controla esta página ainda. Recarregue uma vez e verifique de novo.', 'golem is up to date.': 'O golem está atualizado.',
+  'This browser keeps nothing for golem: sessions last until the page closes.': 'Este navegador não guarda nada para o golem: as sessões duram até a página fechar.',
+  // the drawer
+  'Today': 'Hoje', 'This week': 'Esta semana', 'Earlier': 'Antes', 'Examples': 'Exemplos', 'example': 'exemplo', 'rename': 'renomear', 'export': 'exportar', 'delete': 'apagar', 'confirm delete': 'confirmar',
+  '{n} card': '{n} cartão', '{n} cards': '{n} cartões', '{n} match in history': '{n} resultado no histórico', '{n} matches in history': '{n} resultados no histórico',
+  'Session name. Leave empty to name it automatically.': 'Nome da sessão. Deixe vazio para dar nome automático.',
+  // the Skills tab
+  '{live} skills run here. {planned} more are planned from packages that already exist or are named here. Tap an example to run it.': '{live} habilidades rodam aqui. Mais {planned} estão planejadas, de pacotes que já existem ou estão nomeados aqui. Toque num exemplo para rodar.',
+  'live': 'pronta', 'planned': 'planejada', 'Compute': 'Cálculo', 'Field': 'Campo', 'Table': 'Tabela', 'Knowledge': 'Conhecimento', 'Device': 'Aparelho', 'Session': 'Sessão',
+  'Skill descriptions and answers are in English for now.': 'As descrições das habilidades e as respostas ainda estão em inglês.',
+  // Packs and this device
+  'golem knows what its installed packs hold. These are the gcu-library entries plus packs worth adding.': 'O golem sabe o que os pacotes instalados contêm. Estes são os itens da gcu-library, mais pacotes que valem acrescentar.',
+  'Library': 'Biblioteca', 'installed': 'instalado', 'sample': 'amostra', 'not wired': 'não ligado', 'On this device': 'Neste aparelho', 'Taught words': 'Palavras ensinadas', 'Notes': 'Notas', 'Open table': 'Tabela aberta', 'Files on this device': 'Arquivos neste aparelho',
+  'None yet. Try “pop means population”.': 'Nenhuma ainda. Experimente “pop means population”.', 'None yet. Try “remember that …”.': 'Nenhuma ainda. Experimente “lembra que …”.', 'None.': 'Nenhuma.', 'None yet. Tap the paperclip to open a CSV.': 'Nenhum ainda. Toque no clipe para abrir um CSV.',
+  '{name} · {n} rows · {source}': '{name} · {n} linhas · {source}', 'sample data': 'dados de amostra', 'from your files': 'dos seus arquivos',
+  'This app': 'Este app', 'Installed as an Android app through lead-acid. It has no network permission and checks for nothing: a new version comes as a new APK.': 'Instalado como app Android pelo lead-acid. Não tem permissão de rede e não verifica nada: uma versão nova vem como um APK novo.',
+  'Opened as a file, so there is nothing to install or update. Served over https, golem installs as an app and works offline.': 'Aberto como arquivo, então não há nada a instalar ou atualizar. Servido por https, o golem se instala como app e funciona offline.',
+  'Kept on this device and works offline. It looks for a new version only when you ask; that is one request to where golem came from.': 'Guardado neste aparelho e funciona offline. Só procura uma versão nova quando você pede; isso é um pedido para o lugar de onde o golem veio.',
+  ' Last checked {time}.': ' Última verificação: {time}.', 'Reload to the new golem': 'Recarregar para o golem novo', 'Check for updates': 'Buscar atualizações',
+  'Voice': 'Voz', 'The mic in the box listens with the phone\'s own recognizer, offline; what it hears goes into the box for you to check.': 'O microfone na caixa ouve com o reconhecedor do próprio celular, offline; o que ele ouve vai para a caixa para você conferir.',
+  'No offline recognizer for {lang} on this phone, so there is no mic.': 'Não há reconhecedor offline para {lang} neste celular, então não há microfone.', 'Answers can be read aloud with the phone\'s offline voices.': 'As respostas podem ser lidas em voz alta com as vozes offline do celular.',
+  'Reading every answer aloud': 'Lendo todas as respostas em voz alta', 'Read every answer aloud': 'Ler todas as respostas em voz alta', 'No offline voice for {lang}, so nothing is read aloud.': 'Não há voz offline para {lang}, então nada é lido em voz alta.',
+  'This app has no network permission, so the library is out of reach from here: download the .gcudat from gcu-library in a browser and open it with the paperclip.': 'Este app não tem permissão de rede, então a biblioteca está fora de alcance daqui: baixe o .gcudat da gcu-library num navegador e abra com o clipe.',
+  'Install from the library ({size})': 'Instalar da biblioteca ({size})', 'Install from the library (2.8 MB)': 'Instalar da biblioteca (2,8 MB)', 'With full profiles (5.1 MB)': 'Com os perfis completos (5,1 MB)', 'Add the full profiles (5.1 MB)': 'Acrescentar os perfis completos (5,1 MB)', 'Remove': 'Remover',
+  'Installed: version {v}, kept on this device.': 'Instalado: versão {v}, guardado neste aparelho.', 'This browser gives golem no IndexedDB, so a pack cannot be kept.': 'Este navegador não dá IndexedDB ao golem, então um pacote não pode ser guardado.',
+  ' Installing makes one request to the library for its list and one per pack; a .gcudat file opened with the paperclip installs with none.': ' Instalar faz um pedido à biblioteca pela lista e um por pacote; um arquivo .gcudat aberto com o clipe instala sem nenhum.',
+  'The 14-country sample ships with golem.': 'A amostra de 14 países vem com o golem.', 'Installed: version {v}, {n} countries{full}. Kept on this device.': 'Instalado: versão {v}, {n} países{full}. Guardado neste aparelho.', ', with the full profiles': ', com os perfis completos',
+  'Installing…': 'Instalando…', 'Installed: {n} countries{full}.': 'Instalado: {n} países{full}.', 'Removed. The 14-country sample answers again.': 'Removido. A amostra de 14 países responde de novo.',
+  'A sample term index ships: where a term is defined, without the passage.': 'Vem um índice de termos de amostra: onde um termo é definido, sem o trecho.', 'Installed: {n} terms with their defining passages.': 'Instalado: {n} termos com os trechos que os definem.',
+  'Removed. The sample term index answers again.': 'Removido. O índice de amostra responde de novo.', 'A sample of rules 10, 11 and 13 ships.': 'Vem uma amostra das regras 10, 11 e 13.',
+  'Installed: {n} checks from its rules and chapter V.': 'Instalado: {n} verificações das regras e do capítulo V.', 'Removed. The sample checks answer again.': 'Removido. As verificações de amostra respondem de novo.'
+};
+  return { uiLang, setUiLang, t, plural, applyStatic };
+})();
+
+/* ==== src/shell/render.js ==== */
+const __m66 = (() => {
 const { fmt } = __m0;
 const { conversions, equalArea } = __m5;
 const { Figure } = __m64;
+const { t } = __m65;
 // Rendering. The engine hands over plain blocks; this is the only file that turns them into markup.
 
 const escHtml = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -29510,7 +29731,7 @@ function drawChart(cv) {
   cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);   // the CSS sizes it (the column's width, its aspect kept)
   fig.draw(cv.getContext('2d'), { dpr });
 }
-function drawCharts(root) { (root || document).querySelectorAll('canvas[data-chart]').forEach(cv => { try { drawChart(cv); } catch (e) { cv.replaceWith(Object.assign(document.createElement('div'), { className: 'note err', textContent: `The chart could not be drawn: ${e.message}` })); } }); }
+function drawCharts(root) { (root || document).querySelectorAll('canvas[data-chart]').forEach(cv => { try { drawChart(cv); } catch (e) { cv.replaceWith(Object.assign(document.createElement('div'), { className: 'note err', textContent: t('The chart could not be drawn: {e}', { e: e.message }) })); } }); }
 function svgCurve(b) {
   const W = 340, H = 150, x0 = 38, X = x => x0 + x / b.xmax * (W - x0 - 10), Y = y => H - y / b.ymax * (H - 10);
   let s = `<svg viewBox="0 0 ${W} ${H + 24}" width="${W}" height="${H + 24}" role="img" aria-label="${escHtml(b.label)}"><path class="ax" d="M${x0} 6V${H}H${W - 6}"/>`;
@@ -29541,7 +29762,7 @@ function blockHtml(b) {
       : `<button class="btn${i.go ? ' go' : ''}" type="button" data-act="${escHtml(i.act)}"${i.msg ? ` data-msg="${escHtml(i.msg)}"` : ''}${i.send ? ` data-send="${escHtml(JSON.stringify(i.send))}"` : ''}>${escHtml(i.label)}</button>`).join('')}</div>`;
     case 'net': return svgNet(b);
     // a reading the card waits for: in the app, a live value and the button that takes it; in a browser, only the words
-    case 'capture': return `<div class="capture" data-kind="${escHtml(b.kind)}"><p class="how">${escHtml(b.how || '')}</p><div class="live" aria-live="off">${b.kind === 'position' ? 'no fix yet' : 'waiting for the compass…'}</div><div class="opts"><button class="btn go" type="button" data-act="take">${b.kind === 'position' ? 'Use my position' : 'Take reading'}</button></div></div>`;
+    case 'capture': return `<div class="capture" data-kind="${escHtml(b.kind)}"><p class="how">${escHtml(b.how || '')}</p><div class="live" aria-live="off">${t(b.kind === 'position' ? 'no fix yet' : 'waiting for the compass…')}</div><div class="opts"><button class="btn go" type="button" data-act="take">${t(b.kind === 'position' ? 'Use my position' : 'Take reading')}</button></div></div>`;
     case 'bars': return b.lo != null ? `<figure class="chart"><canvas data-chart="${escHtml(JSON.stringify(b))}" role="img" aria-label="${escHtml(chartLabel(b))}"></canvas></figure>` : svgBars(b);
     case 'figure': return `<figure class="fig"><canvas data-fig width="${+b.w || 400}" height="${+b.h || 300}" role="img" aria-label="${escHtml(b.label || 'Figure')}"></canvas><figcaption>${escHtml(b.label || 'Figure')}</figcaption></figure>`;
     case 'curve': return svgCurve(b);
@@ -29554,14 +29775,14 @@ function cardEl(c) {
   const el = document.createElement('article');
   el.className = 'card'; el.dataset.id = c.id; el.dataset.rung = c.rung; el.tabIndex = -1;
   el.setAttribute('aria-label', `#${pad(c.id)}: ${c.raw}`); if (c.pinned) el.dataset.pinned = '1';
-  const r = c.res, read = r.read.map(x => typeof x === 'string' ? escHtml(x) : x.alts ? `<button class="slot" type="button" data-act="slot" data-key="${x.key}" title="Tap to change this reading" aria-label="${escHtml(x.v)}: tap to read it another way">${escHtml(x.v)}</button>` : `<span class="slot">${escHtml(x.v)}</span>`).join(' ');
-  const ask = r.ask ? `<div class="note">${escHtml(r.ask.prompt)}</div>${r.ask.options.length ? `<div class="opts">${r.ask.options.map((o, i) => `<button class="btn" type="button" data-act="answer" data-i="${i}">${escHtml(o.label)}</button>`).join('')}${r.ask.parse ? '<span class="sub">or type it</span>' : ''}</div>` : ''}` : '';
+  const r = c.res, read = r.read.map(x => typeof x === 'string' ? escHtml(x) : x.alts ? `<button class="slot" type="button" data-act="slot" data-key="${x.key}" title="${escHtml(t('Tap to change this reading'))}" aria-label="${escHtml(t('{v}: tap to read it another way', { v: x.v }))}">${escHtml(x.v)}</button>` : `<span class="slot">${escHtml(x.v)}</span>`).join(' ');
+  const ask = r.ask ? `<div class="note">${escHtml(r.ask.prompt)}</div>${r.ask.options.length ? `<div class="opts">${r.ask.options.map((o, i) => `<button class="btn" type="button" data-act="answer" data-i="${i}">${escHtml(o.label)}</button>`).join('')}${r.ask.parse ? `<span class="sub">${t('or type it')}</span>` : ''}</div>` : ''}` : '';
   el.innerHTML = `<div class="q">${escHtml(c.raw)}</div>
-    <div class="reply"><div class="chead"><span class="rung ${c.rung}">${RUNG[c.rung]}</span><span>#${pad(c.id)}</span>${c.amends ? `<span>from #${pad(c.amends)}</span>` : ''}<span class="ms">${c.ms < 10 ? c.ms.toFixed(1) : Math.round(c.ms)} ms</span></div>
-    ${read ? `<div class="read"><span class="lbl">read as</span> ${read}</div>` : ''}
+    <div class="reply"><div class="chead"><span class="rung ${c.rung}">${t(RUNG[c.rung])}</span><span>#${pad(c.id)}</span>${c.amends ? `<span>${t('from #{n}', { n: pad(c.amends) })}</span>` : ''}<span class="ms">${c.ms < 10 ? c.ms.toFixed(1) : Math.round(c.ms)} ms</span></div>
+    ${read ? `<div class="read"><span class="lbl">${t('read as')}</span> ${read}</div>` : ''}
     <div class="ans">${r.body.map(blockHtml).join('')}${ask}</div>
-    <div class="cfoot"><details class="trace"><summary>how · ${r.trace.length} step${r.trace.length === 1 ? '' : 's'}</summary><ol>${r.trace.map(t => `<li>${escHtml(t)}</li>`).join('')}</ol></details>
-    <span class="cacts"><button class="cact" type="button" data-act="copyans" title="Copy the answer (c)">copy</button><button class="cact" type="button" data-act="edit" title="Put this question back in the box to change it (e)">edit</button><button class="cact" type="button" data-act="pin" aria-pressed="${!!c.pinned}" title="Keep this card at the top of the session (p)">${c.pinned ? 'pinned' : 'pin'}</button><button class="cact" type="button" data-act="branch" title="A new session with the cards up to this one">branch</button><button class="cact say" type="button" data-act="say" title="Read this answer aloud, with the phone's offline voice">say</button></span></div></div>`;
+    <div class="cfoot"><details class="trace"><summary>${t('how')} · ${r.trace.length} ${t(r.trace.length === 1 ? 'step' : 'steps')}</summary><ol>${r.trace.map(t => `<li>${escHtml(t)}</li>`).join('')}</ol></details>
+    <span class="cacts"><button class="cact" type="button" data-act="copyans" title="${escHtml(t('Copy the answer (c)'))}">${t('copy')}</button><button class="cact" type="button" data-act="edit" title="${escHtml(t('Put this question back in the box to change it (e)'))}">${t('edit')}</button><button class="cact" type="button" data-act="pin" aria-pressed="${!!c.pinned}" title="${escHtml(t('Keep this card at the top of the session (p)'))}">${t(c.pinned ? 'pinned' : 'pin')}</button><button class="cact" type="button" data-act="branch" title="${escHtml(t('A new session with the cards up to this one'))}">${t('branch')}</button><button class="cact say" type="button" data-act="say" title="${escHtml(t('Read this answer aloud, with the phone\'s offline voice'))}">${t('say')}</button></span></div></div>`;
   const figs = r.body.filter(b => b.t === 'figure');
   el.querySelectorAll('canvas[data-fig]').forEach((cv, i) => { try { drawFigure(cv, figs[i]); } catch (e) { cv.replaceWith(Object.assign(document.createElement('div'), { className: 'note err', textContent: `The figure could not be drawn: ${e.message}` })); } });
   return el;
@@ -29595,7 +29816,7 @@ function figImage(ctx, x, y, w, h, cols, rows, b64) {
 })();
 
 /* ==== src/vendor/sw-register.js ==== */
-const __m66 = (() => {
+const __m67 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sw's page-side companion, copied from ../auditable/ext/sw/register.js (at auditable 8837da6e).
 
 // @gcu/sw — the page-side companion (ES module). Registration + persistent
@@ -29673,7 +29894,7 @@ function registerGcuSw(opts = {}) {
 })();
 
 /* ==== src/shell/main.js ==== */
-const __m67 = (() => {
+const __m68 = (() => {
 const { S } = __m0;
 const { submit, flipSlot, answer, capture, seedExamples, openFile, openBinary, openStreamed, preview } = __m59;
 const { scanTable, STREAM_OVER } = __m58;
@@ -29687,19 +29908,22 @@ const { BINARY } = __m48;
 const { setRunner, onJobDone } = __m0;
 const { sessions, current, newSession, openSession, renameSession, deleteSession, searchHistory, parts, hydrate, onChange, exportSession, importSession, pinCard, branchSession } = __m54;
 const { openStore, putBlob, getBlob } = __m62;
-const { skills, PACKS, STARTERS } = __m50;
+const { skills, PACKS, STARTERS, STARTERS_PT } = __m50;
 const { shell } = __m63;
-const { escHtml, pad, cardEl, drawCharts } = __m65;
-const { registerGcuSw } = __m66;
+const { escHtml, pad, cardEl, drawCharts } = __m66;
+const { registerGcuSw } = __m67;
+const { t, plural, setUiLang, uiLang, applyStatic } = __m65;
+const { setLanguage } = __m53;
 // The shell: wiring, tabs, the session drawer, storage, and the sleep switch. Everything that touches
 // the DOM or the browser lives here or in render.js; the engine never does.
 
 const $ = id => document.getElementById(id);
-const THEME = 'golem.theme', FOLD = 'golem.side';
+const THEME = 'golem.theme', FOLD = 'golem.side', LANG = 'golem.lang';
 const narrow = () => window.matchMedia('(max-width: 860px)').matches;
 let awake = true, statusT;
 
-function status(msg) { $('status').textContent = msg; clearTimeout(statusT); statusT = setTimeout(() => { $('status').textContent = ''; }, 5000); }
+// a message in the person's language: t() on a sentence that is already translated leaves it as it is
+function status(msg) { $('status').textContent = t(msg); clearTimeout(statusT); statusT = setTimeout(() => { $('status').textContent = ''; }, 5000); }
 function showTab(t) {
   ['ask', 'skills', 'packs', 'about'].forEach(k => { $('v-' + k).hidden = k !== t; });
   document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === t));
@@ -29714,7 +29938,9 @@ function tick() {
 setInterval(tick, 500);
 
 /* ── the stream ── */
-function renderBar() { $('sname').textContent = current().name; }
+// a session's name as shown: the default one in the person's language, any other as it is
+const nameOf = s => s.name === 'New session' ? t('New session') : s.name;
+function renderBar() { $('sname').textContent = nameOf(current()); }
 function renderStream(focus) {
   $('stream').innerHTML = '';
   S.cards.forEach(c => $('stream').appendChild(cardEl(c))); drawCharts($('stream')); armCaptures();
@@ -29727,7 +29953,7 @@ function welcome() { $('welcome').hidden = S.cards.length > 0; renderPins(); }
 function renderPins() {
   const pins = S.cards.filter(c => c.pinned);
   $('pins').hidden = !pins.length;
-  $('pins').innerHTML = pins.length ? `<span class="lbl">pinned</span>${pins.map(c => `<button class="chip" type="button" data-goto="${c.id}">#${pad(c.id)} ${escHtml(c.raw.length > 40 ? c.raw.slice(0, 39) + '…' : c.raw)}</button>`).join('')}` : '';
+  $('pins').innerHTML = pins.length ? `<span class="lbl">${t('pinned')}</span>${pins.map(c => `<button class="chip" type="button" data-goto="${c.id}">#${pad(c.id)} ${escHtml(c.raw.length > 40 ? c.raw.slice(0, 39) + '…' : c.raw)}</button>`).join('')}` : '';
 }
 const cardOf = id => $('stream').querySelector(`.card[data-id="${id}"]`);
 function copyText(text, where) {
@@ -29741,8 +29967,8 @@ function cardAction(c, act) {
   const answerText = () => el ? [...el.querySelector('.ans').children].filter(n => !n.matches('.src, .opts')).map(n => n.innerText.trim()).filter(Boolean).join('\n') : '';
   if (act === 'copyans') copyText(c.res.copy || answerText(), el && el.querySelector('.ans'));
   else if (act === 'edit') { const q = $('q'); q.value = c.raw; q.dispatchEvent(new Event('input')); q.focus(); q.setSelectionRange(q.value.length, q.value.length); status('Back in the box: change it and press Enter. The answer comes as a new card.'); }
-  else if (act === 'pin') { const on = pinCard(c); replaceCard(c); renderPins(); status(on ? `Pinned #${pad(c.id)}.` : `Unpinned #${pad(c.id)}.`); }
-  else if (act === 'branch') { const s = branchSession(c.id); renderStream(); renderDrawer(); status(`A new session, "${s.name}", with the cards up to #${pad(c.id)}.`); }
+  else if (act === 'pin') { const on = pinCard(c); replaceCard(c); renderPins(); status(t(on ? 'Pinned #{n}.' : 'Unpinned #{n}.', { n: pad(c.id) })); }
+  else if (act === 'branch') { const s = branchSession(c.id); renderStream(); renderDrawer(); status(t('A new session, "{name}", with the cards up to #{n}.', { name: s.name, n: pad(c.id) })); }
 }
 // moving between cards from the keyboard: j / k or the arrows when the box is not focused; c, e, p act on the focused card;
 // / or Escape goes back to the box
@@ -29779,9 +30005,9 @@ function show(o) {
     case 'new-session': renderStream(); status('New session.'); break;
     case 'recipe': renderStream(); status(o.msg); break;
     case 'drawer': openDrawer(); break;
-    case 'rename': status(`Session named “${o.name}”.`); break;
-    case 'answered': replaceCard(o.card); status(`Answered #${pad(o.card.id)}: ${o.label}`); break;
-    case 'undo': { const el = $('stream').querySelector(`[data-id="${o.card.id}"]`); if (el) el.remove(); welcome(); status(`Removed #${pad(o.card.id)}: ${o.card.raw}`); break; }
+    case 'rename': status(t('Session named “{name}”.', { name: o.name })); break;
+    case 'answered': replaceCard(o.card); status(t('Answered #{n}: {label}', { n: pad(o.card.id), label: o.label })); break;
+    case 'undo': { const el = $('stream').querySelector(`[data-id="${o.card.id}"]`); if (el) el.remove(); welcome(); status(t('Removed #{n}: {raw}', { n: pad(o.card.id), raw: o.card.raw })); break; }
     case 'nothing': status(o.msg); break;
     case 'card': {
       const el = cardEl(o.card); $('stream').appendChild(el); drawCharts(el); welcome(); armCaptures(); if (voice.all) say(el); showTab('ask'); el.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
@@ -29796,10 +30022,10 @@ function show(o) {
 
 /* ── catalog and packs ── */
 function renderSkills() {
-  const rows = skills(), live = rows.filter(s => s.live).length; let h = `<h1 class="vhead">Skills</h1><div class="sub">${live} skills run here. ${rows.length - live} more are planned from packages that already exist or are named here. Tap an example to run it.</div>`, g = '';
+  const rows = skills(), live = rows.filter(s => s.live).length; let h = `<h1 class="vhead">${t('Skills')}</h1><div class="sub">${t('{live} skills run here. {planned} more are planned from packages that already exist or are named here. Tap an example to run it.', { live, planned: rows.length - live })}${uiLang() === 'pt' ? ' ' + t('Skill descriptions and answers are in English for now.') : ''}</div>`, g = '';
   rows.forEach(s => {
-    if (s.group !== g) { h += `<div class="lbl">${escHtml(s.group)}</div>`; g = s.group; }
-    h += `<div class="item"><h3>${escHtml(s.title)} <span class="tag ${s.live ? 'live' : 'plan'}">${s.live ? 'live' : 'planned'}</span></h3><p>${escHtml(s.about)}</p><div class="from">${escHtml(s.on)}</div>${s.examples.length ? `<div class="opts">${s.examples.map(x => `<button class="chip" type="button" data-q="${escHtml(x)}" style="white-space:normal;text-align:left">${escHtml(x)}</button>`).join('')}</div>` : ''}</div>`;
+    if (s.group !== g) { h += `<div class="lbl">${escHtml(t(s.group))}</div>`; g = s.group; }
+    h += `<div class="item"><h3>${escHtml(s.title)} <span class="tag ${s.live ? 'live' : 'plan'}">${t(s.live ? 'live' : 'planned')}</span></h3><p>${escHtml(s.about)}</p><div class="from">${escHtml(s.on)}</div>${s.examples.length ? `<div class="opts">${s.examples.map(x => `<button class="chip" type="button" data-q="${escHtml(x)}" style="white-space:normal;text-align:left">${escHtml(x)}</button>`).join('')}</div>` : ''}</div>`;
   });
   $('v-skills').innerHTML = h;
 }
@@ -29808,26 +30034,27 @@ function renderSkills() {
 // file there is no worker, and nothing to install or update. Inside the lead-acid shell (the Android app) there is none either:
 // the app has no network permission, a new version is a new APK, and the library is reached through .gcudat files.
 const inApp = shell.present;
-const OFFLINE_APP = 'This app has no network permission, so the library is out of reach from here: download the .gcudat from gcu-library in a browser and open it with the paperclip.';
+const OFFLINE_APP = () => t('This app has no network permission, so the library is out of reach from here: download the .gcudat from gcu-library in a browser and open it with the paperclip.');
 let requests = 0, update = { at: null, ready: false, note: '' };
 // Saving a file: a download in a browser; in the app (whose WebView drops downloads) lead-acid publishes it to Downloads,
 // under the name Android gave it ("x (1).ics" when x.ics is there).
 async function saveFile(name, data, mime) {
   if (inApp) {
-    try { const r = await shell.publish(name, typeof data === 'string' ? new TextEncoder().encode(data) : data, { collection: 'Downloads', mime }); status(`Saved ${r.name || name} to Downloads.`); }
-    catch (e) { status(`Not saved: ${e.message}`); }
+    try { const r = await shell.publish(name, typeof data === 'string' ? new TextEncoder().encode(data) : data, { collection: 'Downloads', mime }); status(t('Saved {name} to Downloads.', { name: r.name || name })); }
+    catch (e) { status(t('Not saved: {e}', { e: e.message })); }
     return;
   }
   const url = URL.createObjectURL(new Blob([data], { type: mime })), a = document.createElement('a');
-  a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000); status(`Saved ${name}.`);
+  a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000); status(t('Saved {name}.', { name }));
 }
-const countRequest = () => { requests++; $('st-req').textContent = `${requests} request${requests === 1 ? '' : 's'}`; };
+const requestText = () => t(requests === 1 ? '{n} request' : '{n} requests', { n: requests });
+const countRequest = () => { requests++; $('st-req').textContent = requestText(); };
 const sw = inApp ? { supported: false, checkNow: async () => null, applyUpdate() {} } : registerGcuSw({ url: 'sw.js', persist: true, onUpdateAvailable: () => { update.ready = true; renderPacks(); } });
 async function checkUpdates() {
-  countRequest(); update.note = 'Checking…'; renderPacks();
+  countRequest(); update.note = t('Checking…'); renderPacks();
   const r = await sw.checkNow();
   update.at = Date.now();
-  update.note = !r ? 'No worker controls this page yet. Reload once, then check again.' : r.changed ? '' : 'golem is up to date.';
+  update.note = !r ? t('No worker controls this page yet. Reload once, then check again.') : r.changed ? '' : t('golem is up to date.');
   if (r && r.changed) update.ready = true;
   renderPacks();
 }
@@ -29837,10 +30064,17 @@ async function checkUpdates() {
 const VOICE = 'golem.say';
 const voice = { hear: false, say: false, all: false };
 try { voice.all = localStorage.getItem(VOICE) === 'all'; } catch (e) { /* storage is optional */ }
+// the language golem listens and speaks in: the interface's (pt-BR or en-US)
+const speechLang = () => uiLang() === 'pt' ? 'pt-BR' : 'en-US', langName = () => uiLang() === 'pt' ? 'português' : 'English';
 const data = d => typeof d === 'string' ? (() => { try { return JSON.parse(d); } catch (e) { return {}; } })() : (d || {});
+// what the phone offers in the person's language (checked again when the language changes)
+function voiceSupport() {
+  if (!inApp) return;
+  shell.speech.support(speechLang()).then(s => { voice.hear = !!(s && s.onDevice && s.language && s.language.installed); $('mic').hidden = !voice.hear; renderPacks(); }).catch(() => {});
+}
 if (inApp) {
-  shell.speech.support('en-US').then(s => { if (s && s.onDevice && s.language && s.language.installed) { voice.hear = true; $('mic').hidden = false; } }).catch(() => {});
-  shell.tts.support().then(t => { if (t && t.available && t.offlineVoices) { voice.say = true; document.documentElement.dataset.say = '1'; renderPacks(); } }).catch(() => {});
+  voiceSupport();
+  shell.tts.support().then(v => { if (v && v.available && v.offlineVoices) { voice.say = true; document.documentElement.dataset.say = '1'; renderPacks(); } }).catch(() => {});
 }
 // the words the recognizer should expect: the open table's columns and categories, and the units golem knows by name
 const biasWords = () => [...(S.table ? S.table.cols.map(c => c.name) : []), ...(S.table ? S.table.cols.flatMap(c => c.values || []).slice(0, 40) : []), 'g/t', 'ppm', 'dip direction', 'trend', 'plunge'].slice(0, 80);
@@ -29849,29 +30083,29 @@ async function listen() {
   if (listening) { listening.stop(); return; }
   const q = $('q'), put = t => { q.value = t; q.dispatchEvent(new Event('input')); };
   try {
-    listening = await shell.speech.listen({ lang: 'en-US', bias: biasWords() });
+    listening = await shell.speech.listen({ lang: speechLang(), bias: biasWords() });
     $('mic').setAttribute('aria-pressed', 'true'); status('Listening. Tap the mic again to stop.');
     listening.on('partial', d => put(data(d).text || ''))
       .on('result', d => { const a = data(d).alternatives || [], t = a.length ? a[0].text : ''; put(t); q.focus(); status(t ? 'Heard. The reading is under the box; press Enter to run it.' : 'Nothing heard.'); })
-      .on('error', d => status(`The recognizer stopped: ${data(d).code || 'error'}.`))
+      .on('error', d => status(t('The recognizer stopped: {code}.', { code: data(d).code || 'error' })))
       .onClose(() => { listening = null; $('mic').setAttribute('aria-pressed', 'false'); });
   } catch (e) {
     listening = null; $('mic').setAttribute('aria-pressed', 'false');
-    status(e.status === 403 ? 'Voice needs the microphone: allow it in the dialog, or in the app\'s settings.' : e.status === 503 ? 'This phone has no offline recognizer for English. Its language pack for offline speech is in the system settings.' : `Voice failed: ${e.message}`);
+    status(e.status === 403 ? t('Voice needs the microphone: allow it in the dialog, or in the app\'s settings.') : e.status === 503 ? t('This phone has no offline recognizer for {lang}. Its language pack for offline speech is in the system settings.', { lang: langName() }) : t('Voice failed: {e}', { e: e.message }));
   }
 }
 $('mic').addEventListener('click', () => { if (awake) listen(); });
 // a card said aloud: what was read, then the answer's first lines, without sources
 function spokenOf(el) {
   const read = el.querySelector('.read'), ans = [...el.querySelector('.ans').children].filter(n => !n.matches('.src, .opts, .lbl, figure, svg, canvas'));
-  return [read ? read.innerText.replace(/^read as\s*/i, '').replace(/⇄/g, '') : '', ...ans.slice(0, 2).map(n => n.innerText)].join('. ').replace(/\s+/g, ' ').slice(0, 400);
+  return [read ? read.innerText.replace(/^(read as|lido como)\s*/i, '').replace(/⇄/g, '') : '', ...ans.slice(0, 2).map(n => n.innerText)].join('. ').replace(/\s+/g, ' ').slice(0, 400);
 }
-function say(el) { if (voice.say && el) shell.tts.speak(spokenOf(el), { lang: 'en-US', queue: 'flush' }).catch(e => status(e.status === 503 ? 'No offline voice for English on this phone.' : `Could not speak: ${e.message}`)); }
+function say(el) { if (voice.say && el) shell.tts.speak(spokenOf(el), { lang: speechLang(), queue: 'flush' }).catch(e => status(e.status === 503 ? t('No offline voice for {lang} on this phone.', { lang: langName() }) : t('Could not speak: {e}', { e: e.message }))); }
 function voiceItem() {
   if (!inApp) return '';
-  const hear = voice.hear ? 'The mic in the box listens with the phone\'s own recognizer, offline; what it hears goes into the box for you to check.' : 'No offline recognizer for English on this phone, so there is no mic.';
-  const out = voice.say ? `Answers can be read aloud with the phone's offline voices.</p><div class="opts"><button class="btn${voice.all ? ' go' : ''}" type="button" id="say-all" aria-pressed="${voice.all}">${voice.all ? 'Reading every answer aloud' : 'Read every answer aloud'}</button></div>` : 'No offline voice for English, so nothing is read aloud.</p>';
-  return `<div class="item"><h3>Voice</h3><p>${hear} ${out}</div>`;
+  const hear = voice.hear ? t('The mic in the box listens with the phone\'s own recognizer, offline; what it hears goes into the box for you to check.') : t('No offline recognizer for {lang} on this phone, so there is no mic.', { lang: langName() });
+  const out = voice.say ? `${t('Answers can be read aloud with the phone\'s offline voices.')}</p><div class="opts"><button class="btn${voice.all ? ' go' : ''}" type="button" id="say-all" aria-pressed="${voice.all}">${t(voice.all ? 'Reading every answer aloud' : 'Read every answer aloud')}</button></div>` : t('No offline voice for {lang}, so nothing is read aloud.', { lang: langName() }) + '</p>';
+  return `<div class="item"><h3>${t('Voice')}</h3><p>${hear} ${out}</div>`;
 }
 /* ── field capture, in the app: the phone's fused orientation for a plane or a line, one position fix. A card that waits
    for a reading (res.capture) shows it live; the reading taken goes into the card's args (capture() in the engine). ── */
@@ -29891,14 +30125,14 @@ async function armCaptures() {
     orient = await shell.orientation({ rateHz: 20 });
     orient.on(o => { samples.push({ alpha: o.alpha, beta: o.beta, gamma: o.gamma, acc: o.accuracy, t: Date.now() }); samples = samples.filter(s => s.t > Date.now() - 1000); paintCaptures(); })
       .onClose(() => { orient = null; });
-  } catch (e) { orient = null; $('stream').querySelectorAll('.capture .live').forEach(l => { l.textContent = 'The compass is not available here.'; }); }
+  } catch (e) { orient = null; $('stream').querySelectorAll('.capture .live').forEach(l => { l.textContent = t('The compass is not available here.'); }); }
 }
 function paintCaptures() {
   const s = samples[samples.length - 1];
   for (const c of pendingCaptures()) {
     const live = cardOf(c.id) && cardOf(c.id).querySelector('.capture .live'); if (!live || !s) continue;
     const [x, y] = fromDevice(c.res.capture.kind, s.alpha, s.beta, s.gamma);
-    live.innerHTML = `${String(Math.round(((x % 360) + 360) % 360)).padStart(3, '0')}/${String(Math.round(y)).padStart(2, '0')}<small>magnetic · compass ${escHtml(ACCW[s.acc] || 'not reported')}</small>`;
+    live.innerHTML = `${String(Math.round(((x % 360) + 360) % 360)).padStart(3, '0')}/${String(Math.round(y)).padStart(2, '0')}<small>${escHtml(t('magnetic · compass {acc}', { acc: t(ACCW[s.acc] || 'not reported') }))}</small>`;
   }
 }
 // the steadiest reading of the last second: the sample nearest the others, and how far the farthest was
@@ -29910,29 +30144,29 @@ function takeReading(c) {
   vs.forEach((v, i) => { const sum = vs.reduce((a, w) => a + angle(v, w), 0); if (sum < bestSum) { bestSum = sum; best = i; } });
   const s = samples[best], spread = Math.max(...vs.map(w => angle(vs[best], w)));
   capture(c, { alpha: s.alpha, beta: s.beta, gamma: s.gamma, acc: s.acc, spread: Math.round(spread * 10) / 10, at: s.t });
-  replaceCard(c); armCaptures(); status(`Measured. ${spread > 2 ? 'The phone moved while measuring; hold it still for a steadier reading.' : ''}`.trim());
+  replaceCard(c); armCaptures(); status(spread > 2 ? 'Measured. The phone moved while measuring; hold it still for a steadier reading.' : 'Measured.');
 }
 // one position fix: the first good one in 15 seconds, or the best of them
 async function takePosition(c) {
   const live = cardOf(c.id) && cardOf(c.id).querySelector('.capture .live'), show = t => { if (live) live.textContent = t; };
   let best = null, st = null;
   try {
-    st = await shell.gnss.location({ minMs: 1000 }); show('Waiting for a fix…');
+    st = await shell.gnss.location({ minMs: 1000 }); show(t('Waiting for a fix…'));
     await new Promise(done => {
       const stop = setTimeout(done, 15000);
       st.on('fix', d => { const f = data(d); if (f.lat == null) return; if (!best || (f.acc != null && f.acc < best.acc)) best = f; show(`±${Math.round(f.acc)} m…`); if (f.acc != null && f.acc <= 20) { clearTimeout(stop); done(); } });
     });
-  } catch (e) { show(''); status(e.status === 403 || (e.info && e.info.error === 'permission') ? 'Position needs the location permission: allow it in the dialog, or in the app\'s settings.' : `No position: ${e.message}`); return; }
+  } catch (e) { show(''); status(e.status === 403 || (e.info && e.info.error === 'permission') ? t('Position needs the location permission: allow it in the dialog, or in the app\'s settings.') : t('No position: {e}', { e: e.message })); return; }
   finally { if (st) st.close(); }
-  if (!best) { show('No fix. Go where the sky is open and try again.'); return; }
-  capture(c, { lat: best.lat, lon: best.lon, acc: best.acc, at: best.t || Date.now() }); replaceCard(c); status(`Position taken, ±${Math.round(best.acc)} m.`);
+  if (!best) { show(t('No fix. Go where the sky is open and try again.')); return; }
+  capture(c, { lat: best.lat, lon: best.lon, acc: best.acc, at: best.t || Date.now() }); replaceCard(c); status(t('Position taken, ±{m} m.', { m: Math.round(best.acc) }));
 }
 function appItem() {
-  if (inApp) return '<div class="item"><h3>This app</h3><p>Installed as an Android app through lead-acid. It has no network permission and checks for nothing: a new version comes as a new APK.</p></div>';
-  if (!sw.supported) return '<div class="item"><h3>This app</h3><p>Opened as a file, so there is nothing to install or update. Served over https, golem installs as an app and works offline.</p></div>';
-  const at = update.at ? ` Last checked ${new Date(update.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}.` : '';
-  return `<div class="item"><h3>This app</h3><p>Kept on this device and works offline. It looks for a new version only when you ask; that is one request to where golem came from.${at}</p>`
-    + `<div class="opts">${update.ready ? '<button class="btn go" type="button" id="sw-apply">Reload to the new golem</button>' : '<button class="btn" type="button" id="sw-check">Check for updates</button>'}${update.note ? `<span class="sub">${escHtml(update.note)}</span>` : ''}</div></div>`;
+  if (inApp) return `<div class="item"><h3>${t('This app')}</h3><p>${t('Installed as an Android app through lead-acid. It has no network permission and checks for nothing: a new version comes as a new APK.')}</p></div>`;
+  if (!sw.supported) return `<div class="item"><h3>${t('This app')}</h3><p>${t('Opened as a file, so there is nothing to install or update. Served over https, golem installs as an app and works offline.')}</p></div>`;
+  const at = update.at ? t(' Last checked {time}.', { time: new Date(update.at).toLocaleTimeString(uiLang() === 'pt' ? 'pt-BR' : 'en-GB', { hour: '2-digit', minute: '2-digit' }) }) : '';
+  return `<div class="item"><h3>${t('This app')}</h3><p>${t('Kept on this device and works offline. It looks for a new version only when you ask; that is one request to where golem came from.')}${at}</p>`
+    + `<div class="opts">${update.ready ? `<button class="btn go" type="button" id="sw-apply">${t('Reload to the new golem')}</button>` : `<button class="btn" type="button" id="sw-check">${t('Check for updates')}</button>`}${update.note ? `<span class="sub">${escHtml(update.note)}</span>` : ''}</div></div>`;
 }
 // The Factbook pack (SPEC 13.8), installed on request: from gcu-library (one request for its registry, one per pack, each
 // checked against the registry's SHA-256) or from a .gcudat file opened with the paperclip. Kept by store.js under /packs/.
@@ -29953,39 +30187,39 @@ async function registry() {
   return n => (Array.isArray(list) ? list : Object.values(list)).find(e => e && e.name === n);
 }
 async function installFactbook(full) {
-  if (packBusy) return; packBusy = true; packNote = 'Installing…'; renderPacks();
+  if (packBusy) return; packBusy = true; packNote = t('Installing…'); renderPacks();
   try {
     const find = await registry();
     const fb = find('factbook'), ff = full ? find('factbook-full') : null; if (!fb || (full && !ff)) throw new Error('the library lists no factbook pack');
     const pack = await factbookFromGcudat(await fetchPack(fb), ff ? await fetchPack(ff) : null);
     await keepFactbook(pack);
-  } catch (e) { packNote = `Not installed: ${e.message}.`; }
+  } catch (e) { packNote = t('Not installed: {e}.', { e: e.message }); }
   packBusy = false; renderPacks();
 }
 async function keepFactbook(pack) {
   await store.writePack('factbook', pack);
-  const i = useFactbook(pack); packNote = `Installed: ${i.count} countries${pack.profiles ? ', with the full profiles' : ''}.`; status(packNote);
+  const i = useFactbook(pack); packNote = t('Installed: {n} countries{full}.', { n: i.count, full: pack.profiles ? t(', with the full profiles') : '' }); status(packNote);
 }
 // the book packs: compiled at install into the index golem uses (packs.js), kept, handed to books.js
 const BOOKS = {
-  ods: { compile: compileOds, size: '1.9 MB', sample: 'A sample term index ships: where a term is defined, without the passage.', installed: i => `Installed: ${i.count} terms with their defining passages.`, removed: 'Removed. The sample term index answers again.' },
-  'elements-of-style': { compile: compileStrunk, size: '36 kB', sample: 'A sample of rules 10, 11 and 13 ships.', installed: i => `Installed: ${i.count} checks from its rules and chapter V.`, removed: 'Removed. The sample checks answer again.' },
+  ods: { compile: compileOds, size: '1.9 MB', sample: 'A sample term index ships: where a term is defined, without the passage.', installed: i => t('Installed: {n} terms with their defining passages.', { n: i.count }), removed: 'Removed. The sample term index answers again.' },
+  'elements-of-style': { compile: compileStrunk, size: '36 kB', sample: 'A sample of rules 10, 11 and 13 ships.', installed: i => t('Installed: {n} checks from its rules and chapter V.', { n: i.count }), removed: 'Removed. The sample checks answer again.' },
 };
 const bookNote = {};
 async function keepBook(slug, compiled) { await store.writePack(slug, compiled); bookNote[slug] = BOOKS[slug].installed(useBook(slug, compiled)); status(bookNote[slug]); }
 async function installBook(slug) {
-  if (packBusy) return; packBusy = true; bookNote[slug] = 'Installing…'; renderPacks();
+  if (packBusy) return; packBusy = true; bookNote[slug] = t('Installing…'); renderPacks();
   try { const e = (await registry())(slug); if (!e) throw new Error(`the library lists no ${slug} pack`); await keepBook(slug, await BOOKS[slug].compile(await fetchPack(e))); }
-  catch (err) { bookNote[slug] = `Not installed: ${err.message}.`; }
+  catch (err) { bookNote[slug] = t('Not installed: {e}.', { e: err.message }); }
   packBusy = false; renderPacks();
 }
-async function removeBook(slug) { await store.removePack(slug); useBook(slug, null); bookNote[slug] = BOOKS[slug].removed; renderPacks(); }
+async function removeBook(slug) { await store.removePack(slug); useBook(slug, null); bookNote[slug] = t(BOOKS[slug].removed); renderPacks(); }
 function bookItem(slug) {
   const i = bookInfo(slug), B = BOOKS[slug];
-  const acts = i.kind === 'sample' ? (inApp ? `<span class="sub">${OFFLINE_APP}</span>` : `<button class="btn go" type="button" data-pk-install="${slug}">Install from the library (${B.size})</button>`) : `<button class="btn" type="button" data-pk-remove="${slug}">Remove</button>`;
-  return `<p>${i.kind === 'sample' ? B.sample : `Installed: version ${escHtml(i.version || '')}, kept on this device.`}</p><div class="opts">${store && store.kind === 'idb' ? acts : '<span class="sub">This browser gives golem no IndexedDB, so a pack cannot be kept.</span>'}${bookNote[slug] ? `<span class="sub">${escHtml(bookNote[slug])}</span>` : ''}</div>`;
+  const acts = i.kind === 'sample' ? (inApp ? `<span class="sub">${OFFLINE_APP()}</span>` : `<button class="btn go" type="button" data-pk-install="${slug}">${t('Install from the library ({size})', { size: B.size })}</button>`) : `<button class="btn" type="button" data-pk-remove="${slug}">${t('Remove')}</button>`;
+  return `<p>${i.kind === 'sample' ? t(B.sample) : escHtml(t('Installed: version {v}, kept on this device.', { v: i.version || '' }))}</p><div class="opts">${store && store.kind === 'idb' ? acts : `<span class="sub">${t('This browser gives golem no IndexedDB, so a pack cannot be kept.')}</span>`}${bookNote[slug] ? `<span class="sub">${escHtml(bookNote[slug])}</span>` : ''}</div>`;
 }
-async function removeFactbook() { await store.removePack('factbook'); useFactbook(null); packNote = 'Removed. The 14-country sample answers again.'; renderPacks(); }
+async function removeFactbook() { await store.removePack('factbook'); useFactbook(null); packNote = t('Removed. The 14-country sample answers again.'); renderPacks(); }
 // a .gcudat opened with the paperclip: the factbook, or its full profiles for the factbook already installed
 async function openPackFile(name, bytes) {
   const p = await readGcudat(bytes);
@@ -29999,16 +30233,16 @@ async function openPackFile(name, bytes) {
 }
 function factbookItem() {
   const i = factbookInfo();
-  const state = i.kind === 'sample' ? 'The 14-country sample ships with golem.' : `Installed: version ${escHtml(i.version)}, ${i.count} countries${i.profiles ? ', with the full profiles' : ''}. Kept on this device.`;
-  const acts = inApp ? `${i.kind === 'sample' ? '' : '<button class="btn" type="button" id="fb-remove">Remove</button>'}<span class="sub">${OFFLINE_APP}</span>`
+  const state = i.kind === 'sample' ? t('The 14-country sample ships with golem.') : escHtml(t('Installed: version {v}, {n} countries{full}. Kept on this device.', { v: i.version, n: i.count, full: i.profiles ? t(', with the full profiles') : '' }));
+  const acts = inApp ? `${i.kind === 'sample' ? '' : `<button class="btn" type="button" id="fb-remove">${t('Remove')}</button>`}<span class="sub">${OFFLINE_APP()}</span>`
     : i.kind === 'sample'
-    ? `<button class="btn go" type="button" id="fb-install">Install from the library (2.8 MB)</button><button class="btn" type="button" id="fb-install-full">With full profiles (5.1 MB)</button>`
-    : `${i.profiles ? '' : '<button class="btn" type="button" id="fb-install-full">Add the full profiles (5.1 MB)</button>'}<button class="btn" type="button" id="fb-remove">Remove</button>`;
-  return `<p>${state}${inApp ? '' : ' Installing makes one request to the library for its list and one per pack; a .gcudat file opened with the paperclip installs with none.'}</p><div class="opts">${store && store.kind === 'idb' ? acts : '<span class="sub">This browser gives golem no IndexedDB, so a pack cannot be kept.</span>'}${packNote ? `<span class="sub">${escHtml(packNote)}</span>` : ''}</div>`;
+    ? `<button class="btn go" type="button" id="fb-install">${t('Install from the library (2.8 MB)')}</button><button class="btn" type="button" id="fb-install-full">${t('With full profiles (5.1 MB)')}</button>`
+    : `${i.profiles ? '' : `<button class="btn" type="button" id="fb-install-full">${t('Add the full profiles (5.1 MB)')}</button>`}<button class="btn" type="button" id="fb-remove">${t('Remove')}</button>`;
+  return `<p>${state}${inApp ? '' : t(' Installing makes one request to the library for its list and one per pack; a .gcudat file opened with the paperclip installs with none.')}</p><div class="opts">${store && store.kind === 'idb' ? acts : `<span class="sub">${t('This browser gives golem no IndexedDB, so a pack cannot be kept.')}</span>`}${packNote ? `<span class="sub">${escHtml(packNote)}</span>` : ''}</div>`;
 }
 function renderPacks() {
-  const lab = { live: 'installed', samp: 'sample', plan: 'not wired' };
-  let h = '<h1 class="vhead">Packs and this device</h1><div class="sub">golem knows what its installed packs hold. These are the gcu-library entries plus packs worth adding.</div><div class="lbl">Library</div>';
+  const lab = { live: t('installed'), samp: t('sample'), plan: t('not wired') };
+  let h = `<h1 class="vhead">${t('Packs and this device')}</h1><div class="sub">${t('golem knows what its installed packs hold. These are the gcu-library entries plus packs worth adding.')}</div><div class="lbl">${t('Library')}</div>`;
   const fbi = factbookInfo();
   PACKS.forEach(([id, name, meta, st, d]) => {
     if (id === 'factbook') st = fbi.kind === 'sample' ? 'samp' : 'live';
@@ -30017,7 +30251,7 @@ function renderPacks() {
     h += `<div class="item"><h3>${escHtml(name)} <span class="tag ${st}">${lab[st]}</span></h3><p>${escHtml(d)}</p>${id === 'factbook' ? factbookItem() : BOOKS[id] ? bookItem(id) : ''}<div class="from">${escHtml(id)} · ${escHtml(meta)}</div></div>`;
   });
   const al = Object.entries(S.aliases);
-  h += `<div class="lbl">On this device</div><div class="item"><h3>Taught words</h3><p>${al.length ? al.map(([k, v]) => `${escHtml(k)} → ${escHtml(v)}`).join('<br>') : 'None yet. Try “pop means population”.'}</p></div><div class="item"><h3>Notes</h3><p>${S.facts.length ? S.facts.map(escHtml).join('<br>') : 'None yet. Try “remember that …”.'}</p></div><div class="item"><h3>Open table</h3><p>${S.table ? `${escHtml(S.table.name)} · ${S.table.rows.length} rows · ${S.table.source === 'sample' ? 'sample data' : 'from your files'}` : 'None.'}</p></div><div class="item"><h3>Files on this device</h3><p>${Object.values(S.files).length ? Object.values(S.files).map(f => `${escHtml(f.name)} · ${(f.size / 1024).toFixed(0)} kB`).join('<br>') : 'None yet. Tap the paperclip to open a CSV.'}</p></div>`;
+  h += `<div class="lbl">${t('On this device')}</div><div class="item"><h3>${t('Taught words')}</h3><p>${al.length ? al.map(([k, v]) => `${escHtml(k)} → ${escHtml(v)}`).join('<br>') : t('None yet. Try “pop means population”.')}</p></div><div class="item"><h3>${t('Notes')}</h3><p>${S.facts.length ? S.facts.map(escHtml).join('<br>') : t('None yet. Try “remember that …”.')}</p></div><div class="item"><h3>${t('Open table')}</h3><p>${S.table ? escHtml(t('{name} · {n} rows · {source}', { name: S.table.name, n: S.table.rows.length, source: t(S.table.source === 'sample' ? 'sample data' : 'from your files') })) : t('None.')}</p></div><div class="item"><h3>${t('Files on this device')}</h3><p>${Object.values(S.files).length ? Object.values(S.files).map(f => `${escHtml(f.name)} · ${(f.size / 1024).toFixed(0)} kB`).join('<br>') : t('None yet. Tap the paperclip to open a CSV.')}</p></div>`;
   h += voiceItem() + appItem();
   $('v-packs').innerHTML = h;
   for (const [id, fn] of [['fb-install', () => installFactbook(false)], ['fb-install-full', () => installFactbook(true)], ['fb-remove', removeFactbook]]) { const b = $(id); if (b) b.addEventListener('click', fn); }
@@ -30029,22 +30263,22 @@ function renderPacks() {
 
 /* ── the drawer: sessions and history ── */
 let ren = null, del = null;
-const when = t => { const d = new Date(t), n = new Date(); return d.toDateString() === n.toDateString() ? d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }); };
+const when = ms => { const d = new Date(ms), n = new Date(), loc = uiLang() === 'pt' ? 'pt-BR' : 'en-GB'; return d.toDateString() === n.toDateString() ? d.toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit' }) : d.toLocaleDateString(loc, { day: 'numeric', month: 'short' }); };
 function renderDrawer() {
   const q = $('hq').value.trim(); let h;
   if (q) {
     const hits = searchHistory(q);
-    h = `<div class="lbl">${hits.length} match${hits.length === 1 ? '' : 'es'} in history</div>` + hits.slice(0, 40).map(({ session: s, card: c }) => `<div class="srow"><button class="open hit" type="button" data-s="${s.id}" data-c="${c.id}">&gt; ${escHtml(c.raw)}</button><div class="meta"><span>${escHtml(s.name)}</span></div></div>`).join('');
+    h = `<div class="lbl">${t(hits.length === 1 ? '{n} match in history' : '{n} matches in history', { n: hits.length })}</div>` + hits.slice(0, 40).map(({ session: s, card: c }) => `<div class="srow"><button class="open hit" type="button" data-s="${s.id}" data-c="${c.id}">&gt; ${escHtml(c.raw)}</button><div class="meta"><span>${escHtml(s.name)}</span></div></div>`).join('');
   } else {
-    const cur = current(), day = 864e5, today = new Date().setHours(0, 0, 0, 0), age = t => t >= today ? 'Today' : t >= today - 6 * day ? 'This week' : 'Earlier';
+    const cur = current(), day = 864e5, today = new Date().setHours(0, 0, 0, 0), age = ms => t(ms >= today ? 'Today' : ms >= today - 6 * day ? 'This week' : 'Earlier');
     let g = ''; h = '';
     // yours by when they were last used, then the examples golem seeded on the first visit
     const all = [...sessions()].sort((x, y) => y.updated - x.updated || y.id - x.id);
     [...all.filter(s => !s.example), ...all.filter(s => s.example)].forEach(s => {
-      const grp = s.example ? 'Examples' : age(s.updated);
+      const grp = s.example ? t('Examples') : age(s.updated);
       if (grp !== g) { g = grp; h += `<div class="lbl">${g}</div>`; }
-      const name = ren === s.id ? `<input class="ren" data-id="${s.id}" value="${escHtml(s.name)}" aria-label="Session name. Leave empty to name it automatically.">` : `<button class="open" type="button" data-s="${s.id}" title="${escHtml(s.name)}">${escHtml(s.name)}</button>`;
-      h += `<div class="srow" aria-current="${s === cur}">${name}<div class="meta"><span>${s.cards.length} card${s.cards.length === 1 ? '' : 's'} · ${when(s.updated)}</span>${s.example ? '<span class="tag samp">example</span>' : ''}<span class="acts"><button class="link" type="button" data-ren="${s.id}">rename</button><button class="link" type="button" data-exp="${s.id}">export</button><button class="link" type="button" data-del="${s.id}">${del === s.id ? 'confirm delete' : 'delete'}</button></span></div></div>`;
+      const name = ren === s.id ? `<input class="ren" data-id="${s.id}" value="${escHtml(s.name)}" aria-label="${t('Session name. Leave empty to name it automatically.')}">` : `<button class="open" type="button" data-s="${s.id}" title="${escHtml(nameOf(s))}">${escHtml(nameOf(s))}</button>`;
+      h += `<div class="srow" aria-current="${s === cur}">${name}<div class="meta"><span>${t(s.cards.length === 1 ? '{n} card' : '{n} cards', { n: s.cards.length })} · ${when(s.updated)}</span>${s.example ? `<span class="tag samp">${t('example')}</span>` : ''}<span class="acts"><button class="link" type="button" data-ren="${s.id}">${t('rename')}</button><button class="link" type="button" data-exp="${s.id}">${t('export')}</button><button class="link" type="button" data-del="${s.id}">${t(del === s.id ? 'confirm delete' : 'delete')}</button></span></div></div>`;
     });
   }
   $('dlist').innerHTML = h;
@@ -30072,15 +30306,26 @@ function persist() {
 document.addEventListener('visibilitychange', () => { if (document.hidden && store) { clearTimeout(saveT); firstUnsaved = 0; store.save(parts()); } });
 onChange(() => { renderBar(); persist(); if (!$('hq').value.trim() && ren == null) renderDrawer(); });
 
+/* ── language: the device's, or the choice kept on this device. golem reads both; the interface is the chosen one ── */
+function applyLanguage(l) {
+  setUiLang(l); setLanguage(l); applyStatic(document);
+  $('lang-k').textContent = l === 'pt' ? 'Português' : 'English';
+  $('st-req').textContent = requestText(); applyTheme(theme); renderPower(); renderStarters(); renderSkills(); voiceSupport();
+  if (ready) { renderStream(); renderDrawer(); renderPacks(); }
+}
+let lang = (navigator.language || 'en').toLowerCase().startsWith('pt') ? 'pt' : 'en';
+try { const l = localStorage.getItem(LANG); if (l === 'en' || l === 'pt') lang = l; } catch (e) { /* storage is optional */ }
+$('lang').addEventListener('click', () => { lang = lang === 'pt' ? 'en' : 'pt'; try { localStorage.setItem(LANG, lang); } catch (e) { /* storage is optional */ } applyLanguage(lang); });
 /* ── theme: auto follows the system; a choice is kept on this device ── */
 const THEMES = ['auto', 'light', 'dark'];
 let theme = 'auto';
-function applyTheme(t) { if (t === 'auto') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = t; $('theme-k').textContent = t; drawCharts(); }
+function applyTheme(th) { if (th === 'auto') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = th; $('theme-k').textContent = t(th); drawCharts(); }
 // charts read the theme's colours and the column's width when drawn: draw them again when either changes
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => drawCharts());
 let redrawT; window.addEventListener('resize', () => { clearTimeout(redrawT); redrawT = setTimeout(() => drawCharts(), 150); });
 try { const t = localStorage.getItem(THEME); if (THEMES.includes(t)) theme = t; } catch (e) { /* storage is optional */ }
 applyTheme(theme);
+applyLanguage(lang);
 $('theme').addEventListener('click', () => { theme = THEMES[(THEMES.indexOf(theme) + 1) % 3]; applyTheme(theme); try { localStorage.setItem(THEME, theme); } catch (e) { /* storage is optional */ } });
 
 /* ── wiring ── */
@@ -30158,24 +30403,24 @@ function openPicked(f) {
   if (!awake) return status('Asleep. Tap wake at the top right.');
   if (!ready) return status('Opening your sessions…');
   if (f.size > STREAM_OVER) {   // a text table too large to hold: kept as it is, typed from its head, scanned per question
-    if (!/\.(csv|tsv|txt)$/i.test(f.name)) { status(`That file is over 20 MB. golem streams large CSV and TSV tables; a ${f.name.split('.').pop()} that large is not read.`); return; }
+    if (!/\.(csv|tsv|txt)$/i.test(f.name)) { status(t('That file is over 20 MB. golem streams large CSV and TSV tables; a {ext} that large is not read.', { ext: f.name.split('.').pop() })); return; }
     f.slice(0, 1 << 20).text().then(async head => {
       const o = openStreamed(f.name, f.size, head); if (o.kind !== 'card') { show(o); return; }
-      BIG[o.hash] = f; show(o); status(`Opened ${f.name} as a stream.`);
-      await putBlob(o.hash, f).catch(() => status(`${f.name} could not be kept on this device; it works until the page closes.`));
+      BIG[o.hash] = f; show(o); status(t('Opened {name} as a stream.', { name: f.name }));
+      await putBlob(o.hash, f).catch(() => status(t('{name} could not be kept on this device; it works until the page closes.', { name: f.name })));
     }, () => status('Could not read that file.'));
     return;
   }
   if (/\.gcudat$/i.test(f.name)) {   // a pack: installed, not opened as a table
-    f.arrayBuffer().then(buf => openPackFile(f.name, new Uint8Array(buf))).then(() => renderPacks(), err => status(`Not installed: ${err.message}.`));
+    f.arrayBuffer().then(buf => openPackFile(f.name, new Uint8Array(buf))).then(() => renderPacks(), err => status(t('Not installed: {e}.', { e: err.message })));
     return;
   }
   if (/\.golem\.json$/i.test(f.name)) {   // a session exported from golem: it comes back as a session of its own
-    f.text().then(t => { let s = null; try { s = importSession(JSON.parse(t)); } catch (err) { s = null; } if (!s) { status('That is not a golem session file.'); return; } renderStream(); renderDrawer(); status(`Imported "${s.name}".`); }, () => status('Could not read that file.'));
+    f.text().then(txt => { let s = null; try { s = importSession(JSON.parse(txt)); } catch (err) { s = null; } if (!s) { status('That is not a golem session file.'); return; } renderStream(); renderDrawer(); status(t('Imported "{name}".', { name: s.name })); }, () => status('Could not read that file.'));
     return;
   }
-  if (BINARY.test(f.name)) f.arrayBuffer().then(buf => openBinary(f.name, buf)).then(o => { show(o); if (o.kind === 'card') status(`Opened ${f.name}.`); }, () => status('Could not read that file.'));
-  else f.text().then(text => { show(openFile(f.name, text)); status(`Opened ${f.name}.`); }, () => status('Could not read that file.'));
+  if (BINARY.test(f.name)) f.arrayBuffer().then(buf => openBinary(f.name, buf)).then(o => { show(o); if (o.kind === 'card') status(t('Opened {name}.', { name: f.name })); }, () => status('Could not read that file.'));
+  else f.text().then(text => { show(openFile(f.name, text)); status(t('Opened {name}.', { name: f.name })); }, () => status('Could not read that file.'));
 }
 // dropped on the window (a desktop browser)
 window.addEventListener('dragover', e => { if (e.dataTransfer && [...e.dataTransfer.types].includes('Files')) { e.preventDefault(); document.documentElement.dataset.drop = '1'; } });
@@ -30185,7 +30430,7 @@ window.addEventListener('drop', e => { delete document.documentElement.dataset.d
 if (inApp) shell.intake(async d => {
   if (d.kind === 'text' || (d.text && !d.token)) { const q = $('q'); q.value = String(d.text || ''); q.dispatchEvent(new Event('input')); q.focus(); status('Shared text is in the box: press Enter to run it.'); return; }
   try { const bytes = await d.blob.arrayBuffer(); const until = () => ready ? openPicked(new File([bytes], d.name || 'shared', { type: d.mime || '' })) : setTimeout(until, 100); until(); }
-  catch (e) { status(`Could not read the shared file: ${e.message}`); }
+  catch (e) { status(t('Could not read the shared file: {e}', { e: e.message })); }
 }).catch(() => {});
 document.querySelector('.tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) showTab(b.dataset.tab); });
 document.querySelector('.sfoot').addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (b) { showTab(b.dataset.tab); closeDrawer(); } });
@@ -30222,9 +30467,9 @@ $('stream').addEventListener('click', e => {
   }
   tick(); renderPacks();
 });
+function renderPower() { $('st-on').textContent = t(awake ? 'awake' : 'asleep'); $('power').textContent = t(awake ? 'sleep' : 'wake'); $('power').setAttribute('aria-pressed', String(!awake)); }
 $('power').addEventListener('click', () => {
-  awake = !awake; $('app').classList.toggle('asleep', !awake); $('st-on').textContent = awake ? 'awake' : 'asleep'; $('q').disabled = !awake;
-  $('power').textContent = awake ? 'sleep' : 'wake'; $('power').setAttribute('aria-pressed', String(!awake));
+  awake = !awake; $('app').classList.toggle('asleep', !awake); $('q').disabled = !awake; renderPower();
   status(awake ? 'Awake.' : 'Asleep. Nothing runs until you wake it.');
 });
 $('menu').addEventListener('click', openDrawer);
@@ -30252,11 +30497,12 @@ $('dlist').addEventListener('click', e => {
     deleteSession(id); del = null; renderStream(); renderDrawer();
   }
 });
-$('starts').innerHTML = STARTERS.map(([g, items]) => `<section class="sgroup"><h2>${escHtml(g)}</h2>${items.map(([t, q]) => `<button class="start" type="button" data-q="${escHtml(q)}"><b>${escHtml(t)}</b><span>${escHtml(q)}</span></button>`).join('')}</section>`).join('');
+function renderStarters() { $('starts').innerHTML = (uiLang() === 'pt' ? STARTERS_PT : STARTERS).map(([g, items]) => `<section class="sgroup"><h2>${escHtml(g)}</h2>${items.map(([t, q]) => `<button class="start" type="button" data-q="${escHtml(q)}"><b>${escHtml(t)}</b><span>${escHtml(q)}</span></button>`).join('')}</section>`).join(''); }
+renderStarters();
 
 /* ── start: restore saved sessions, or seed two examples ── */
 renderSkills();
-if (shell.present) $('st-where').textContent = 'in the lead-acid shell';
+if (shell.present) { $('st-where').dataset.tEn = 'in the lead-acid shell'; $('st-where').textContent = t('in the lead-acid shell'); }
 // the device's sessions come back from the store (moved from localStorage once, the first time), or two examples are seeded
 (async () => {
   store = await openStore();
@@ -30269,7 +30515,7 @@ if (shell.present) $('st-where').textContent = 'in the lead-acid shell';
   // the "New session" shortcut of the installed app
   if (new URLSearchParams(location.search).has('new')) { newSession(); try { history.replaceState(null, '', location.pathname); } catch (e) { /* file:// */ } }
   renderStream(); renderDrawer(); renderPacks();
-  $('status').textContent = store.kind === 'none' ? 'This browser keeps nothing for golem: sessions last until the page closes.' : '';
+  $('status').textContent = store.kind === 'none' ? t('This browser keeps nothing for golem: sessions last until the page closes.') : '';
   ready = true; document.documentElement.dataset.ready = '1';   // tests wait for this
 })();
   return {  };

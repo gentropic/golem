@@ -385,7 +385,7 @@ In order. Each step leaves something that runs.
     - **Storage.** Sessions, files and taught words live in `localStorage` today; step 9 moves them to `@gcu/vfs`, which an installed app benefits from most. The PWA does not wait for it.
     - **Test.** The smoke test serves `dist/` over `http://localhost`, checks the manifest, waits for the worker, goes offline (`context.setOffline(true)`), reloads, and expects the app to load and answer with no requests.
     - **Android.** lead-acid stays the path to device intents (calendar, alarms, sensors); the PWA is the web path, and both carry the same `golem.html`.
-12. **Release.** Licence attributions, the capability statement, pt-BR bank, store listing. (Fonts are embedded since 8 Oct 2026; no seal artifacts, see principle 9.)
+12. **Release.** Licence attributions, the capability statement, store listing. (Fonts are embedded since 8 Oct 2026; no seal artifacts, see principle 9.) Portuguese, begun 14 Oct 2026: golem reads pt-BR and English, the person's language first (the other only as written, never through its typo repairs); dates, units, geologic units, places and accented country names read in Portuguese; the interface (`shell/i18n.js`: the page, the sidebar, the composer, the cards' frame, the messages, the About view, the starters) is in Portuguese for a pt browser or by the switch in the sidebar. Still English: what the tools answer (the card bodies, about 50 tools), the skills' descriptions and the session names they compute. Decimal commas ("2,7") need the pt locale of `@gcu/dispatch`.
 
 ---
 

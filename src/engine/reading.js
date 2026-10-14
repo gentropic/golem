@@ -6,14 +6,23 @@ import { examples, vocab } from './skills.js';
 import { ontology } from './ontology.js';
 import { calcOf } from './calc.js';
 import { estimateOf } from './estimate.js';
-import { createEngine, makeSession, ENGLISH } from '../vendor/dispatch.js';
+import { createEngine, makeSession, ENGLISH, PORTUGUESE } from '../vendor/dispatch.js';
+
+// The languages golem reads, the person's first: a phrase reads in whichever it is in ("converte 5 km para mi" or
+// "convert 5 km to mi"), and a tie goes to the person's. The shell sets it (the device's language, or the choice).
+const LOCALES = { en: ENGLISH, pt: PORTUGUESE };
+let order = ['en', 'pt'];
+export function setLanguage(l) { order = l === 'pt' ? ['pt', 'en'] : ['en', 'pt']; }
+export const language = () => order[0];
+// an engine per language over the same ontology, rebuilt when the ontology changes
+function enginesFor(cache, o) { const key = JSON.stringify(o); if (cache.key !== key) { cache.key = key; cache.E = {}; } return loc => cache.E[loc] || (cache.E[loc] = createEngine(o, LOCALES[loc])); }
 
 export const norm = s => s.trim().replace(/\s+/g, ' ').replace(/[?.!]+$/, '');
 
 /* ── rung 2, first half: the clause parser over golem's ontology ── */
-let clause = null, clauseFor = null;
+const clauses = {};
 // rebuilt whenever what it reads changes: the open table's columns, kept files, saved places, logged activities
-export const clauseEngine = () => { const o = ontology(), key = JSON.stringify(o); if (!clause || clauseFor !== key) { clause = createEngine(o, ENGLISH); clauseFor = key; } return clause; };
+export const clauseEngine = (loc = order[0]) => enginesFor(clauses, ontology())(loc);
 const clauseSession = () => makeSession([]);   // no memory of its own: what came before is the cards', read by the context rung
 // The parser's verdict on a text, then the frame's bind(): a frame may answer { tool, args }, or
 // { clarify } when the reading is whole but a value is missing, which becomes a clarify verdict too.
@@ -21,8 +30,17 @@ const clauseSession = () => makeSession([]);   // no memory of its own: what cam
 // When the grammar finds several readings, each is bound: if exactly one names a tool that takes it, that is the
 // reading ("python" is a verb and a format; only the verb has a tool for "python\n<code>"), and the trace says so.
 const bindOf = cmd => { const f = FRAMES.find(x => x.name === cmd.verb), b = f && f.bind(cmd); return b && !b.clarify ? b : null; };
+// in the person's language, then the other; the first that binds a tool is the reading, else the person's verdict. The
+// other language counts only as written: its typo repairs would turn an English word into a Portuguese one ("decode"
+// into "decide") ahead of the rungs that read it as meant
+const repaired = r => (r.diag && r.diag.notes || []).some(n => /^read ".*" as ".*"$/.test(n)) || (r.diag && r.diag.repairs && r.diag.repairs.length > 0);
 function verdictOf(text, session, opts, engine) {
-  let r = (engine || clauseEngine()).understand(text, session, opts);
+  if (engine) return verdictIn(engine, text, session, opts);
+  const first = verdictIn(clauseEngine(order[0]), text, session, opts); if (first.b) return first;
+  const second = verdictIn(clauseEngine(order[1]), text, session, opts); return second.b && !repaired(second.r) ? second : first;
+}
+function verdictIn(E, text, session, opts) {
+  let r = E.understand(text, session, opts);
   if (r.status === 'ambiguous' && r.alternatives) {
     const bound = r.alternatives.map((cmds, k) => ({ cmds, echo: r.readings[k], b: bindOf(cmds[0]) })).filter(x => x.b);
     const takers = bound.filter((x, i) => bound.findIndex(y => JSON.stringify(y.b) === JSON.stringify(x.b)) === i);   // the same call twice is one reading
@@ -102,11 +120,15 @@ function fragmentRead(raw, last, dry) {
 let amendEngines = {};
 function amendEngine(tool) {
   const frames = FRAMES.filter(f => f.amends && (f.amends.includes(tool) || f.amends.includes('*'))), o = ontology(frames), key = JSON.stringify(o);
-  if (!amendEngines[tool] || amendEngines[tool].key !== key) amendEngines[tool] = { key, frames, E: createEngine(o, ENGLISH) };
-  return amendEngines[tool];
+  const cache = amendEngines[tool] || (amendEngines[tool] = {});
+  return { frames, at: enginesFor(cache, o) };
 }
 function amendRead(raw, last, dry) {
-  const { frames, E } = amendEngine(last.tool);
+  for (const loc of order) { const r = amendIn(raw, last, dry, loc, loc !== order[0]); if (r) return r; }
+  return null;
+}
+function amendIn(raw, last, dry, loc, exact) {
+  const { frames, at } = amendEngine(last.tool), E = at(loc);
   // a leading "and" joins the amendment to the card ("and median"); the tokenizer says where the rest starts
   const { toks } = E.tokenize(raw, { names: {} }); const text = toks.length > 1 && toks[0].senses.some(x => x.cat === 'CONJ') ? raw.slice(toks[1].s) : raw;
   const take = cmd => { const f = frames.find(x => x.name === cmd.verb), out = f && f.bind(cmd, last.args, last); return out ? { tool: out.tool || last.tool, args: out.args } : null; };
@@ -114,7 +136,7 @@ function amendRead(raw, last, dry) {
   // with its verb ("trace it", "assume normal"), or as a fragment of one of the frames ("in milliseconds", "by character")
   let r = E.understand(text, makeSession([])), hit = pick(r);
   for (const f of frames) { if (hit) break; const s = makeSession([]); s.last = { verb: f.name, theme: [], roles: {} }; const rf = E.understand(text, s, { fragment: true }); hit = pick(rf); if (hit) r = rf; }
-  if (!hit) return null;
+  if (!hit || (exact && repaired(r))) return null;
   if (dry) return { amends: last.id, echo: r.echo || r.readings[0] };
   const res = runTool(hit.tool, hit.args); if (!res) return null;
   res.trace.unshift(`clause: amends #${String(last.id).padStart(2, '0')}: ${(r.echo || r.readings[0]).replace(/\.$/, '')}`);
@@ -276,11 +298,13 @@ session({ name: 'rename', label: 'Name session', words: ['name this session', 'n
 session({ name: 'undo', label: 'Undo', words: ['undo', 'undo that', 'take that back', 'scratch that', 'remove that', 'never mind'], theme: [], required: [], roles: {}, words_pt: ['desfaz', 'desfazer'], label_pt: 'Desfazer', bind: () => ({ session: 'undo' }) });
 session({ name: 'again', label: 'Again', words: ['again', 'repeat', 'rerun', 'do it again', 'repeat that', 'one more time', 'run it again'], theme: [], required: [], roles: {}, words_pt: ['de novo', 'repete'], label_pt: 'De novo', bind: () => ({ session: 'again' }) });
 session({ name: 'yes', label: 'Yes', words: ['yes', 'ok', 'okay', 'sure', 'do it', 'go', 'go ahead', 'yes please', 'yep', 'yeah', 'please do', 'that one'], theme: [], required: [], roles: {}, words_pt: ['sim', 'pode', 'isso'], label_pt: 'Sim', bind: () => ({ session: 'yes' }) });
-let sessionEngine = null;
+const sessionEngines = {};
 export function sessionRead(raw) {
-  const frames = FRAMES.filter(f => f.session), o = ontology(frames), key = JSON.stringify(o);
-  if (!sessionEngine || sessionEngine.key !== key) sessionEngine = { key, E: createEngine(o, ENGLISH) };
-  const r = sessionEngine.E.understand(raw, makeSession([]));
-  if (r.status !== 'ok') return null;
-  const cmd = r.commands[0], f = frames.find(x => x.name === cmd.verb), b = f && f.bind(cmd); return b ? { ...b, echo: r.echo.replace(/\.$/, '') } : null;
+  const frames = FRAMES.filter(f => f.session), at = enginesFor(sessionEngines, ontology(frames));
+  for (const loc of order) {
+    const r = at(loc).understand(raw, makeSession([]));
+    if (r.status !== 'ok' || (loc !== order[0] && repaired(r))) continue;
+    const cmd = r.commands[0], f = frames.find(x => x.name === cmd.verb), b = f && f.bind(cmd); if (b) return { ...b, echo: r.echo.replace(/\.$/, '') };
+  }
+  return null;
 }

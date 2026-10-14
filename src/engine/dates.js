@@ -12,7 +12,20 @@ export function easter(y) {
   return new Date(y, mo - 1, da);
 }
 const MOVABLE = { easter: 0, 'easter sunday': 0, 'good friday': -2, carnival: -47, 'carnival tuesday': -47, 'carnival monday': -48, 'ash wednesday': -46, 'corpus christi': 60, 'palm sunday': -7, 'pentecost': 49, 'whit sunday': 49, 'ascension': 39 };
+// A date or a time the grammar read in Portuguese, put in the words the patterns below know: month and weekday names,
+// hoje/amanhã/ontem, "de" between the parts, "às 9", "14h30". Word by word over a value already read, not a reader.
+const PT_WORDS = { janeiro: 'january', fevereiro: 'february', março: 'march', marco: 'march', abril: 'april', maio: 'may', junho: 'june', julho: 'july', agosto: 'august', setembro: 'september', outubro: 'october', novembro: 'november', dezembro: 'december',
+  domingo: 'sunday', segunda: 'monday', 'segunda-feira': 'monday', terça: 'tuesday', terca: 'tuesday', 'terça-feira': 'tuesday', quarta: 'wednesday', 'quarta-feira': 'wednesday', quinta: 'thursday', 'quinta-feira': 'thursday',
+  sexta: 'friday', 'sexta-feira': 'friday', sábado: 'saturday', sabado: 'saturday', hoje: 'today', amanhã: 'tomorrow', amanha: 'tomorrow', ontem: 'yesterday', natal: 'christmas', páscoa: 'easter', pascoa: 'easter', carnaval: 'carnival',
+  próxima: 'next', proxima: 'next', próximo: 'next', proximo: 'next', às: 'at', as: 'at', ao: 'at', meio: 'noon', 'meio-dia': 'noon' };
+export function enDate(s) {
+  if (!/[a-zà-ú]/i.test(s)) return s;
+  return String(s).toLowerCase().split(/(\s+)/).map(t => PT_WORDS[t] ?? t).join('')
+    .replace(/\b(\d{1,2}) de ([a-z]+)/g, '$1 $2').replace(/\b([a-z]+) de (\d{4})\b/g, '$1 $2').replace(/\b(na|no|em|dia|no dia)\s+(?=\d|[a-z]+day\b)/g, '')
+    .replace(/\b(\d{1,2})h(\d\d)?\b/g, (_, h, mi) => `at ${h}:${mi || '00'}`).replace(/\bat at\b/g, 'at').replace(/\bmeio dia\b/g, 'noon');
+}
 export function findDate(s, opt = {}) {
+  s = enDate(s);
   const now = today(), back = !!opt.back;
   const add = n => new Date(now.getFullYear(), now.getMonth(), now.getDate() + n);
   const md = (d, mo, y) => { let dt = new Date(y ? +y : now.getFullYear(), mo, d); if (!y && !back && dt < now) dt = new Date(now.getFullYear() + 1, mo, d); if (!y && back && dt > now) dt = new Date(now.getFullYear() - 1, mo, d); return dt; };
@@ -39,6 +52,7 @@ export function findDate(s, opt = {}) {
   return null;
 }
 export function findTime(s) {
+  s = enDate(s);
   let m = /\b(?:at )?noon\b/.exec(s);
   if (m) return { h: 12, mi: 0, m };
   m = /\bat (\d{1,2})(?::(\d\d))? ?(am|pm)?\b/.exec(s) || /\b(\d{1,2}):(\d\d) ?(am|pm)?\b/.exec(s) || /\b(\d{1,2})() ?(am|pm)\b/.exec(s);

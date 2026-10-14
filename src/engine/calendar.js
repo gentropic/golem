@@ -177,7 +177,7 @@ frame({
 noun(() => {
   const names = [...new Set([...ZONES.filter(z => !/^Etc\//.test(z) && z.includes('/')).map(cityOf), ...Object.keys(ALIAS), ...HERE.filter(w => w !== 'me'), 'home', ...(S.tables.places ? S.tables.places.rows.map(r => r.name) : [])])];
   const words = Object.fromEntries(names.map(n => [n, [n]]));
-  return { type: 'place', exact: true, words, generic: ['place'], words_pt: words, generic_pt: ['lugar'] };
+  return { type: 'place', exact: true, words, generic: ['place'], words_pt: { ...words, here: ['here', 'aqui', 'onde estou', 'minha localização'] }, generic_pt: ['lugar'] };
 });
 shape({ type: 'place', re: String.raw`(?:utc|gmt)\s?[+-]\d{1,2}(?::?\d{2})?` });   // "utc+8", "gmt-3"
 // "what time is 9 am in sao paulo in perth", "when it is 9am in sao paulo, what time is it in perth"

@@ -190,6 +190,7 @@ td.n,th.n{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-
 .cact.say{display:none}html[data-say] .cact.say{display:inline-block}
 .card:focus{outline:none}
 .card:focus-visible .reply,.card:focus .reply{box-shadow:-2px 0 0 0 var(--rc), -4px 0 0 0 var(--au-focus, var(--au-action))}
+html[lang="pt-BR"] .card[data-pinned] .chead::before{content:'fixado'}
 .card[data-pinned] .chead::before{content:'pinned';font:600 10px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--au-action)}
 .pins{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 18px;padding-bottom:12px;border-bottom:1px solid var(--au-border)}
 .pins .lbl{margin:0 4px 0 0}
@@ -216,6 +217,7 @@ html:not([data-app]) .capture .live,html:not([data-app]) .capture .opts{display:
 @media (min-width:1600px){.view{padding-left:calc((100% - 900px) / 2);padding-right:calc((100% - 900px) / 2)}.dock{padding-left:calc((100% - 900px) / 2);padding-right:calc((100% - 900px) / 2)}}
 .composer{background:var(--au-surface-raised);border:1px solid var(--au-rule);border-radius:12px;padding:10px 8px 8px 14px;display:grid;grid-template-columns:minmax(0,1fr);gap:4px;transition:border-color var(--dur) var(--ease)}
 html[data-drop] .composer{border-color:var(--au-action);box-shadow:0 0 0 3px var(--au-action-soft)}
+html[lang="pt-BR"][data-drop] .composer::after{content:"Solte para abrir"}
 html[data-drop] .composer::after{content:"Drop to open";font:12px var(--mono);color:var(--au-action)}
 .composer:focus-within{border-color:var(--au-action)}
 .composer textarea{width:100%;background:none;border:0;outline:0;padding:2px 4px 2px 0;font:15px/1.45 var(--mono);resize:none;max-height:40vh;overflow:auto;min-height:24px}
@@ -259,6 +261,7 @@ html[data-drop] .composer::after{content:"Drop to open";font:12px var(--mono);co
 .view > .lbl{margin-top:10px}
 .notes{display:grid;gap:26px;min-width:0}
 .notes section{display:grid;gap:8px;min-width:0}
+html:not([lang="pt-BR"]) .notes[data-lang="pt"],html[lang="pt-BR"] .notes[data-lang="en"]{display:none}
 .notes h2{margin:0;font:700 12px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--au-fg-muted);border-bottom:1px solid var(--au-rule);padding-bottom:5px}
 .notes p{margin:0}
 .notes ol,.notes ul{margin:0;padding-left:20px;display:grid;gap:5px}
@@ -270,43 +273,44 @@ html[data-drop] .composer::after{content:"Drop to open";font:12px var(--mono);co
 <div class="app" id="app">
   <div class="scrim" id="scrim"></div>
   <aside class="side" id="drawer" aria-label="Sessions and history">
-    <div class="brandrow"><span class="brand"><i aria-hidden="true"></i>golem</span><span class="grow"></span><button class="ibtn only-wide" id="fold" type="button" aria-label="Hide the sidebar" title="Hide the sidebar (Ctrl+B)"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect x="2" y="3" width="14" height="12" rx="2"/><path d="M7 3v12M12 7l-2 2 2 2"/></svg></button><button class="ibtn only-narrow" id="dclose" type="button" aria-label="Close the sidebar"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M4 4l10 10M14 4L4 14"/></svg></button></div>
-    <button class="newbtn" id="newsess" type="button"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v12M2 8h12"/></svg>New session<span class="k only-wide">Ctrl+Shift+O</span></button>
-    <input id="hq" type="search" placeholder="Search every session" aria-label="Search history" title="Search every session (Ctrl+K)">
+    <div class="brandrow"><span class="brand"><i aria-hidden="true"></i>golem</span><span class="grow"></span><button class="ibtn only-wide" id="fold" type="button" aria-label="Hide the sidebar" title="Hide the sidebar (Ctrl+B)" data-t-attr="aria-label title"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect x="2" y="3" width="14" height="12" rx="2"/><path d="M7 3v12M12 7l-2 2 2 2"/></svg></button><button class="ibtn only-narrow" id="dclose" type="button" aria-label="Close the sidebar" data-t-attr="aria-label"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M4 4l10 10M14 4L4 14"/></svg></button></div>
+    <button class="newbtn" id="newsess" type="button"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v12M2 8h12"/></svg><span data-t>New session</span><span class="k only-wide">Ctrl+Shift+O</span></button>
+    <input id="hq" type="search" placeholder="Search every session" aria-label="Search history" title="Search every session (Ctrl+K)" data-t-attr="placeholder aria-label title">
     <div class="dlist" id="dlist"></div>
     <nav class="sfoot" aria-label="golem">
-      <button class="navbtn only-wide" type="button" data-tab="skills"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12M2 8h12M2 13h7"/></svg>Skills</button>
-      <button class="navbtn only-wide" type="button" data-tab="packs"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 5l6-3 6 3-6 3-6-3zM2 5v6l6 3 6-3V5M8 8v6"/></svg>Packs and this device</button>
-      <button class="navbtn" type="button" data-tab="about"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M8 7v4M8 4.6v.1"/></svg>How golem reads</button>
-      <button class="navbtn" id="theme" type="button"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M8 2a6 6 0 0 0 0 12z" fill="currentColor"/></svg>Theme<span class="k" id="theme-k">auto</span></button>
+      <button class="navbtn only-wide" type="button" data-tab="skills"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12M2 8h12M2 13h7"/></svg><span data-t>Skills</span></button>
+      <button class="navbtn only-wide" type="button" data-tab="packs"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 5l6-3 6 3-6 3-6-3zM2 5v6l6 3 6-3V5M8 8v6"/></svg><span data-t>Packs and this device</span></button>
+      <button class="navbtn" type="button" data-tab="about"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M8 7v4M8 4.6v.1"/></svg><span data-t>How golem reads</span></button>
+      <button class="navbtn" id="theme" type="button"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M8 2a6 6 0 0 0 0 12z" fill="currentColor"/></svg><span data-t>Theme</span><span class="k" id="theme-k">auto</span></button>
+      <button class="navbtn" id="lang" type="button" title="English / Português"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M2 8h12M8 2c-2 2-2 10 0 12M8 2c2 2 2 10 0 12"/></svg><span data-t>Language</span><span class="k" id="lang-k">English</span></button>
     </nav>
   </aside>
 
   <main class="main" id="phone">
     <header class="top">
-      <button class="ibtn only-narrow" id="menu" type="button" aria-label="Sessions and history" title="Show the sidebar (Ctrl+B)"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M2 4h14M2 9h14M2 14h14"/></svg></button>
-      <div class="ttl"><button class="sbtn" id="sname" type="button" title="Sessions and history">New session</button><span class="stat"><b id="st-on">awake</b><span class="only-wide"> · <span id="st-where">on this device</span></span> · <span id="st-req" title="Requests golem has made to the network. Only installing a pack or checking for updates makes one.">0 requests</span></span></div>
-      <button class="ibtn only-narrow" id="newtop" type="button" aria-label="New session" title="New session (Ctrl+Shift+O)"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M9 3v12M3 9h12"/></svg></button>
-      <button class="power" id="power" type="button" title="Sleep: golem reads and runs nothing until you wake it" aria-pressed="false">sleep</button>
+      <button class="ibtn only-narrow" id="menu" type="button" aria-label="Sessions and history" title="Show the sidebar (Ctrl+B)" data-t-attr="aria-label title"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M2 4h14M2 9h14M2 14h14"/></svg></button>
+      <div class="ttl"><button class="sbtn" id="sname" type="button" title="Sessions and history" data-t-attr="title">New session</button><span class="stat"><b id="st-on">awake</b><span class="only-wide"> · <span id="st-where" data-t>on this device</span></span> · <span id="st-req" title="Requests golem has made to the network. Only installing a pack or checking for updates makes one." data-t-attr="title">0 requests</span></span></div>
+      <button class="ibtn only-narrow" id="newtop" type="button" aria-label="New session" title="New session (Ctrl+Shift+O)" data-t-attr="aria-label title"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M9 3v12M3 9h12"/></svg></button>
+      <button class="power" id="power" type="button" title="Sleep: golem reads and runs nothing until you wake it" data-t-attr="title" aria-pressed="false">sleep</button>
     </header>
 
     <div class="view" id="v-ask">
       <div class="welcome" id="welcome" hidden>
         <div class="mark"><i aria-hidden="true"></i>golem</div>
-        <p>Ask, compute, or act. Nothing here calls a model: every answer is a reading you can check and a tool that computes. If I cannot read something, I say so.</p>
-        <p class="hint">Tap one to start, or type below. A few sessions already run are under Examples in the sidebar.</p>
+        <p data-t>Ask, compute, or act. Nothing here calls a model: every answer is a reading you can check and a tool that computes. If I cannot read something, I say so.</p>
+        <p class="hint" data-t>Tap one to start, or type below. A few sessions already run are under Examples in the sidebar.</p>
         <div class="starts" id="starts"></div>
       </div>
-      <div class="lbl" id="exlbl" hidden>Example session</div>
+      <div class="lbl" id="exlbl" hidden data-t>Example session</div>
       <div class="pins" id="pins" hidden></div>
-      <div id="stream" role="feed" aria-label="Questions and answers"></div>
+      <div id="stream" role="feed" aria-label="Questions and answers" data-t-attr="aria-label"></div>
       <div class="sr" id="sr" aria-live="polite"></div>
     </div>
     <div class="view" id="v-skills" hidden></div>
     <div class="view" id="v-packs" hidden></div>
     <div class="view" id="v-about" hidden>
-      <h1 class="vhead">How golem reads</h1>
-      <div class="notes">
+      <h1 class="vhead" data-t>How golem reads</h1>
+      <div class="notes" data-lang="en">
         <section>
           <h2>A query, rung by rung</h2>
           <p>Each answer shows which rung read the query and what it was read as. Dashed slots are ambiguous readings: tap one to flip it and the answer recomputes. The line down the left of an answer has the rung's colour.</p>
@@ -317,7 +321,7 @@ html[data-drop] .composer::after{content:"Drop to open";font:12px var(--mono);co
             <li><span class="rung guess">guess</span> Nothing read it exactly, so it offers readings that change it slightly (an ignored word, an assumed preposition) and says what each changed. None runs until you pick one.</li>
             <li><span class="rung none">no reading</span> It stops, shows the nearest skills, and offers to learn the word it did not know.</li>
           </ol>
-          <p>Open <b>plan</b> under an answer to see every step that produced it.</p>
+          <p>Open <b>how</b> under an answer to see every step that produced it. Beside it, <b>copy</b> takes the answer, <b>edit</b> puts the question back in the box, <b>pin</b> keeps the card at the top of the session, and <b>branch</b> starts a new session from it. golem reads English and Portuguese, whichever the interface is set to first.</p>
         </section>
         <section>
           <h2>Sessions, history and names</h2>
@@ -329,17 +333,18 @@ html[data-drop] .composer::after{content:"Drop to open";font:12px var(--mono);co
           <h2>Keys</h2>
           <ul>
             <li><code>Enter</code> runs, <code>Shift+Enter</code> starts a new line, <code>↑</code> and <code>↓</code> on an empty line step through this session's queries.</li>
-            <li><code>/</code> or <code>Esc</code> puts the cursor in the box.</li>
+            <li><code>/</code> or <code>Esc</code> puts the cursor in the box; <code>Esc</code> in an empty box goes to the last card.</li>
+            <li>Between cards: <code>j</code> and <code>k</code> (or the arrows) move, <code>c</code> copies the answer, <code>e</code> edits the question, <code>p</code> pins.</li>
             <li><code>Ctrl+Shift+O</code> starts a new session, <code>Ctrl+K</code> searches every session (<code>Enter</code> opens the first), <code>Ctrl+B</code> shows or hides the sidebar. On a Mac, Cmd works for Ctrl.</li>
           </ul>
         </section>
         <section>
           <h2>Files</h2>
-          <p>The paperclip opens tables (CSV, TSV, xlsx, Parquet, Datamine .dm), drawings and geometry (DXF, WKT, GeoJSON, YAML) and documents (Markdown, text, HTML). Files stay on this device. Documents are searched by word: <code>find resurvey in my documents</code>.</p>
+          <p>The paperclip opens tables (CSV, TSV, xlsx, Parquet, Datamine .dm), drawings and geometry (DXF, WKT, GeoJSON, YAML) and documents (Markdown, text, HTML); so does a file dropped on the window, or shared to the app. Files stay on this device. Documents are searched by word: <code>find resurvey in my documents</code>.</p>
         </section>
         <section>
-          <h2>Hand-offs on Android</h2>
-          <p>In the lead-acid shell, golem fills in an event, a timer or a message and hands it to the app you already use; that app asks you to confirm. Nothing goes through a Google API or the network. In a browser the hand-off is simulated.</p>
+          <h2>On Android</h2>
+          <p>In the lead-acid app, golem fills in an event, a timer or an alarm and hands it to the app you already use; that app asks you to confirm. It measures a plane or a line with the phone's compass (<code>measure bedding</code>), takes a position when you ask (<code>declination here</code>), listens with the phone's own offline recognizer and reads answers aloud with its offline voices. Nothing goes through a Google API or the network.</p>
         </section>
         <section>
           <h2>What is real here</h2>
@@ -350,26 +355,70 @@ html[data-drop] .composer::after{content:"Drop to open";font:12px var(--mono);co
           </ul>
         </section>
       </div>
+      <div class="notes" data-lang="pt" lang="pt-BR">
+        <section>
+          <h2>Uma pergunta, degrau a degrau</h2>
+          <p>Cada resposta mostra que degrau leu a pergunta e como ela foi lida. As lacunas tracejadas são leituras ambíguas: toque numa para trocar, e a resposta é recalculada. A linha à esquerda da resposta tem a cor do degrau.</p>
+          <ol>
+            <li><span class="rung context">contexto</span> Uma pergunta em aberto do golem, ou um ajuste da última resposta: <code>em pés</code>, <code>escala log</code>, <code>e chile</code>, <code>por quê</code>, <code>desfaz</code>.</li>
+            <li><span class="rung grammar">gramática</span> A leitura controlada, em português ou inglês: a gramática de orações do <code>@gcu/dispatch</code>, e depois o leitor de aritmética. Enquanto você escreve, a linha embaixo da caixa mostra o que seria lido.</li>
+            <li><span class="rung taught">ensinado</span> Expressões que você ensinou neste aparelho: <code>dens means density</code>.</li>
+            <li><span class="rung guess">palpite</span> Nada leu exatamente, então ele oferece leituras que mudam um pouco o texto (uma palavra deixada de lado, uma preposição suposta) e diz o que cada uma mudou. Nenhuma roda até você escolher.</li>
+            <li><span class="rung none">sem leitura</span> Ele para, mostra as habilidades mais próximas e se oferece para aprender a palavra que não conhecia.</li>
+          </ol>
+          <p>Abra <b>como</b> embaixo de uma resposta para ver cada passo que a produziu. Ao lado, <b>copiar</b> pega a resposta, <b>editar</b> põe a pergunta de volta na caixa, <b>fixar</b> mantém o cartão no topo da sessão e <b>ramificar</b> começa uma sessão nova a partir dele. As respostas das ferramentas ainda estão em inglês.</p>
+        </section>
+        <section>
+          <h2>Sessões, histórico e nomes</h2>
+          <p>Uma sessão é guardada como o seu plano: a lista de chamadas de ferramentas e seus argumentos. Abrir uma sessão refaz o plano, então o histórico custa poucas centenas de bytes e as respostas antigas continuam reproduzíveis. A busca na barra lateral olha todas as sessões.</p>
+          <p>Os nomes são calculados a partir das ferramentas que rodaram, e param de mudar quando você dá um nome: <code>chama esta sessão de laboratório sexta</code>.</p>
+        </section>
+        <section>
+          <h2>Teclas</h2>
+          <ul>
+            <li><code>Enter</code> roda, <code>Shift+Enter</code> quebra a linha, <code>↑</code> e <code>↓</code> numa linha vazia percorrem as perguntas desta sessão.</li>
+            <li><code>/</code> ou <code>Esc</code> põe o cursor na caixa; <code>Esc</code> com a caixa vazia vai para o último cartão.</li>
+            <li>Entre cartões: <code>j</code> e <code>k</code> (ou as setas) navegam, <code>c</code> copia a resposta, <code>e</code> edita a pergunta, <code>p</code> fixa.</li>
+            <li><code>Ctrl+Shift+O</code> começa uma sessão nova, <code>Ctrl+K</code> busca em todas as sessões, <code>Ctrl+B</code> mostra ou esconde a barra lateral. No Mac, Cmd faz o papel de Ctrl.</li>
+          </ul>
+        </section>
+        <section>
+          <h2>Arquivos</h2>
+          <p>O clipe abre tabelas (CSV, TSV, xlsx, Parquet, Datamine .dm), desenhos e geometria (DXF, WKT, GeoJSON, YAML) e documentos (Markdown, texto, HTML); um arquivo solto na janela, ou compartilhado com o app, também abre. Os arquivos ficam neste aparelho.</p>
+        </section>
+        <section>
+          <h2>No Android</h2>
+          <p>No app lead-acid, o golem preenche um evento, um cronômetro ou um alarme e entrega ao app que você já usa; esse app pede a sua confirmação. Ele mede um plano ou uma linha com a bússola do celular (<code>mede o acamamento</code>), pega uma posição quando você pede (<code>declinação aqui</code>), ouve com o reconhecedor offline do próprio celular e lê as respostas com as vozes offline dele. Nada passa por uma API do Google nem pela rede.</p>
+        </section>
+        <section>
+          <h2>O que é real aqui</h2>
+          <ul>
+            <li>Calculado na página: unidades, aritmética, datas, geologia estrutural e o estereograma, tabelas e gráficos, conversões, busca em documentos, Python num worker, toda a leitura, o ensino e os ajustes.</li>
+            <li>Dados de amostra vêm marcados como amostra: <code>assays.csv</code> é sintético, e os números dos países são uma amostra arredondada.</li>
+            <li>Fora do escopo, de propósito: texto livre para o qual ninguém escreveu um caminho, como redações, tradução livre, resumos com palavras próprias e conversa fiada. O golem diz que não tem leitura.</li>
+          </ul>
+        </section>
+      </div>
     </div>
 
     <div class="dock">
       <form class="composer" id="f" autocomplete="off">
-        <textarea id="q" rows="1" placeholder="Ask, compute, or act" aria-label="Query" enterkeyhint="go" aria-describedby="pv" spellcheck="false" autocapitalize="off"></textarea>
+        <textarea id="q" rows="1" placeholder="Ask, compute, or act" aria-label="Query" data-t-attr="placeholder aria-label" enterkeyhint="go" aria-describedby="pv" spellcheck="false" autocapitalize="off"></textarea>
         <div class="pv" id="pv" hidden><i aria-hidden="true"></i><span></span></div>
-        <div class="sg" id="sg" hidden aria-label="Completions"></div>
+        <div class="sg" id="sg" hidden aria-label="Completions" data-t-attr="aria-label"></div>
         <div class="crow">
-          <button class="ibtn" id="attach" type="button" title="Open a file: a table, a drawing or a document" aria-label="Open a file"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M15 8.5l-6 6a3.5 3.5 0 0 1-5-5l6.5-6.5a2.3 2.3 0 0 1 3.3 3.3L7.4 12.6a1.1 1.1 0 0 1-1.6-1.6L11.5 5.3"/></svg></button><input type="file" id="file" accept=".golem.json,.json,.gcudat,.csv,.tsv,.txt,.md,.markdown,.html,.htm,.xlsx,.xlsm,.dm,.parquet,.dxf,.yaml,.yml,.wkt,.geojson,text/csv,text/tab-separated-values,text/plain" hidden>
-          <button class="ibtn mic" id="mic" type="button" hidden title="Speak a question: the phone's own recognizer, offline" aria-label="Speak a question" aria-pressed="false"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect x="6.5" y="2" width="5" height="9" rx="2.5"/><path d="M4 8.5a5 5 0 0 0 10 0M9 13.5V16"/></svg></button>
-          <span class="grow"><span class="only-wide">Enter runs · Tab completes · Shift+Enter for a new line · ↑ for earlier queries</span></span>
-          <button class="send" id="send" type="submit" aria-label="Run" title="Run"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 13V3M3.5 7.5L8 3l4.5 4.5"/></svg></button>
+          <button class="ibtn" id="attach" type="button" title="Open a file: a table, a drawing or a document" aria-label="Open a file" data-t-attr="title aria-label"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M15 8.5l-6 6a3.5 3.5 0 0 1-5-5l6.5-6.5a2.3 2.3 0 0 1 3.3 3.3L7.4 12.6a1.1 1.1 0 0 1-1.6-1.6L11.5 5.3"/></svg></button><input type="file" id="file" accept=".golem.json,.json,.gcudat,.csv,.tsv,.txt,.md,.markdown,.html,.htm,.xlsx,.xlsm,.dm,.parquet,.dxf,.yaml,.yml,.wkt,.geojson,text/csv,text/tab-separated-values,text/plain" hidden>
+          <button class="ibtn mic" id="mic" type="button" hidden title="Speak a question: the phone's own recognizer, offline" aria-label="Speak a question" data-t-attr="title aria-label" aria-pressed="false"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect x="6.5" y="2" width="5" height="9" rx="2.5"/><path d="M4 8.5a5 5 0 0 0 10 0M9 13.5V16"/></svg></button>
+          <span class="grow"><span class="only-wide" data-t>Enter runs · Tab completes · Shift+Enter for a new line · ↑ for earlier queries</span></span>
+          <button class="send" id="send" type="submit" aria-label="Run" title="Run" data-t-attr="aria-label title"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 13V3M3.5 7.5L8 3l4.5 4.5"/></svg></button>
         </div>
       </form>
-      <div id="status" aria-live="polite" data-hint="No model runs here. golem reads what you type, or says it cannot."></div>
+      <div id="status" aria-live="polite" data-hint="No model runs here. golem reads what you type, or says it cannot." data-t-attr="data-hint"></div>
     </div>
     <nav class="tabs" role="tablist">
-      <button role="tab" data-tab="ask" aria-selected="true">Ask</button>
-      <button role="tab" data-tab="skills" aria-selected="false">Skills</button>
-      <button role="tab" data-tab="packs" aria-selected="false">Packs</button>
+      <button role="tab" data-tab="ask" aria-selected="true" data-t>Ask</button>
+      <button role="tab" data-tab="skills" aria-selected="false" data-t>Skills</button>
+      <button role="tab" data-tab="packs" aria-selected="false" data-t>Packs</button>
     </nav>
   </main>
 </div>

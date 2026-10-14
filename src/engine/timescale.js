@@ -70,13 +70,13 @@ tool({
 frame({
   name: 'date', label: 'Date', words: ['how old is', 'when was', 'when is', 'date', 'age of'], elidable: true,
   theme: ['chron'], required: ['theme'], roles: {},
-  words_pt: ['quando foi', 'idade de', 'datar', 'data'], label_pt: 'Datar',
+  words_pt: ['quando foi', 'idade de', 'idade do', 'idade da', 'qual a idade de', 'qual a idade do', 'qual a idade da', 'qual é a idade do', 'qual é a idade da', 'datar', 'data'], label_pt: 'Datar',
   bind: c => { const t = c.theme[0]; return t && t.value ? { tool: 'timescale', args: { unit: t.value } } : null; }
 });
 /* ── what reads the rest: duration, before and after, subdivisions, an age in Ma ── */
 const unitArg = c => c.theme[0] && c.theme[0].value;
 for (const [name, words, ask, words_pt] of [
-  ['chronlength', ['how long was', 'how long is', 'how long did', 'duration of', 'length of', 'how long did it last'], 'duration', ['quanto durou', 'duração de']],
+  ['chronlength', ['how long was', 'how long is', 'how long did', 'duration of', 'length of', 'how long did it last'], 'duration', ['quanto durou', 'quanto tempo durou', 'quanto tempo dura', 'duração de', 'duração do', 'duração da', 'qual a duração do', 'qual a duração da']],
   ['chronbefore', ['what came before', 'what comes before', 'what was before', 'which came before', 'what is before', 'before'], 'before', ['o que veio antes de', 'antes de']],
   ['chronafter', ['what came after', 'what comes after', 'what was after', 'which came after', 'what is after', 'after'], 'after', ['o que veio depois de', 'depois de']]
 ]) frame({ name, label: 'Timescale', words, theme: ['chron'], required: ['theme'], roles: {}, words_pt, label_pt: 'Escala do tempo', bind: c => unitArg(c) ? { tool: 'timescale', args: { unit: unitArg(c), ask } } : null });

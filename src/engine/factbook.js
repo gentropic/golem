@@ -44,7 +44,8 @@ const ALIAS = { 'United States': ['usa', 'u.s.', 'united states of america'], 'U
   DRC: ['democratic republic of the congo', 'dr congo', 'congo kinshasa', 'congo'], 'Congo (Brazzaville)': ['republic of the congo', 'congo brazzaville', 'congo'] };
 const display = lang => { try { return new Intl.DisplayNames([lang], { type: 'region' }); } catch (e) { return null; } };
 const EN = display('en'), PT = display('pt');
-function formsOf(name) { const n = fold(name), out = [n]; const nb = n.replace(/\s*\(.*\)\s*/g, ' ').trim(); if (nb !== n) out.push(nb); for (const x of [...out]) if (/^the /.test(x)) out.push(x.slice(4)); return out; }
+// folded and as written: "mongolia" and "mongólia" (the parser matches what was typed, accents and all)
+function formsOf(name) { const n = fold(name), w = name.toLowerCase().replace(/[’`]/g, "'").replace(/\s+/g, ' ').trim(), out = w !== n ? [n, w] : [n]; const nb = n.replace(/\s*\(.*\)\s*/g, ' ').trim(); if (nb !== n) out.push(nb); for (const x of [...out]) if (/^the /.test(x)) out.push(x.slice(4)); return out; }
 function wordsOf(r, D) {
   const out = new Set(formsOf(r.name)); for (const a of (D === EN ? ALIAS[r.name] : null) || []) out.add(fold(a));
   if (D && r.iso2) { let d = null; try { d = D.of(r.iso2.toUpperCase()); } catch (e) { d = null; } if (d && d.toUpperCase() !== r.iso2.toUpperCase()) for (const f of formsOf(d)) out.add(f); }

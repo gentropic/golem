@@ -13,17 +13,20 @@ import { BINARY } from '../engine/formats.js';
 import { setRunner, onJobDone } from '../engine/core.js';
 import { sessions, current, newSession, openSession, renameSession, deleteSession, searchHistory, parts, hydrate, onChange, exportSession, importSession, pinCard, branchSession } from '../engine/sessions.js';
 import { openStore, putBlob, getBlob } from './store.js';
-import { skills, PACKS, STARTERS } from '../engine/skills.js';
+import { skills, PACKS, STARTERS, STARTERS_PT } from '../engine/skills.js';
 import { shell } from '../vendor/leadacid.js';
 import { escHtml, pad, cardEl, drawCharts } from './render.js';
 import { registerGcuSw } from '../vendor/sw-register.js';
+import { t, plural, setUiLang, uiLang, applyStatic } from './i18n.js';
+import { setLanguage } from '../engine/reading.js';
 
 const $ = id => document.getElementById(id);
-const THEME = 'golem.theme', FOLD = 'golem.side';
+const THEME = 'golem.theme', FOLD = 'golem.side', LANG = 'golem.lang';
 const narrow = () => window.matchMedia('(max-width: 860px)').matches;
 let awake = true, statusT;
 
-function status(msg) { $('status').textContent = msg; clearTimeout(statusT); statusT = setTimeout(() => { $('status').textContent = ''; }, 5000); }
+// a message in the person's language: t() on a sentence that is already translated leaves it as it is
+function status(msg) { $('status').textContent = t(msg); clearTimeout(statusT); statusT = setTimeout(() => { $('status').textContent = ''; }, 5000); }
 function showTab(t) {
   ['ask', 'skills', 'packs', 'about'].forEach(k => { $('v-' + k).hidden = k !== t; });
   document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === t));
@@ -38,7 +41,9 @@ function tick() {
 setInterval(tick, 500);
 
 /* ── the stream ── */
-function renderBar() { $('sname').textContent = current().name; }
+// a session's name as shown: the default one in the person's language, any other as it is
+const nameOf = s => s.name === 'New session' ? t('New session') : s.name;
+function renderBar() { $('sname').textContent = nameOf(current()); }
 function renderStream(focus) {
   $('stream').innerHTML = '';
   S.cards.forEach(c => $('stream').appendChild(cardEl(c))); drawCharts($('stream')); armCaptures();
@@ -51,7 +56,7 @@ function welcome() { $('welcome').hidden = S.cards.length > 0; renderPins(); }
 function renderPins() {
   const pins = S.cards.filter(c => c.pinned);
   $('pins').hidden = !pins.length;
-  $('pins').innerHTML = pins.length ? `<span class="lbl">pinned</span>${pins.map(c => `<button class="chip" type="button" data-goto="${c.id}">#${pad(c.id)} ${escHtml(c.raw.length > 40 ? c.raw.slice(0, 39) + '…' : c.raw)}</button>`).join('')}` : '';
+  $('pins').innerHTML = pins.length ? `<span class="lbl">${t('pinned')}</span>${pins.map(c => `<button class="chip" type="button" data-goto="${c.id}">#${pad(c.id)} ${escHtml(c.raw.length > 40 ? c.raw.slice(0, 39) + '…' : c.raw)}</button>`).join('')}` : '';
 }
 const cardOf = id => $('stream').querySelector(`.card[data-id="${id}"]`);
 function copyText(text, where) {
@@ -65,8 +70,8 @@ function cardAction(c, act) {
   const answerText = () => el ? [...el.querySelector('.ans').children].filter(n => !n.matches('.src, .opts')).map(n => n.innerText.trim()).filter(Boolean).join('\n') : '';
   if (act === 'copyans') copyText(c.res.copy || answerText(), el && el.querySelector('.ans'));
   else if (act === 'edit') { const q = $('q'); q.value = c.raw; q.dispatchEvent(new Event('input')); q.focus(); q.setSelectionRange(q.value.length, q.value.length); status('Back in the box: change it and press Enter. The answer comes as a new card.'); }
-  else if (act === 'pin') { const on = pinCard(c); replaceCard(c); renderPins(); status(on ? `Pinned #${pad(c.id)}.` : `Unpinned #${pad(c.id)}.`); }
-  else if (act === 'branch') { const s = branchSession(c.id); renderStream(); renderDrawer(); status(`A new session, "${s.name}", with the cards up to #${pad(c.id)}.`); }
+  else if (act === 'pin') { const on = pinCard(c); replaceCard(c); renderPins(); status(t(on ? 'Pinned #{n}.' : 'Unpinned #{n}.', { n: pad(c.id) })); }
+  else if (act === 'branch') { const s = branchSession(c.id); renderStream(); renderDrawer(); status(t('A new session, "{name}", with the cards up to #{n}.', { name: s.name, n: pad(c.id) })); }
 }
 // moving between cards from the keyboard: j / k or the arrows when the box is not focused; c, e, p act on the focused card;
 // / or Escape goes back to the box
@@ -103,9 +108,9 @@ function show(o) {
     case 'new-session': renderStream(); status('New session.'); break;
     case 'recipe': renderStream(); status(o.msg); break;
     case 'drawer': openDrawer(); break;
-    case 'rename': status(`Session named “${o.name}”.`); break;
-    case 'answered': replaceCard(o.card); status(`Answered #${pad(o.card.id)}: ${o.label}`); break;
-    case 'undo': { const el = $('stream').querySelector(`[data-id="${o.card.id}"]`); if (el) el.remove(); welcome(); status(`Removed #${pad(o.card.id)}: ${o.card.raw}`); break; }
+    case 'rename': status(t('Session named “{name}”.', { name: o.name })); break;
+    case 'answered': replaceCard(o.card); status(t('Answered #{n}: {label}', { n: pad(o.card.id), label: o.label })); break;
+    case 'undo': { const el = $('stream').querySelector(`[data-id="${o.card.id}"]`); if (el) el.remove(); welcome(); status(t('Removed #{n}: {raw}', { n: pad(o.card.id), raw: o.card.raw })); break; }
     case 'nothing': status(o.msg); break;
     case 'card': {
       const el = cardEl(o.card); $('stream').appendChild(el); drawCharts(el); welcome(); armCaptures(); if (voice.all) say(el); showTab('ask'); el.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
@@ -120,10 +125,10 @@ function show(o) {
 
 /* ── catalog and packs ── */
 function renderSkills() {
-  const rows = skills(), live = rows.filter(s => s.live).length; let h = `<h1 class="vhead">Skills</h1><div class="sub">${live} skills run here. ${rows.length - live} more are planned from packages that already exist or are named here. Tap an example to run it.</div>`, g = '';
+  const rows = skills(), live = rows.filter(s => s.live).length; let h = `<h1 class="vhead">${t('Skills')}</h1><div class="sub">${t('{live} skills run here. {planned} more are planned from packages that already exist or are named here. Tap an example to run it.', { live, planned: rows.length - live })}${uiLang() === 'pt' ? ' ' + t('Skill descriptions and answers are in English for now.') : ''}</div>`, g = '';
   rows.forEach(s => {
-    if (s.group !== g) { h += `<div class="lbl">${escHtml(s.group)}</div>`; g = s.group; }
-    h += `<div class="item"><h3>${escHtml(s.title)} <span class="tag ${s.live ? 'live' : 'plan'}">${s.live ? 'live' : 'planned'}</span></h3><p>${escHtml(s.about)}</p><div class="from">${escHtml(s.on)}</div>${s.examples.length ? `<div class="opts">${s.examples.map(x => `<button class="chip" type="button" data-q="${escHtml(x)}" style="white-space:normal;text-align:left">${escHtml(x)}</button>`).join('')}</div>` : ''}</div>`;
+    if (s.group !== g) { h += `<div class="lbl">${escHtml(t(s.group))}</div>`; g = s.group; }
+    h += `<div class="item"><h3>${escHtml(s.title)} <span class="tag ${s.live ? 'live' : 'plan'}">${t(s.live ? 'live' : 'planned')}</span></h3><p>${escHtml(s.about)}</p><div class="from">${escHtml(s.on)}</div>${s.examples.length ? `<div class="opts">${s.examples.map(x => `<button class="chip" type="button" data-q="${escHtml(x)}" style="white-space:normal;text-align:left">${escHtml(x)}</button>`).join('')}</div>` : ''}</div>`;
   });
   $('v-skills').innerHTML = h;
 }
@@ -132,26 +137,27 @@ function renderSkills() {
 // file there is no worker, and nothing to install or update. Inside the lead-acid shell (the Android app) there is none either:
 // the app has no network permission, a new version is a new APK, and the library is reached through .gcudat files.
 const inApp = shell.present;
-const OFFLINE_APP = 'This app has no network permission, so the library is out of reach from here: download the .gcudat from gcu-library in a browser and open it with the paperclip.';
+const OFFLINE_APP = () => t('This app has no network permission, so the library is out of reach from here: download the .gcudat from gcu-library in a browser and open it with the paperclip.');
 let requests = 0, update = { at: null, ready: false, note: '' };
 // Saving a file: a download in a browser; in the app (whose WebView drops downloads) lead-acid publishes it to Downloads,
 // under the name Android gave it ("x (1).ics" when x.ics is there).
 async function saveFile(name, data, mime) {
   if (inApp) {
-    try { const r = await shell.publish(name, typeof data === 'string' ? new TextEncoder().encode(data) : data, { collection: 'Downloads', mime }); status(`Saved ${r.name || name} to Downloads.`); }
-    catch (e) { status(`Not saved: ${e.message}`); }
+    try { const r = await shell.publish(name, typeof data === 'string' ? new TextEncoder().encode(data) : data, { collection: 'Downloads', mime }); status(t('Saved {name} to Downloads.', { name: r.name || name })); }
+    catch (e) { status(t('Not saved: {e}', { e: e.message })); }
     return;
   }
   const url = URL.createObjectURL(new Blob([data], { type: mime })), a = document.createElement('a');
-  a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000); status(`Saved ${name}.`);
+  a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000); status(t('Saved {name}.', { name }));
 }
-const countRequest = () => { requests++; $('st-req').textContent = `${requests} request${requests === 1 ? '' : 's'}`; };
+const requestText = () => t(requests === 1 ? '{n} request' : '{n} requests', { n: requests });
+const countRequest = () => { requests++; $('st-req').textContent = requestText(); };
 const sw = inApp ? { supported: false, checkNow: async () => null, applyUpdate() {} } : registerGcuSw({ url: 'sw.js', persist: true, onUpdateAvailable: () => { update.ready = true; renderPacks(); } });
 async function checkUpdates() {
-  countRequest(); update.note = 'Checking…'; renderPacks();
+  countRequest(); update.note = t('Checking…'); renderPacks();
   const r = await sw.checkNow();
   update.at = Date.now();
-  update.note = !r ? 'No worker controls this page yet. Reload once, then check again.' : r.changed ? '' : 'golem is up to date.';
+  update.note = !r ? t('No worker controls this page yet. Reload once, then check again.') : r.changed ? '' : t('golem is up to date.');
   if (r && r.changed) update.ready = true;
   renderPacks();
 }
@@ -161,10 +167,17 @@ async function checkUpdates() {
 const VOICE = 'golem.say';
 const voice = { hear: false, say: false, all: false };
 try { voice.all = localStorage.getItem(VOICE) === 'all'; } catch (e) { /* storage is optional */ }
+// the language golem listens and speaks in: the interface's (pt-BR or en-US)
+const speechLang = () => uiLang() === 'pt' ? 'pt-BR' : 'en-US', langName = () => uiLang() === 'pt' ? 'português' : 'English';
 const data = d => typeof d === 'string' ? (() => { try { return JSON.parse(d); } catch (e) { return {}; } })() : (d || {});
+// what the phone offers in the person's language (checked again when the language changes)
+function voiceSupport() {
+  if (!inApp) return;
+  shell.speech.support(speechLang()).then(s => { voice.hear = !!(s && s.onDevice && s.language && s.language.installed); $('mic').hidden = !voice.hear; renderPacks(); }).catch(() => {});
+}
 if (inApp) {
-  shell.speech.support('en-US').then(s => { if (s && s.onDevice && s.language && s.language.installed) { voice.hear = true; $('mic').hidden = false; } }).catch(() => {});
-  shell.tts.support().then(t => { if (t && t.available && t.offlineVoices) { voice.say = true; document.documentElement.dataset.say = '1'; renderPacks(); } }).catch(() => {});
+  voiceSupport();
+  shell.tts.support().then(v => { if (v && v.available && v.offlineVoices) { voice.say = true; document.documentElement.dataset.say = '1'; renderPacks(); } }).catch(() => {});
 }
 // the words the recognizer should expect: the open table's columns and categories, and the units golem knows by name
 const biasWords = () => [...(S.table ? S.table.cols.map(c => c.name) : []), ...(S.table ? S.table.cols.flatMap(c => c.values || []).slice(0, 40) : []), 'g/t', 'ppm', 'dip direction', 'trend', 'plunge'].slice(0, 80);
@@ -173,29 +186,29 @@ async function listen() {
   if (listening) { listening.stop(); return; }
   const q = $('q'), put = t => { q.value = t; q.dispatchEvent(new Event('input')); };
   try {
-    listening = await shell.speech.listen({ lang: 'en-US', bias: biasWords() });
+    listening = await shell.speech.listen({ lang: speechLang(), bias: biasWords() });
     $('mic').setAttribute('aria-pressed', 'true'); status('Listening. Tap the mic again to stop.');
     listening.on('partial', d => put(data(d).text || ''))
       .on('result', d => { const a = data(d).alternatives || [], t = a.length ? a[0].text : ''; put(t); q.focus(); status(t ? 'Heard. The reading is under the box; press Enter to run it.' : 'Nothing heard.'); })
-      .on('error', d => status(`The recognizer stopped: ${data(d).code || 'error'}.`))
+      .on('error', d => status(t('The recognizer stopped: {code}.', { code: data(d).code || 'error' })))
       .onClose(() => { listening = null; $('mic').setAttribute('aria-pressed', 'false'); });
   } catch (e) {
     listening = null; $('mic').setAttribute('aria-pressed', 'false');
-    status(e.status === 403 ? 'Voice needs the microphone: allow it in the dialog, or in the app\'s settings.' : e.status === 503 ? 'This phone has no offline recognizer for English. Its language pack for offline speech is in the system settings.' : `Voice failed: ${e.message}`);
+    status(e.status === 403 ? t('Voice needs the microphone: allow it in the dialog, or in the app\'s settings.') : e.status === 503 ? t('This phone has no offline recognizer for {lang}. Its language pack for offline speech is in the system settings.', { lang: langName() }) : t('Voice failed: {e}', { e: e.message }));
   }
 }
 $('mic').addEventListener('click', () => { if (awake) listen(); });
 // a card said aloud: what was read, then the answer's first lines, without sources
 function spokenOf(el) {
   const read = el.querySelector('.read'), ans = [...el.querySelector('.ans').children].filter(n => !n.matches('.src, .opts, .lbl, figure, svg, canvas'));
-  return [read ? read.innerText.replace(/^read as\s*/i, '').replace(/⇄/g, '') : '', ...ans.slice(0, 2).map(n => n.innerText)].join('. ').replace(/\s+/g, ' ').slice(0, 400);
+  return [read ? read.innerText.replace(/^(read as|lido como)\s*/i, '').replace(/⇄/g, '') : '', ...ans.slice(0, 2).map(n => n.innerText)].join('. ').replace(/\s+/g, ' ').slice(0, 400);
 }
-function say(el) { if (voice.say && el) shell.tts.speak(spokenOf(el), { lang: 'en-US', queue: 'flush' }).catch(e => status(e.status === 503 ? 'No offline voice for English on this phone.' : `Could not speak: ${e.message}`)); }
+function say(el) { if (voice.say && el) shell.tts.speak(spokenOf(el), { lang: speechLang(), queue: 'flush' }).catch(e => status(e.status === 503 ? t('No offline voice for {lang} on this phone.', { lang: langName() }) : t('Could not speak: {e}', { e: e.message }))); }
 function voiceItem() {
   if (!inApp) return '';
-  const hear = voice.hear ? 'The mic in the box listens with the phone\'s own recognizer, offline; what it hears goes into the box for you to check.' : 'No offline recognizer for English on this phone, so there is no mic.';
-  const out = voice.say ? `Answers can be read aloud with the phone's offline voices.</p><div class="opts"><button class="btn${voice.all ? ' go' : ''}" type="button" id="say-all" aria-pressed="${voice.all}">${voice.all ? 'Reading every answer aloud' : 'Read every answer aloud'}</button></div>` : 'No offline voice for English, so nothing is read aloud.</p>';
-  return `<div class="item"><h3>Voice</h3><p>${hear} ${out}</div>`;
+  const hear = voice.hear ? t('The mic in the box listens with the phone\'s own recognizer, offline; what it hears goes into the box for you to check.') : t('No offline recognizer for {lang} on this phone, so there is no mic.', { lang: langName() });
+  const out = voice.say ? `${t('Answers can be read aloud with the phone\'s offline voices.')}</p><div class="opts"><button class="btn${voice.all ? ' go' : ''}" type="button" id="say-all" aria-pressed="${voice.all}">${t(voice.all ? 'Reading every answer aloud' : 'Read every answer aloud')}</button></div>` : t('No offline voice for {lang}, so nothing is read aloud.', { lang: langName() }) + '</p>';
+  return `<div class="item"><h3>${t('Voice')}</h3><p>${hear} ${out}</div>`;
 }
 /* ── field capture, in the app: the phone's fused orientation for a plane or a line, one position fix. A card that waits
    for a reading (res.capture) shows it live; the reading taken goes into the card's args (capture() in the engine). ── */
@@ -215,14 +228,14 @@ async function armCaptures() {
     orient = await shell.orientation({ rateHz: 20 });
     orient.on(o => { samples.push({ alpha: o.alpha, beta: o.beta, gamma: o.gamma, acc: o.accuracy, t: Date.now() }); samples = samples.filter(s => s.t > Date.now() - 1000); paintCaptures(); })
       .onClose(() => { orient = null; });
-  } catch (e) { orient = null; $('stream').querySelectorAll('.capture .live').forEach(l => { l.textContent = 'The compass is not available here.'; }); }
+  } catch (e) { orient = null; $('stream').querySelectorAll('.capture .live').forEach(l => { l.textContent = t('The compass is not available here.'); }); }
 }
 function paintCaptures() {
   const s = samples[samples.length - 1];
   for (const c of pendingCaptures()) {
     const live = cardOf(c.id) && cardOf(c.id).querySelector('.capture .live'); if (!live || !s) continue;
     const [x, y] = fromDevice(c.res.capture.kind, s.alpha, s.beta, s.gamma);
-    live.innerHTML = `${String(Math.round(((x % 360) + 360) % 360)).padStart(3, '0')}/${String(Math.round(y)).padStart(2, '0')}<small>magnetic · compass ${escHtml(ACCW[s.acc] || 'not reported')}</small>`;
+    live.innerHTML = `${String(Math.round(((x % 360) + 360) % 360)).padStart(3, '0')}/${String(Math.round(y)).padStart(2, '0')}<small>${escHtml(t('magnetic · compass {acc}', { acc: t(ACCW[s.acc] || 'not reported') }))}</small>`;
   }
 }
 // the steadiest reading of the last second: the sample nearest the others, and how far the farthest was
@@ -234,29 +247,29 @@ function takeReading(c) {
   vs.forEach((v, i) => { const sum = vs.reduce((a, w) => a + angle(v, w), 0); if (sum < bestSum) { bestSum = sum; best = i; } });
   const s = samples[best], spread = Math.max(...vs.map(w => angle(vs[best], w)));
   capture(c, { alpha: s.alpha, beta: s.beta, gamma: s.gamma, acc: s.acc, spread: Math.round(spread * 10) / 10, at: s.t });
-  replaceCard(c); armCaptures(); status(`Measured. ${spread > 2 ? 'The phone moved while measuring; hold it still for a steadier reading.' : ''}`.trim());
+  replaceCard(c); armCaptures(); status(spread > 2 ? 'Measured. The phone moved while measuring; hold it still for a steadier reading.' : 'Measured.');
 }
 // one position fix: the first good one in 15 seconds, or the best of them
 async function takePosition(c) {
   const live = cardOf(c.id) && cardOf(c.id).querySelector('.capture .live'), show = t => { if (live) live.textContent = t; };
   let best = null, st = null;
   try {
-    st = await shell.gnss.location({ minMs: 1000 }); show('Waiting for a fix…');
+    st = await shell.gnss.location({ minMs: 1000 }); show(t('Waiting for a fix…'));
     await new Promise(done => {
       const stop = setTimeout(done, 15000);
       st.on('fix', d => { const f = data(d); if (f.lat == null) return; if (!best || (f.acc != null && f.acc < best.acc)) best = f; show(`±${Math.round(f.acc)} m…`); if (f.acc != null && f.acc <= 20) { clearTimeout(stop); done(); } });
     });
-  } catch (e) { show(''); status(e.status === 403 || (e.info && e.info.error === 'permission') ? 'Position needs the location permission: allow it in the dialog, or in the app\'s settings.' : `No position: ${e.message}`); return; }
+  } catch (e) { show(''); status(e.status === 403 || (e.info && e.info.error === 'permission') ? t('Position needs the location permission: allow it in the dialog, or in the app\'s settings.') : t('No position: {e}', { e: e.message })); return; }
   finally { if (st) st.close(); }
-  if (!best) { show('No fix. Go where the sky is open and try again.'); return; }
-  capture(c, { lat: best.lat, lon: best.lon, acc: best.acc, at: best.t || Date.now() }); replaceCard(c); status(`Position taken, ±${Math.round(best.acc)} m.`);
+  if (!best) { show(t('No fix. Go where the sky is open and try again.')); return; }
+  capture(c, { lat: best.lat, lon: best.lon, acc: best.acc, at: best.t || Date.now() }); replaceCard(c); status(t('Position taken, ±{m} m.', { m: Math.round(best.acc) }));
 }
 function appItem() {
-  if (inApp) return '<div class="item"><h3>This app</h3><p>Installed as an Android app through lead-acid. It has no network permission and checks for nothing: a new version comes as a new APK.</p></div>';
-  if (!sw.supported) return '<div class="item"><h3>This app</h3><p>Opened as a file, so there is nothing to install or update. Served over https, golem installs as an app and works offline.</p></div>';
-  const at = update.at ? ` Last checked ${new Date(update.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}.` : '';
-  return `<div class="item"><h3>This app</h3><p>Kept on this device and works offline. It looks for a new version only when you ask; that is one request to where golem came from.${at}</p>`
-    + `<div class="opts">${update.ready ? '<button class="btn go" type="button" id="sw-apply">Reload to the new golem</button>' : '<button class="btn" type="button" id="sw-check">Check for updates</button>'}${update.note ? `<span class="sub">${escHtml(update.note)}</span>` : ''}</div></div>`;
+  if (inApp) return `<div class="item"><h3>${t('This app')}</h3><p>${t('Installed as an Android app through lead-acid. It has no network permission and checks for nothing: a new version comes as a new APK.')}</p></div>`;
+  if (!sw.supported) return `<div class="item"><h3>${t('This app')}</h3><p>${t('Opened as a file, so there is nothing to install or update. Served over https, golem installs as an app and works offline.')}</p></div>`;
+  const at = update.at ? t(' Last checked {time}.', { time: new Date(update.at).toLocaleTimeString(uiLang() === 'pt' ? 'pt-BR' : 'en-GB', { hour: '2-digit', minute: '2-digit' }) }) : '';
+  return `<div class="item"><h3>${t('This app')}</h3><p>${t('Kept on this device and works offline. It looks for a new version only when you ask; that is one request to where golem came from.')}${at}</p>`
+    + `<div class="opts">${update.ready ? `<button class="btn go" type="button" id="sw-apply">${t('Reload to the new golem')}</button>` : `<button class="btn" type="button" id="sw-check">${t('Check for updates')}</button>`}${update.note ? `<span class="sub">${escHtml(update.note)}</span>` : ''}</div></div>`;
 }
 // The Factbook pack (SPEC 13.8), installed on request: from gcu-library (one request for its registry, one per pack, each
 // checked against the registry's SHA-256) or from a .gcudat file opened with the paperclip. Kept by store.js under /packs/.
@@ -277,39 +290,39 @@ async function registry() {
   return n => (Array.isArray(list) ? list : Object.values(list)).find(e => e && e.name === n);
 }
 async function installFactbook(full) {
-  if (packBusy) return; packBusy = true; packNote = 'Installing…'; renderPacks();
+  if (packBusy) return; packBusy = true; packNote = t('Installing…'); renderPacks();
   try {
     const find = await registry();
     const fb = find('factbook'), ff = full ? find('factbook-full') : null; if (!fb || (full && !ff)) throw new Error('the library lists no factbook pack');
     const pack = await factbookFromGcudat(await fetchPack(fb), ff ? await fetchPack(ff) : null);
     await keepFactbook(pack);
-  } catch (e) { packNote = `Not installed: ${e.message}.`; }
+  } catch (e) { packNote = t('Not installed: {e}.', { e: e.message }); }
   packBusy = false; renderPacks();
 }
 async function keepFactbook(pack) {
   await store.writePack('factbook', pack);
-  const i = useFactbook(pack); packNote = `Installed: ${i.count} countries${pack.profiles ? ', with the full profiles' : ''}.`; status(packNote);
+  const i = useFactbook(pack); packNote = t('Installed: {n} countries{full}.', { n: i.count, full: pack.profiles ? t(', with the full profiles') : '' }); status(packNote);
 }
 // the book packs: compiled at install into the index golem uses (packs.js), kept, handed to books.js
 const BOOKS = {
-  ods: { compile: compileOds, size: '1.9 MB', sample: 'A sample term index ships: where a term is defined, without the passage.', installed: i => `Installed: ${i.count} terms with their defining passages.`, removed: 'Removed. The sample term index answers again.' },
-  'elements-of-style': { compile: compileStrunk, size: '36 kB', sample: 'A sample of rules 10, 11 and 13 ships.', installed: i => `Installed: ${i.count} checks from its rules and chapter V.`, removed: 'Removed. The sample checks answer again.' },
+  ods: { compile: compileOds, size: '1.9 MB', sample: 'A sample term index ships: where a term is defined, without the passage.', installed: i => t('Installed: {n} terms with their defining passages.', { n: i.count }), removed: 'Removed. The sample term index answers again.' },
+  'elements-of-style': { compile: compileStrunk, size: '36 kB', sample: 'A sample of rules 10, 11 and 13 ships.', installed: i => t('Installed: {n} checks from its rules and chapter V.', { n: i.count }), removed: 'Removed. The sample checks answer again.' },
 };
 const bookNote = {};
 async function keepBook(slug, compiled) { await store.writePack(slug, compiled); bookNote[slug] = BOOKS[slug].installed(useBook(slug, compiled)); status(bookNote[slug]); }
 async function installBook(slug) {
-  if (packBusy) return; packBusy = true; bookNote[slug] = 'Installing…'; renderPacks();
+  if (packBusy) return; packBusy = true; bookNote[slug] = t('Installing…'); renderPacks();
   try { const e = (await registry())(slug); if (!e) throw new Error(`the library lists no ${slug} pack`); await keepBook(slug, await BOOKS[slug].compile(await fetchPack(e))); }
-  catch (err) { bookNote[slug] = `Not installed: ${err.message}.`; }
+  catch (err) { bookNote[slug] = t('Not installed: {e}.', { e: err.message }); }
   packBusy = false; renderPacks();
 }
-async function removeBook(slug) { await store.removePack(slug); useBook(slug, null); bookNote[slug] = BOOKS[slug].removed; renderPacks(); }
+async function removeBook(slug) { await store.removePack(slug); useBook(slug, null); bookNote[slug] = t(BOOKS[slug].removed); renderPacks(); }
 function bookItem(slug) {
   const i = bookInfo(slug), B = BOOKS[slug];
-  const acts = i.kind === 'sample' ? (inApp ? `<span class="sub">${OFFLINE_APP}</span>` : `<button class="btn go" type="button" data-pk-install="${slug}">Install from the library (${B.size})</button>`) : `<button class="btn" type="button" data-pk-remove="${slug}">Remove</button>`;
-  return `<p>${i.kind === 'sample' ? B.sample : `Installed: version ${escHtml(i.version || '')}, kept on this device.`}</p><div class="opts">${store && store.kind === 'idb' ? acts : '<span class="sub">This browser gives golem no IndexedDB, so a pack cannot be kept.</span>'}${bookNote[slug] ? `<span class="sub">${escHtml(bookNote[slug])}</span>` : ''}</div>`;
+  const acts = i.kind === 'sample' ? (inApp ? `<span class="sub">${OFFLINE_APP()}</span>` : `<button class="btn go" type="button" data-pk-install="${slug}">${t('Install from the library ({size})', { size: B.size })}</button>`) : `<button class="btn" type="button" data-pk-remove="${slug}">${t('Remove')}</button>`;
+  return `<p>${i.kind === 'sample' ? t(B.sample) : escHtml(t('Installed: version {v}, kept on this device.', { v: i.version || '' }))}</p><div class="opts">${store && store.kind === 'idb' ? acts : `<span class="sub">${t('This browser gives golem no IndexedDB, so a pack cannot be kept.')}</span>`}${bookNote[slug] ? `<span class="sub">${escHtml(bookNote[slug])}</span>` : ''}</div>`;
 }
-async function removeFactbook() { await store.removePack('factbook'); useFactbook(null); packNote = 'Removed. The 14-country sample answers again.'; renderPacks(); }
+async function removeFactbook() { await store.removePack('factbook'); useFactbook(null); packNote = t('Removed. The 14-country sample answers again.'); renderPacks(); }
 // a .gcudat opened with the paperclip: the factbook, or its full profiles for the factbook already installed
 async function openPackFile(name, bytes) {
   const p = await readGcudat(bytes);
@@ -323,16 +336,16 @@ async function openPackFile(name, bytes) {
 }
 function factbookItem() {
   const i = factbookInfo();
-  const state = i.kind === 'sample' ? 'The 14-country sample ships with golem.' : `Installed: version ${escHtml(i.version)}, ${i.count} countries${i.profiles ? ', with the full profiles' : ''}. Kept on this device.`;
-  const acts = inApp ? `${i.kind === 'sample' ? '' : '<button class="btn" type="button" id="fb-remove">Remove</button>'}<span class="sub">${OFFLINE_APP}</span>`
+  const state = i.kind === 'sample' ? t('The 14-country sample ships with golem.') : escHtml(t('Installed: version {v}, {n} countries{full}. Kept on this device.', { v: i.version, n: i.count, full: i.profiles ? t(', with the full profiles') : '' }));
+  const acts = inApp ? `${i.kind === 'sample' ? '' : `<button class="btn" type="button" id="fb-remove">${t('Remove')}</button>`}<span class="sub">${OFFLINE_APP()}</span>`
     : i.kind === 'sample'
-    ? `<button class="btn go" type="button" id="fb-install">Install from the library (2.8 MB)</button><button class="btn" type="button" id="fb-install-full">With full profiles (5.1 MB)</button>`
-    : `${i.profiles ? '' : '<button class="btn" type="button" id="fb-install-full">Add the full profiles (5.1 MB)</button>'}<button class="btn" type="button" id="fb-remove">Remove</button>`;
-  return `<p>${state}${inApp ? '' : ' Installing makes one request to the library for its list and one per pack; a .gcudat file opened with the paperclip installs with none.'}</p><div class="opts">${store && store.kind === 'idb' ? acts : '<span class="sub">This browser gives golem no IndexedDB, so a pack cannot be kept.</span>'}${packNote ? `<span class="sub">${escHtml(packNote)}</span>` : ''}</div>`;
+    ? `<button class="btn go" type="button" id="fb-install">${t('Install from the library (2.8 MB)')}</button><button class="btn" type="button" id="fb-install-full">${t('With full profiles (5.1 MB)')}</button>`
+    : `${i.profiles ? '' : `<button class="btn" type="button" id="fb-install-full">${t('Add the full profiles (5.1 MB)')}</button>`}<button class="btn" type="button" id="fb-remove">${t('Remove')}</button>`;
+  return `<p>${state}${inApp ? '' : t(' Installing makes one request to the library for its list and one per pack; a .gcudat file opened with the paperclip installs with none.')}</p><div class="opts">${store && store.kind === 'idb' ? acts : `<span class="sub">${t('This browser gives golem no IndexedDB, so a pack cannot be kept.')}</span>`}${packNote ? `<span class="sub">${escHtml(packNote)}</span>` : ''}</div>`;
 }
 function renderPacks() {
-  const lab = { live: 'installed', samp: 'sample', plan: 'not wired' };
-  let h = '<h1 class="vhead">Packs and this device</h1><div class="sub">golem knows what its installed packs hold. These are the gcu-library entries plus packs worth adding.</div><div class="lbl">Library</div>';
+  const lab = { live: t('installed'), samp: t('sample'), plan: t('not wired') };
+  let h = `<h1 class="vhead">${t('Packs and this device')}</h1><div class="sub">${t('golem knows what its installed packs hold. These are the gcu-library entries plus packs worth adding.')}</div><div class="lbl">${t('Library')}</div>`;
   const fbi = factbookInfo();
   PACKS.forEach(([id, name, meta, st, d]) => {
     if (id === 'factbook') st = fbi.kind === 'sample' ? 'samp' : 'live';
@@ -341,7 +354,7 @@ function renderPacks() {
     h += `<div class="item"><h3>${escHtml(name)} <span class="tag ${st}">${lab[st]}</span></h3><p>${escHtml(d)}</p>${id === 'factbook' ? factbookItem() : BOOKS[id] ? bookItem(id) : ''}<div class="from">${escHtml(id)} · ${escHtml(meta)}</div></div>`;
   });
   const al = Object.entries(S.aliases);
-  h += `<div class="lbl">On this device</div><div class="item"><h3>Taught words</h3><p>${al.length ? al.map(([k, v]) => `${escHtml(k)} → ${escHtml(v)}`).join('<br>') : 'None yet. Try “pop means population”.'}</p></div><div class="item"><h3>Notes</h3><p>${S.facts.length ? S.facts.map(escHtml).join('<br>') : 'None yet. Try “remember that …”.'}</p></div><div class="item"><h3>Open table</h3><p>${S.table ? `${escHtml(S.table.name)} · ${S.table.rows.length} rows · ${S.table.source === 'sample' ? 'sample data' : 'from your files'}` : 'None.'}</p></div><div class="item"><h3>Files on this device</h3><p>${Object.values(S.files).length ? Object.values(S.files).map(f => `${escHtml(f.name)} · ${(f.size / 1024).toFixed(0)} kB`).join('<br>') : 'None yet. Tap the paperclip to open a CSV.'}</p></div>`;
+  h += `<div class="lbl">${t('On this device')}</div><div class="item"><h3>${t('Taught words')}</h3><p>${al.length ? al.map(([k, v]) => `${escHtml(k)} → ${escHtml(v)}`).join('<br>') : t('None yet. Try “pop means population”.')}</p></div><div class="item"><h3>${t('Notes')}</h3><p>${S.facts.length ? S.facts.map(escHtml).join('<br>') : t('None yet. Try “remember that …”.')}</p></div><div class="item"><h3>${t('Open table')}</h3><p>${S.table ? escHtml(t('{name} · {n} rows · {source}', { name: S.table.name, n: S.table.rows.length, source: t(S.table.source === 'sample' ? 'sample data' : 'from your files') })) : t('None.')}</p></div><div class="item"><h3>${t('Files on this device')}</h3><p>${Object.values(S.files).length ? Object.values(S.files).map(f => `${escHtml(f.name)} · ${(f.size / 1024).toFixed(0)} kB`).join('<br>') : t('None yet. Tap the paperclip to open a CSV.')}</p></div>`;
   h += voiceItem() + appItem();
   $('v-packs').innerHTML = h;
   for (const [id, fn] of [['fb-install', () => installFactbook(false)], ['fb-install-full', () => installFactbook(true)], ['fb-remove', removeFactbook]]) { const b = $(id); if (b) b.addEventListener('click', fn); }
@@ -353,22 +366,22 @@ function renderPacks() {
 
 /* ── the drawer: sessions and history ── */
 let ren = null, del = null;
-const when = t => { const d = new Date(t), n = new Date(); return d.toDateString() === n.toDateString() ? d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }); };
+const when = ms => { const d = new Date(ms), n = new Date(), loc = uiLang() === 'pt' ? 'pt-BR' : 'en-GB'; return d.toDateString() === n.toDateString() ? d.toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit' }) : d.toLocaleDateString(loc, { day: 'numeric', month: 'short' }); };
 function renderDrawer() {
   const q = $('hq').value.trim(); let h;
   if (q) {
     const hits = searchHistory(q);
-    h = `<div class="lbl">${hits.length} match${hits.length === 1 ? '' : 'es'} in history</div>` + hits.slice(0, 40).map(({ session: s, card: c }) => `<div class="srow"><button class="open hit" type="button" data-s="${s.id}" data-c="${c.id}">&gt; ${escHtml(c.raw)}</button><div class="meta"><span>${escHtml(s.name)}</span></div></div>`).join('');
+    h = `<div class="lbl">${t(hits.length === 1 ? '{n} match in history' : '{n} matches in history', { n: hits.length })}</div>` + hits.slice(0, 40).map(({ session: s, card: c }) => `<div class="srow"><button class="open hit" type="button" data-s="${s.id}" data-c="${c.id}">&gt; ${escHtml(c.raw)}</button><div class="meta"><span>${escHtml(s.name)}</span></div></div>`).join('');
   } else {
-    const cur = current(), day = 864e5, today = new Date().setHours(0, 0, 0, 0), age = t => t >= today ? 'Today' : t >= today - 6 * day ? 'This week' : 'Earlier';
+    const cur = current(), day = 864e5, today = new Date().setHours(0, 0, 0, 0), age = ms => t(ms >= today ? 'Today' : ms >= today - 6 * day ? 'This week' : 'Earlier');
     let g = ''; h = '';
     // yours by when they were last used, then the examples golem seeded on the first visit
     const all = [...sessions()].sort((x, y) => y.updated - x.updated || y.id - x.id);
     [...all.filter(s => !s.example), ...all.filter(s => s.example)].forEach(s => {
-      const grp = s.example ? 'Examples' : age(s.updated);
+      const grp = s.example ? t('Examples') : age(s.updated);
       if (grp !== g) { g = grp; h += `<div class="lbl">${g}</div>`; }
-      const name = ren === s.id ? `<input class="ren" data-id="${s.id}" value="${escHtml(s.name)}" aria-label="Session name. Leave empty to name it automatically.">` : `<button class="open" type="button" data-s="${s.id}" title="${escHtml(s.name)}">${escHtml(s.name)}</button>`;
-      h += `<div class="srow" aria-current="${s === cur}">${name}<div class="meta"><span>${s.cards.length} card${s.cards.length === 1 ? '' : 's'} · ${when(s.updated)}</span>${s.example ? '<span class="tag samp">example</span>' : ''}<span class="acts"><button class="link" type="button" data-ren="${s.id}">rename</button><button class="link" type="button" data-exp="${s.id}">export</button><button class="link" type="button" data-del="${s.id}">${del === s.id ? 'confirm delete' : 'delete'}</button></span></div></div>`;
+      const name = ren === s.id ? `<input class="ren" data-id="${s.id}" value="${escHtml(s.name)}" aria-label="${t('Session name. Leave empty to name it automatically.')}">` : `<button class="open" type="button" data-s="${s.id}" title="${escHtml(nameOf(s))}">${escHtml(nameOf(s))}</button>`;
+      h += `<div class="srow" aria-current="${s === cur}">${name}<div class="meta"><span>${t(s.cards.length === 1 ? '{n} card' : '{n} cards', { n: s.cards.length })} · ${when(s.updated)}</span>${s.example ? `<span class="tag samp">${t('example')}</span>` : ''}<span class="acts"><button class="link" type="button" data-ren="${s.id}">${t('rename')}</button><button class="link" type="button" data-exp="${s.id}">${t('export')}</button><button class="link" type="button" data-del="${s.id}">${t(del === s.id ? 'confirm delete' : 'delete')}</button></span></div></div>`;
     });
   }
   $('dlist').innerHTML = h;
@@ -396,15 +409,26 @@ function persist() {
 document.addEventListener('visibilitychange', () => { if (document.hidden && store) { clearTimeout(saveT); firstUnsaved = 0; store.save(parts()); } });
 onChange(() => { renderBar(); persist(); if (!$('hq').value.trim() && ren == null) renderDrawer(); });
 
+/* ── language: the device's, or the choice kept on this device. golem reads both; the interface is the chosen one ── */
+function applyLanguage(l) {
+  setUiLang(l); setLanguage(l); applyStatic(document);
+  $('lang-k').textContent = l === 'pt' ? 'Português' : 'English';
+  $('st-req').textContent = requestText(); applyTheme(theme); renderPower(); renderStarters(); renderSkills(); voiceSupport();
+  if (ready) { renderStream(); renderDrawer(); renderPacks(); }
+}
+let lang = (navigator.language || 'en').toLowerCase().startsWith('pt') ? 'pt' : 'en';
+try { const l = localStorage.getItem(LANG); if (l === 'en' || l === 'pt') lang = l; } catch (e) { /* storage is optional */ }
+$('lang').addEventListener('click', () => { lang = lang === 'pt' ? 'en' : 'pt'; try { localStorage.setItem(LANG, lang); } catch (e) { /* storage is optional */ } applyLanguage(lang); });
 /* ── theme: auto follows the system; a choice is kept on this device ── */
 const THEMES = ['auto', 'light', 'dark'];
 let theme = 'auto';
-function applyTheme(t) { if (t === 'auto') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = t; $('theme-k').textContent = t; drawCharts(); }
+function applyTheme(th) { if (th === 'auto') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = th; $('theme-k').textContent = t(th); drawCharts(); }
 // charts read the theme's colours and the column's width when drawn: draw them again when either changes
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => drawCharts());
 let redrawT; window.addEventListener('resize', () => { clearTimeout(redrawT); redrawT = setTimeout(() => drawCharts(), 150); });
 try { const t = localStorage.getItem(THEME); if (THEMES.includes(t)) theme = t; } catch (e) { /* storage is optional */ }
 applyTheme(theme);
+applyLanguage(lang);
 $('theme').addEventListener('click', () => { theme = THEMES[(THEMES.indexOf(theme) + 1) % 3]; applyTheme(theme); try { localStorage.setItem(THEME, theme); } catch (e) { /* storage is optional */ } });
 
 /* ── wiring ── */
@@ -482,24 +506,24 @@ function openPicked(f) {
   if (!awake) return status('Asleep. Tap wake at the top right.');
   if (!ready) return status('Opening your sessions…');
   if (f.size > STREAM_OVER) {   // a text table too large to hold: kept as it is, typed from its head, scanned per question
-    if (!/\.(csv|tsv|txt)$/i.test(f.name)) { status(`That file is over 20 MB. golem streams large CSV and TSV tables; a ${f.name.split('.').pop()} that large is not read.`); return; }
+    if (!/\.(csv|tsv|txt)$/i.test(f.name)) { status(t('That file is over 20 MB. golem streams large CSV and TSV tables; a {ext} that large is not read.', { ext: f.name.split('.').pop() })); return; }
     f.slice(0, 1 << 20).text().then(async head => {
       const o = openStreamed(f.name, f.size, head); if (o.kind !== 'card') { show(o); return; }
-      BIG[o.hash] = f; show(o); status(`Opened ${f.name} as a stream.`);
-      await putBlob(o.hash, f).catch(() => status(`${f.name} could not be kept on this device; it works until the page closes.`));
+      BIG[o.hash] = f; show(o); status(t('Opened {name} as a stream.', { name: f.name }));
+      await putBlob(o.hash, f).catch(() => status(t('{name} could not be kept on this device; it works until the page closes.', { name: f.name })));
     }, () => status('Could not read that file.'));
     return;
   }
   if (/\.gcudat$/i.test(f.name)) {   // a pack: installed, not opened as a table
-    f.arrayBuffer().then(buf => openPackFile(f.name, new Uint8Array(buf))).then(() => renderPacks(), err => status(`Not installed: ${err.message}.`));
+    f.arrayBuffer().then(buf => openPackFile(f.name, new Uint8Array(buf))).then(() => renderPacks(), err => status(t('Not installed: {e}.', { e: err.message })));
     return;
   }
   if (/\.golem\.json$/i.test(f.name)) {   // a session exported from golem: it comes back as a session of its own
-    f.text().then(t => { let s = null; try { s = importSession(JSON.parse(t)); } catch (err) { s = null; } if (!s) { status('That is not a golem session file.'); return; } renderStream(); renderDrawer(); status(`Imported "${s.name}".`); }, () => status('Could not read that file.'));
+    f.text().then(txt => { let s = null; try { s = importSession(JSON.parse(txt)); } catch (err) { s = null; } if (!s) { status('That is not a golem session file.'); return; } renderStream(); renderDrawer(); status(t('Imported "{name}".', { name: s.name })); }, () => status('Could not read that file.'));
     return;
   }
-  if (BINARY.test(f.name)) f.arrayBuffer().then(buf => openBinary(f.name, buf)).then(o => { show(o); if (o.kind === 'card') status(`Opened ${f.name}.`); }, () => status('Could not read that file.'));
-  else f.text().then(text => { show(openFile(f.name, text)); status(`Opened ${f.name}.`); }, () => status('Could not read that file.'));
+  if (BINARY.test(f.name)) f.arrayBuffer().then(buf => openBinary(f.name, buf)).then(o => { show(o); if (o.kind === 'card') status(t('Opened {name}.', { name: f.name })); }, () => status('Could not read that file.'));
+  else f.text().then(text => { show(openFile(f.name, text)); status(t('Opened {name}.', { name: f.name })); }, () => status('Could not read that file.'));
 }
 // dropped on the window (a desktop browser)
 window.addEventListener('dragover', e => { if (e.dataTransfer && [...e.dataTransfer.types].includes('Files')) { e.preventDefault(); document.documentElement.dataset.drop = '1'; } });
@@ -509,7 +533,7 @@ window.addEventListener('drop', e => { delete document.documentElement.dataset.d
 if (inApp) shell.intake(async d => {
   if (d.kind === 'text' || (d.text && !d.token)) { const q = $('q'); q.value = String(d.text || ''); q.dispatchEvent(new Event('input')); q.focus(); status('Shared text is in the box: press Enter to run it.'); return; }
   try { const bytes = await d.blob.arrayBuffer(); const until = () => ready ? openPicked(new File([bytes], d.name || 'shared', { type: d.mime || '' })) : setTimeout(until, 100); until(); }
-  catch (e) { status(`Could not read the shared file: ${e.message}`); }
+  catch (e) { status(t('Could not read the shared file: {e}', { e: e.message })); }
 }).catch(() => {});
 document.querySelector('.tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) showTab(b.dataset.tab); });
 document.querySelector('.sfoot').addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (b) { showTab(b.dataset.tab); closeDrawer(); } });
@@ -546,9 +570,9 @@ $('stream').addEventListener('click', e => {
   }
   tick(); renderPacks();
 });
+function renderPower() { $('st-on').textContent = t(awake ? 'awake' : 'asleep'); $('power').textContent = t(awake ? 'sleep' : 'wake'); $('power').setAttribute('aria-pressed', String(!awake)); }
 $('power').addEventListener('click', () => {
-  awake = !awake; $('app').classList.toggle('asleep', !awake); $('st-on').textContent = awake ? 'awake' : 'asleep'; $('q').disabled = !awake;
-  $('power').textContent = awake ? 'sleep' : 'wake'; $('power').setAttribute('aria-pressed', String(!awake));
+  awake = !awake; $('app').classList.toggle('asleep', !awake); $('q').disabled = !awake; renderPower();
   status(awake ? 'Awake.' : 'Asleep. Nothing runs until you wake it.');
 });
 $('menu').addEventListener('click', openDrawer);
@@ -576,11 +600,12 @@ $('dlist').addEventListener('click', e => {
     deleteSession(id); del = null; renderStream(); renderDrawer();
   }
 });
-$('starts').innerHTML = STARTERS.map(([g, items]) => `<section class="sgroup"><h2>${escHtml(g)}</h2>${items.map(([t, q]) => `<button class="start" type="button" data-q="${escHtml(q)}"><b>${escHtml(t)}</b><span>${escHtml(q)}</span></button>`).join('')}</section>`).join('');
+function renderStarters() { $('starts').innerHTML = (uiLang() === 'pt' ? STARTERS_PT : STARTERS).map(([g, items]) => `<section class="sgroup"><h2>${escHtml(g)}</h2>${items.map(([t, q]) => `<button class="start" type="button" data-q="${escHtml(q)}"><b>${escHtml(t)}</b><span>${escHtml(q)}</span></button>`).join('')}</section>`).join(''); }
+renderStarters();
 
 /* ── start: restore saved sessions, or seed two examples ── */
 renderSkills();
-if (shell.present) $('st-where').textContent = 'in the lead-acid shell';
+if (shell.present) { $('st-where').dataset.tEn = 'in the lead-acid shell'; $('st-where').textContent = t('in the lead-acid shell'); }
 // the device's sessions come back from the store (moved from localStorage once, the first time), or two examples are seeded
 (async () => {
   store = await openStore();
@@ -593,6 +618,6 @@ if (shell.present) $('st-where').textContent = 'in the lead-acid shell';
   // the "New session" shortcut of the installed app
   if (new URLSearchParams(location.search).has('new')) { newSession(); try { history.replaceState(null, '', location.pathname); } catch (e) { /* file:// */ } }
   renderStream(); renderDrawer(); renderPacks();
-  $('status').textContent = store.kind === 'none' ? 'This browser keeps nothing for golem: sessions last until the page closes.' : '';
+  $('status').textContent = store.kind === 'none' ? t('This browser keeps nothing for golem: sessions last until the page closes.') : '';
   ready = true; document.documentElement.dataset.ready = '1';   // tests wait for this
 })();

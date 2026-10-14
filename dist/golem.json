@@ -744,133 +744,182 @@
       ],
       "words_pt": {
         "Hadean": [
-          "hadean"
+          "hadean",
+          "hadeano"
         ],
         "Archean": [
-          "archean"
+          "archean",
+          "arqueano"
         ],
         "Proterozoic": [
-          "proterozoic"
+          "proterozoic",
+          "proterozoico"
         ],
         "Phanerozoic": [
-          "phanerozoic"
+          "phanerozoic",
+          "fanerozoico"
         ],
         "Eoarchean": [
-          "eoarchean"
+          "eoarchean",
+          "eoarcheano"
         ],
         "Paleoarchean": [
-          "paleoarchean"
+          "paleoarchean",
+          "paleoarcheano"
         ],
         "Mesoarchean": [
-          "mesoarchean"
+          "mesoarchean",
+          "mesoarcheano"
         ],
         "Neoarchean": [
-          "neoarchean"
+          "neoarchean",
+          "neoarcheano"
         ],
         "Paleoproterozoic": [
-          "paleoproterozoic"
+          "paleoproterozoic",
+          "paleoproterozoico"
         ],
         "Mesoproterozoic": [
-          "mesoproterozoic"
+          "mesoproterozoic",
+          "mesoproterozoico"
         ],
         "Neoproterozoic": [
-          "neoproterozoic"
+          "neoproterozoic",
+          "neoproterozoico"
         ],
         "Paleozoic": [
-          "paleozoic"
+          "paleozoic",
+          "paleozoico"
         ],
         "Mesozoic": [
-          "mesozoic"
+          "mesozoic",
+          "mesozoico"
         ],
         "Cenozoic": [
-          "cenozoic"
+          "cenozoic",
+          "cenozoico"
         ],
         "Siderian": [
-          "siderian"
+          "siderian",
+          "sideriano"
         ],
         "Rhyacian": [
-          "rhyacian"
+          "rhyacian",
+          "rhyaciano"
         ],
         "Orosirian": [
-          "orosirian"
+          "orosirian",
+          "orosiriano"
         ],
         "Statherian": [
-          "statherian"
+          "statherian",
+          "statheriano"
         ],
         "Calymmian": [
-          "calymmian"
+          "calymmian",
+          "calymmiano"
         ],
         "Ectasian": [
-          "ectasian"
+          "ectasian",
+          "ectasiano"
         ],
         "Stenian": [
-          "stenian"
+          "stenian",
+          "steniano"
         ],
         "Tonian": [
-          "tonian"
+          "tonian",
+          "toniano"
         ],
         "Cryogenian": [
-          "cryogenian"
+          "cryogenian",
+          "criogeniano"
         ],
         "Ediacaran": [
-          "ediacaran"
+          "ediacaran",
+          "ediacarano"
         ],
         "Cambrian": [
-          "cambrian"
+          "cambrian",
+          "cambriano"
         ],
         "Ordovician": [
-          "ordovician"
+          "ordovician",
+          "ordoviciano"
         ],
         "Silurian": [
-          "silurian"
+          "silurian",
+          "siluriano"
         ],
         "Devonian": [
-          "devonian"
+          "devonian",
+          "devoniano"
         ],
         "Carboniferous": [
-          "carboniferous"
+          "carboniferous",
+          "carbonífero",
+          "carbonifero"
         ],
         "Permian": [
-          "permian"
+          "permian",
+          "permiano"
         ],
         "Triassic": [
-          "triassic"
+          "triassic",
+          "triássico",
+          "triassico"
         ],
         "Jurassic": [
-          "jurassic"
+          "jurassic",
+          "jurássico",
+          "jurassico"
         ],
         "Cretaceous": [
-          "cretaceous"
+          "cretaceous",
+          "cretáceo",
+          "cretaceo"
         ],
         "Paleogene": [
-          "paleogene"
+          "paleogene",
+          "paleógeno",
+          "paleogeno"
         ],
         "Neogene": [
-          "neogene"
+          "neogene",
+          "neógeno",
+          "neogeno"
         ],
         "Quaternary": [
-          "quaternary"
+          "quaternary",
+          "quaternário",
+          "quaternario"
         ],
         "Terreneuvian": [
-          "terreneuvian"
+          "terreneuvian",
+          "terreneuviano"
         ],
         "Series 2": [
           "series 2"
         ],
         "Miaolingian": [
-          "miaolingian"
+          "miaolingian",
+          "miaolingiano"
         ],
         "Furongian": [
-          "furongian"
+          "furongian",
+          "furongiano"
         ],
         "Early Ordovician": [
-          "early ordovician"
+          "early ordovician",
+          "early ordoviciano"
         ],
         "Middle Ordovician": [
-          "middle ordovician"
+          "middle ordovician",
+          "middle ordoviciano"
         ],
         "Late Ordovician": [
-          "late ordovician"
+          "late ordovician",
+          "late ordoviciano"
         ],
         "Llandovery": [
           "llandovery"
@@ -885,28 +934,36 @@
           "pridoli"
         ],
         "Early Devonian": [
-          "early devonian"
+          "early devonian",
+          "early devoniano"
         ],
         "Middle Devonian": [
-          "middle devonian"
+          "middle devonian",
+          "middle devoniano"
         ],
         "Late Devonian": [
-          "late devonian"
+          "late devonian",
+          "late devoniano"
         ],
         "Mississippian": [
-          "mississippian"
+          "mississippian",
+          "mississipiano"
         ],
         "Pennsylvanian": [
-          "pennsylvanian"
+          "pennsylvanian",
+          "pensilvaniano"
         ],
         "Cisuralian": [
-          "cisuralian"
+          "cisuralian",
+          "cisuraliano"
         ],
         "Guadalupian": [
-          "guadalupian"
+          "guadalupian",
+          "guadalupiano"
         ],
         "Lopingian": [
-          "lopingian"
+          "lopingian",
+          "lopingiano"
         ],
         "Early Triassic": [
           "early triassic"
@@ -927,34 +984,44 @@
           "late jurassic"
         ],
         "Early Cretaceous": [
-          "early cretaceous"
+          "early cretaceous",
+          "early cretaceo"
         ],
         "Late Cretaceous": [
-          "late cretaceous"
+          "late cretaceous",
+          "late cretaceo"
         ],
         "Paleocene": [
-          "paleocene"
+          "paleocene",
+          "paleoceno"
         ],
         "Eocene": [
-          "eocene"
+          "eocene",
+          "eoceno"
         ],
         "Oligocene": [
-          "oligocene"
+          "oligocene",
+          "oligoceno"
         ],
         "Miocene": [
-          "miocene"
+          "miocene",
+          "mioceno"
         ],
         "Pliocene": [
-          "pliocene"
+          "pliocene",
+          "plioceno"
         ],
         "Pleistocene": [
-          "pleistocene"
+          "pleistocene",
+          "pleistoceno"
         ],
         "Holocene": [
-          "holocene"
+          "holocene",
+          "holoceno"
         ],
         "Fortunian": [
-          "fortunian"
+          "fortunian",
+          "fortuniano"
         ],
         "Stage 2": [
           "stage 2"
@@ -966,295 +1033,391 @@
           "stage 4"
         ],
         "Wuliuan": [
-          "wuliuan"
+          "wuliuan",
+          "wuliuano"
         ],
         "Drumian": [
-          "drumian"
+          "drumian",
+          "drumiano"
         ],
         "Guzhangian": [
-          "guzhangian"
+          "guzhangian",
+          "guzhangiano"
         ],
         "Paibian": [
-          "paibian"
+          "paibian",
+          "paibiano"
         ],
         "Jiangshanian": [
-          "jiangshanian"
+          "jiangshanian",
+          "jiangshaniano"
         ],
         "Stage 10": [
           "stage 10"
         ],
         "Tremadocian": [
-          "tremadocian"
+          "tremadocian",
+          "tremadociano"
         ],
         "Floian": [
-          "floian"
+          "floian",
+          "floiano"
         ],
         "Dapingian": [
-          "dapingian"
+          "dapingian",
+          "dapingiano"
         ],
         "Darriwilian": [
-          "darriwilian"
+          "darriwilian",
+          "darriwiliano"
         ],
         "Sandbian": [
-          "sandbian"
+          "sandbian",
+          "sandbiano"
         ],
         "Katian": [
-          "katian"
+          "katian",
+          "katiano"
         ],
         "Hirnantian": [
-          "hirnantian"
+          "hirnantian",
+          "hirnantiano"
         ],
         "Rhuddanian": [
-          "rhuddanian"
+          "rhuddanian",
+          "rhuddaniano"
         ],
         "Aeronian": [
-          "aeronian"
+          "aeronian",
+          "aeroniano"
         ],
         "Telychian": [
-          "telychian"
+          "telychian",
+          "telychiano"
         ],
         "Sheinwoodian": [
-          "sheinwoodian"
+          "sheinwoodian",
+          "sheinwoodiano"
         ],
         "Homerian": [
-          "homerian"
+          "homerian",
+          "homeriano"
         ],
         "Gorstian": [
-          "gorstian"
+          "gorstian",
+          "gorstiano"
         ],
         "Ludfordian": [
-          "ludfordian"
+          "ludfordian",
+          "ludfordiano"
         ],
         "Lochkovian": [
-          "lochkovian"
+          "lochkovian",
+          "lochkoviano"
         ],
         "Pragian": [
-          "pragian"
+          "pragian",
+          "pragiano"
         ],
         "Emsian": [
-          "emsian"
+          "emsian",
+          "emsiano"
         ],
         "Eifelian": [
-          "eifelian"
+          "eifelian",
+          "eifeliano"
         ],
         "Givetian": [
-          "givetian"
+          "givetian",
+          "givetiano"
         ],
         "Frasnian": [
-          "frasnian"
+          "frasnian",
+          "frasniano"
         ],
         "Famennian": [
-          "famennian"
+          "famennian",
+          "famenniano"
         ],
         "Tournaisian": [
-          "tournaisian"
+          "tournaisian",
+          "tournaisiano"
         ],
         "Visean": [
-          "visean"
+          "visean",
+          "viseano"
         ],
         "Serpukhovian": [
-          "serpukhovian"
+          "serpukhovian",
+          "serpukhoviano"
         ],
         "Bashkirian": [
-          "bashkirian"
+          "bashkirian",
+          "bashkiriano"
         ],
         "Moscovian": [
-          "moscovian"
+          "moscovian",
+          "moscoviano"
         ],
         "Kasimovian": [
-          "kasimovian"
+          "kasimovian",
+          "kasimoviano"
         ],
         "Gzhelian": [
-          "gzhelian"
+          "gzhelian",
+          "gzheliano"
         ],
         "Asselian": [
-          "asselian"
+          "asselian",
+          "asseliano"
         ],
         "Sakmarian": [
-          "sakmarian"
+          "sakmarian",
+          "sakmariano"
         ],
         "Artinskian": [
-          "artinskian"
+          "artinskian",
+          "artinskiano"
         ],
         "Kungurian": [
-          "kungurian"
+          "kungurian",
+          "kunguriano"
         ],
         "Roadian": [
-          "roadian"
+          "roadian",
+          "roadiano"
         ],
         "Wordian": [
-          "wordian"
+          "wordian",
+          "wordiano"
         ],
         "Capitanian": [
-          "capitanian"
+          "capitanian",
+          "capitaniano"
         ],
         "Wuchiapingian": [
-          "wuchiapingian"
+          "wuchiapingian",
+          "wuchiapingiano"
         ],
         "Changhsingian": [
-          "changhsingian"
+          "changhsingian",
+          "changhsingiano"
         ],
         "Induan": [
-          "induan"
+          "induan",
+          "induano"
         ],
         "Olenekian": [
-          "olenekian"
+          "olenekian",
+          "olenekiano"
         ],
         "Anisian": [
-          "anisian"
+          "anisian",
+          "anisiano"
         ],
         "Ladinian": [
-          "ladinian"
+          "ladinian",
+          "ladiniano"
         ],
         "Carnian": [
-          "carnian"
+          "carnian",
+          "carniano"
         ],
         "Norian": [
-          "norian"
+          "norian",
+          "noriano"
         ],
         "Rhaetian": [
-          "rhaetian"
+          "rhaetian",
+          "rhaetiano"
         ],
         "Hettangian": [
-          "hettangian"
+          "hettangian",
+          "hettangiano"
         ],
         "Sinemurian": [
-          "sinemurian"
+          "sinemurian",
+          "sinemuriano"
         ],
         "Pliensbachian": [
-          "pliensbachian"
+          "pliensbachian",
+          "pliensbachiano"
         ],
         "Toarcian": [
-          "toarcian"
+          "toarcian",
+          "toarciano"
         ],
         "Aalenian": [
-          "aalenian"
+          "aalenian",
+          "aaleniano"
         ],
         "Bajocian": [
-          "bajocian"
+          "bajocian",
+          "bajociano"
         ],
         "Bathonian": [
-          "bathonian"
+          "bathonian",
+          "bathoniano"
         ],
         "Callovian": [
-          "callovian"
+          "callovian",
+          "calloviano"
         ],
         "Oxfordian": [
-          "oxfordian"
+          "oxfordian",
+          "oxfordiano"
         ],
         "Kimmeridgian": [
-          "kimmeridgian"
+          "kimmeridgian",
+          "kimmeridgiano"
         ],
         "Tithonian": [
-          "tithonian"
+          "tithonian",
+          "tithoniano"
         ],
         "Berriasian": [
-          "berriasian"
+          "berriasian",
+          "berriasiano"
         ],
         "Valanginian": [
-          "valanginian"
+          "valanginian",
+          "valanginiano"
         ],
         "Hauterivian": [
-          "hauterivian"
+          "hauterivian",
+          "hauteriviano"
         ],
         "Barremian": [
-          "barremian"
+          "barremian",
+          "barremiano"
         ],
         "Aptian": [
-          "aptian"
+          "aptian",
+          "aptiano"
         ],
         "Albian": [
-          "albian"
+          "albian",
+          "albiano"
         ],
         "Cenomanian": [
-          "cenomanian"
+          "cenomanian",
+          "cenomaniano"
         ],
         "Turonian": [
-          "turonian"
+          "turonian",
+          "turoniano"
         ],
         "Coniacian": [
-          "coniacian"
+          "coniacian",
+          "coniaciano"
         ],
         "Santonian": [
-          "santonian"
+          "santonian",
+          "santoniano"
         ],
         "Campanian": [
-          "campanian"
+          "campanian",
+          "campaniano"
         ],
         "Maastrichtian": [
-          "maastrichtian"
+          "maastrichtian",
+          "maastrichtiano"
         ],
         "Danian": [
-          "danian"
+          "danian",
+          "daniano"
         ],
         "Selandian": [
-          "selandian"
+          "selandian",
+          "selandiano"
         ],
         "Thanetian": [
-          "thanetian"
+          "thanetian",
+          "thanetiano"
         ],
         "Ypresian": [
-          "ypresian"
+          "ypresian",
+          "ypresiano"
         ],
         "Lutetian": [
-          "lutetian"
+          "lutetian",
+          "lutetiano"
         ],
         "Bartonian": [
-          "bartonian"
+          "bartonian",
+          "bartoniano"
         ],
         "Priabonian": [
-          "priabonian"
+          "priabonian",
+          "priaboniano"
         ],
         "Rupelian": [
-          "rupelian"
+          "rupelian",
+          "rupeliano"
         ],
         "Chattian": [
-          "chattian"
+          "chattian",
+          "chattiano"
         ],
         "Aquitanian": [
-          "aquitanian"
+          "aquitanian",
+          "aquitaniano"
         ],
         "Burdigalian": [
-          "burdigalian"
+          "burdigalian",
+          "burdigaliano"
         ],
         "Langhian": [
-          "langhian"
+          "langhian",
+          "langhiano"
         ],
         "Serravallian": [
-          "serravallian"
+          "serravallian",
+          "serravalliano"
         ],
         "Tortonian": [
-          "tortonian"
+          "tortonian",
+          "tortoniano"
         ],
         "Messinian": [
-          "messinian"
+          "messinian",
+          "messiniano"
         ],
         "Zanclean": [
-          "zanclean"
+          "zanclean",
+          "zancleano"
         ],
         "Piacenzian": [
-          "piacenzian"
+          "piacenzian",
+          "piacenziano"
         ],
         "Gelasian": [
-          "gelasian"
+          "gelasian",
+          "gelasiano"
         ],
         "Calabrian": [
-          "calabrian"
+          "calabrian",
+          "calabriano"
         ],
         "Chibanian": [
-          "chibanian"
+          "chibanian",
+          "chibaniano"
         ],
         "Late Pleistocene": [
-          "late pleistocene"
+          "late pleistocene",
+          "late pleistoceno"
         ],
         "Greenlandian": [
-          "greenlandian"
+          "greenlandian",
+          "greenlandiano"
         ],
         "Northgrippian": [
-          "northgrippian"
+          "northgrippian",
+          "northgrippiano"
         ],
         "Meghalayan": [
-          "meghalayan"
+          "meghalayan",
+          "meghalayano"
         ]
       },
       "generic_pt": [
@@ -1268,235 +1431,6 @@
         "andar",
         "idade"
       ]
-    },
-    {
-      "type": "holiday",
-      "words": {
-        "christmas": [
-          "christmas"
-        ],
-        "christmas day": [
-          "christmas day"
-        ],
-        "xmas": [
-          "xmas"
-        ],
-        "christmas eve": [
-          "christmas eve"
-        ],
-        "new year's day": [
-          "new year's day"
-        ],
-        "new year": [
-          "new year"
-        ],
-        "new years day": [
-          "new years day"
-        ],
-        "new year's eve": [
-          "new year's eve"
-        ],
-        "new years eve": [
-          "new years eve"
-        ],
-        "easter": [
-          "easter"
-        ],
-        "easter sunday": [
-          "easter sunday"
-        ],
-        "good friday": [
-          "good friday"
-        ],
-        "carnival": [
-          "carnival"
-        ],
-        "carnival tuesday": [
-          "carnival tuesday"
-        ],
-        "carnival monday": [
-          "carnival monday"
-        ],
-        "ash wednesday": [
-          "ash wednesday"
-        ],
-        "corpus christi": [
-          "corpus christi"
-        ],
-        "palm sunday": [
-          "palm sunday"
-        ],
-        "pentecost": [
-          "pentecost"
-        ],
-        "whit sunday": [
-          "whit sunday"
-        ],
-        "ascension": [
-          "ascension"
-        ]
-      },
-      "words_pt": {
-        "christmas": [
-          "natal"
-        ],
-        "christmas eve": [
-          "véspera de natal",
-          "vespera de natal"
-        ],
-        "new year": [
-          "ano novo",
-          "réveillon"
-        ],
-        "easter": [
-          "páscoa",
-          "pascoa"
-        ],
-        "carnival": [
-          "carnaval"
-        ],
-        "good friday": [
-          "sexta-feira santa"
-        ],
-        "corpus christi": [
-          "corpus christi"
-        ]
-      }
-    },
-    {
-      "type": "hole",
-      "words": {
-        "hole": [
-          "hole",
-          "drill hole",
-          "drillhole",
-          "borehole"
-        ]
-      },
-      "words_pt": {
-        "hole": [
-          "furo",
-          "furo de sonda"
-        ]
-      }
-    },
-    {
-      "type": "plane",
-      "words": {
-        "bedding": [
-          "bedding",
-          "bed",
-          "beds"
-        ],
-        "vein": [
-          "vein"
-        ],
-        "foliation": [
-          "foliation"
-        ],
-        "contact": [
-          "contact"
-        ],
-        "fault": [
-          "fault"
-        ],
-        "plane": [
-          "plane"
-        ],
-        "surface": [
-          "surface"
-        ],
-        "joint": [
-          "joint"
-        ],
-        "cleavage": [
-          "cleavage"
-        ],
-        "shear": [
-          "shear zone",
-          "shear"
-        ]
-      },
-      "generic": [
-        "plane",
-        "planes",
-        "measurement",
-        "measurements",
-        "reading",
-        "readings",
-        "structures"
-      ],
-      "words_pt": {
-        "bedding": [
-          "acamamento",
-          "estratificação"
-        ],
-        "vein": [
-          "veio"
-        ],
-        "foliation": [
-          "foliação",
-          "foliacao"
-        ],
-        "contact": [
-          "contato"
-        ],
-        "fault": [
-          "falha"
-        ],
-        "plane": [
-          "plano"
-        ],
-        "joint": [
-          "junta",
-          "fratura"
-        ]
-      },
-      "generic_pt": [
-        "planos",
-        "medidas"
-      ]
-    },
-    {
-      "type": "intercept",
-      "words": {},
-      "generic": [
-        "intercept",
-        "intercepts",
-        "interval",
-        "intervals",
-        "row",
-        "rows",
-        "sample",
-        "samples",
-        "core length",
-        "downhole length",
-        "drilled length"
-      ],
-      "generic_pt": [
-        "intervalo",
-        "intervalos",
-        "intercepto",
-        "linha",
-        "linhas",
-        "amostra",
-        "amostras"
-      ]
-    },
-    {
-      "type": "thickness",
-      "words": {
-        "true": [
-          "true thickness",
-          "true width"
-        ]
-      },
-      "words_pt": {
-        "true": [
-          "espessura verdadeira",
-          "espessura real"
-        ]
-      }
     },
     {
       "type": "column",
@@ -1781,6 +1715,235 @@
       }
     },
     {
+      "type": "holiday",
+      "words": {
+        "christmas": [
+          "christmas"
+        ],
+        "christmas day": [
+          "christmas day"
+        ],
+        "xmas": [
+          "xmas"
+        ],
+        "christmas eve": [
+          "christmas eve"
+        ],
+        "new year's day": [
+          "new year's day"
+        ],
+        "new year": [
+          "new year"
+        ],
+        "new years day": [
+          "new years day"
+        ],
+        "new year's eve": [
+          "new year's eve"
+        ],
+        "new years eve": [
+          "new years eve"
+        ],
+        "easter": [
+          "easter"
+        ],
+        "easter sunday": [
+          "easter sunday"
+        ],
+        "good friday": [
+          "good friday"
+        ],
+        "carnival": [
+          "carnival"
+        ],
+        "carnival tuesday": [
+          "carnival tuesday"
+        ],
+        "carnival monday": [
+          "carnival monday"
+        ],
+        "ash wednesday": [
+          "ash wednesday"
+        ],
+        "corpus christi": [
+          "corpus christi"
+        ],
+        "palm sunday": [
+          "palm sunday"
+        ],
+        "pentecost": [
+          "pentecost"
+        ],
+        "whit sunday": [
+          "whit sunday"
+        ],
+        "ascension": [
+          "ascension"
+        ]
+      },
+      "words_pt": {
+        "christmas": [
+          "natal"
+        ],
+        "christmas eve": [
+          "véspera de natal",
+          "vespera de natal"
+        ],
+        "new year": [
+          "ano novo",
+          "réveillon"
+        ],
+        "easter": [
+          "páscoa",
+          "pascoa"
+        ],
+        "carnival": [
+          "carnaval"
+        ],
+        "good friday": [
+          "sexta-feira santa"
+        ],
+        "corpus christi": [
+          "corpus christi"
+        ]
+      }
+    },
+    {
+      "type": "hole",
+      "words": {
+        "hole": [
+          "hole",
+          "drill hole",
+          "drillhole",
+          "borehole"
+        ]
+      },
+      "words_pt": {
+        "hole": [
+          "furo",
+          "furo de sonda"
+        ]
+      }
+    },
+    {
+      "type": "plane",
+      "words": {
+        "bedding": [
+          "bedding",
+          "bed",
+          "beds"
+        ],
+        "vein": [
+          "vein"
+        ],
+        "foliation": [
+          "foliation"
+        ],
+        "contact": [
+          "contact"
+        ],
+        "fault": [
+          "fault"
+        ],
+        "plane": [
+          "plane"
+        ],
+        "surface": [
+          "surface"
+        ],
+        "joint": [
+          "joint"
+        ],
+        "cleavage": [
+          "cleavage"
+        ],
+        "shear": [
+          "shear zone",
+          "shear"
+        ]
+      },
+      "generic": [
+        "plane",
+        "planes",
+        "measurement",
+        "measurements",
+        "reading",
+        "readings",
+        "structures"
+      ],
+      "words_pt": {
+        "bedding": [
+          "acamamento",
+          "estratificação"
+        ],
+        "vein": [
+          "veio"
+        ],
+        "foliation": [
+          "foliação",
+          "foliacao"
+        ],
+        "contact": [
+          "contato"
+        ],
+        "fault": [
+          "falha"
+        ],
+        "plane": [
+          "plano"
+        ],
+        "joint": [
+          "junta",
+          "fratura"
+        ]
+      },
+      "generic_pt": [
+        "planos",
+        "medidas"
+      ]
+    },
+    {
+      "type": "intercept",
+      "words": {},
+      "generic": [
+        "intercept",
+        "intercepts",
+        "interval",
+        "intervals",
+        "row",
+        "rows",
+        "sample",
+        "samples",
+        "core length",
+        "downhole length",
+        "drilled length"
+      ],
+      "generic_pt": [
+        "intervalo",
+        "intervalos",
+        "intercepto",
+        "linha",
+        "linhas",
+        "amostra",
+        "amostras"
+      ]
+    },
+    {
+      "type": "thickness",
+      "words": {
+        "true": [
+          "true thickness",
+          "true width"
+        ]
+      },
+      "words_pt": {
+        "true": [
+          "espessura verdadeira",
+          "espessura real"
+        ]
+      }
+    },
+    {
       "type": "country",
       "exact": true,
       "words": {
@@ -1837,14 +2000,16 @@
       ],
       "words_pt": {
         "Australia": [
-          "australia"
+          "australia",
+          "austrália"
         ],
         "Brazil": [
           "brazil",
           "brasil"
         ],
         "Canada": [
-          "canada"
+          "canada",
+          "canadá"
         ],
         "Chile": [
           "chile"
@@ -1854,7 +2019,8 @@
           "alemanha"
         ],
         "Indonesia": [
-          "indonesia"
+          "indonesia",
+          "indonésia"
         ],
         "Ireland": [
           "ireland",
@@ -1862,14 +2028,17 @@
         ],
         "Japan": [
           "japan",
-          "japao"
+          "japao",
+          "japão"
         ],
         "Kazakhstan": [
           "kazakhstan",
-          "cazaquistao"
+          "cazaquistao",
+          "cazaquistão"
         ],
         "Mongolia": [
-          "mongolia"
+          "mongolia",
+          "mongólia"
         ],
         "Peru": [
           "peru"
@@ -1879,10 +2048,12 @@
         ],
         "South Africa": [
           "south africa",
-          "africa do sul"
+          "africa do sul",
+          "áfrica do sul"
         ],
         "Zambia": [
-          "zambia"
+          "zambia",
+          "zâmbia"
         ]
       },
       "generic_pt": [
@@ -5689,7 +5860,10 @@
           "new zealand"
         ],
         "here": [
-          "here"
+          "here",
+          "aqui",
+          "onde estou",
+          "minha localização"
         ],
         "my time": [
           "my time"
@@ -7248,6 +7422,10 @@
   ],
   "shapes": [
     {
+      "type": "stat",
+      "re": "p\\d{1,2}"
+    },
+    {
       "type": "holiday",
       "re": "(?:christmas|xmas|christmas eve|new year|new year's day|new year's eve|easter|easter sunday|good friday|carnival|carnival tuesday|carnival monday|ash wednesday|corpus christi|palm sunday|pentecost|whit sunday|ascension)\\s+\\d{4}"
     },
@@ -7258,10 +7436,6 @@
     {
       "type": "point3",
       "re": "-?\\d+(?:\\.\\d+)?\\s*,\\s*-?\\d+(?:\\.\\d+)?\\s*,\\s*-?\\d+(?:\\.\\d+)?"
-    },
-    {
-      "type": "stat",
-      "re": "p\\d{1,2}"
     },
     {
       "type": "explainable",
@@ -7353,6 +7527,13 @@
         "m",
         "meter",
         "metre"
+      ],
+      "words_pt": [
+        "m",
+        "meter",
+        "metre",
+        "metro",
+        "metros"
       ]
     },
     {
@@ -7362,6 +7543,15 @@
         "km",
         "kilometer",
         "kilometre"
+      ],
+      "words_pt": [
+        "km",
+        "kilometer",
+        "kilometre",
+        "quilômetro",
+        "quilômetros",
+        "quilometro",
+        "quilometros"
       ]
     },
     {
@@ -7369,6 +7559,11 @@
       "dim": "length",
       "words": [
         "cm"
+      ],
+      "words_pt": [
+        "cm",
+        "centímetro",
+        "centímetros"
       ]
     },
     {
@@ -7376,6 +7571,11 @@
       "dim": "length",
       "words": [
         "mm"
+      ],
+      "words_pt": [
+        "mm",
+        "milímetro",
+        "milímetros"
       ]
     },
     {
@@ -7385,6 +7585,13 @@
         "ft",
         "foot",
         "feet"
+      ],
+      "words_pt": [
+        "ft",
+        "foot",
+        "feet",
+        "pé",
+        "pés"
       ]
     },
     {
@@ -7394,6 +7601,13 @@
         "inch",
         "inches",
         "\""
+      ],
+      "words_pt": [
+        "inch",
+        "inches",
+        "\"",
+        "polegada",
+        "polegadas"
       ]
     },
     {
@@ -7402,6 +7616,12 @@
       "words": [
         "mi",
         "mile"
+      ],
+      "words_pt": [
+        "mi",
+        "mile",
+        "milha",
+        "milhas"
       ]
     },
     {
@@ -7410,6 +7630,12 @@
       "words": [
         "yd",
         "yard"
+      ],
+      "words_pt": [
+        "yd",
+        "yard",
+        "jarda",
+        "jardas"
       ]
     },
     {
@@ -7418,6 +7644,12 @@
       "words": [
         "g",
         "gram"
+      ],
+      "words_pt": [
+        "g",
+        "gram",
+        "grama",
+        "gramas"
       ]
     },
     {
@@ -7426,6 +7658,14 @@
       "words": [
         "kg",
         "kilogram"
+      ],
+      "words_pt": [
+        "kg",
+        "kilogram",
+        "quilo",
+        "quilos",
+        "quilograma",
+        "quilogramas"
       ]
     },
     {
@@ -7435,6 +7675,14 @@
         "t",
         "tonne",
         "metric ton"
+      ],
+      "words_pt": [
+        "t",
+        "tonne",
+        "metric ton",
+        "tonelada",
+        "toneladas",
+        "tonelada métrica"
       ]
     },
     {
@@ -7444,6 +7692,13 @@
         "lb",
         "lbs",
         "pound"
+      ],
+      "words_pt": [
+        "lb",
+        "lbs",
+        "pound",
+        "libra",
+        "libras"
       ]
     },
     {
@@ -7453,6 +7708,13 @@
         "troy oz",
         "ozt",
         "troy ounce"
+      ],
+      "words_pt": [
+        "troy oz",
+        "ozt",
+        "troy ounce",
+        "onça troy",
+        "onças troy"
       ]
     },
     {
@@ -7470,6 +7732,13 @@
         "short ton",
         "st",
         "ton"
+      ],
+      "words_pt": [
+        "short ton",
+        "st",
+        "ton",
+        "tonelada curta",
+        "toneladas curtas"
       ]
     },
     {
@@ -7477,6 +7746,11 @@
       "dim": "mass",
       "words": [
         "long ton"
+      ],
+      "words_pt": [
+        "long ton",
+        "tonelada longa",
+        "toneladas longas"
       ]
     },
     {
@@ -7485,6 +7759,12 @@
       "words": [
         "ct",
         "carat"
+      ],
+      "words_pt": [
+        "ct",
+        "carat",
+        "quilate",
+        "quilates"
       ]
     },
     {
@@ -7516,6 +7796,13 @@
         "%",
         "percent",
         "pct"
+      ],
+      "words_pt": [
+        "%",
+        "percent",
+        "pct",
+        "por cento",
+        "porcento"
       ]
     },
     {
@@ -7524,6 +7811,12 @@
       "words": [
         "m²",
         "m2"
+      ],
+      "words_pt": [
+        "m²",
+        "m2",
+        "metro quadrado",
+        "metros quadrados"
       ]
     },
     {
@@ -7535,6 +7828,15 @@
         "sq km",
         "square kilometer",
         "square km"
+      ],
+      "words_pt": [
+        "km²",
+        "km2",
+        "sq km",
+        "square kilometer",
+        "square km",
+        "quilômetro quadrado",
+        "quilômetros quadrados"
       ]
     },
     {
@@ -7543,6 +7845,11 @@
       "words": [
         "ha",
         "hectare"
+      ],
+      "words_pt": [
+        "ha",
+        "hectare",
+        "hectares"
       ]
     },
     {
@@ -7550,6 +7857,10 @@
       "dim": "area",
       "words": [
         "acre"
+      ],
+      "words_pt": [
+        "acre",
+        "acres"
       ]
     },
     {
@@ -7560,6 +7871,14 @@
         "square mile",
         "mi2",
         "mi²"
+      ],
+      "words_pt": [
+        "sq mi",
+        "square mile",
+        "mi2",
+        "mi²",
+        "milha quadrada",
+        "milhas quadradas"
       ]
     },
     {
@@ -7569,6 +7888,13 @@
         "l",
         "liter",
         "litre"
+      ],
+      "words_pt": [
+        "l",
+        "liter",
+        "litre",
+        "litro",
+        "litros"
       ]
     },
     {
@@ -7578,6 +7904,13 @@
         "m³",
         "m3",
         "cubic meter"
+      ],
+      "words_pt": [
+        "m³",
+        "m3",
+        "cubic meter",
+        "metro cúbico",
+        "metros cúbicos"
       ]
     },
     {
@@ -7605,6 +7938,12 @@
       "words": [
         "gal",
         "gallon"
+      ],
+      "words_pt": [
+        "gal",
+        "gallon",
+        "galão",
+        "galões"
       ]
     },
     {
@@ -7613,6 +7952,12 @@
       "words": [
         "bbl",
         "barrel"
+      ],
+      "words_pt": [
+        "bbl",
+        "barrel",
+        "barril",
+        "barris"
       ]
     },
     {
@@ -7657,6 +8002,13 @@
         "s",
         "sec",
         "second"
+      ],
+      "words_pt": [
+        "s",
+        "sec",
+        "second",
+        "segundo",
+        "segundos"
       ]
     },
     {
@@ -7665,6 +8017,12 @@
       "words": [
         "min",
         "minute"
+      ],
+      "words_pt": [
+        "min",
+        "minute",
+        "minuto",
+        "minutos"
       ]
     },
     {
@@ -7674,6 +8032,13 @@
         "h",
         "hr",
         "hour"
+      ],
+      "words_pt": [
+        "h",
+        "hr",
+        "hour",
+        "hora",
+        "horas"
       ]
     },
     {
@@ -7690,6 +8055,12 @@
         "°c",
         "c",
         "celsius"
+      ],
+      "words_pt": [
+        "°c",
+        "c",
+        "celsius",
+        "graus celsius"
       ]
     },
     {
@@ -7699,6 +8070,12 @@
         "°f",
         "f",
         "fahrenheit"
+      ],
+      "words_pt": [
+        "°f",
+        "f",
+        "fahrenheit",
+        "graus fahrenheit"
       ]
     },
     {
@@ -7735,6 +8112,11 @@
       "dim": "mass ratio",
       "words": [
         "oz per short ton"
+      ],
+      "words_pt": [
+        "oz per short ton",
+        "onça por tonelada curta",
+        "onças por tonelada curta"
       ]
     },
     {
@@ -7772,6 +8154,13 @@
         "oz",
         "ounce",
         "ounces"
+      ],
+      "words_pt": [
+        "oz",
+        "ounce",
+        "ounces",
+        "onça",
+        "onças"
       ]
     },
     {
@@ -7977,38 +8366,6 @@
   ],
   "postmods": [
     {
-      "prep": "",
-      "heads": [
-        "hole"
-      ],
-      "attr": "ori",
-      "mod": "orientation"
-    },
-    {
-      "prep": "at",
-      "heads": [
-        "hole"
-      ],
-      "attr": "ori",
-      "mod": "orientation"
-    },
-    {
-      "prep": "",
-      "heads": [
-        "plane"
-      ],
-      "attr": "ori",
-      "mod": "orientation"
-    },
-    {
-      "prep": "at",
-      "heads": [
-        "plane"
-      ],
-      "attr": "ori",
-      "mod": "orientation"
-    },
-    {
       "prep": "of",
       "heads": [
         "stat"
@@ -8031,6 +8388,38 @@
       ],
       "attr": "where",
       "mod": "cond"
+    },
+    {
+      "prep": "",
+      "heads": [
+        "hole"
+      ],
+      "attr": "ori",
+      "mod": "orientation"
+    },
+    {
+      "prep": "at",
+      "heads": [
+        "hole"
+      ],
+      "attr": "ori",
+      "mod": "orientation"
+    },
+    {
+      "prep": "",
+      "heads": [
+        "plane"
+      ],
+      "attr": "ori",
+      "mod": "orientation"
+    },
+    {
+      "prep": "at",
+      "heads": [
+        "plane"
+      ],
+      "attr": "ori",
+      "mod": "orientation"
     },
     {
       "prep": "",
@@ -8186,17 +8575,17 @@
       ]
     },
     {
-      "head": "intercept",
-      "attr": "length",
-      "dims": [
-        "length"
-      ]
-    },
-    {
       "head": "sample",
       "attr": "limit",
       "dims": [
         "bare"
+      ]
+    },
+    {
+      "head": "intercept",
+      "attr": "length",
+      "dims": [
+        "length"
       ]
     },
     {
@@ -8358,6 +8747,36 @@
       "label_pt": "Rastrear"
     },
     {
+      "name": "abilities",
+      "label": "What I can do",
+      "words": [
+        "what can you do",
+        "what can i ask",
+        "what do you do",
+        "what can i do here",
+        "what are your skills",
+        "what skills do you have",
+        "help",
+        "skills",
+        "list the skills",
+        "list skills",
+        "show the skills",
+        "show me what you can do",
+        "what else can you do"
+      ],
+      "theme": [],
+      "required": [],
+      "roles": {},
+      "words_pt": [
+        "o que você faz",
+        "o que voce faz",
+        "o que você sabe fazer",
+        "ajuda",
+        "habilidades"
+      ],
+      "label_pt": "O que sei fazer"
+    },
+    {
       "name": "convert",
       "label": "Convert",
       "words": [
@@ -8397,228 +8816,6 @@
         "passa"
       ],
       "label_pt": "Converter"
-    },
-    {
-      "name": "calc",
-      "label": "Calculate",
-      "words": [
-        "calculate",
-        "compute",
-        "evaluate",
-        "work out",
-        "eval",
-        "calc"
-      ],
-      "theme": [
-        "text"
-      ],
-      "required": [
-        "theme"
-      ],
-      "roles": {},
-      "words_pt": [
-        "calcula",
-        "calcule",
-        "quanto é",
-        "avalia"
-      ],
-      "label_pt": "Calcular"
-    },
-    {
-      "name": "daysUntil",
-      "label": "Days until",
-      "words": [
-        "days until",
-        "days till",
-        "days to",
-        "days before",
-        "days left until",
-        "how many days until",
-        "how many days till",
-        "how many days to",
-        "how many days are left until",
-        "how many days left until",
-        "countdown to"
-      ],
-      "theme": [
-        "date",
-        "holiday"
-      ],
-      "required": [
-        "theme"
-      ],
-      "roles": {},
-      "words_pt": [
-        "dias até",
-        "dias ate",
-        "quantos dias até",
-        "quantos dias ate",
-        "quantos dias faltam para",
-        "quantos dias faltam até"
-      ],
-      "label_pt": "Days until"
-    },
-    {
-      "name": "whenIs",
-      "label": "When is",
-      "words": [
-        "when is",
-        "when was",
-        "when will be",
-        "when does",
-        "when falls",
-        "what date is",
-        "what date was"
-      ],
-      "theme": [
-        "date",
-        "holiday"
-      ],
-      "required": [
-        "theme"
-      ],
-      "roles": {},
-      "words_pt": [
-        "quando é",
-        "quando e",
-        "quando foi",
-        "quando cai",
-        "que data é"
-      ],
-      "label_pt": "When is"
-    },
-    {
-      "name": "weekday",
-      "label": "Weekday",
-      "words": [
-        "what day is",
-        "what day was",
-        "what day will be",
-        "what weekday is",
-        "what weekday was",
-        "what day of the week is",
-        "what day of the week was",
-        "which day is",
-        "what day does",
-        "what day",
-        "what weekday",
-        "which day"
-      ],
-      "theme": [
-        "date",
-        "holiday"
-      ],
-      "required": [
-        "theme"
-      ],
-      "roles": {},
-      "words_pt": [
-        "que dia é",
-        "que dia e",
-        "que dia foi",
-        "que dia da semana é",
-        "que dia cai",
-        "em que dia cai"
-      ],
-      "label_pt": "Weekday"
-    },
-    {
-      "name": "thickness",
-      "label": "True thickness",
-      "words": [
-        "calculate",
-        "compute",
-        "work out",
-        "find",
-        "get"
-      ],
-      "elidable": true,
-      "theme": [
-        "thickness"
-      ],
-      "required": [
-        "theme"
-      ],
-      "roles": {
-        "of": {
-          "preps": [
-            "of",
-            "for"
-          ],
-          "types": [
-            "intercept",
-            "hole",
-            "plane",
-            "quantity:length"
-          ]
-        },
-        "in": {
-          "preps": [
-            "in",
-            "down",
-            "along",
-            "from",
-            "with",
-            ""
-          ],
-          "types": [
-            "hole",
-            "holeid"
-          ]
-        },
-        "through": {
-          "preps": [
-            "through",
-            "across",
-            "against",
-            "with",
-            ""
-          ],
-          "types": [
-            "plane"
-          ]
-        },
-        "where": {
-          "preps": [
-            "where"
-          ],
-          "types": [
-            "cond"
-          ]
-        }
-      },
-      "words_pt": [
-        "calcula",
-        "calcule"
-      ],
-      "label_pt": "Espessura verdadeira"
-    },
-    {
-      "name": "stereonet",
-      "label": "Stereonet",
-      "words": [
-        "plot",
-        "stereonet",
-        "stereonet of",
-        "show",
-        "draw",
-        "plot plane"
-      ],
-      "elidable": true,
-      "theme": [
-        "plane",
-        "orientation"
-      ],
-      "required": [
-        "theme"
-      ],
-      "roles": {},
-      "words_pt": [
-        "estereograma",
-        "plota",
-        "mostra"
-      ],
-      "label_pt": "Estereograma"
     },
     {
       "name": "reformat",
@@ -9069,6 +9266,264 @@
         "confere"
       ],
       "label_pt": "Verificar intervalos"
+    },
+    {
+      "name": "calc",
+      "label": "Calculate",
+      "words": [
+        "calculate",
+        "compute",
+        "evaluate",
+        "work out",
+        "eval",
+        "calc"
+      ],
+      "theme": [
+        "text"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {},
+      "words_pt": [
+        "calcula",
+        "calcule",
+        "quanto é",
+        "avalia"
+      ],
+      "label_pt": "Calcular"
+    },
+    {
+      "name": "export",
+      "label": "Export",
+      "words": [
+        "export",
+        "save",
+        "write",
+        "give me"
+      ],
+      "elidable": true,
+      "theme": [
+        "table"
+      ],
+      "required": [
+        "as"
+      ],
+      "roles": {
+        "as": {
+          "preps": [
+            "as",
+            "to",
+            "in"
+          ],
+          "types": [
+            "format"
+          ]
+        }
+      },
+      "words_pt": [
+        "exportar",
+        "exporta",
+        "salvar",
+        "salva"
+      ],
+      "label_pt": "Exportar"
+    },
+    {
+      "name": "daysUntil",
+      "label": "Days until",
+      "words": [
+        "days until",
+        "days till",
+        "days to",
+        "days before",
+        "days left until",
+        "how many days until",
+        "how many days till",
+        "how many days to",
+        "how many days are left until",
+        "how many days left until",
+        "countdown to"
+      ],
+      "theme": [
+        "date",
+        "holiday"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {},
+      "words_pt": [
+        "dias até",
+        "dias ate",
+        "quantos dias até",
+        "quantos dias ate",
+        "quantos dias faltam para",
+        "quantos dias faltam até"
+      ],
+      "label_pt": "Days until"
+    },
+    {
+      "name": "whenIs",
+      "label": "When is",
+      "words": [
+        "when is",
+        "when was",
+        "when will be",
+        "when does",
+        "when falls",
+        "what date is",
+        "what date was"
+      ],
+      "theme": [
+        "date",
+        "holiday"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {},
+      "words_pt": [
+        "quando é",
+        "quando e",
+        "quando foi",
+        "quando cai",
+        "que data é"
+      ],
+      "label_pt": "When is"
+    },
+    {
+      "name": "weekday",
+      "label": "Weekday",
+      "words": [
+        "what day is",
+        "what day was",
+        "what day will be",
+        "what weekday is",
+        "what weekday was",
+        "what day of the week is",
+        "what day of the week was",
+        "which day is",
+        "what day does",
+        "what day",
+        "what weekday",
+        "which day"
+      ],
+      "theme": [
+        "date",
+        "holiday"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {},
+      "words_pt": [
+        "que dia é",
+        "que dia e",
+        "que dia foi",
+        "que dia da semana é",
+        "que dia cai",
+        "em que dia cai"
+      ],
+      "label_pt": "Weekday"
+    },
+    {
+      "name": "thickness",
+      "label": "True thickness",
+      "words": [
+        "calculate",
+        "compute",
+        "work out",
+        "find",
+        "get"
+      ],
+      "elidable": true,
+      "theme": [
+        "thickness"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {
+        "of": {
+          "preps": [
+            "of",
+            "for"
+          ],
+          "types": [
+            "intercept",
+            "hole",
+            "plane",
+            "quantity:length"
+          ]
+        },
+        "in": {
+          "preps": [
+            "in",
+            "down",
+            "along",
+            "from",
+            "with",
+            ""
+          ],
+          "types": [
+            "hole",
+            "holeid"
+          ]
+        },
+        "through": {
+          "preps": [
+            "through",
+            "across",
+            "against",
+            "with",
+            ""
+          ],
+          "types": [
+            "plane"
+          ]
+        },
+        "where": {
+          "preps": [
+            "where"
+          ],
+          "types": [
+            "cond"
+          ]
+        }
+      },
+      "words_pt": [
+        "calcula",
+        "calcule"
+      ],
+      "label_pt": "Espessura verdadeira"
+    },
+    {
+      "name": "stereonet",
+      "label": "Stereonet",
+      "words": [
+        "plot",
+        "stereonet",
+        "stereonet of",
+        "show",
+        "draw",
+        "plot plane"
+      ],
+      "elidable": true,
+      "theme": [
+        "plane",
+        "orientation"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {},
+      "words_pt": [
+        "estereograma",
+        "plota",
+        "mostra"
+      ],
+      "label_pt": "Estereograma"
     },
     {
       "name": "lookup",
@@ -9729,6 +10184,13 @@
       "words_pt": [
         "quando foi",
         "idade de",
+        "idade do",
+        "idade da",
+        "qual a idade de",
+        "qual a idade do",
+        "qual a idade da",
+        "qual é a idade do",
+        "qual é a idade da",
         "datar",
         "data"
       ],
@@ -9754,7 +10216,13 @@
       "roles": {},
       "words_pt": [
         "quanto durou",
-        "duração de"
+        "quanto tempo durou",
+        "quanto tempo dura",
+        "duração de",
+        "duração do",
+        "duração da",
+        "qual a duração do",
+        "qual a duração da"
       ],
       "label_pt": "Escala do tempo"
     },
@@ -11844,72 +12312,6 @@
         "é abreviação de"
       ],
       "label_pt": "Ensinar"
-    },
-    {
-      "name": "abilities",
-      "label": "What I can do",
-      "words": [
-        "what can you do",
-        "what can i ask",
-        "what do you do",
-        "what can i do here",
-        "what are your skills",
-        "what skills do you have",
-        "help",
-        "skills",
-        "list the skills",
-        "list skills",
-        "show the skills",
-        "show me what you can do",
-        "what else can you do"
-      ],
-      "theme": [],
-      "required": [],
-      "roles": {},
-      "words_pt": [
-        "o que você faz",
-        "o que voce faz",
-        "o que você sabe fazer",
-        "ajuda",
-        "habilidades"
-      ],
-      "label_pt": "O que sei fazer"
-    },
-    {
-      "name": "export",
-      "label": "Export",
-      "words": [
-        "export",
-        "save",
-        "write",
-        "give me"
-      ],
-      "elidable": true,
-      "theme": [
-        "table"
-      ],
-      "required": [
-        "as"
-      ],
-      "roles": {
-        "as": {
-          "preps": [
-            "as",
-            "to",
-            "in"
-          ],
-          "types": [
-            "format"
-          ]
-        }
-      },
-      "words_pt": [
-        "exportar",
-        "exporta",
-        "salvar",
-        "salva"
-      ],
-      "label_pt": "Exportar"
     }
   ],
   "conditions": {

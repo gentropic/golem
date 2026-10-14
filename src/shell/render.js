@@ -2,6 +2,7 @@
 import { fmt } from '../engine/core.js';
 import { conversions, equalArea } from '../vendor/bearing.js';
 import { Figure } from '../vendor/plot.js';
+import { t } from './i18n.js';
 
 export const escHtml = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 export const pad = n => String(n).padStart(2, '0');
@@ -53,7 +54,7 @@ export function drawChart(cv) {
   cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);   // the CSS sizes it (the column's width, its aspect kept)
   fig.draw(cv.getContext('2d'), { dpr });
 }
-export function drawCharts(root) { (root || document).querySelectorAll('canvas[data-chart]').forEach(cv => { try { drawChart(cv); } catch (e) { cv.replaceWith(Object.assign(document.createElement('div'), { className: 'note err', textContent: `The chart could not be drawn: ${e.message}` })); } }); }
+export function drawCharts(root) { (root || document).querySelectorAll('canvas[data-chart]').forEach(cv => { try { drawChart(cv); } catch (e) { cv.replaceWith(Object.assign(document.createElement('div'), { className: 'note err', textContent: t('The chart could not be drawn: {e}', { e: e.message }) })); } }); }
 function svgCurve(b) {
   const W = 340, H = 150, x0 = 38, X = x => x0 + x / b.xmax * (W - x0 - 10), Y = y => H - y / b.ymax * (H - 10);
   let s = `<svg viewBox="0 0 ${W} ${H + 24}" width="${W}" height="${H + 24}" role="img" aria-label="${escHtml(b.label)}"><path class="ax" d="M${x0} 6V${H}H${W - 6}"/>`;
@@ -84,7 +85,7 @@ function blockHtml(b) {
       : `<button class="btn${i.go ? ' go' : ''}" type="button" data-act="${escHtml(i.act)}"${i.msg ? ` data-msg="${escHtml(i.msg)}"` : ''}${i.send ? ` data-send="${escHtml(JSON.stringify(i.send))}"` : ''}>${escHtml(i.label)}</button>`).join('')}</div>`;
     case 'net': return svgNet(b);
     // a reading the card waits for: in the app, a live value and the button that takes it; in a browser, only the words
-    case 'capture': return `<div class="capture" data-kind="${escHtml(b.kind)}"><p class="how">${escHtml(b.how || '')}</p><div class="live" aria-live="off">${b.kind === 'position' ? 'no fix yet' : 'waiting for the compass…'}</div><div class="opts"><button class="btn go" type="button" data-act="take">${b.kind === 'position' ? 'Use my position' : 'Take reading'}</button></div></div>`;
+    case 'capture': return `<div class="capture" data-kind="${escHtml(b.kind)}"><p class="how">${escHtml(b.how || '')}</p><div class="live" aria-live="off">${t(b.kind === 'position' ? 'no fix yet' : 'waiting for the compass…')}</div><div class="opts"><button class="btn go" type="button" data-act="take">${t(b.kind === 'position' ? 'Use my position' : 'Take reading')}</button></div></div>`;
     case 'bars': return b.lo != null ? `<figure class="chart"><canvas data-chart="${escHtml(JSON.stringify(b))}" role="img" aria-label="${escHtml(chartLabel(b))}"></canvas></figure>` : svgBars(b);
     case 'figure': return `<figure class="fig"><canvas data-fig width="${+b.w || 400}" height="${+b.h || 300}" role="img" aria-label="${escHtml(b.label || 'Figure')}"></canvas><figcaption>${escHtml(b.label || 'Figure')}</figcaption></figure>`;
     case 'curve': return svgCurve(b);
@@ -97,14 +98,14 @@ export function cardEl(c) {
   const el = document.createElement('article');
   el.className = 'card'; el.dataset.id = c.id; el.dataset.rung = c.rung; el.tabIndex = -1;
   el.setAttribute('aria-label', `#${pad(c.id)}: ${c.raw}`); if (c.pinned) el.dataset.pinned = '1';
-  const r = c.res, read = r.read.map(x => typeof x === 'string' ? escHtml(x) : x.alts ? `<button class="slot" type="button" data-act="slot" data-key="${x.key}" title="Tap to change this reading" aria-label="${escHtml(x.v)}: tap to read it another way">${escHtml(x.v)}</button>` : `<span class="slot">${escHtml(x.v)}</span>`).join(' ');
-  const ask = r.ask ? `<div class="note">${escHtml(r.ask.prompt)}</div>${r.ask.options.length ? `<div class="opts">${r.ask.options.map((o, i) => `<button class="btn" type="button" data-act="answer" data-i="${i}">${escHtml(o.label)}</button>`).join('')}${r.ask.parse ? '<span class="sub">or type it</span>' : ''}</div>` : ''}` : '';
+  const r = c.res, read = r.read.map(x => typeof x === 'string' ? escHtml(x) : x.alts ? `<button class="slot" type="button" data-act="slot" data-key="${x.key}" title="${escHtml(t('Tap to change this reading'))}" aria-label="${escHtml(t('{v}: tap to read it another way', { v: x.v }))}">${escHtml(x.v)}</button>` : `<span class="slot">${escHtml(x.v)}</span>`).join(' ');
+  const ask = r.ask ? `<div class="note">${escHtml(r.ask.prompt)}</div>${r.ask.options.length ? `<div class="opts">${r.ask.options.map((o, i) => `<button class="btn" type="button" data-act="answer" data-i="${i}">${escHtml(o.label)}</button>`).join('')}${r.ask.parse ? `<span class="sub">${t('or type it')}</span>` : ''}</div>` : ''}` : '';
   el.innerHTML = `<div class="q">${escHtml(c.raw)}</div>
-    <div class="reply"><div class="chead"><span class="rung ${c.rung}">${RUNG[c.rung]}</span><span>#${pad(c.id)}</span>${c.amends ? `<span>from #${pad(c.amends)}</span>` : ''}<span class="ms">${c.ms < 10 ? c.ms.toFixed(1) : Math.round(c.ms)} ms</span></div>
-    ${read ? `<div class="read"><span class="lbl">read as</span> ${read}</div>` : ''}
+    <div class="reply"><div class="chead"><span class="rung ${c.rung}">${t(RUNG[c.rung])}</span><span>#${pad(c.id)}</span>${c.amends ? `<span>${t('from #{n}', { n: pad(c.amends) })}</span>` : ''}<span class="ms">${c.ms < 10 ? c.ms.toFixed(1) : Math.round(c.ms)} ms</span></div>
+    ${read ? `<div class="read"><span class="lbl">${t('read as')}</span> ${read}</div>` : ''}
     <div class="ans">${r.body.map(blockHtml).join('')}${ask}</div>
-    <div class="cfoot"><details class="trace"><summary>how · ${r.trace.length} step${r.trace.length === 1 ? '' : 's'}</summary><ol>${r.trace.map(t => `<li>${escHtml(t)}</li>`).join('')}</ol></details>
-    <span class="cacts"><button class="cact" type="button" data-act="copyans" title="Copy the answer (c)">copy</button><button class="cact" type="button" data-act="edit" title="Put this question back in the box to change it (e)">edit</button><button class="cact" type="button" data-act="pin" aria-pressed="${!!c.pinned}" title="Keep this card at the top of the session (p)">${c.pinned ? 'pinned' : 'pin'}</button><button class="cact" type="button" data-act="branch" title="A new session with the cards up to this one">branch</button><button class="cact say" type="button" data-act="say" title="Read this answer aloud, with the phone's offline voice">say</button></span></div></div>`;
+    <div class="cfoot"><details class="trace"><summary>${t('how')} · ${r.trace.length} ${t(r.trace.length === 1 ? 'step' : 'steps')}</summary><ol>${r.trace.map(t => `<li>${escHtml(t)}</li>`).join('')}</ol></details>
+    <span class="cacts"><button class="cact" type="button" data-act="copyans" title="${escHtml(t('Copy the answer (c)'))}">${t('copy')}</button><button class="cact" type="button" data-act="edit" title="${escHtml(t('Put this question back in the box to change it (e)'))}">${t('edit')}</button><button class="cact" type="button" data-act="pin" aria-pressed="${!!c.pinned}" title="${escHtml(t('Keep this card at the top of the session (p)'))}">${t(c.pinned ? 'pinned' : 'pin')}</button><button class="cact" type="button" data-act="branch" title="${escHtml(t('A new session with the cards up to this one'))}">${t('branch')}</button><button class="cact say" type="button" data-act="say" title="${escHtml(t('Read this answer aloud, with the phone\'s offline voice'))}">${t('say')}</button></span></div></div>`;
   const figs = r.body.filter(b => b.t === 'figure');
   el.querySelectorAll('canvas[data-fig]').forEach((cv, i) => { try { drawFigure(cv, figs[i]); } catch (e) { cv.replaceWith(Object.assign(document.createElement('div'), { className: 'note err', textContent: `The figure could not be drawn: ${e.message}` })); } });
   return el;

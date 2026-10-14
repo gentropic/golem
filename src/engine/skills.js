@@ -56,4 +56,11 @@ export const STARTERS = [
   ['Units and numbers', [['Convert a grade', '0.35 oz per short ton in g/t'], ['With uncertainty', '2.7 ± 0.1 t/m3 * 1.35 Mm3'], ['Run some Python', 'run this: sum(x * x for x in range(10))']]],
   ['Every day', [['Set a reminder', 'remind me to send the samples to the lab on friday at 9'], ['Two time zones', '9am sao paulo in perth'], ['What can you do?', 'what can you do']]],
 ];
+// the same, for the Portuguese interface: each one reads in Portuguese (test/portuguese.test.mjs)
+export const STARTERS_PT = [
+  ['No campo', [['Espessura verdadeira', 'espessura verdadeira de 14 m, furo 270/60, acamamento 045/30'], ['Declinação', 'declinação em -19.92, -43.94'], ['Medir com o celular', 'mede o acamamento']]],
+  ['Laboratório e tabelas', [['Uma tabela para testar (dados de amostra)', 'abre assays.csv'], ['Massa molar', 'massa molar de CuFeS2'], ['Histograma', 'histograma de cu']]],
+  ['Unidades e números', [['Converter', 'converte 5 km para milhas'], ['Temperatura', '25 graus celsius em fahrenheit'], ['Dias úteis', 'quantos dias úteis até 20 de dezembro']]],
+  ['Dia a dia', [['Lembrete', 'me lembra de mandar as amostras pro laboratório na sexta às 9'], ['Que horas são', 'que horas são em perth'], ['O que você faz?', 'o que você faz']]],
+];
 export const SUGGESTIONS = ['pop means population', 'histogram of cu', 'log scale', 'population density of mongolia in people per square mile', 'and chile', 'set a timer for 5 min', 'what is a skiplist', 'why', 'export as script', 'undo'];
