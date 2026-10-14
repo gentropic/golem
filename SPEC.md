@@ -1,11 +1,11 @@
 # golem — specification
 
-**Status:** draft 0.1, 8 Oct 2026. Written from the design conversation and the interactive mock in `src/`.
+**Status:** draft 0.1, 8 Oct 2026 (revised to 14 Oct). Written from the design conversation and the working prototype in `src/`.
 **Working name:** golem (`@gcu/golem`). Not final; see [Open decisions](#14-open-decisions).
 
 golem is an assistant with no model at runtime. A person types a request in plain language; golem reads it with a deterministic ladder of parsers, turns the reading into a plan of tool calls, runs the plan on the device, and shows the answer together with the reading and the plan. It is the GCU candidate for a first published Android app, packaged with lead-acid.
 
-Sections 1 to 11 describe the target. Section 12 says what the mock does today. Section 13 is the path between them.
+Sections 1 to 11 describe the target. Section 12 says what golem does today. Section 13 is the path between them.
 
 ---
 
@@ -60,7 +60,7 @@ Sections 1 to 11 describe the target. Section 12 says what the mock does today. 
 
 ## 3. The reading ladder
 
-| Rung | What reads the query | In the mock |
+| Rung | What reads the query | Today |
 |---|---|---|
 | 1 `context` | An open question on the last card; an amendment of the last card (`in feet`, `log scale`, `and chile`); a meta-intent (`why`, `undo`, `again`) | Session frames read first; amendments after rung 2, as the tool's amendment frames or a fragment of the last card's clause command |
 | 2 `grammar` | The controlled-English parser ("clause": Earley parsing with costed repairs, ontology as data, locale banks). Lives in `auditable/ext/dispatch/src/grammar/` since 8 Oct 2026. Reads imperatives, bare phrases ("density of chalcopyrite", "2 km in miles") and closed questions ("what is …", "which … are …"), with free text, dates, clock times, token shapes and politeness around them; open questions stay out of scope by design | The vendored parser over golem's frames, then the expression parsers for arithmetic |
@@ -89,13 +89,13 @@ Operations on the session plan, resolved before anything else:
 | session | `new session`, `name this session …`, `history` | See section 8 |
 | export | `export as script` | Emits the session plan as adder source |
 
-Amendments are declared per tool: a tool result says which amendment family it accepts (`unit`, `hist`, `fact` in the mock). Target: each tool declares its amendable arguments and the phrases that select them, as data.
+Amendments are declared per tool: a tool result says which amendment family it accepts (`unit`, `hist`, `fact` at first). Target: each tool declares its amendable arguments and the phrases that select them, as data.
 
 ---
 
 ## 4. Contracts
 
-### 4.1 As implemented in the mock
+### 4.1 As implemented
 
 ```ts
 // A tool takes its arguments and returns a result, or null for "this reading does not apply".
@@ -158,29 +158,29 @@ Since 8 Oct 2026 the first half is declared data: a tool lists the conditions it
 
 ## 6. Skills
 
-Status: **mock** = works in `src/` today; **planned** = named, not built.
+Status: **live** = works in `src/` today; **planned** = named, not built.
 
 | Group | Skill | Status | Builds on |
 |---|---|---|---|
-| Compute | Unit conversion with dimension checks | mock (own table, checked against `@gcu/units`) | `@gcu/units`, `@gcu/dimensions` |
-| Compute | Arithmetic, trig in degrees | mock (own parser) | `@gcu/expr` if it fits, else keep the parser |
-| Compute | Dates: day counts, weekdays | mock | built in |
-| Device | Places saved by coordinates (no gazetteer, device location off: an unknown name is asked for); distance and bearings by Vincenty on WGS84 (Karney where Vincenty fails is not built); UTM both ways by the Krüger series with the zone a slot near an edge; SAD69 and Córrego Alegre refused | mock (8 Oct 2026) | built in |
-| Device | Sun times by NOAA's equations in the place's zone when its name has one, else UTC and said so; the moon's phase from the mean synodic month, labelled to about half a day | mock (8 Oct 2026); Meeus's periodic terms not applied | built in |
-| Device | The log: a device table written from cards ("log 5 km run yesterday"), asked in plain words (totals and means by week or month, units converted within a dimension), opened as the table for every table question; undo removes the row, "that was 6 km" rewrites it | mock (8 Oct 2026); device tables are `S.tables`, serialised with notes and files | built in |
-| Compute | Decision matrix: options, criteria, weights and scores asked one at a time as a form, weighted totals, bars, the smallest weight change that flips the top; reports the highest score only | mock (8 Oct 2026); the form card is `firstNeed()` in `src/engine/forms.js`, answers are args and slots | built in |
-| Field | Sampling and economics formulas: Gy's fundamental error (for σ or for the sample mass), break-even cutoff grade, NSR per tonne, metal equivalents; every term a slot, conventions offered first and never applied silently | mock (8 Oct 2026) | built in |
-| Compute | Text tools: word count and Flesch readability (English, labelled estimates), key sentences by TextRank in source order, a Myers diff by line, word or character | mock (8 Oct 2026); payloads follow a colon or the first line, and the shell input is a growing textarea | built in |
-| Compute | Molar mass, element-to-oxide factors, element fractions, the periodic table | mock (8 Oct 2026) over `src/engine/data/elements.js`: IUPAC CIAAW 2024 weights abridged to five figures, source in the file; no mineral names until a minerals pack exists | the periodic table as a records pack |
-| Compute | Estimates with ranges: arithmetic over "a to b" and "a ± b" by simulation, units carried through, mean and 10th/50th/90th percentiles, the seed in the plan | mock (own sampler, 8 Oct 2026); distributions are slots | `@gcu/scitra` for the samplers once vendored |
+| Compute | Unit conversion with dimension checks | live (own table, checked against `@gcu/units`) | `@gcu/units`, `@gcu/dimensions` |
+| Compute | Arithmetic, trig in degrees | live (own parser) | `@gcu/expr` if it fits, else keep the parser |
+| Compute | Dates: day counts, weekdays | live | built in |
+| Device | Places saved by coordinates (no gazetteer, device location off: an unknown name is asked for); distance and bearings by Vincenty on WGS84 (Karney where Vincenty fails is not built); UTM both ways by the Krüger series with the zone a slot near an edge; SAD69 and Córrego Alegre refused | live (8 Oct 2026) | built in |
+| Device | Sun times by NOAA's equations in the place's zone when its name has one, else UTC and said so; the moon's phase from the mean synodic month, labelled to about half a day | live (8 Oct 2026); Meeus's periodic terms not applied | built in |
+| Device | The log: a device table written from cards ("log 5 km run yesterday"), asked in plain words (totals and means by week or month, units converted within a dimension), opened as the table for every table question; undo removes the row, "that was 6 km" rewrites it | live (8 Oct 2026); device tables are `S.tables`, serialised with notes and files | built in |
+| Compute | Decision matrix: options, criteria, weights and scores asked one at a time as a form, weighted totals, bars, the smallest weight change that flips the top; reports the highest score only | live (8 Oct 2026); the form card is `firstNeed()` in `src/engine/forms.js`, answers are args and slots | built in |
+| Field | Sampling and economics formulas: Gy's fundamental error (for σ or for the sample mass), break-even cutoff grade, NSR per tonne, metal equivalents; every term a slot, conventions offered first and never applied silently | live (8 Oct 2026) | built in |
+| Compute | Text tools: word count and Flesch readability (English, labelled estimates), key sentences by TextRank in source order, a Myers diff by line, word or character | live (8 Oct 2026); payloads follow a colon or the first line, and the shell input is a growing textarea | built in |
+| Compute | Molar mass, element-to-oxide factors, element fractions, the periodic table | live (8 Oct 2026) over `src/engine/data/elements.js`: IUPAC CIAAW 2024 weights abridged to five figures, source in the file; no mineral names until a minerals pack exists | the periodic table as a records pack |
+| Compute | Estimates with ranges: arithmetic over "a to b" and "a ± b" by simulation, units carried through, mean and 10th/50th/90th percentiles, the seed in the plan | live (own sampler, 8 Oct 2026); distributions are slots | `@gcu/scitra` for the samplers once vendored |
 | Compute | Working days and rosters: counts, N working days from a date, is-it-a-working-day, on/off rosters; the calendar is a slot (Brazil federal, weekdays only) | `@gcu/plan` calendar and holidays vendored (8 Oct 2026); municipal calendars and the plan what-ifs are not | `@gcu/plan` |
-| Compute | Time zones: a time in one place as it reads in another, now in a place, shared hours across places; named days (Easter, Carnival, Christmas) | mock, Intl only (8 Oct 2026) | built in |
-| Compute | Run and trace Python: adder in a fresh Web Worker per run, built from the page itself; `host: false`, `remote: false`, a budget of 2,000,000 statements and 5 s, the worker killed a second later; output, the last value, the error with its line, a trace table; numpy/pandas/scipy imports rewritten by @gcu/ipynb's table and shown | mock (9 Oct 2026); adder's single-file build vendored as is, with natra (numpy; it compiles its Wasm kernels in the worker with atra from the alpack sources, Wasm built from source per principle 9), scitra (scipy), sadpan (pandas), learn (sklearn; its tree `.compile()` builds JavaScript and is refused in the worker), plot (matplotlib, as `plt`; figures leave the worker as draw lists, plain JSON, and the shell replays them on a canvas through allowlists) and line (by its own name) registered; the worker is about 1.6 MB of a 2.6 MB page | `@gcu/adder`, `@gcu/ipynb`, `@gcu/natra`, `@gcu/atra`, `@gcu/scitra`, `@gcu/sadpan`, `@gcu/learn`, `@gcu/plot`, `@gcu/line` |
-| Compute | Hashes and encodings: SHA-256 of a text or an opened file; base64, hex and URL encoding both ways | mock (own SHA-256, 8 Oct 2026) | Web Crypto is asynchronous, so the digest is computed in the tool |
-| Table | The open table as CSV, TSV or JSON, with copy and save | mock (8 Oct 2026) | built in |
-| Table | Field compute over a table: true thickness of every intercept and apparent dip of every plane, the row's columns bound to the skill's arguments by name, constants filling the rest, unfillable rows listed | mock (8 Oct 2026); two skills bound so far | `@gcu/bearing` |
+| Compute | Time zones: a time in one place as it reads in another, now in a place, shared hours across places; named days (Easter, Carnival, Christmas) | live, Intl only (8 Oct 2026) | built in |
+| Compute | Run and trace Python: adder in a fresh Web Worker per run, built from the page itself; `host: false`, `remote: false`, a budget of 2,000,000 statements and 5 s, the worker killed a second later; output, the last value, the error with its line, a trace table; numpy/pandas/scipy imports rewritten by @gcu/ipynb's table and shown | live (9 Oct 2026); adder's single-file build vendored as is, with natra (numpy; it compiles its Wasm kernels in the worker with atra from the alpack sources, Wasm built from source per principle 9), scitra (scipy), sadpan (pandas), learn (sklearn; its tree `.compile()` builds JavaScript and is refused in the worker), plot (matplotlib, as `plt`; figures leave the worker as draw lists, plain JSON, and the shell replays them on a canvas through allowlists) and line (by its own name) registered; the worker is about 1.6 MB of a 2.6 MB page | `@gcu/adder`, `@gcu/ipynb`, `@gcu/natra`, `@gcu/atra`, `@gcu/scitra`, `@gcu/sadpan`, `@gcu/learn`, `@gcu/plot`, `@gcu/line` |
+| Compute | Hashes and encodings: SHA-256 of a text or an opened file; base64, hex and URL encoding both ways | live (own SHA-256, 8 Oct 2026) | Web Crypto is asynchronous, so the digest is computed in the tool |
+| Table | The open table as CSV, TSV or JSON, with copy and save | live (8 Oct 2026) | built in |
+| Table | Field compute over a table: true thickness of every intercept and apparent dip of every plane, the row's columns bound to the skill's arguments by name, constants filling the rest, unfillable rows listed | live (8 Oct 2026); two skills bound so far | `@gcu/bearing` |
 | Table | xlsx and Datamine .dm through the picker: converted to text per sheet by the vendored readers when opened (the reader is asynchronous, tools are not), kept on the device, a workbook with several sheets asks which; what did not carry over is said | `@gcu/sheet` and `@gcu/dm` vendored (8 Oct 2026); Parquet read the same way and written from the open table, YAML ↔ JSON within the strict subset, WKT ↔ GeoJSON and DXF → GeoJSON or WKT (11 Oct 2026); writing xlsx not yet (the writer is asynchronous) | `@gcu/parquet`, `@gcu/yaml`, `@gcu/wkt`, `@gcu/dxf` |
-| Compute | Explainers: cron schedules, epoch times, chmod modes, URLs, ECMAScript regular expressions | mock (own parsers, 8 Oct 2026); JWT waits for sensitive arguments, PCRE dialect not read | built in |
+| Compute | Explainers: cron schedules, epoch times, chmod modes, URLs, ECMAScript regular expressions | live (own parsers, 8 Oct 2026); JWT waits for sensitive arguments, PCRE dialect not read | built in |
 | Compute | Step-by-step algebra | planned | new package; nothing symbolic was found in the monorepo |
 | Field | True thickness from intercept, hole and plane | `@gcu/bearing` vendored | `@gcu/bearing` |
 | Field | Stereonet: planes, poles, lines | `@gcu/bearing` vendored (projection); own SVG | `@gcu/bearing`, `@gcu/stereonet` |
@@ -191,24 +191,24 @@ Status: **mock** = works in `src/` today; **planned** = named, not built.
 | Field | Compass capture from phone sensors | planned | lead-acid sensor route (does not exist yet) |
 | Field | Colour from camera to Munsell | planned | swatch (not found under `ext/`) |
 | Field | Kinematic slope check | planned | daylight / `@gcu/bearing` |
-| Table | Open, type and validate a table | mock (synthetic data) | `@gcu/recon`, `@gcu/sadpan`, `@gcu/sluice`, `@gcu/dm` |
+| Table | Open, type and validate a table | live (synthetic data) | `@gcu/recon`, `@gcu/sadpan`, `@gcu/sluice`, `@gcu/dm` |
 | Table | Histogram and summary | `@gcu/sadpan` vendored (statistics); own bars | `@gcu/sadpan`, `@gcu/plot` |
 | Table | Transform by example | planned | new package |
 | Table | Report paragraph from plan parameters | planned | templates; see [Open decisions](#14-open-decisions) on output English |
-| Knowledge | Record lookup, conversion, filter, rank | mock (14-row sample) | factbook pack, `@gcu/sift` |
-| Knowledge | Term definitions with reader hand-off | mock (locator only) | `@gcu/librarian`, `@gcu/reader-core` |
+| Knowledge | Record lookup, conversion, filter, rank | live (14-row sample) | factbook pack, `@gcu/sift` |
+| Knowledge | Term definitions with reader hand-off | live (locator only) | `@gcu/librarian`, `@gcu/reader-core` |
 | Knowledge | Geologic timescale: bounds, ranks, parents, neighbours, subdivisions, the unit at an age | built in (8 Oct 2026) from the ICS chart via Macrostrat, CC BY 4.0, 171 units | the first real records pack; the `golem` facet is this file |
-| Knowledge | Style check from a rule pack | mock | elements-of-style pack |
-| Knowledge | Search over the user's documents | mock (11 Oct 2026): Markdown, text and HTML from the picker kept on the device, cut into passages by heading and paragraph, indexed by librarian (rebuilt from the kept files, never stored), passages returned verbatim with the matched words marked; no folder indexing (needs the `tree` plugin's grant), no PDF, no documentation packs yet | `@gcu/librarian`, `@gcu/vfs` |
-| Device | Calendar event | mock (simulated hand-off) | lead-acid intent route |
-| Device | Timer, alarm | mock (simulated hand-off) | lead-acid intent route |
+| Knowledge | Style check from a rule pack | live | elements-of-style pack |
+| Knowledge | Search over the user's documents | live (11 Oct 2026): Markdown, text and HTML from the picker kept on the device, cut into passages by heading and paragraph, indexed by librarian (rebuilt from the kept files, never stored), passages returned verbatim with the matched words marked; no folder indexing (needs the `tree` plugin's grant), no PDF, no documentation packs yet | `@gcu/librarian`, `@gcu/vfs` |
+| Device | Calendar event | live (simulated hand-off) | lead-acid intent route |
+| Device | Timer, alarm | live (simulated hand-off) | lead-acid intent route |
 | Device | Map, dial, share | planned | lead-acid intent route; `share` exists today |
-| Session | Explain, amend, repeat, undo | mock | section 3 |
-| Session | Teach a word | mock | device lexicon |
-| Session | Notes: remember and recall | mock | glass later; a table now |
-| Session | Sessions, history, auto names | mock | section 8 |
-| Session | Recipes | mock (11 Oct 2026): a session's steps saved as card specs with the subjects that change (the table, columns), run again into a session of its own with every step re-read and the run stopped at the first step that does not read; batch over every kept table, one row each; recipes are device state | section 8 |
-| Session | Export the plan as a script | mock (illustrative API names) | `@gcu/adder` |
+| Session | Explain, amend, repeat, undo | live | section 3 |
+| Session | Teach a word | live | device lexicon |
+| Session | Notes: remember and recall | live | glass later; a table now |
+| Session | Sessions, history, auto names | live | section 8 |
+| Session | Recipes | live (11 Oct 2026): a session's steps saved as card specs with the subjects that change (the table, columns), run again into a session of its own with every step re-read and the run stopped at the first step that does not read; batch over every kept table, one row each; recipes are device state | section 8 |
+| Session | Export the plan as a script | live (illustrative API names) | `@gcu/adder` |
 
 Package names in the right-hand column were checked against `gentropic/auditable` `ext/*/package.json` at commit `09c4904`. Two things the design leans on were **not** found under `ext/` at that commit and need locating before they are relied on: the dispatch meta-intent package (`dispatch-meta`) and swatch. The clause grammar was folded into `ext/dispatch/src/grammar/` on 8 Oct 2026 (see `ext/dispatch/SPEC.md`, "The grammar rung").
 
@@ -247,19 +247,19 @@ The geologic timescale (ICS chart, attribution carried in the pack; accepted 8 O
 - **Opening** a session clears the working state and replays the specs in order.
 - **History search** is a substring match over `raw` across all sessions. A hit opens its session at that card. Target: `@gcu/librarian` for fuzzy and prefix matching.
 - **Device state** is separate from sessions: the taught lexicon and notes belong to the device and are shared by all sessions.
-- **Storage:** the mock uses `localStorage` under `golem.mock.v2`. Target: `@gcu/vfs` over OPFS or IndexedDB, one file per session, so sessions can be exported, shared as capsules, or synced.
+- **Storage:** `localStorage` under `golem.state.v2` (read once from the old key `golem.mock.v2`, then moved). Target: `@gcu/vfs` over OPFS or IndexedDB, one file per session, so sessions can be exported, shared as capsules, or synced.
 
 ### Auto-naming
 
 Computed from the plan, no model:
 
-1. Each card contributes `[label, weight]` from its tool and arguments (`tagOf()` in the mock).
+1. Each card contributes `[label, weight]` from its tool and arguments (`tagOf()`).
 2. Weights sum per label. A small recency term breaks ties.
 3. If the session touched a table, the name is `<table>: <top two table labels>`.
 4. Otherwise it is the top two labels joined with a comma, or the top one when two exceed 40 characters.
 5. The name updates as cards are added until the user names the session. Clearing the name returns it to automatic.
 
-Mock weights, to be tuned on real use:
+Starting weights, to be tuned on real use:
 
 | Weight | Tools |
 |---|---|
@@ -316,9 +316,9 @@ Default to the user-confirms route: the app then requests no dangerous permissio
 
 ---
 
-## 12. The mock today
+## 12. golem today
 
-`dist/golem.html` is a working mock: an app with a session sidebar and a centred conversation on wide screens, and the handset layout (drawer, stream, composer, tabs) on narrow ones. `npm test` drives it through 27 queries.
+`dist/golem.html` is a working prototype: an app with a session sidebar and a centred conversation on wide screens, and the handset layout (drawer, stream, composer, tabs) on narrow ones. `npm test` drives it through 27 queries.
 
 **Real, computed in the page:** unit conversion with dimension checks; arithmetic by recursive descent (no `eval`); dates; true thickness and the equal-area stereonet; histogram; the Strunk checker (15 patterns from rules 11 to 13 of the 1918 edition); every reading, amendment, taught word, note, session, name and replay.
 
@@ -352,7 +352,7 @@ Default to the user-confirms route: the app then requests no dangerous permissio
 
 ---
 
-## 13. Path from mock to app
+## 13. Path from prototype to app
 
 In order. Each step leaves something that runs.
 

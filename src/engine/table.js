@@ -77,7 +77,7 @@ export function colOf(word, table = S.table) {
 }
 const colNames = t => t.cols.map(c => c.name).join(', ');
 const shown = w => { const c = colOf(w, S.table || { cols: SAMPLE_COLS }); return c ? (c.analyte || c.name) : w; };
-const srcLine = t => t.source === 'sample' ? 'assays.csv · synthetic sample generated for this mock' : t.source === 'device' ? `the ${t.name} · ${t.rows.length} rows · a table on this device` : `${t.name}${t.sheet && t.from === 'xlsx' ? ' · sheet ' + t.sheet : ''} · ${t.rows.length} rows · ${t.from === 'xlsx' ? 'read by @gcu/sheet, ' : t.from === 'dm' ? 'read by @gcu/dm, ' : t.from === 'parquet' ? 'read by @gcu/parquet, ' : ''}typed by @gcu/recon`;
+const srcLine = t => t.source === 'sample' ? 'assays.csv · synthetic sample data, generated, not from a real deposit' : t.source === 'device' ? `the ${t.name} · ${t.rows.length} rows · a table on this device` : `${t.name}${t.sheet && t.from === 'xlsx' ? ' · sheet ' + t.sheet : ''} · ${t.rows.length} rows · ${t.from === 'xlsx' ? 'read by @gcu/sheet, ' : t.from === 'dm' ? 'read by @gcu/dm, ' : t.from === 'parquet' ? 'read by @gcu/parquet, ' : ''}typed by @gcu/recon`;
 
 /* ── statistics, weighted or not ───────────────────────────── */
 export function stats(v) {

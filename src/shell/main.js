@@ -11,7 +11,7 @@ import { shell } from '../vendor/leadacid.js';
 import { escHtml, pad, cardEl } from './render.js';
 
 const $ = id => document.getElementById(id);
-const KEY = 'golem.mock.v2', THEME = 'golem.theme', FOLD = 'golem.side';
+const KEY = 'golem.state.v2', OLD_KEY = 'golem.mock.v2', THEME = 'golem.theme', FOLD = 'golem.side';   // the old key is read once, then moved
 const narrow = () => window.matchMedia('(max-width: 860px)').matches;
 let awake = true, statusT;
 
@@ -66,15 +66,15 @@ function show(o) {
 
 /* ── catalog and packs ── */
 function renderSkills() {
-  const rows = skills(), live = rows.filter(s => s.live).length; let h = `<h1 class="vhead">Skills</h1><div class="sub">${live} skills run in this mock. ${rows.length - live} more are planned from packages that already exist or are named here. Tap an example to run it.</div>`, g = '';
+  const rows = skills(), live = rows.filter(s => s.live).length; let h = `<h1 class="vhead">Skills</h1><div class="sub">${live} skills run here. ${rows.length - live} more are planned from packages that already exist or are named here. Tap an example to run it.</div>`, g = '';
   rows.forEach(s => {
     if (s.group !== g) { h += `<div class="lbl">${escHtml(s.group)}</div>`; g = s.group; }
-    h += `<div class="item"><h3>${escHtml(s.title)} <span class="tag ${s.live ? 'live' : 'plan'}">${s.live ? 'in mock' : 'planned'}</span></h3><p>${escHtml(s.about)}</p><div class="from">${escHtml(s.on)}</div>${s.examples.length ? `<div class="opts">${s.examples.map(x => `<button class="chip" type="button" data-q="${escHtml(x)}" style="white-space:normal;text-align:left">${escHtml(x)}</button>`).join('')}</div>` : ''}</div>`;
+    h += `<div class="item"><h3>${escHtml(s.title)} <span class="tag ${s.live ? 'live' : 'plan'}">${s.live ? 'live' : 'planned'}</span></h3><p>${escHtml(s.about)}</p><div class="from">${escHtml(s.on)}</div>${s.examples.length ? `<div class="opts">${s.examples.map(x => `<button class="chip" type="button" data-q="${escHtml(x)}" style="white-space:normal;text-align:left">${escHtml(x)}</button>`).join('')}</div>` : ''}</div>`;
   });
   $('v-skills').innerHTML = h;
 }
 function renderPacks() {
-  const lab = { live: 'in mock', samp: 'sample in mock', plan: 'not wired' };
+  const lab = { live: 'installed', samp: 'sample', plan: 'not wired' };
   let h = '<h1 class="vhead">Packs and this device</h1><div class="sub">golem knows what its installed packs hold. These are the gcu-library entries plus packs worth adding.</div><div class="lbl">Library</div>';
   PACKS.forEach(([id, name, meta, st, d]) => { h += `<div class="item"><h3>${escHtml(name)} <span class="tag ${st}">${lab[st]}</span></h3><p>${escHtml(d)}</p><div class="from">${escHtml(id)} · ${escHtml(meta)}</div></div>`; });
   const al = Object.entries(S.aliases);
@@ -112,7 +112,13 @@ function commitName(inp) { ren = null; renameSession(+inp.dataset.id, inp.value)
 
 /* ── storage ── */
 function persist() { try { localStorage.setItem(KEY, JSON.stringify(serialize())); } catch (e) { /* storage is optional */ } }
-function restore() { try { return hydrate(JSON.parse(localStorage.getItem(KEY))); } catch (e) { return false; } }
+function restore() {
+  try {
+    let raw = localStorage.getItem(KEY);
+    if (raw == null && (raw = localStorage.getItem(OLD_KEY)) != null) { localStorage.setItem(KEY, raw); localStorage.removeItem(OLD_KEY); }
+    return hydrate(JSON.parse(raw));
+  } catch (e) { return false; }
+}
 onChange(() => { renderBar(); persist(); if (!$('hq').value.trim() && ren == null) renderDrawer(); });
 
 /* ── theme: auto follows the system; a choice is kept on this device ── */

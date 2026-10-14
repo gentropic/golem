@@ -9,7 +9,7 @@ export const FB = [['Australia', 'Canberra', 7741220, 26.8e6, 0], ['Brazil', 'Br
   ['Kazakhstan', 'Astana', 2724900, 20.3e6, 1], ['Mongolia', 'Ulaanbaatar', 1564116, 3.3e6, 1], ['Peru', 'Lima', 1285216, 32.6e6, 0], ['Portugal', 'Lisbon', 92090, 10.2e6, 0],
   ['South Africa', 'Pretoria', 1219090, 60.4e6, 0], ['Zambia', 'Lusaka', 752618, 20.8e6, 1]];
 export const fbFind = n => FB.find(r => r[0].toLowerCase() === n.trim().toLowerCase().replace(/^the /, ''));
-const FBSRC = { t: 'src', text: 'factbook pack · 14-country rounded sample in this mock' };
+const FBSRC = { t: 'src', text: 'factbook pack · a rounded 14-country sample, not the full pack' };
 const FIELDS = ['capital', 'population', 'area', 'density'];
 tool({
   name: 'fact',
@@ -57,7 +57,7 @@ tool({
     const t = a.term.replace(/s$/, ''), k = ODS[t] ? t : ODSA[t];
     if (k) return {
       read: ['find the definition of', { v: k }],
-      body: [{ t: 'big', v: `Open Data Structures, ch. ${ODS[k][0]}`, size: 17 }, { t: 'sub', text: `Defined in §${ODS[k][1]}.` }, { t: 'note', text: 'The app shows the defining passage here and opens the reader at that section. This mock carries only the locator.' },
+      body: [{ t: 'big', v: `Open Data Structures, ch. ${ODS[k][0]}`, size: 17 }, { t: 'sub', text: `Defined in §${ODS[k][1]}.` }, { t: 'note', text: 'With the ods pack installed, the defining passage shows here. This build carries only the locator.' },
         { t: 'actions', items: [{ href: 'https://gentropic.github.io/gcu-library/read.html?book=ods', label: 'Open in the library reader' }] }, { t: 'src', text: 'ods pack · CC BY 2.5 · Pat Morin · sample term index' }],
       trace: [`index.lookup("${k}") across installed packs`, 'hit: ods, glossary facet'], py: `library.define("${k}")`
     };

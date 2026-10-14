@@ -2,7 +2,7 @@
   "name": "golem",
   "version": "0.0.1",
   "private": true,
-  "description": "golem: an assistant with no model at runtime. Interactive mock and spec.",
+  "description": "golem: an assistant with no model at runtime. A working prototype and its spec.",
   "type": "module",
   "license": "MIT",
   "scripts": {

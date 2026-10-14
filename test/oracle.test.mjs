@@ -1,6 +1,6 @@
 // Oracle tests: golem's own arithmetic against the GCU packages it does not vendor yet, imported from
 // the sibling clone of gentropic/auditable when it is there (skipped otherwise). SPEC.md section 13
-// step 5 says to check each mock result against the package result before deleting mock code; this is
+// step 5 says to check each of golem's own results against the package result before deleting golem's code; this is
 // that check. bearing, sadpan and units passed it and are vendored now (units since 14 Oct 2026: golem's conversion
 // factors are the package's; this test holds the vendored copy to the sibling's source).
 import { test } from 'node:test';

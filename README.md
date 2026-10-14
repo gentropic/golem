@@ -2,10 +2,10 @@
 
 An assistant with no model at runtime. You type a request; golem shows what it read, computes the answer with a tool, and keeps the plan. When it cannot read a request it says so.
 
-This repository holds the specification and a working mock.
+This repository holds the specification and a working prototype.
 
-- **[SPEC.md](SPEC.md)** is the design: principles, the reading ladder, contracts, skills, packs, sessions, Android hand-offs, what the mock does and does not do, and the open decisions.
-- **`dist/golem.html`** is the mock. Open it in a browser; it needs no server and no install.
+- **[SPEC.md](SPEC.md)** is the design: principles, the reading ladder, contracts, skills, packs, sessions, Android hand-offs, what golem does today and does not do, and the open decisions.
+- **`dist/golem.html`** is golem. Open it in a browser; it needs no server and no install.
 
 ## Try it
 
@@ -113,12 +113,12 @@ test/interchange.test.mjs    YAML and JSON both ways, the strict-subset refusal,
 test/places.test.mjs         Vincenty against the Geoscience Australia test line, UTM round trips and the meridian arc, sun and moon
 test/oracle.test.mjs         golem's arithmetic against the GCU packages it does not vendor
 test/smoke.mjs               browser smoke test on the built file
-dist/golem.html              the built mock (committed, so it opens without a build)
+dist/golem.html              the built app (committed, so it opens without a build)
 ```
 
 ## Status
 
-A mock. The engine is real but small, the data is sample data, and the Android hand-offs are simulated. SPEC.md section 12 has the full list, and section 13 the path to an app.
+A working prototype. The reading and the tools are real; the packs are small samples, the table is synthetic sample data, and the Android hand-offs are simulated. SPEC.md section 12 has the full list, and section 13 the path to an app.
 
 ## Licence
 
