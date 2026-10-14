@@ -11409,8 +11409,8 @@ frame({
   theme: ['text'], required: [],
   roles: { on: { preps: ['on', 'for'], types: ['date', 'holiday'] }, at: { preps: ['at'], types: ['clock'] }, for: { preps: ['for'], types: ['quantity:time'] }, to: { preps: ['to'], types: ['text'] } },   // to: "remind me on friday at 9 to send the samples"
   words_pt: ['me lembra de', 'me lembre de', 'me lembra', 'agenda', 'agende', 'marca', 'marque', 'novo evento'], label_pt: 'Evento',
-  bind: c => {
-    const title = (c.theme[0] || (c.roles.to || [])[0] || {}).value, on = c.roles.on && c.roles.on[0], at = c.roles.at && c.roles.at[0], du = c.roles.for && c.roles.for[0];
+  bind: c => {   // "schedule a core shed visit": the event is "Core shed visit"
+    const title = ((c.theme[0] || (c.roles.to || [])[0] || {}).value || '').replace(/^(?:a|an|the)\s+/i, ''), on = c.roles.on && c.roles.on[0], at = c.roles.at && c.roles.at[0], du = c.roles.for && c.roles.for[0];
     if (!title) return null;
     if (!on && !at) return { clarify: 'when? Say "on friday", "tomorrow" or "at 9"' };
     const d = on ? findDate(dateWords(on)) : null; if (on && !d) return null;
