@@ -116,6 +116,7 @@ const PLANE_T = ['plane', 'orientation'];
 noun({ type: 'appdip', words: { apparent: ['apparent dip'] }, words_pt: { apparent: ['mergulho aparente'] } });
 noun({ type: 'section', words: { section: ['section', 'cross section', 'cross-section', 'profile'] }, words_pt: { section: ['seção', 'secao', 'perfil'] } });
 for (const prep of ['', 'at', 'along']) postmod({ prep, heads: ['section'], attr: 'az', quantity: true });   // "a section at 045"
+qmod({ head: 'section', attr: 'az', dims: ['bare', 'angle'] });                                                   // "a 045 section"
 noun({ type: 'intersection', words: { intersection: ['intersection', 'line of intersection', 'intersection line'] }, words_pt: { intersection: ['interseção', 'intersecao', 'linha de interseção'] } });
 noun({ type: 'rake', words: { rake: ['rake', 'pitch'] }, words_pt: { rake: ['rake', 'caimento'] } });
 postmod({ prep: '', heads: ['rake'], attr: 'angle', quantity: true });            // "rake 30"
@@ -127,10 +128,10 @@ const ori2 = n => oriOf(n);
 // "apparent dip of 000/30 on a section at 045"
 frame({
   name: 'apparent', label: 'Apparent dip', words: ['calculate', 'compute'], elidable: true, theme: ['appdip'], required: ['theme', 'of', 'on'],
-  roles: { of: { preps: ['of', 'for'], types: PLANE_T }, on: { preps: ['on', 'along', 'in', 'for'], types: ['section'] }, where: { preps: ['where'], types: ['text'] } }, label_pt: 'Mergulho aparente',
+  roles: { of: { preps: ['of', 'for'], types: PLANE_T }, on: { preps: ['on', 'along', 'in', 'for'], types: ['section'] }, where: { preps: ['where'], types: ['cond'] } }, label_pt: 'Mergulho aparente',
   bind: c => {
     const p = c.roles.of[0], az = c.roles.on[0].attrs && c.roles.on[0].attrs.az; if (!az) return null;
-    if (p.all) return { tool: 'apply', args: { skill: 'apparent', az: az.n, ...(c.roles.where ? { where: c.roles.where[0].value } : {}) } };   // every plane of the open table
+    if (p.all) return { tool: 'apply', args: { skill: 'apparent', az: az.n, ...(c.roles.where ? { where: c.roles.where[0].cond } : {}) } };   // every plane of the open table
     const o = ori2(p); return o ? { tool: 'apparent', args: { a1: o[0], a2: o[1], conv: 'dd', az: az.n } } : null;
   }
 });
@@ -144,6 +145,11 @@ frame({
 frame({
   name: 'intersect', label: 'Intersection', words: ['where do', 'find the'], elidable: true, theme: ['intersection'], required: ['theme', 'of'], roles: { of: { preps: ['of', 'between'], types: PLANE_T } }, label_pt: 'Interseção',
   bind: c => { const [a, b] = c.roles.of.map(ori2); return c.roles.of.length === 2 && a && b ? { tool: 'intersect', args: { a, b, conv: 'dd' } } : null; }
+});
+// "where do 090/45 and 270/45 intersect", "do 090/45 and 270/45 meet": the planes are the theme, the verb comes last
+frame({
+  name: 'intersectv', label: 'Intersection', words: ['intersect', 'meet', 'cross'], theme: PLANE_T, required: ['theme'], roles: {}, words_pt: ['se cruzam', 'se intersectam'], label_pt: 'Interseção',
+  bind: c => { const [a, b] = c.theme.map(ori2); return c.theme.length === 2 && a && b ? { tool: 'intersect', args: { a, b, conv: 'dd' } } : null; }
 });
 // "line at rake 90 on 150/40", "rake 30 on 120/50", "rake of 150/40 on 150/40"
 frame({

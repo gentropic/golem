@@ -2,7 +2,7 @@
 // columns bound to the skill's arguments through their names, constants filling what no column holds.
 // Rows a binding cannot fill are listed, not skipped silently.
 import { S, tool, fmt, rad, deg, p3, p2 } from './core.js';
-import { whereToSift } from './table.js';
+import { whereOf } from './table.js';
 import { evaluatePredicate, predicateToString } from '../vendor/sift.js';
 import { conversions, vec3 } from '../vendor/bearing.js';
 
@@ -20,7 +20,7 @@ tool({
     const refuse = (text, why) => ({ read, body: [{ t: 'note', kind: 'err', text }, { t: 'src', text: `${T.name} · ${T.rows.length} rows` }], trace: [why] });
     let rows = T.rows.map((r, i) => ({ r, i: i + 1 })), whereText = null;
     if (a.hole) { if (!R.hole) return refuse(`${T.name} has no hole column, so "in ${a.hole}" has nothing to match.`, 'no hole column'); rows = rows.filter(x => String(x.r[R.hole]).toLowerCase() === a.hole.toLowerCase()); if (!rows.length) return refuse(`No rows for hole ${a.hole}.`, 'hole: no rows'); }
-    if (a.where) { let p; try { p = whereToSift(a.where, T); } catch (e) { return refuse(e.message, 'where: rejected'); } rows = rows.filter(x => evaluatePredicate(p.pred, k => x.r[k])); whereText = predicateToString(p.pred); }
+    if (a.where) { let p; try { p = whereOf(a.where, T); } catch (e) { return refuse(e.message, 'where: rejected'); } rows = rows.filter(x => evaluatePredicate(p.pred, k => x.r[k])); whereText = predicateToString(p.pred); }
     const binding = [], need = [];
     const planeDD = colNamed(T, PLANE_DD), planeDip = colNamed(T, PLANE_DIP), holeAz = colNamed(T, HOLE_AZ), holeDip = colNamed(T, HOLE_DIP) || (!planeDD ? colNamed(T, PLANE_DIP) : null);
     let getPlane, getHole, getLen;
@@ -57,6 +57,6 @@ tool({
       ...(unfilled.length ? [{ t: 'note', text: `Not filled, left out of the total: ${unfilled.slice(0, 12).join('; ')}${unfilled.length > 12 ? ` and ${unfilled.length - 12} more` : ''}.` }] : []),
       { t: 'src', text: `${T.name} · @gcu/bearing (vendored) on each row · sift for the filter` }
     ];
-    return { read: [...read, ...(a.constText ? ['with', { v: a.constText }] : []), ...(a.skill === 'apparent' ? ['on a section at', { v: p3(a.az) }] : [])], value: a.skill === 'thickness' ? total : total / out.length, body, trace: [`select ${rows.length} rows${a.hole ? ' in ' + a.hole : ''}${whereText ? ' where ' + whereText : ''}`, `bind: ${binding.join('; ')}`, `${a.skill} on each row → ${out.length} values, ${unfilled.length} unfilled`], py: `table.apply(dh, skill="${a.skill}", binding=${JSON.stringify(binding)}${a.where ? `, where=${JSON.stringify(a.where)}` : ''})` };
+    return { read: [...read, ...(a.constText ? ['with', { v: a.constText }] : []), ...(a.skill === 'apparent' ? ['on a section at', { v: p3(a.az) }] : [])], value: a.skill === 'thickness' ? total : total / out.length, body, trace: [`select ${rows.length} rows${a.hole ? ' in ' + a.hole : ''}${whereText ? ' where ' + whereText : ''}`, `bind: ${binding.join('; ')}`, `${a.skill} on each row → ${out.length} values, ${unfilled.length} unfilled`], py: `table.apply(dh, skill="${a.skill}", binding=${JSON.stringify(binding)}${whereText ? `, where=${JSON.stringify(whereText)}` : ''})` };
   }
 });

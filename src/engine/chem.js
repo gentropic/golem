@@ -135,8 +135,13 @@ frame({
 // "how much cu in CuFeS2", "what fraction of fe is in fe2o3"
 frame({
   name: 'chemfrac', label: 'Fraction', words: ['how much', 'what fraction of', 'fraction of', 'percent of', '% of', 'how much of'], theme: ['element'], required: ['theme', 'in'],
-  roles: { in: { preps: ['in', 'of'], types: ['formula', 'text'] } }, words_pt: ['quanto', 'quanto de', 'fração de'], label_pt: 'Fração',   // text: a mineral name reaches the tool, which says where minerals live
-  bind: c => ({ tool: 'chem', args: { ask: 'fraction', element: c.theme[0].value.toLowerCase(), formula: c.roles.in[0].value } })
+  // "how much fe is in 45.2% fe2o3": a grade of the formula, so the element's share of it (the conversion factor)
+  roles: { in: { preps: ['in', 'of'], types: ['formula', 'text', 'quantity:*'] }, as: { preps: [''], types: ['formula'] } }, words_pt: ['quanto', 'quanto de', 'fração de'], label_pt: 'Fração',   // text: a mineral name reaches the tool, which says where minerals live
+  bind: c => {
+    const q = c.roles.in.find(n => n.type === 'quantity'), f = [...c.roles.in, ...(c.roles.as || [])].filter(n => n.type !== 'quantity');
+    if (q) return f.length === 1 && f[0].type === 'formula' ? { tool: 'chem', args: { ask: 'factor', value: q.n, unit: q.unit, from: f[0].value, to: c.theme[0].value } } : null;
+    return c.roles.as || c.roles.in.length !== 1 ? null : { tool: 'chem', args: { ask: 'fraction', element: c.theme[0].value.toLowerCase(), formula: c.roles.in[0].value } };
+  }
 });
 // "convert 45.2% fe2o3 to fe", "fe to fe2o3", "factor from cu to cuo", "fe to oxide"
 frame({

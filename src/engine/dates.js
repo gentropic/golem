@@ -89,5 +89,5 @@ const onDate = (name, words, words_pt, label) => frame({
 onDate('daysUntil', ['days until', 'days till', 'days to', 'days before', 'days left until', 'how many days until', 'how many days till', 'how many days to', 'how many days are left until', 'how many days left until', 'countdown to'],
   ['dias até', 'dias ate', 'quantos dias até', 'quantos dias ate', 'quantos dias faltam para', 'quantos dias faltam até'], 'Days until');
 onDate('whenIs', ['when is', 'when was', 'when will be', 'when does', 'when falls', 'what date is', 'what date was'], ['quando é', 'quando e', 'quando foi', 'quando cai', 'que data é'], 'When is');
-onDate('weekday', ['what day is', 'what day was', 'what day will be', 'what weekday is', 'what weekday was', 'what day of the week is', 'what day of the week was', 'which day is', 'what day does'],
+onDate('weekday', ['what day is', 'what day was', 'what day will be', 'what weekday is', 'what weekday was', 'what day of the week is', 'what day of the week was', 'which day is', 'what day does', 'what day', 'what weekday', 'which day'],
   ['que dia é', 'que dia e', 'que dia foi', 'que dia da semana é', 'que dia cai', 'em que dia cai'], 'Weekday');

@@ -1,7 +1,7 @@
 // ⚠ VENDORED — DO NOT EDIT. @gcu/dispatch, built from ../auditable/ext/dispatch/src/ by its own build.
 // Source of truth: gentropic/auditable ext/dispatch (local clone: ../auditable). Re-vendor by copying
 // ext/dispatch/index.js here after 'node ext/dispatch/build.js'. golem uses the grammar rung only:
-// createEngine, makeSession, ENGLISH, PORTUGUESE. At auditable a15480d8.
+// createEngine, makeSession, ENGLISH, PORTUGUESE. At auditable 25d300d5.
 
 // ⚠ GENERATED FILE — DO NOT EDIT. Source: src/  Build: @gcu/build src/main.js
 // @gcu/dispatch — Session-trained natural-language → tool-call dispatch: a Snips-shaped resolver (averaged-perceptron intent + CRF-class slot tagger + gazetteers + deterministic per-kind assemblers) that trains IN THE BROWSER from the host session's own vocabulary in under a second. Tools are declarative (ten kinds) and a grammar rung (clause: case-grammar frames over an Earley chart with costed repairs, en + pt-BR) reads controlled commands before the learners see them; no shipped model, no network, explainable per decision — refusals return empty calls so the host degrades into its command palette. Born from an incubator where this beat a 26M finetuned transformer 50/52 to 3/24 on a frozen yardstick.
@@ -1019,6 +1019,19 @@ function buildGrammar(X) {
   rule('Cmd', 'AGAIN BUT Theme PPs', (_, __, t, a) => ({ kind: 'again', args: [...t, ...a] }));
   rule('Cmd', 'AGAIN COMMA BUT Theme PPs', (_, __, ___, t, a) => ({ kind: 'again', args: [...t, ...a] }));
 
+  // question shapes around a verb: a copula after the thing ("how much fe is in 45.2% fe2o3"), "are there" ("how many
+  // working days are there between …"), do-support with the verb last ("where do 090/45 and 270/45 intersect"), and a
+  // verb said last, as a noun ("fe to fe2o3 factor")
+  rule('Cmd', 'VERB NPList COP PPs', (v, l, _, a) => a.length ? { kind: 'cmd', verb: v.verb, args: [{ kind: 'np', list: l }, ...a] } : null);
+  rule('Cmd', 'VERB NPList COP', (v, l) => ({ kind: 'cmd', verb: v.verb, args: [{ kind: 'np', list: l }] }));   // the copula last: "what day 15 nov 2027 is"
+  // what is asked for first, then the copula and the thing: "how many g/t is 0.35 oz per short ton" — the first thing is placed by its type
+  rule('Cmd', 'VERB NP COP NPList PPs', (v, n, _, l, a) => ({ kind: 'cmd', verb: v.verb, args: [{ kind: 'np', list: l }, ...a, { kind: 'pp', prep: '', canon: [''], val: [n], topic: true }] }));
+  if (X.exist) rule('Cmd', 'VERB Theme EXIST PPs', (v, t, _, a) => ({ kind: 'cmd', verb: v.verb, args: [...t, ...a] }));
+  if (X.doq) rule('Cmd', 'DOQ NPList PPs VERB PPs', (_, l, a, v, b) => ({ kind: 'cmd', verb: v.verb, args: [{ kind: 'np', list: l }, ...a, ...b] }));   // "what does 1 m of nq core weigh at 2.7"
+  rule('Cmd', 'NPList PPs VERB', (l, a, v) => ({ kind: 'cmd', verb: v.verb, args: [{ kind: 'np', list: l }, ...a] }));
+  // an argument said first, before a comma: "on a 14 on 14 off roster, am i off on 25 dec". The binder places it by its
+  // preposition, or, when the preposition names no role that takes it, as one of the things the command is about
+  rule('Cmd', 'PP COMMA Cmd', (p, _, c) => c.kind === 'cmd' ? { ...c, args: [...c.args, { ...p, topic: true }] } : null);
   if (X.subject) rule('Cmd', 'NP VERB Theme PPs', (n, v, t, a) => ({ kind: 'cmd', verb: v.verb, args: [...t, { kind: 'pp', prep: '', canon: ['subject'], val: [n] }, ...a] }));   // "pop means population": only frames that declare a subject
   rule('Cmd', 'VERB PPs LATE NPList', (v, a, _, l) => ({ kind: 'cmd', verb: v.verb, args: [{ kind: 'np', list: l }, ...a] }));   // object after the PPs — a repair, never free
   rule('Cmd', 'LATE PP PPs VERB Theme PPs', (_, p, a, v, t, b) => ({ kind: 'cmd', verb: v.verb, args: [...t, p, ...a, ...b] }));   // arguments before the verb — also a repair
@@ -1030,6 +1043,7 @@ function buildGrammar(X) {
   rule('Theme', 'NPList', l => [{ kind: 'np', list: l }]);
   rule('PPs', '', () => []);
   rule('PPs', 'PP PPs', (a, r) => [a, ...r]);
+  rule('PPs', 'COMMA PP PPs', (_, a, r) => [a, ...r]);   // arguments set off by commas: "landlocked countries, sorted by population"
 
   rule('PP', 'PREP NPList', (p, l) => ({ kind: 'pp', prep: p.word, canon: p.canon, val: l }));
   rule('PP', 'COLON NPList', (_, l) => ({ kind: 'pp', prep: ':', canon: [':'], val: l }));   // "check: …", a payload after a line break
@@ -1063,6 +1077,16 @@ function buildGrammar(X) {
     for (const m of pm) { const r = X.postmod(n, m); if (!r) return null; Object.assign(n, r); }
     return n;
   });
+  // a shaped value before its noun: "a 000/30 plane", "a 14 on 14 off roster" — the value names the thing, or modifies it
+  // the way it would after it ("plane 000/30")
+  const litHead = (t, h, pm) => {
+    let n = h.type === t.type && h.generic ? { ...h, value: t.value, generic: false } : null;
+    if (!n) { const r = X.postmod(h, { prep: '', np: { type: t.type, value: t.value } }); if (!r) return null; n = { ...h, ...r, generic: false }; }
+    for (const m of pm) { const r = X.postmod(n, m); if (!r) return null; Object.assign(n, r); }
+    return n;
+  };
+  rule('NP', 'LIT Head PostMods', litHead);
+  rule('NP', 'DET LIT Head PostMods', (_, t, h, pm) => litHead(t, h, pm));
   rule('NP', 'Date', d => d);
   rule('NP', 'Clock', c => c);
   rule('NP', 'DET Quantity Head', (_, q, h) => X.qmod(q, h));
@@ -1089,7 +1113,7 @@ function buildGrammar(X) {
       continue;
     }
     if (X.postmodQuantity.has(p)) { rule('PostMod', `PREP:${p} Quantity`, (_, q) => ({ prep: p, q })); rule('PostMod', `COP PREP:${p} Quantity`, (_, __, q) => ({ prep: p, q })); }   // "cu above 1", "cu is above 1"
-    else rule('PostMod', `PREP:${p} NP`, (_, n) => ({ prep: p, np: n }));
+    if (X.postmodThing.has(p)) rule('PostMod', `PREP:${p} NP`, (_, n) => ({ prep: p, np: n }));   // "a section at 045" and "a hole at 270/60" both
   }
   rule('PostMod', 'PREP:of Quantity', (_, q) => ({ prep: 'of', q, qmod: true }));   // "a search of 200 m" / "busca de 200 m"
   // relative clause: "the variogram (that) I fitted yesterday", "the run we did last week", "the variogram fitted this morning"
@@ -1140,11 +1164,57 @@ function buildGrammar(X) {
   rule('Clock', 'CLOCK', c => clock(c.h, c.mi, hhmm(c.h, c.mi)));
   rule('Clock', 'NUM AMPM', (n, a) => { if (!Number.isInteger(n.n) || n.n < 1 || n.n > 12) return null; const pm = /^p/.test(a.word), am = /^a/.test(a.word);
     const h = pm && n.n < 12 ? n.n + 12 : am && n.n === 12 ? 0 : n.n; return clock(h, 0, hhmm(h, 0)); });
+  rule('Clock', 'CLOCK AMPM', (c, a) => { if (c.h < 1 || c.h > 12) return null; const pm = /^p/.test(a.word), am = /^a/.test(a.word);   // "2:30 pm"
+    const h = pm && c.h < 12 ? c.h + 12 : am && c.h === 12 ? 0 : c.h; return clock(h, c.mi, hhmm(h, c.mi)); });
   rule('Clock', 'NUM', n => Number.isInteger(n.n) && n.n >= 0 && n.n <= 24 ? clock(n.n, 0, hhmm(n.n, 0)) : null);
 
   rule('Quantity', 'NUM', t => ({ type: 'quantity', n: t.n, unit: null, dim: 'bare' }));
   rule('Quantity', 'NUM UNIT', (t, u) => ({ type: 'quantity', n: t.n, unit: u.unit, dim: u.dim }));
+  // a fraction said after the whole: "an hour and a half", "one and a half hours", "2 km and a quarter" (never a list)
+  rule('Quantity', `Quantity CONJ:${X.and} FRAC`, (q, _, f) => q.unit ? { ...q, n: q.n + f.n } : null);
+  rule('Quantity', `NUM CONJ:${X.and} FRAC UNIT`, (t, _, f, u) => ({ type: 'quantity', n: t.n + f.n, unit: u.unit, dim: u.dim }));
   rule('Quantity', 'DET UNIT', (d, u) => X.indefinite.includes(d.word) ? { type: 'quantity', n: 1, unit: u.unit, dim: u.dim } : null);   // "an hour", "um minuto"
+  // conditions on rows, for roles of type 'cond': "cu > 0.5 and lith is BRX", "au between 1 and 2", "lith in BRX, GRD",
+  // "cu is not blank", "not au above 1". A condition is one thing; "and" binds tighter than "or". The columns it may
+  // name are the ontology's (conditions.subjects); a value is a number, a name, a shape, or a word nobody declared
+  // ("lith is granite"), which the host matches against its data.
+  if (X.cond) {
+    const leafC = (c, op, v) => ({ col: { type: c.type, value: c.value ?? c.name ?? null }, op, ...(Array.isArray(v) ? { vals: v } : v === undefined ? {} : { val: v }) });
+    const node = c => ({ type: 'cond', value: X.condText(c), cond: c, generic: false, attrs: {} });
+    rule('Cond', 'CAnd', a => a);
+    rule('Cond', `Cond CONJ:${X.or} CAnd`, (a, _, b) => ({ or: [...(a.or ?? [a]), b] }));
+    rule('CAnd', 'CAtom', a => a);
+    rule('CAnd', `CAnd CONJ:${X.and} CAtom`, (a, _, b) => ({ and: [...(a.and ?? [a]), b] }));
+    rule('CAtom', 'NOT CAtom', (_, a) => ({ not: a }));
+    for (const op of ['above', 'below', 'atleast', 'atmost', 'equals']) {
+      rule('CAtom', `CCol PREP:${op} CVal`, (c, _, v) => leafC(c, op, v));
+      rule('CAtom', `CCol COP PREP:${op} CVal`, (c, _, __, v) => leafC(c, op, v));
+      rule('CAtom', `CCol NOT PREP:${op} CVal`, (c, _, __, v) => ({ not: leafC(c, op, v) }));
+    }
+    rule('CAtom', 'CCol COP CVal', (c, _, v) => leafC(c, 'equals', v));
+    rule('CAtom', 'CCol NOT CVal', (c, _, v) => leafC(c, 'differs', v));
+    rule('CAtom', 'CCol COP NOT CVal', (c, _, __, v) => leafC(c, 'differs', v));
+    rule('CAtom', 'CCol CVal', (c, v) => v.n == null ? leafC(c, 'equals', v) : null);   // "lith BRX": a name, never a bare number
+    rule('CAtom', `CCol PREP:between CVal CONJ:${X.and} CVal`, (c, _, a, __, b) => a.n != null && b.n != null ? leafC(c, 'between', [a, b]) : null);
+    rule('CAtom', `CCol COP PREP:between CVal CONJ:${X.and} CVal`, (c, _, __, a, ___, b) => a.n != null && b.n != null ? leafC(c, 'between', [a, b]) : null);
+    rule('CAtom', 'CCol PREP:in CVals', (c, _, vs) => leafC(c, 'in', vs));
+    rule('CAtom', 'CCol COP PREP:in CVals', (c, _, __, vs) => leafC(c, 'in', vs));
+    rule('CAtom', 'CCol COP BLANK', c => leafC(c, 'blank'));
+    rule('CAtom', 'CCol NOT BLANK', c => leafC(c, 'present'));
+    rule('CAtom', 'CCol COP NOT BLANK', c => leafC(c, 'present'));
+    rule('CCol', 'Head', h => X.cond.subjects.includes(h.type) && !h.generic ? h : null);
+    rule('CCol', 'DET Head', (_, h) => X.cond.subjects.includes(h.type) && !h.generic ? h : null);
+    rule('CVal', 'Quantity', q => ({ n: q.n, ...(q.unit ? { unit: q.unit } : {}) }));
+    rule('CVal', 'NOUN', t => ({ s: t.value ?? t.word }));
+    rule('CVal', 'IDENT', t => ({ s: t.name }));
+    rule('CVal', 'LIT', t => ({ s: t.value }));
+    rule('CVal', 'UNK', t => ({ s: t.word }));
+    rule('CVals', 'CVal', v => [v]);
+    rule('CVals', 'CVal COMMA CVals', (v, _, r) => [v, ...r]);
+    rule('CVals', 'CVal CONJ CVals', (v, _, r) => [v, ...r]);
+    rule('PP', 'PREP Cond', (p, c) => ({ kind: 'pp', prep: p.word, canon: p.canon, val: [node(c)] }));
+    for (const p of X.condPostPreps) rule('PostMod', `PREP:${p} Cond`, (_, c) => ({ prep: p, np: node(c) }));   // "samples with au above 0.1"
+  }
   return R;
 }
 
@@ -1159,16 +1229,21 @@ const ENGLISH = {
   code: 'en', headFirst: false,
   DET: 'the|a|an|this|that|my|our', REF: 'last|previous|latest|current|first|new',
   QUANT: 'all|every|each', EXCEPT: 'except|excluding|minus', CONJ: 'and|or|plus', COMMA: ',',
-  PREP: 'with|using|by|per|in|on|for|from|to|at|as|above|below|over|under|of|into|without|against|where|until|till|after|before|since|between|across|through|during|within|around|near|grouped by|weighted by|sorted by|ordered by|having|that have|which have|that has|which has|have|has|>|<|>=|<=|=|≥|≤|greater than|more than|less than|at least|at most|equal to|equals',
+  PREP: 'with the highest|with the largest|with the most|with the lowest|with the smallest|with the least|by highest|by lowest|starting|starting on|starting from|beginning|beginning on|with|using|by|per|in|on|for|from|to|at|as|above|below|over|under|of|into|without|against|where|until|till|after|before|since|between|across|through|during|within|around|near|grouped by|weighted by|sorted by|ordered by|having|that have|which have|that has|which has|have|has|>|<|>=|<=|=|≥|≤|greater than|more than|less than|at least|at most|equal to|equals',
   THEN: 'then|afterwards|next', BUT: 'but', PRON: 'it|them|those', AGAIN: 'again|rerun|redo|repeat|same',
   QWORD: 'why|how|what|when|who|is|are|does|do|should|can|could|would',
   // closed questions the grammar reads as commands with the verb left out: a wh-word, a copula, the fused forms
   DEMO: 'this|these|it|that|them|the following|the following text|the text|the two|both',   // before a colon: "summarise this: …"
+  // do-support questions, the verb last ("where do … intersect", "what does … weigh"); "are there"; negation and blanks in conditions
+  DOQ: 'where do|where does|what do|what does|how much does|how much do|how many do|when do|when does|how do|how does|do|does', EXIST: 'are there|is there|were there|was there|will there be|there are|there is',
+  OR: 'or', NOT: "not|isn't|aren't|is not|are not", BLANK: 'blank|empty|null|missing|nan',
   WH: 'what|which', COP: 'is|are|was|were', WHCOP: "what is|what's|whats|what are|which is|which are|how much is|how many are",
-  TRAIL: 'please|thanks|thank you|pls|plz|cheers|for me|for us',   // politeness that closes a sentence, trimmed from the end of a free text
-  FILLER: "please|now|just|kindly|go|ahead|me|us|hey|hi|hello|yo|thanks|thank you|cheers|pls|plz|so|um|uh|er|erm|hmm|well|oh|alright|can you|could you|would you|will you|i want you to|i need you to|i want to|i need|i'd like|i would like|give me|tell me|for me|let us|lets",
+  TRAIL: 'right now|please|thanks|thank you|pls|plz|cheers|for me|for us',   // politeness that closes a sentence, trimmed from the end of a free text
+  FILLER: "right now|please|now|just|kindly|go|ahead|me|us|hey|hi|hello|yo|thanks|thank you|cheers|pls|plz|so|um|uh|er|erm|hmm|well|oh|alright|can you|could you|would you|will you|i want you to|i need you to|i want to|i need|i'd like|i would like|give me|tell me|for me|let us|lets",
   // identity for every English preposition except the comparisons, which share a canon with their words
-  preps: { '>': ['above'], 'greater than': ['above'], 'more than': ['above'], '<': ['below'], 'less than': ['below'], '>=': ['atleast'], '≥': ['atleast'], 'at least': ['atleast'],
+  preps: { over: ['over', 'above'], under: ['under', 'below'], starting: ['from'], 'starting on': ['from'], 'starting from': ['from'], beginning: ['from'], 'beginning on': ['from'],
+    'with the highest': ['highest'], 'with the largest': ['highest'], 'with the most': ['highest'], 'by highest': ['highest'], 'with the lowest': ['lowest'], 'with the smallest': ['lowest'], 'with the least': ['lowest'], 'by lowest': ['lowest'],
+    '>': ['above'], 'greater than': ['above'], 'more than': ['above'], '<': ['below'], 'less than': ['below'], '>=': ['atleast'], '≥': ['atleast'], 'at least': ['atleast'],
     '<=': ['atmost'], '≤': ['atmost'], 'at most': ['atmost'], '=': ['equals'], 'equal to': ['equals'], equals: ['equals'],
     'grouped by': ['by'], 'weighted by': ['weighted'], 'sorted by': ['sort'], 'ordered by': ['sort'],
     having: ['where'], 'that have': ['where'], 'which have': ['where'], 'that has': ['where'], 'which has': ['where'], have: ['where'], has: ['where'] },
@@ -1181,7 +1256,8 @@ const ENGLISH = {
   // number words, and the fractions people say before a unit
   numbers: { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19,
     twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90, hundred: 100, 'a hundred': 100, dozen: 12, 'a dozen': 12, 'a couple of': 2, 'a few': 3,
-    'half an': 0.5, 'half a': 0.5, half: 0.5, 'a quarter of an': 0.25, 'a quarter of a': 0.25, 'quarter of an': 0.25, 'quarter of a': 0.25, 'three quarters of an': 0.75, 'three quarters of a': 0.75, 'an hour and a half': 1.5 },
+    'half an': 0.5, 'half a': 0.5, half: 0.5, 'a quarter of an': 0.25, 'a quarter of a': 0.25, 'quarter of an': 0.25, 'quarter of a': 0.25, 'three quarters of an': 0.75, 'three quarters of a': 0.75 },
+  fractions: { 'a half': 0.5, 'a quarter': 0.25, 'three quarters': 0.75 },
   AMPM: "am|pm|a.m.|p.m.|o'clock",
   indefinite: ['a', 'an'], newRef: ['new'], firstRef: ['first'],
   phr: { new: 'new', last: 'last', every: 'every', except: 'except', fromRun: 'from run', above: 'above', below: 'below', atleast: 'at least', atmost: 'at most', equals: 'equal to', then: 'Then', assuming: 'assuming', of: 'of', hole: '___', than: 'than' },
@@ -1226,7 +1302,7 @@ function createEngine(ont, locale = ENGLISH) {
   // ---- lexicon from ontology + locale ----
   const LEX = {};
   const add = (words, cat, extra = {}) => { for (const w of words.split('|')) (LEX[w] ??= []).push({ cat, word: w, ...extra }); };
-  for (const cat of ['DET', 'REF', 'QUANT', 'EXCEPT', 'CONJ', 'COMMA', 'THEN', 'BUT', 'PRON', 'AGAIN', 'QWORD', 'FILLER', 'REL', 'SUBJ', 'WH', 'COP', 'WHCOP', 'DEMO']) if (locale[cat]) add(locale[cat], cat);
+  for (const cat of ['DET', 'REF', 'QUANT', 'EXCEPT', 'CONJ', 'COMMA', 'THEN', 'BUT', 'PRON', 'AGAIN', 'QWORD', 'FILLER', 'REL', 'SUBJ', 'WH', 'COP', 'WHCOP', 'DEMO', 'DOQ', 'EXIST', 'NOT', 'BLANK']) if (locale[cat]) add(locale[cat], cat);
   for (const [w, r] of Object.entries(locale.times)) add(w, 'TIME', { from: r[0], to: r[1] });
   for (const [w, c] of Object.entries(locale.comps)) add(w, 'COMP', { sign: c[0], sup: !!c[1] });
   for (const p of locale.PREP.split('|')) add(p, 'PREP', { canon: locale.preps[p] ?? [p] });
@@ -1235,7 +1311,8 @@ function createEngine(ont, locale = ENGLISH) {
   for (const [w, m] of Object.entries(locale.months ?? {})) add(w, 'MONTH', { m });
   for (const [w, c] of Object.entries(locale.clocks ?? {})) add(w, 'CLOCK', { h: c[0], mi: c[1] });
   if (locale.AMPM) add(locale.AMPM, 'AMPM');
-  for (const [w, n] of Object.entries(locale.numbers ?? {})) add(w, 'NUM', { n });   // number words: "ninety", "half an", "a quarter of an"
+  for (const [w, n] of Object.entries(locale.numbers ?? {})) add(w, 'NUM', { n });
+  for (const [w, n] of Object.entries(locale.fractions ?? {})) add(w, 'FRAC', { n });   // "and a half": only after a whole   // number words: "ninety", "half an", "a quarter of an"
   const L = k => `${k}_${locale.code}`;   // ontology synonym column for this locale, falling back to the default column
   const col = (o, k) => o[L(k)] ?? o[k];
   // a frame may take a subject before its verb ("pop means population"): it binds as the role 'subject'
@@ -1261,12 +1338,17 @@ function createEngine(ont, locale = ENGLISH) {
     headFirst: !!locale.headFirst,
     nextDay: locale.THEN.split('|').includes('next'),
     indefinite: locale.indefinite ?? [],
-    subject: ont.verbs.some(v => v.subject),   // some frame takes a subject before its verb
+    subject: ont.verbs.some(v => v.subject),
+    and: locale.CONJ.split('|')[0], or: locale.OR ?? 'or', doq: !!locale.DOQ, exist: !!locale.EXIST,
+    cond: ont.conditions ?? null,   // { subjects: [types] }: the things a condition on rows may name
+    condPostPreps: [...new Set(ont.postmods.filter(p => p.mod === 'cond').map(p => p.prep))],
+    condText: c => condText(c),   // some frame takes a subject before its verb
     // a role with no marker ("decode hex 676f", "9am sao paulo in perth"): only things of the types such roles take
     bareTypes: new Set(ont.verbs.flatMap(v => Object.values(v.roles ?? {}).filter(r => r.preps.includes('')).flatMap(r => r.types))),   // "next friday" where the bank has the word
     identTypes: new Set(ont.nouns.filter(n => n.ident).map(n => n.type)),
     postmodPreps: [...new Set(ont.postmods.map(p => p.prep))],
     postmodQuantity: new Set(ont.postmods.filter(p => p.quantity).map(p => p.prep)),
+    postmodThing: new Set(ont.postmods.filter(p => !p.quantity).map(p => p.prep)),
     compound(a, h) {
       if (a.type === h.type && !a.generic && h.generic) return { ...h, value: a.value, generic: false };
       for (const c of ont.compounds) if (c.mod === a.type && c.heads.includes(h.type)) return { ...h, attrs: { ...h.attrs, [c.attr]: a.value ?? '?' } };
@@ -1278,7 +1360,7 @@ function createEngine(ont, locale = ENGLISH) {
       for (const p of ont.postmods) {
         if (p.prep !== m.prep || !p.heads.includes(n.type)) continue;
         if (p.quantity) { if (!m.q) continue; return { attrs: { ...n.attrs, [p.attr]: m.q } }; }
-        if (m.np && m.np.type === p.mod) return { attrs: { ...n.attrs, [p.attr]: p.byName ? (m.np.name ?? m.np.ref ?? '?') : m.np.value } };
+        if (m.np && m.np.type === p.mod) return { attrs: { ...n.attrs, [p.attr]: p.mod === 'cond' ? m.np : p.byName ? (m.np.name ?? m.np.ref ?? '?') : m.np.value } };
       }
       return null;
     },
@@ -1287,6 +1369,20 @@ function createEngine(ont, locale = ENGLISH) {
       return null;
     },
   };
+  // a condition as the echo says it: "cu > 0.5 and lith = BRX"
+  const OPS = { above: '>', below: '<', atleast: '≥', atmost: '≤', equals: '=', differs: '≠' };
+  const valText = v => v.n != null ? `${v.n}${v.unit ? ' ' + v.unit : ''}` : v.s;
+  function condText(c) {
+    if (c.or) return c.or.map(x => x.and ? `(${condText(x)})` : condText(x)).join(` ${locale.OR ?? 'or'} `);
+    if (c.and) return c.and.map(condText).join(` ${locale.CONJ.split('|')[0]} `);
+    if (c.not) return `${locale.NOT?.split('|')[0] ?? 'not'} (${condText(c.not)})`;
+    const col = c.col.value;
+    if (c.op === 'between') return `${col} ${OPS.atleast} ${valText(c.vals[0])} ${locale.CONJ.split('|')[0]} ${col} ${OPS.atmost} ${valText(c.vals[1])}`;
+    if (c.op === 'in') return `${col} ∈ {${c.vals.map(valText).join(', ')}}`;
+    if (c.op === 'blank') return `${col} = ∅`;
+    if (c.op === 'present') return `${col} ≠ ∅`;
+    return `${col} ${OPS[c.op]} ${valText(c.val)}`;
+  }
   const R = buildGrammar(X);
 
   // ---- tokenizer ----
@@ -1313,6 +1409,10 @@ function createEngine(ont, locale = ENGLISH) {
       let hit = null;
       let mwPlural = false;
       for (const mw of MULTI) if (mw.every((w, k) => raw[i + k]?.w === w || (k === mw.length - 1 && raw[i + k] && locale.stem(raw[i + k].w) === locale.stem(w) && LEX[mw.join(' ')].some(x => x.cat === 'NOUN')))) { hit = mw; mwPlural = locale.plural(raw[i + mw.length - 1].w); break; }
+      if (hit && hit.length > 1) for (let j = 1; j < hit.length; j++) {
+        const over = MULTI.find(mw => mw.length > hit.length - j && mw.every((x, k) => raw[i + j + k]?.w === x));
+        if (over && raw.slice(i, i + j).every(r => LEX[r.w])) { hit = null; break; }
+      }
       if (hit) { const w = hit.join(' '); if (LEX[w][0].cat !== 'FILLER') toks.push(at({ word: w, senses: mwPlural ? LEX[w].map(x => x.cat === 'NOUN' ? { ...x, plural: true } : x) : LEX[w] }, i, i + hit.length)); i += hit.length; continue; }
       const i0 = i, w = raw[i++].w, src = raw[i0].src.trim();
       if (w === '?' || w === '!') continue;
@@ -1336,6 +1436,8 @@ function createEngine(ont, locale = ENGLISH) {
       if (cands.length > 1) notes.push(`"${w}" could be ${cands.map(c => `"${c}"`).join(' / ')} — not guessing`);
       unknown.push(w); toks.push(at({ word: w, senses: [{ cat: 'UNK' }] }, i0, i));
     }
+    // "uma hora e meia": a fraction right after a unit and "and" is the fraction, not a number of its own
+    for (let k = 2; k < toks.length; k++) if (toks[k].senses.some(x => x.cat === 'FRAC') && toks[k - 1].senses.some(x => x.cat === 'CONJ') && toks[k - 2].senses.some(x => x.cat === 'UNIT')) toks[k] = { ...toks[k], senses: toks[k].senses.filter(x => x.cat === 'FRAC') };
     while (toks[0]?.senses.every(x => x.cat === 'COMMA')) toks.shift();   // "hey golem, …": the filler went, its comma goes too
     while (toks.at(-1)?.senses.every(x => x.cat === 'COMMA')) toks.pop();
     return { toks, notes, unknown };
@@ -1381,7 +1483,7 @@ function createEngine(ont, locale = ENGLISH) {
   }
   const describeRepairs = (toks, repairs) => repairs.map(r => r.op === 'skip' ? `ignored "${r.word}"` : r.op === 'subst' ? `read "${r.word}" as "${r.to}"` : r.sym === 'LATE' ? 'read the arguments out of order' : `assumed ${r.sym === 'PREP' ? 'a preposition' : 'an article'} before "${toks[r.at]?.word ?? 'the end'}"`);
   // human names for the terminals the chart was waiting for
-  const EXPECT = { NOUN: 'a thing', VERB: 'a verb', DET: 'an article', PREP: 'a preposition', NUM: 'a number', UNIT: 'a unit', IDENT: 'a name', CONJ: `'${locale.CONJ.split('|')[0]}'`, THEN: `'${locale.THEN.split('|')[0]}'`, COMMA: "','", QUANT: 'a quantifier', REF: `'${locale.REF.split('|')[0]}'`, PRON: 'a pronoun', REL: `'${locale.REL.split('|')[0]}'`, SUBJ: `'${locale.SUBJ.split('|')[0]}'`, TIME: 'a time', COMP: 'a comparative', WH: 'a question word', COP: `'${(locale.COP ?? 'is').split('|')[0]}'`, WHCOP: `'${(locale.WHCOP ?? 'what is').split('|')[0]}'`, EXCEPT: `'${locale.EXCEPT.split('|')[0]}'`, BUT: `'${locale.BUT.split('|')[0]}'`, AGAIN: `'${locale.AGAIN.split('|')[0]}'`, DAY: 'a date', MONTH: 'a date', DATE: 'a date', CLOCK: 'a clock time', AMPM: "'am' or 'pm'", COLON: "':'", LIT: 'a value', DEMO: `'${(locale.DEMO ?? 'this').split('|')[0]}'` };
+  const EXPECT = { DOQ: 'a question word', EXIST: "'there'", NOT: "'not'", BLANK: "'blank'", FRAC: "'a half'", UNK: 'a word', NOUN: 'a thing', VERB: 'a verb', DET: 'an article', PREP: 'a preposition', NUM: 'a number', UNIT: 'a unit', IDENT: 'a name', CONJ: `'${locale.CONJ.split('|')[0]}'`, THEN: `'${locale.THEN.split('|')[0]}'`, COMMA: "','", QUANT: 'a quantifier', REF: `'${locale.REF.split('|')[0]}'`, PRON: 'a pronoun', REL: `'${locale.REL.split('|')[0]}'`, SUBJ: `'${locale.SUBJ.split('|')[0]}'`, TIME: 'a time', COMP: 'a comparative', WH: 'a question word', COP: `'${(locale.COP ?? 'is').split('|')[0]}'`, WHCOP: `'${(locale.WHCOP ?? 'what is').split('|')[0]}'`, EXCEPT: `'${locale.EXCEPT.split('|')[0]}'`, BUT: `'${locale.BUT.split('|')[0]}'`, AGAIN: `'${locale.AGAIN.split('|')[0]}'`, DAY: 'a date', MONTH: 'a date', DATE: 'a date', CLOCK: 'a clock time', AMPM: "'am' or 'pm'", COLON: "':'", LIT: 'a value', DEMO: `'${(locale.DEMO ?? 'this').split('|')[0]}'` };
   const expectName = sym => { const [cat, w] = sym.split(':'); if (cat === 'LATE' || cat === 'TEXT' || (cat === 'LIT' && !(ont.shapes ?? []).length)) return null; return w ? `'${w}'` : (EXPECT[cat] ?? cat); };
 
   // ---- binding ----
@@ -1393,9 +1495,28 @@ function createEngine(ont, locale = ENGLISH) {
     if (cmd.verb == null) return bindElided(cmd);
     const F = VERBS[cmd.verb]; const problems = [];
     let alts = [{ verb: cmd.verb, theme: null, roles: {} }];
+    const fitsTheme = n => F.theme.some(t => typeOk(t, n));
+    const rolesFor = n => Object.entries(F.roles).filter(([, r]) => r.types.some(t => typeOk(t, n))).map(([k]) => k);
+    // Loose things — listed after the theme with no preposition ("true thickness, bedding 045/30, hole 270/60, 14 m
+    // intercept"), after a colon the frame has no role for ("work out the true thickness: 14 m intercept, …"), or said
+    // first with a preposition that names no role taking them ("on a 14 on 14 off roster, am i off …") — join the
+    // theme when they are of its type, and otherwise go to each role their type fits (several roles: several readings).
+    const loose = [];
+    const args = [];
     for (const a of cmd.args) {
       if (a.kind === 'np') {
-        const bad = a.list.filter(n => !F.theme.some(t => typeOk(t, n)));
+        const bad = a.list.filter(n => !fitsTheme(n));
+        if (bad.length && fitsTheme(a.list[0])) { args.push({ kind: 'np', list: a.list.filter(fitsTheme) }); loose.push(...bad); continue; }
+        args.push(a); continue;
+      }
+      const taken = Object.entries(F.roles).some(([, r]) => (a.canon.includes('*') || r.preps.some(p => a.canon.includes(p))) && a.val.every(v => r.types.some(t => typeOk(t, v))));
+      const colonRole = Object.values(F.roles).some(r => r.preps.includes(':'));
+      if ((a.topic || (a.canon.includes(':') && !colonRole)) && !taken) { loose.push(...a.val); continue; }
+      args.push(a);
+    }
+    for (const a of args) {
+      if (a.kind === 'np') {
+        const bad = a.list.filter(n => !fitsTheme(n));
         if (bad.length) { problems.push(`"${lbl(cmd.verb)}" takes ${F.theme.join('/')}, not ${bad.map(describe).join(', ')}`); return { alts: [], problems }; }
         alts = alts.map(b => b.theme ? null : { ...b, theme: a.list }).filter(Boolean);
         if (!alts.length) problems.push('two things in object position — which one did you mean?');
@@ -1411,6 +1532,12 @@ function createEngine(ont, locale = ENGLISH) {
         }
         alts = alts.flatMap(b => roles.map(([k]) => ({ ...b, roles: { ...b.roles, [k]: [...(b.roles[k] ?? []), v] } })));
       }
+    }
+    for (const n of loose) {
+      if (fitsTheme(n)) { alts = alts.map(b => ({ ...b, theme: [...(b.theme ?? []), n] })); continue; }
+      const fit = rolesFor(n), bare = fit.filter(k => F.roles[k].preps.includes('')), ks = bare.length ? bare : fit;   // unmarked: the roles that may go unmarked first
+      if (!ks.length) { problems.push(`"${lbl(cmd.verb)}" has no place for ${describe(n)}`); return { alts: [], problems }; }
+      alts = alts.flatMap(b => ks.map(k => ({ ...b, roles: { ...b.roles, [k]: [...(b.roles[k] ?? []), n] } })));
     }
     return { alts, problems };
   }
@@ -1508,7 +1635,7 @@ function createEngine(ont, locale = ENGLISH) {
     if (n.type === 'quantity') return `${n.n}${n.unit ? ' ' + n.unit : ''}`;
     if (n.type === 'unit') return n.unit;
     if (n.type === 'text') return n.value.length > 60 ? `"${n.value.slice(0, 57).trimEnd()}…"` : `"${n.value}"`;
-    if (n.type === 'date' || n.type === 'clock') return n.value;
+    if (n.type === 'date' || n.type === 'clock' || n.type === 'cond') return n.value;
     if (n.type === '*') return n.pron ?? 'that';
     if (n.all) return `${locale.agree[locale.gender(typeName(n.type))]?.[P.every] ?? P.every} ${typeName(n.type)}${n.except?.length ? ` ${P.except} ` + n.except.map(describe).join(', ') : ''}`;
     if (n.attrs?.radius) return describe(n.attrs.radius);
@@ -1648,7 +1775,7 @@ function createEngine(ont, locale = ENGLISH) {
         // that belong to the sentence ("…, please.", "… hole 12?"); a span that stops early stops at its last word.
         const s0 = colon != null ? colon : toks[from].s;
         const e = colon != null ? text.length : j === toks.length ? text.length - (TRAIL.exec(text)?.[0].length ?? 0) : toks[j - 1].e;
-        const t = text.slice(s0, e).trim(); if (!t) { empty = true; break; }
+        const t = colon != null ? text.slice(s0, e).trim() : text.slice(s0, e).trim().replace(/[\s,;]+$/, ''); if (!t) { empty = true; break; }   // a text that stops early leaves its comma to the sentence
         tt = [...tt.slice(0, i), { word: '«text»', senses: [{ cat: 'TEXT', text: t }], s: s0, e }, ...tt.slice(j)];
       }
       if (empty) continue;
@@ -1677,7 +1804,7 @@ function createEngine(ont, locale = ENGLISH) {
     let result = strictFull.length ? semantic(strictFull, toks, session, diag, opts) : null;
     if ((!result || result.status !== 'ok') && (TEXT_THEME.size || TEXT_PREPS.size || TEXT_SUBJECT.size || BARE.length)) {   // a free-text slot, before any repair
       const t = textRead(toks, text, session, diag, opts, start);
-      if (t && (t.status === 'ok' || !result)) return t;
+      if (t && (!result || (t.status === 'ok' && result.status !== 'ambiguous'))) return t;
     }
     if ((!result || result.status === 'reject') && opts.repair?.budget) {
       // error-correcting pass: candidate derivations by ascending repair cost; the first tier that survives binding wins
@@ -1934,16 +2061,19 @@ const PORTUGUESE = {
   DET: 'o|a|os|as|um|uma|uns|umas|este|esta|esse|essa|meu|minha|nosso|nossa',
   REF: 'último|última|ultimo|ultima|últimos|últimas|anterior|atual|primeiro|primeira|novo|nova',
   QUANT: 'todos|todas|todo|toda|cada', EXCEPT: 'exceto|menos|excluindo|tirando|fora', CONJ: 'e|ou|mais', COMMA: ',',
-  PREP: 'com|usando|por|em|no|na|nos|nas|para|pra|pro|de|do|da|dos|das|a|ao|à|às|até|como|acima de|abaixo de|sem|contra|dentro de|sobre|onde|agrupado por|ponderado por|ordenado por|que têm|que tem|depois de|antes de|desde|entre|durante|através de|atraves de|perto de|>|<|>=|<=|=|≥|≤|maior que|menor que|pelo menos|no mínimo|no minimo|no máximo|no maximo|igual a',
+  PREP: 'com o maior|com a maior|com os maiores|com as maiores|com o menor|com a menor|com os menores|com as menores|começando em|a partir de|com|usando|por|em|no|na|nos|nas|para|pra|pro|de|do|da|dos|das|a|ao|à|às|até|como|acima de|abaixo de|sem|contra|dentro de|sobre|onde|agrupado por|ponderado por|ordenado por|que têm|que tem|depois de|antes de|desde|entre|durante|através de|atraves de|perto de|>|<|>=|<=|=|≥|≤|maior que|menor que|pelo menos|no mínimo|no minimo|no máximo|no maximo|igual a',
   THEN: 'depois|então|em seguida|aí', BUT: 'mas|porém|só que', PRON: 'isso|isto|ele|ela|eles|elas',
   AGAIN: 'de novo|novamente|repete|repetir|refaz|refazer|mesmo|mesma|igual|outra vez',
   QWORD: 'por que|porque|como|qual|quais|quando|quem|é|são|será|pode|poderia|deveria|dá',
   DEMO: 'isto|isso|este|esta|estes|estas|o seguinte|o seguinte texto|o texto|os dois|ambos',   // antes dos dois-pontos: "resume isto: …"
+  OR: 'ou', NOT: 'não|nao|não é|nao e', BLANK: 'vazio|vazia|nulo|nula|em branco', EXIST: 'tem|há|ha|existem',
   WH: 'qual|quais|que', COP: 'é|são|sao|era|foi|eram|foram', WHCOP: 'qual é|qual e|quais são|quais sao|o que é|o que e|quanto é|quanto e|quanto dá|quanto da|quanto são|quanto sao',
   TRAIL: 'por favor|obrigado|obrigada|valeu|pfv|pf|pra mim|para mim',   // cortesia que fecha a frase, cortada do fim de um texto livre
   FILLER: 'por favor|agora|só|me|favor|pra mim|então|ei|oi|olá|valeu|obrigado|obrigada|beleza|aí|tá|dá pra|dá para|você pode|pode|consegue|queria que você|quero que você|vamos|bora|hum|bom|me diz|me fala|me dá|preciso de|eu preciso de|gostaria de|eu queria',
   preps: {   // surface → canonical set; polysemy is resolved by types downstream
-    com: ['with'], usando: ['using'], por: ['by'], em: ['in', 'on'], no: ['in', 'on'], na: ['in', 'on'], nos: ['in', 'on'], nas: ['in', 'on'],
+    'com o maior': ['highest'], 'com a maior': ['highest'], 'com os maiores': ['highest'], 'com as maiores': ['highest'], 'com o menor': ['lowest'], 'com a menor': ['lowest'], 'com os menores': ['lowest'], 'com as menores': ['lowest'],
+    'começando em': ['from'], 'a partir de': ['from'],
+    com: ['with'], usando: ['using'], por: ['by', 'for'], em: ['in', 'on'], no: ['in', 'on'], na: ['in', 'on'], nos: ['in', 'on'], nas: ['in', 'on'],
     para: ['for', 'to', 'into'], pra: ['for', 'to', 'into'], pro: ['for', 'to', 'into'], de: ['of', 'from'], do: ['of', 'from'], da: ['of', 'from'], dos: ['of', 'from'], das: ['of', 'from'],
     a: ['to', 'at'], ao: ['to', 'at'], 'à': ['to', 'at'], 'até': ['to'], como: ['as'], 'acima de': ['above', 'over'], 'abaixo de': ['below', 'under'],
     sem: ['without'], contra: ['against'], 'dentro de': ['into'], sobre: ['on'], 'às': ['at', 'to'], onde: ['where'], 'agrupado por': ['by'], 'ponderado por': ['weighted'], 'ordenado por': ['sort'], 'que têm': ['where'], 'que tem': ['where'], 'depois de': ['after'], 'antes de': ['before'], desde: ['since', 'from'], entre: ['between'], durante: ['during'], 'através de': ['through'], 'atraves de': ['through'], 'perto de': ['near'],
@@ -1956,6 +2086,7 @@ const PORTUGUESE = {
   clocks: { 'meio-dia': [12, 0], 'meia-noite': [0, 0] },
   numbers: { dois: 2, duas: 2, três: 3, tres: 3, quatro: 4, cinco: 5, seis: 6, sete: 7, oito: 8, nove: 9, dez: 10, onze: 11, doze: 12, quinze: 15, vinte: 20, trinta: 30, quarenta: 40, cinquenta: 50, sessenta: 60, noventa: 90, cem: 100,
     meia: 0.5, meio: 0.5, 'um quarto de': 0.25, 'uma dúzia de': 12 },
+  fractions: { meia: 0.5, meio: 0.5, 'um quarto': 0.25 },
   indefinite: ['um', 'uma', 'uns', 'umas'], newRef: ['novo', 'nova'], firstRef: ['primeiro', 'primeira'],
   phr: { new: 'novo', last: 'último', every: 'todo', except: 'exceto', fromRun: 'da rodada', above: 'acima de', below: 'abaixo de', atleast: 'pelo menos', atmost: 'no máximo', equals: 'igual a', then: 'Depois', assuming: 'assumindo', of: 'de', hole: '___', than: 'que' },
   stem: w => { let x = w.normalize('NFD').replace(/[\u0300-\u036f]/g, '');

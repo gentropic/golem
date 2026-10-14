@@ -7,7 +7,7 @@ export { sessions, current, newSession, openSession, renameSession, deleteSessio
 export { skills, examples, vocab, PACKS, SUGGESTIONS } from './skills.js';
 export { norm, grammar, context, taught, clauseRead, clauseEngine } from './reading.js';
 export { ontology } from './ontology.js';
-export { tableFromText, colOf, whereToSift, stats } from './table.js';
+export { tableFromText, colOf, condToSift, whereSrc, stats } from './table.js';
 export { sha256, tableText } from './convert.js';
 export { zonesOf, offsetOf, instantOf } from './calendar.js';
 export { unitWord } from './estimate.js';

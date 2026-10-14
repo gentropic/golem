@@ -88,7 +88,7 @@ test('amendments on a table question: by, where, weighting, another aggregate', 
   g.reset(); g.openFile('holes.csv', CSV);
   ask('mean cu');
   let c = ask('by litho'); assert.equal(c.rung, 'context'); assert.deepEqual(c.args.by.map(x => x.toLowerCase()), ['litho']);
-  c = ask('where fe > 12'); assert.equal(c.rung, 'context'); assert.equal(c.args.where, 'fe > 12');
+  c = ask('where fe > 12'); assert.equal(c.rung, 'context'); assert.equal(g.whereSrc(c.args.where, g.S.table), 'FE > 12');   // the grammar's condition, as sift reads it
   c = ask('weighted by count'); assert.equal(c.args.weight, 'count');
   c = ask('and median'); assert.deepEqual(c.args.aggs, ['mean', 'median']);
 });

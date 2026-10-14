@@ -180,9 +180,11 @@ noun(() => {
   return { type: 'place', exact: true, words, generic: ['place'], words_pt: words, generic_pt: ['lugar'] };
 });
 shape({ type: 'place', re: String.raw`(?:utc|gmt)\s?[+-]\d{1,2}(?::?\d{2})?` });   // "utc+8", "gmt-3"
+// "what time is 9 am in sao paulo in perth", "when it is 9am in sao paulo, what time is it in perth"
+noun({ type: 'whattime', words: { ask: ['what time is it', 'what time will it be', "what's the time", 'what is the time', 'what time is that'] }, words_pt: { ask: ['que horas são', 'que horas sao', 'que horas serão'] } });
 frame({
-  name: 'zone', label: 'Time in', words: [], elidable: true, theme: ['clock'], required: ['theme', 'to'],
-  roles: { from: { preps: ['', 'from', 'at'], types: ['place'] }, to: { preps: ['in', 'to', 'for', 'as'], types: ['place'] }, on: { preps: ['on'], types: DATE_T } }, label_pt: 'Hora em',
+  name: 'zone', label: 'Time in', words: ['what time is', 'when it is', "when it's", 'if it is', "if it's", 'convert'], elidable: true, theme: ['clock'], required: ['theme', 'to'],
+  roles: { from: { preps: ['', 'from', 'at'], types: ['place'] }, to: { preps: ['in', 'to', 'for', 'as'], types: ['place'] }, on: { preps: ['on'], types: DATE_T }, ask: { preps: [''], types: ['whattime'] } }, label_pt: 'Hora em',
   bind: c => {
     let from = (c.roles.from || []).map(p => p.value), to = (c.roles.to || []).map(p => p.value);
     if (!from.length && to.length === 2) { from = [to[0]]; to = [to[1]]; }
@@ -205,6 +207,7 @@ frame({
 });
 // rosters: "14 on 14 off from 6 oct", "…, am i off at christmas", "am i off on 21 oct", "when is my next swing"
 shape({ type: 'roster', re: String.raw`\d{1,2}\s*(?:on|x|/)\s*,?\s*\d{1,2}(?:\s*off)?` });
+noun({ type: 'roster', words: {}, generic: ['roster', 'rotation', 'swing roster', 'shift roster'], generic_pt: ['escala', 'escala de trabalho'] });   // "a 14 on 14 off roster"
 postmod({ prep: 'from', heads: ['roster'], attr: 'start', mod: 'date' });
 postmod({ prep: 'since', heads: ['roster'], attr: 'start', mod: 'date' });
 noun({ type: 'rosterq', words: { day: ['am i off', 'am i on', 'am i working', 'am i at work', 'will i be off', 'will i be on', 'will i be working', 'are we off', 'are we on', 'off or on'], next: ['next swing', 'my next swing', 'next change', 'next changeover', 'next days off', 'next day off', 'next days on'] },

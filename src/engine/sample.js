@@ -71,6 +71,7 @@ noun({ type: 'coremass', words: { mass: ['mass', 'sample mass', 'core mass', 'we
 const toM = q => { if (!q.unit) return q.n; if (q.unit === 'µm') return q.n * 1e-6; const u = parseUnit(q.unit); return u && u.dim === 'L' ? q.n * u.f : null; };
 unit({ unit: 'µm', dim: 'length', words: ['µm', 'um', 'micron', 'microns', 'micrometre', 'micrometres', 'micrometer', 'micrometers'] });   // the sieve's unit; @gcu/units has no micron
 postmod({ prep: '', heads: ['sgword'], attr: 'value', quantity: true });   // "sg 2.9"
+qmod({ head: 'sgword', attr: 'value', dims: ['bare', 'density'] });          // "a density of 2.7"
 // "half nq, 1.5 m, sg 2.9": the same question as a list
 frame({
   name: 'coremass2', label: 'Sample mass', words: [], elidable: true, theme: ['corecode', 'quantity:length', 'sgword'], required: ['theme'], roles: {}, label_pt: 'Massa da amostra',
@@ -79,11 +80,23 @@ frame({
 });
 frame({
   name: 'coremass', label: 'Sample mass', words: ['calculate', 'compute'], elidable: true, theme: ['coremass'], required: ['theme', 'of'],
-  roles: { of: { preps: ['of', 'for'], types: ['quantity:length', 'corecode'] }, at: { preps: ['at', 'with'], types: ['quantity:density', 'quantity:bare'] } }, label_pt: 'Massa da amostra',
+  roles: { of: { preps: ['of', 'for'], types: ['quantity:length', 'corecode'] }, at: { preps: ['at', 'with'], types: ['quantity:density', 'quantity:bare', 'sgword'] } }, label_pt: 'Massa da amostra',
   bind: c => {
     const len = c.roles.of.find(n => n.type === 'quantity'), cc = c.roles.of.find(n => n.type === 'corecode'), d = c.roles.at && c.roles.at[0];
     if (!len || !cc || !cc.value) return null;
-    return { tool: 'coremass', args: { length: toM(len), split: (cc.attrs && cc.attrs.split) || 'whole', code: cc.value, density: d ? d.n : null } };
+    const density = !d ? null : d.type === 'quantity' ? d.n : d.attrs && d.attrs.value ? d.attrs.value.n : null; if (d && density == null) return null;
+    return { tool: 'coremass', args: { length: toM(len), split: (cc.attrs && cc.attrs.split) || 'whole', code: cc.value, density } };
+  }
+});
+// "what does 1 m of nq core weigh at a density of 2.7", "how much does 2 m of half hq weigh at 2.8"
+frame({
+  name: 'coreweigh', label: 'Sample mass', words: ['weigh', 'weighs'], theme: ['quantity:length', 'corecode'], required: ['theme'],
+  roles: { of: { preps: ['of'], types: ['corecode', 'quantity:length'] }, at: { preps: ['at', 'with'], types: ['quantity:density', 'quantity:bare', 'sgword'] } }, words_pt: ['pesa'], label_pt: 'Massa da amostra',
+  bind: c => {
+    const all = [...c.theme, ...(c.roles.of || [])], len = all.find(n => n.type === 'quantity'), cc = all.find(n => n.type === 'corecode'), d = c.roles.at && c.roles.at[0];
+    if (!len || !cc || !cc.value || all.length !== 2) return null;
+    const density = !d ? null : d.type === 'quantity' ? d.n : d.attrs && d.attrs.value ? d.attrs.value.n : null; if (d && density == null) return null;
+    return { tool: 'coremass', args: { length: toM(len), split: (cc.attrs && cc.attrs.split) || 'whole', code: cc.value, density } };
   }
 });
 // "200 mesh in microns", "75 µm in mesh"

@@ -58,6 +58,7 @@ export function ontology(only) {
     postmods: LEXICON.postmods,
     qmods: [{ head: 'timer', attr: 'duration', dims: ['time'] }, ...LEXICON.qmods],   // "a 30 minute timer"
     verbs: (only || FRAMES.filter(f => !f.amends && !f.session)).map(({ bind, tools, amends, session, ...f }) => f),
+    conditions: { subjects: ['variable', 'column'] },   // what a condition on rows may name: "cu > 0.5 and lith is BRX"
     inherit: [],
     echoOrder: ['of', 'unit', 'by', 'scale', 'for', 'as'],
     roleLabels_pt: { of: 'de', unit: 'unidade', by: 'por', scale: 'escala', for: 'duração', as: 'como' },

@@ -113,7 +113,7 @@ frame({
 // "landlocked countries by population", "which countries are landlocked"
 frame({
   name: 'list', label: 'List', words: ['list', 'rank'], elidable: true,
-  theme: ['country'], required: ['theme'], roles: { by: { preps: ['by'], types: ['property'] } },
+  theme: ['country'], required: ['theme'], roles: { by: { preps: ['by', 'sort'], types: ['property'] } },
   words_pt: ['listar', 'lista', 'ordenar', 'ordena'], label_pt: 'Listar',
   bind: c => {
     const t = c.theme[0], by = c.roles.by && c.roles.by[0].value; if (!t || !t.attrs || t.attrs.filter !== 'landlocked') return null;

@@ -1765,10 +1765,20 @@
       "type": "column",
       "words": {
         "hole": [
-          "hole"
+          "hole",
+          "hole id",
+          "hole ids",
+          "drillhole",
+          "drill hole"
         ],
         "lith": [
-          "lith"
+          "lith",
+          "lithology",
+          "lithologies",
+          "litho",
+          "rock type",
+          "rock types",
+          "rock"
         ],
         "from": [
           "from"
@@ -1783,10 +1793,20 @@
       ],
       "words_pt": {
         "hole": [
-          "hole"
+          "hole",
+          "hole id",
+          "hole ids",
+          "drillhole",
+          "drill hole"
         ],
         "lith": [
-          "lith"
+          "lith",
+          "lithology",
+          "lithologies",
+          "litho",
+          "rock type",
+          "rock types",
+          "rock"
         ],
         "from": [
           "from"
@@ -5407,6 +5427,39 @@
       ]
     },
     {
+      "type": "whattime",
+      "words": {
+        "ask": [
+          "what time is it",
+          "what time will it be",
+          "what's the time",
+          "what is the time",
+          "what time is that"
+        ]
+      },
+      "words_pt": {
+        "ask": [
+          "que horas são",
+          "que horas sao",
+          "que horas serão"
+        ]
+      }
+    },
+    {
+      "type": "roster",
+      "words": {},
+      "generic": [
+        "roster",
+        "rotation",
+        "swing roster",
+        "shift roster"
+      ],
+      "generic_pt": [
+        "escala",
+        "escala de trabalho"
+      ]
+    },
+    {
       "type": "rosterq",
       "words": {
         "day": [
@@ -7574,7 +7627,23 @@
       "mod": "orientation"
     },
     {
+      "prep": "at",
+      "heads": [
+        "hole"
+      ],
+      "attr": "ori",
+      "mod": "orientation"
+    },
+    {
       "prep": "",
+      "heads": [
+        "plane"
+      ],
+      "attr": "ori",
+      "mod": "orientation"
+    },
+    {
+      "prep": "at",
       "heads": [
         "plane"
       ],
@@ -7588,6 +7657,22 @@
       ],
       "attr": "of",
       "mod": "variable"
+    },
+    {
+      "prep": "with",
+      "heads": [
+        "sample"
+      ],
+      "attr": "where",
+      "mod": "cond"
+    },
+    {
+      "prep": "where",
+      "heads": [
+        "sample"
+      ],
+      "attr": "where",
+      "mod": "cond"
     },
     {
       "prep": "",
@@ -7757,6 +7842,14 @@
       ]
     },
     {
+      "head": "section",
+      "attr": "az",
+      "dims": [
+        "bare",
+        "angle"
+      ]
+    },
+    {
       "head": "rake",
       "attr": "angle",
       "dims": [
@@ -7770,6 +7863,14 @@
       "dims": [
         "bare",
         "angle"
+      ]
+    },
+    {
+      "head": "sgword",
+      "attr": "value",
+      "dims": [
+        "bare",
+        "density"
       ]
     },
     {
@@ -7898,7 +7999,9 @@
         "convert",
         "change",
         "express",
-        "put"
+        "put",
+        "how many",
+        "how much"
       ],
       "elidable": true,
       "theme": [
@@ -8031,7 +8134,10 @@
         "what day of the week is",
         "what day of the week was",
         "which day is",
-        "what day does"
+        "what day does",
+        "what day",
+        "what weekday",
+        "which day"
       ],
       "theme": [
         "date",
@@ -8087,7 +8193,8 @@
             "down",
             "along",
             "from",
-            "with"
+            "with",
+            ""
           ],
           "types": [
             "hole",
@@ -8099,7 +8206,8 @@
             "through",
             "across",
             "against",
-            "with"
+            "with",
+            ""
           ],
           "types": [
             "plane"
@@ -8110,7 +8218,7 @@
             "where"
           ],
           "types": [
-            "text"
+            "cond"
           ]
         }
       },
@@ -8254,6 +8362,17 @@
           "types": [
             "scale"
           ]
+        },
+        "where": {
+          "preps": [
+            "where",
+            "with",
+            "if",
+            "when"
+          ],
+          "types": [
+            "cond"
+          ]
         }
       },
       "words_pt": [
@@ -8309,7 +8428,20 @@
             "when"
           ],
           "types": [
-            "text"
+            "cond"
+          ]
+        },
+        "subset": {
+          "preps": [
+            "for",
+            "of",
+            "in",
+            "among",
+            "across",
+            "over"
+          ],
+          "types": [
+            "sample"
           ]
         },
         "weighted": {
@@ -8371,12 +8503,10 @@
             "where",
             "with",
             "if",
-            "when",
-            "where",
-            "having"
+            "when"
           ],
           "types": [
-            "text"
+            "cond"
           ]
         }
       },
@@ -8415,7 +8545,7 @@
             "when"
           ],
           "types": [
-            "text"
+            "cond"
           ]
         },
         "sort": {
@@ -8434,6 +8564,24 @@
           ],
           "types": [
             "order"
+          ]
+        },
+        "highest": {
+          "preps": [
+            "highest"
+          ],
+          "types": [
+            "variable",
+            "column"
+          ]
+        },
+        "lowest": {
+          "preps": [
+            "lowest"
+          ],
+          "types": [
+            "variable",
+            "column"
           ]
         }
       },
@@ -8473,7 +8621,7 @@
             "when"
           ],
           "types": [
-            "text"
+            "cond"
           ]
         }
       },
@@ -8517,7 +8665,7 @@
             "when"
           ],
           "types": [
-            "text"
+            "cond"
           ]
         }
       },
@@ -8646,7 +8794,8 @@
       "roles": {
         "by": {
           "preps": [
-            "by"
+            "by",
+            "sort"
           ],
           "types": [
             "property"
@@ -8875,7 +9024,7 @@
             "where"
           ],
           "types": [
-            "text"
+            "cond"
           ]
         }
       },
@@ -8933,6 +9082,28 @@
           ]
         }
       },
+      "label_pt": "Interseção"
+    },
+    {
+      "name": "intersectv",
+      "label": "Intersection",
+      "words": [
+        "intersect",
+        "meet",
+        "cross"
+      ],
+      "theme": [
+        "plane",
+        "orientation"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {},
+      "words_pt": [
+        "se cruzam",
+        "se intersectam"
+      ],
       "label_pt": "Interseção"
     },
     {
@@ -9329,10 +9500,52 @@
           ],
           "types": [
             "quantity:density",
-            "quantity:bare"
+            "quantity:bare",
+            "sgword"
           ]
         }
       },
+      "label_pt": "Massa da amostra"
+    },
+    {
+      "name": "coreweigh",
+      "label": "Sample mass",
+      "words": [
+        "weigh",
+        "weighs"
+      ],
+      "theme": [
+        "quantity:length",
+        "corecode"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {
+        "of": {
+          "preps": [
+            "of"
+          ],
+          "types": [
+            "corecode",
+            "quantity:length"
+          ]
+        },
+        "at": {
+          "preps": [
+            "at",
+            "with"
+          ],
+          "types": [
+            "quantity:density",
+            "quantity:bare",
+            "sgword"
+          ]
+        }
+      },
+      "words_pt": [
+        "pesa"
+      ],
       "label_pt": "Massa da amostra"
     },
     {
@@ -9747,7 +9960,14 @@
     {
       "name": "zone",
       "label": "Time in",
-      "words": [],
+      "words": [
+        "what time is",
+        "when it is",
+        "when it's",
+        "if it is",
+        "if it's",
+        "convert"
+      ],
       "elidable": true,
       "theme": [
         "clock"
@@ -9785,6 +10005,14 @@
           "types": [
             "date",
             "holiday"
+          ]
+        },
+        "ask": {
+          "preps": [
+            ""
+          ],
+          "types": [
+            "whattime"
           ]
         }
       },
@@ -9968,7 +10196,16 @@
           ],
           "types": [
             "formula",
-            "text"
+            "text",
+            "quantity:*"
+          ]
+        },
+        "as": {
+          "preps": [
+            ""
+          ],
+          "types": [
+            "formula"
           ]
         }
       },
@@ -11232,6 +11469,12 @@
       "label_pt": "Exportar"
     }
   ],
+  "conditions": {
+    "subjects": [
+      "variable",
+      "column"
+    ]
+  },
   "inherit": [],
   "echoOrder": [
     "of",

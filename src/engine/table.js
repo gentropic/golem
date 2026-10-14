@@ -6,6 +6,7 @@ import { DOCUMENT } from './interchange.js';
 import { series } from '../vendor/sadpan.js';
 import { sniff, detectAnalyte, NULL_SENTINELS } from '../vendor/recon.js';
 import { parsePredicate, evaluatePredicate, predicateToString } from '../vendor/sift.js';
+import { parseUnit } from './units.js';
 
 /* ── the sample ────────────────────────────────────────────── */
 function mulberry(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
@@ -61,10 +62,14 @@ export function tableFromText(name, text, hash) {
 }
 export const openTable = t => { S.table = t; return t; };
 // a column by what the person called it: its name, its analyte symbol or element name, or a unique start
+// the words people use for the usual non-grade columns, by the column name's start: "lithology" for lith
+const COLSYN = [[/^lith/i, ['lithology', 'lithologies', 'litho', 'rock type', 'rock types', 'rock']], [/^(hole|bhid|dhid)/i, ['hole id', 'hole ids', 'drillhole', 'drill hole']]];
+const colWords = name => COLSYN.filter(([re]) => re.test(name)).flatMap(([, w]) => w);
 export function colOf(word, table = S.table) {
   if (!table) return null;
   const w = String(word).trim().toLowerCase();
   const byName = table.cols.find(c => c.name.toLowerCase() === w); if (byName) return byName;
+  const bySyn = table.cols.filter(c => colWords(c.name).includes(w)); if (bySyn.length === 1) return bySyn[0];
   const an = detectAnalyte(w) ? detectAnalyte(w).analyte : Object.keys(ELEMENT).find(k => ELEMENT[k] === w);
   if (an) { const c = table.cols.find(c => c.analyte === an); if (c) return c; }
   const starts = table.cols.filter(c => c.name.toLowerCase().startsWith(w));
@@ -162,8 +167,11 @@ tool({
     const trace = [], c = colOf(a.col); if (!c) return null;
     if (c.type !== 'numeric') return { read: ['histogram of', { v: c.name }], body: [{ t: 'note', kind: 'err', text: `${c.name} is a category, not a number. Try "count by ${c.name}".` }], trace: [...trace, 'column is categorical'] };
     const unit = c.unit || '';
-    const { v: all, skipped } = column(S.table.rows, c.name, a.bdl), v = all.filter(x => x > 0);
-    const read = ['histogram of', { v: c.name }, { v: a.log ? 'log scale' : 'linear scale', key: 'log', alts: [false, true], cur: !!a.log }, ...bdlSlot(a, skipped)];
+    let rows = S.table.rows, whereText = null;
+    if (a.where) { let p; try { p = whereOf(a.where, S.table); } catch (e) { return { read: ['histogram of', { v: c.name }, 'where'], body: [{ t: 'note', kind: 'err', text: e.message }], trace: [...trace, 'where: rejected'] }; }
+      rows = rows.filter(r => evaluatePredicate(p.pred, k => r[k])); whereText = predicateToString(p.pred); trace.push(`sift: ${whereText} → ${rows.length} of ${S.table.rows.length} rows`); }
+    const { v: all, skipped } = column(rows, c.name, a.bdl), v = all.filter(x => x > 0);
+    const read = ['histogram of', { v: c.name }, ...(whereText ? ['where', { v: whereText }] : []), { v: a.log ? 'log scale' : 'linear scale', key: 'log', alts: [false, true], cur: !!a.log }, ...bdlSlot(a, skipped)];
     if (v.length < 2) return { read, body: [{ t: 'note', kind: 'err', text: `${c.name} has ${v.length} positive value${v.length === 1 ? '' : 's'}; nothing to bin.` }], trace };
     const st = stats(v), f = a.log ? Math.log10 : x => x, lo = a.log ? f(st.min) : 0, hi = f(st.max), nb = 18, bins = new Array(nb).fill(0);
     v.forEach(x => { bins[Math.min(nb - 1, Math.floor((f(x) - lo) / Math.max(1e-12, hi - lo) * nb))]++; });
@@ -176,58 +184,48 @@ tool({
         { t: 'kv', rows: [['n', String(st.n)], ['mean', `${fmt(st.mean, 3)} ${unit}`], ['median', `${fmt(st.med, 3)} ${unit}`], ['cv', fmt(st.sd / st.mean, 3)], ['range', `${fmt(st.min, 3)} to ${fmt(st.max, 3)} ${unit}`]] },
         { t: 'src', text: `@gcu/sadpan · vendored · sample-count weighted · ${srcLine(S.table)}` }
       ],
-      trace, py: `plot.hist(dh["${c.name}"][dh["${c.name}"] > 0], bins=${nb}${a.log ? ', log=True' : ''})`
+      trace, py: `plot.hist(dh${whereText ? `.query('${whereText}')` : ''}["${c.name}"][dh["${c.name}"] > 0], bins=${nb}${a.log ? ', log=True' : ''})`
     };
   }
 });
 // "histogram of cu", "plot a histogram of fe in log scale"
 frame({
   name: 'plot', label: 'Plot', words: ['plot', 'draw', 'show', 'show me', 'display'], elidable: true,
-  theme: ['plot'], required: ['theme', 'of'], roles: { of: { preps: ['of', 'for'], types: ['variable'] }, scale: { preps: ['in', 'on', 'with'], types: ['scale'] } },
+  theme: ['plot'], required: ['theme', 'of'], roles: { of: { preps: ['of', 'for'], types: ['variable'] }, scale: { preps: ['in', 'on', 'with'], types: ['scale'] }, where: { preps: ['where', 'with', 'if', 'when'], types: ['cond'] } },
   words_pt: ['plotar', 'plota', 'mostrar', 'mostra', 'desenhar', 'desenha'], label_pt: 'Plotar',
   bind: c => {
     const kind = c.theme[0] && c.theme[0].value, v = c.roles.of && c.roles.of[0]; if (!kind || !v || !v.value) return null;
-    return kind === 'histogram' ? { tool: 'hist', args: { col: v.value, log: !!(c.roles.scale && c.roles.scale[0].value === 'log') } } : null;
+    return kind === 'histogram' ? { tool: 'hist', args: { col: v.value, log: !!(c.roles.scale && c.roles.scale[0].value === 'log'), ...(c.roles.where ? { where: c.roles.where[0].cond } : {}) } } : null;
   }
 });
 
 /* ── table questions in controlled English ─────────────────── */
-const AGGS = { mean: 'mean', average: 'mean', avg: 'mean', median: 'median', sum: 'sum', total: 'sum', min: 'min', minimum: 'min', max: 'max', maximum: 'max', std: 'std', stdev: 'std', 'standard deviation': 'std', variance: 'var', cv: 'cv', count: 'count' };
-const AGGRE = '(?:mean|average|avg|median|sum|total|min(?:imum)?|max(?:imum)?|std(?:ev)?|standard deviation|variance|cv|count|p\\d{1,2})';
-const aggOf = w => AGGS[w] || (/^p\d{1,2}$/.test(w) ? w : null);
 const num = s => /^-?\d+(\.\d+)?$/.test(s) ? s : `"${s.replace(/"/g, '')}"`;
 const lit = (table, colName, s) => { if (/^-?\d+(\.\d+)?$/.test(s)) return s; const c = table.cols.find(x => x.name === colName); if (c && c.type === 'categorical') { const hit = table.rows.map(r => r[colName]).find(v => v != null && String(v).toLowerCase() === s.toLowerCase()); if (hit != null) return num(String(hit)); } return num(s); };
-// controlled English conditions → a sift predicate source: "cu > 0.5 and lith is brx" → cu > 0.5 && lith == "brx"
-export function whereToSift(text, table) {
-  let s = ' ' + text.trim() + ' ';
-  const col = w => { const c = colOf(w, table); if (!c) throw new Error(`no column called "${w}"; the table has ${colNames(table)}`); return c.name; };
-  s = s.replace(/\b(\w+) between (\S+) and (\S+)/gi, (_, c, a, b) => `(${col(c)} >= ${a} && ${col(c)} <= ${b})`);
-  s = s.replace(/\b(\w+) (?:is )?in ((?:[\w.-]+,? ?)+)/gi, (_, c, list) => '(' + list.split(/,\s*|\s+/).filter(Boolean).map(v => `${col(c)} == ${lit(table, col(c), v)}`).join(' || ') + ')');
-  s = s.replace(/\b(\w+) is (?:not )?(?:blank|null|empty|missing)/gi, (m, c) => `${col(c)} ${/ not /.test(m) ? '!=' : '=='} null`);
-  s = s.replace(/\b(\w+) (?:is )?(above|over|greater than|more than|at least|below|under|less than|at most|is not|is|=|==|!=|>=|<=|>|<) (\S+)/gi, (_, c, op, v) => {
-    const o = { above: '>', over: '>', 'greater than': '>', 'more than': '>', 'at least': '>=', below: '<', under: '<', 'less than': '<', 'at most': '<=', 'is not': '!=', is: '==', '=': '==', '==': '==', '!=': '!=', '>=': '>=', '<=': '<=', '>': '>', '<': '<' }[op.toLowerCase()];
-    return `${col(c)} ${o} ${lit(table, col(c), v)}`;
-  });
-  s = s.replace(/\bnot \(/gi, '!(').replace(/ and /gi, ' && ').replace(/ or /gi, ' || ');
-  const pred = parsePredicate(s.trim());
-  return { src: s.trim(), pred };
+// A condition as the grammar read it ({ and | or | not | col, op, val | vals }) → a sift predicate source, columns
+// resolved by colOf: "cu > 0.5 and lith is BRX" → cu > 0.5 && lith == "BRX". A value with a unit is converted to the
+// column's unit, or refused. A string is a predicate source already (cards written before 14 Oct 2026).
+const SIFT_OP = { above: '>', below: '<', atleast: '>=', atmost: '<=', equals: '==', differs: '!=' };
+function inUnit(x, col) {
+  if (!x.unit || (col.unit && x.unit.toLowerCase() === col.unit.toLowerCase())) return x.n;
+  const a = parseUnit(x.unit), b = col.unit && parseUnit(col.unit);
+  if (a && b && a.dim === b.dim) return +(x.n * a.f / b.f).toPrecision(12);
+  throw new Error(`${col.name} is in ${col.unit || 'no unit'}; ${x.n} ${x.unit} does not convert to it`);
 }
-function readQuery(text, q) {
-  let m, weight, view;
-  if ((m = /^(.*?) weighted by (length|count|samples?)$/.exec(q))) { q = m[1]; weight = m[2] === 'length' ? 'length' : 'count'; }
-  if ((m = /^(.*?) as a (chart|table)$/.exec(q))) { q = m[1]; view = m[2]; }
-  const base = { weight, view };
-  if ((m = /^check (intervals|overlaps|gaps)(?: by (\w+))?$/.exec(q))) return { ...base, kind: 'check', by: m[2] };
-  if ((m = /^correlation (?:of|between) (\w+) and (\w+)(?: where (.+))?$/.exec(q))) return { ...base, kind: 'corr', cols: [m[1], m[2]], where: m[3] };
-  if ((m = /^(?:distinct|unique|values of) (\w+)(?: where (.+))?$/.exec(q))) return { ...base, kind: 'distinct', cols: [m[1]], where: m[2] };
-  if ((m = /^(?:how many(?: \w+)?|count)(?: where (.+?))?(?: by (\w+(?: and \w+)?))?(?: where (.+))?$/.exec(q))) return { ...base, kind: 'count', by: m[2] ? m[2].split(' and ') : undefined, where: m[1] || m[3] };
-  if ((m = /^(?:show |list )?(?:top (\d+) )?rows(?: where (.+?))?(?: sorted by (\w+)( descending| desc| ascending| asc)?)?$/.exec(q))) return { ...base, kind: 'list', limit: m[1] ? +m[1] : 20, where: m[2], sort: m[3], desc: /desc/.test(m[4] || '') };
-  if ((m = new RegExp(`^(${AGGRE}(?: and ${AGGRE})*) (?:of )?(\\w+(?: and \\w+)*)(?: by (\\w+(?: and \\w+)?))?(?: where (.+))?$`).exec(q))) {
-    const aggs = m[1].split(' and ').map(aggOf); if (aggs.some(x => !x)) return null;
-    return { ...base, kind: 'agg', aggs, cols: m[2].split(' and '), by: m[3] ? m[3].split(' and ') : undefined, where: m[4] };
-  }
-  return null;
+export function condToSift(c, table) {
+  if (c.or) return c.or.map(x => `(${condToSift(x, table)})`).join(' || ');
+  if (c.and) return c.and.map(x => condToSift(x, table)).join(' && ');
+  if (c.not) return `!(${condToSift(c.not, table)})`;
+  const col = colOf(c.col.value, table); if (!col) throw new Error(`no column called "${c.col.value}"; the table has ${colNames(table)}`);
+  // a number column compared with a word is refused: "cu equal to banana" is not a question with an answer of 0 rows
+  const v = x => { if (x.n != null) return String(inUnit(x, col)); if (col.type === 'numeric') throw new Error(`${col.name} holds numbers; "${x.s}" is not one`); return lit(table, col.name, x.s); };
+  if (c.op === 'between') return `(${col.name} >= ${v(c.vals[0])} && ${col.name} <= ${v(c.vals[1])})`;
+  if (c.op === 'in') return `(${c.vals.map(x => `${col.name} == ${v(x)}`).join(' || ')})`;
+  if (c.op === 'blank' || c.op === 'present') return `${col.name} ${c.op === 'blank' ? '==' : '!='} null`;
+  return `${col.name} ${SIFT_OP[c.op]} ${v(c.val)}`;
 }
+export const whereSrc = (w, table) => typeof w === 'string' ? w : condToSift(w, table);
+export const whereOf = (w, table) => ({ pred: parsePredicate(whereSrc(w, table)) });
 const aggLabel = a => a === 'var' ? 'variance' : a === 'cv' ? 'cv' : a;
 function aggregate(agg, v, w) {
   if (!v.length) return null;
@@ -256,7 +254,7 @@ tool({
     const by = bys.map(([, c]) => c);
     let rows = T.rows, whereText = null;
     if (a.where) {
-      let p; try { p = whereToSift(a.where, T); } catch (e) { return refuse([a.kind, 'where', { v: a.where }], e.message); }
+      let p; try { p = whereOf(a.where, T); } catch (e) { return refuse([a.kind, 'where', { v: typeof a.where === 'string' ? a.where : 'that condition' }], e.message); }
       rows = rows.filter(r => evaluatePredicate(p.pred, c => r[c])); whereText = predicateToString(p.pred);
       trace.push(`sift: ${p.src} → ${rows.length} of ${T.rows.length} rows`);
     }
@@ -267,7 +265,7 @@ tool({
     const groups = by.length ? [...rows.reduce((m, r) => { const k = by.map(c => r[c.name] ?? '(blank)').join(' / '); (m.get(k) || m.set(k, []).get(k)).push(r); return m; }, new Map())] : [[null, rows]];
     if (a.kind === 'count') {
       read.push('count rows', ...(by.length ? ['by', { v: by.map(c => c.name).join(' and ') }] : []), ...(whereText ? ['where', { v: whereText }] : []));
-      if (!by.length) return { read, value: rows.length, body: [{ t: 'big', v: String(rows.length), unit: 'rows' }, src], trace: [...trace, `count → ${rows.length}`], py: `len(dh${a.where ? `.query('${a.where}')` : ''})` };
+      if (!by.length) return { read, value: rows.length, body: [{ t: 'big', v: String(rows.length), unit: 'rows' }, src], trace: [...trace, `count → ${rows.length}`], py: `len(dh${whereText ? `.query('${whereText}')` : ''})` };
       const out = groups.map(([k, g]) => [k, g.length]).sort((x, y) => y[1] - x[1]);
       return { read, body: [{ t: 'table', head: [by.map(c => c.name).join(' / '), 'rows'], num: [false, true], rows: out.map(([k, n]) => [k, String(n)]) }, ...(a.view !== 'table' && out.length >= 2 && out.length <= 20 ? [{ t: 'hbars', rows: out.map(([k, n]) => [k, n, String(n)]) }] : []), src], trace: [...trace, `group by ${by.map(c => c.name).join(', ')} → ${out.length} groups`], py: `dh.groupby(${JSON.stringify(by.map(c => c.name))}).size()` };
     }
@@ -314,7 +312,7 @@ tool({
     const table = groups.map(([k, g]) => [...(by.length ? [k] : []), ...cols.flatMap(c => a.aggs.map(agg => cell(g, c, agg)))]);
     read.push(a.aggs.map(aggLabel).join(' and '), 'of', { v: cols.map(c => c.name).join(' and ') }, ...(by.length ? ['by', { v: by.map(c => c.name).join(' and ') }] : []), ...(whereText ? ['where', { v: whereText }] : []), ...weightSlot, ...bdlSlot(a, skipped));
     trace.push(`skip ${skipped.null} blank, ${skipped.bdl} below-detection (${a.bdl || 'exclude'})`, `${weight === 'length' ? `length-weighted over ${R.from}–${R.to}` : 'sample-count weighted'}: ${a.aggs.join(', ')} of ${cols.map(c => c.name).join(', ')}${by.length ? ' by ' + by.map(c => c.name).join(', ') : ''}`);
-    const py = `dh${a.where ? `.query('${a.where}')` : ''}${by.length ? `.groupby(${JSON.stringify(by.map(c => c.name))})` : ''}[${JSON.stringify(cols.map(c => c.name))}].agg(${JSON.stringify(a.aggs)})`;
+    const py = `dh${whereText ? `.query('${whereText}')` : ''}${by.length ? `.groupby(${JSON.stringify(by.map(c => c.name))})` : ''}[${JSON.stringify(cols.map(c => c.name))}].agg(${JSON.stringify(a.aggs)})`;
     if (!by.length && cols.length === 1 && a.aggs.length === 1) {
       const v = table[0][0];
       return { read, value: v, body: [v == null ? { t: 'note', kind: 'err', text: 'No usable values after the filter.' } : { t: 'big', v: fmt(v, 4), unit: a.aggs[0] === 'count' ? 'rows' : a.aggs[0] === 'cv' ? '' : cols[0].unit || '' }, { t: 'sub', text: `${rows.length} rows${skipped.bdl ? `, ${skipped.bdl} below detection ${a.bdl === 'exclude' || !a.bdl ? 'left out' : 'as ' + a.bdl}` : ''}.` }, src], trace, py };
@@ -329,8 +327,15 @@ const numericVar = c => c.type === 'numeric' && !/^(from|to|x|y|z|east|north|ele
 // columns that are not grades (hole, lith, from, to): what a question groups by, lists or sorts by
 noun(() => {
   const cols = S.table ? S.table.cols.filter(c => !numericVar(c)).map(c => c.name) : ['hole', 'lith', 'from', 'to'];
-  const words = Object.fromEntries(cols.map(n => [n, [n.toLowerCase()]]));
+  const words = Object.fromEntries(cols.map(n => [n, [n.toLowerCase(), ...colWords(n)]]));
   return { type: 'column', words, generic: ['field', 'fields'], words_pt: words, generic_pt: ['campo', 'campos'] };
+});
+// the values of the category columns ("BRX", "GRD"), so a condition can name them: "lith BRX", "lith is brx"
+noun(() => {
+  const T0 = S.table; if (!T0) return null;
+  const vals = [...new Set(T0.cols.filter(c => c.type === 'categorical' && c.name !== T0.roles.hole).flatMap(c => [...new Set(T0.rows.map(r => r[c.name]).filter(v => v != null).map(String))].slice(0, 60)))]
+    .filter(v => /^[\w.-]+$/.test(v) && !/^\d/.test(v));
+  return vals.length ? { type: 'catvalue', exact: true, words: Object.fromEntries(vals.map(v => [v, [v.toLowerCase()]])), words_pt: Object.fromEntries(vals.map(v => [v, [v.toLowerCase()]])) } : null;
 });
 // the values of the hole column, as written: "in DH-03"
 noun(() => {
@@ -354,17 +359,21 @@ noun({ type: 'corr', words: { corr: ['correlation', 'corr', 'correlation coeffic
 noun({ type: 'ivcheck', words: { intervals: ['intervals', 'interval', 'overlaps', 'gaps', 'interval overlaps', 'from and to'] }, words_pt: { intervals: ['intervalos', 'sobreposições'] } });
 
 /* ── what reads a question: "mean cu by lith where au > 0.1", "how many samples have au above 1" ── */
-// a condition is the words after "where" (or "with", "having"), read by whereToSift; grouping and sorting are columns
+// a condition is the grammar's (cu > 0.5 and lith is BRX), after "where", "with", "having"; grouping and sorting are columns
 const COLS = ['variable', 'column'];
-const COND = { preps: ['where', 'with', 'if', 'when'], types: ['text'] };
+const COND = { preps: ['where', 'with', 'if', 'when'], types: ['cond'] };
+// "for samples with au above 0.1", "the samples where cu > 1": a condition on the rows a question is about
+const SUBSET = { preps: ['for', 'of', 'in', 'among', 'across', 'over'], types: ['sample'] };
+for (const prep of ['with', 'where']) postmod({ prep, heads: ['sample'], attr: 'where', mod: 'cond' });
+const condOf = c => { const w = c.roles.where && c.roles.where[0]; if (w) return w.cond; const s = [...c.theme, ...(c.roles.subset || [])].find(n => n.type === 'sample' && n.attrs && n.attrs.where); return s ? s.attrs.where.cond : null; };
 const common = c => {
-  const out = {}, by = (c.roles.by || []).map(n => n.value), w = c.roles.where && c.roles.where[0], wt = c.roles.weighted && c.roles.weighted[0], v = c.roles.as && c.roles.as[0];
-  if (by.length) out.by = by; if (w) out.where = w.value; if (wt) out.weight = wt.value; if (v) out.view = v.value;
+  const out = {}, by = (c.roles.by || []).map(n => n.value), w = condOf(c), wt = c.roles.weighted && c.roles.weighted[0], v = c.roles.as && c.roles.as[0];
+  if (by.length) out.by = by; if (w) out.where = w; if (wt) out.weight = wt.value; if (v) out.view = v.value;
   return out;
 };
 frame({
   name: 'agg', label: 'Table question', words: ['calculate', 'compute', 'give me', 'show', 'get', 'find', 'tell me'], elidable: true, theme: ['variable', 'column', 'stat'], required: ['theme'],
-  roles: { by: { preps: ['by', 'per', 'across', 'for', 'in'], types: COLS }, where: COND, weighted: { preps: ['weighted'], types: ['weightkind'] }, as: { preps: ['as', 'in'], types: ['view'] } },
+  roles: { by: { preps: ['by', 'per', 'across', 'for', 'in'], types: COLS }, where: COND, subset: SUBSET, weighted: { preps: ['weighted'], types: ['weightkind'] }, as: { preps: ['as', 'in'], types: ['view'] } },
   words_pt: ['calcula', 'calcule', 'mostra', 'mostre'], label_pt: 'Pergunta à tabela',
   bind: c => {
     const aggs = [], cols = [];
@@ -378,16 +387,18 @@ frame({
 });
 frame({
   name: 'count', label: 'Count', words: ['count', 'how many', 'number of', 'count the', 'total number of'], theme: ['sample'], required: [],
-  roles: { by: { preps: ['by', 'per', 'across', 'for', 'in'], types: COLS }, where: { preps: [...COND.preps, 'where', 'having'], types: ['text'] } },
+  roles: { by: { preps: ['by', 'per', 'across', 'for', 'in'], types: COLS }, where: COND },
   words_pt: ['conta', 'conte', 'quantas', 'quantos', 'número de'], label_pt: 'Contar',
   bind: c => ({ tool: 'query', args: { kind: 'count', ...common(c) } })
 });
 frame({
   name: 'rows', label: 'Rows', words: ['show', 'list', 'show me', 'top', 'display', 'give me'], theme: ['sample'], required: ['theme'],
-  roles: { where: COND, sort: { preps: ['sort', 'by'], types: COLS }, order: { preps: [''], types: ['order'] } },
+  // "sorted by au descending", "with the highest au", "by lowest cu"
+  roles: { where: COND, sort: { preps: ['sort', 'by'], types: COLS }, order: { preps: [''], types: ['order'] }, highest: { preps: ['highest'], types: COLS }, lowest: { preps: ['lowest'], types: COLS } },
   words_pt: ['mostra', 'lista', 'mostre', 'liste'], label_pt: 'Linhas',
-  bind: c => { const s = c.roles.sort && c.roles.sort[0], o = c.roles.order && c.roles.order[0], lim = c.theme[0].attrs.limit;
-    return { tool: 'query', args: { kind: 'list', limit: lim ? lim.n : 20, ...(c.roles.where ? { where: c.roles.where[0].value } : {}), ...(s ? { sort: s.value, desc: !!o && o.value === 'desc' } : {}) } }; }
+  bind: c => { const hi = c.roles.highest && c.roles.highest[0], lo = c.roles.lowest && c.roles.lowest[0], s = (c.roles.sort && c.roles.sort[0]) || hi || lo, o = c.roles.order && c.roles.order[0], lim = c.theme[0].attrs.limit, w = condOf(c);
+    if ([c.roles.sort, hi, lo].filter(Boolean).length > 1) return null;
+    return { tool: 'query', args: { kind: 'list', limit: lim ? lim.n : 20, ...(w ? { where: w } : {}), ...(s ? { sort: s.value, desc: hi ? true : lo ? false : !!o && o.value === 'desc' } : {}) } }; }
 });
 frame({
   name: 'distinct', label: 'Values', words: ['distinct', 'unique', 'values of', 'distinct values of', 'unique values of', 'list the values of', 'categories of'], theme: COLS, required: ['theme'], roles: { where: COND },
