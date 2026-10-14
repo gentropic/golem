@@ -114,6 +114,8 @@ test/places.test.mjs         Vincenty against the Geoscience Australia test line
 test/oracle.test.mjs         golem's arithmetic against the GCU packages it does not vendor
 test/smoke.mjs               browser smoke test on the built file
 dist/golem.html              the built app (committed, so it opens without a build)
+dist/sw.js, manifest.webmanifest, icon*.png, icon.svg
+                             what installing it needs (a PWA, offline once installed); golem.html works without them
 ```
 
 ## Status

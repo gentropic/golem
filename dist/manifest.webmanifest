@@ -1,0 +1,49 @@
+{
+  "id": "./golem.html",
+  "name": "golem",
+  "short_name": "golem",
+  "description": "An assistant with no model at runtime. It reads what you type, or says it cannot. Works offline once installed.",
+  "start_url": "./golem.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#15171A",
+  "theme_color": "#15171A",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "New session",
+      "url": "./golem.html?new",
+      "icons": [
+        {
+          "src": "icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ]
+}

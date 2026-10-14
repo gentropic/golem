@@ -6,6 +6,7 @@
 // imports, aliased imports, re-exports, `export let`, import.meta, several declarators on one export line).
 // It also writes dist/golem.json, the clause ontology the engine derives from its declarations.
 import { readFileSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
+import { deflateSync } from 'node:zlib';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -138,6 +139,50 @@ function fontFaces() {
   }).join('\n');
 }
 
+// ── the installable app (SPEC 13.11): what installing needs, beside golem.html, which stays the whole app ──
+// The mark (an orange square) on Basalt, drawn here: no binary we did not make. Colours are the Switchboard swatches.
+const BASALT = '#15171A', ORANGE = '#FB9044', STONE = '#D2D1CE';
+const rgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+const CRC = Array.from({ length: 256 }, (_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; });
+const crc32 = b => { let c = 0xFFFFFFFF; for (const x of b) c = CRC[(c ^ x) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
+function png(size, mark) {   // mark: the square's side over the icon's
+  const bg = rgb(BASALT), fg = rgb(ORANGE), row = size * 4 + 1, raw = Buffer.alloc(row * size);
+  const lo = Math.round(size * (1 - mark) / 2), hi = size - lo;
+  for (let y = 0; y < size; y++) { raw[y * row] = 0; for (let x = 0; x < size; x++) { const c = x >= lo && x < hi && y >= lo && y < hi ? fg : bg; raw.set([...c, 255], y * row + 1 + x * 4); } }
+  const chunk = (type, data) => { const len = Buffer.alloc(4); len.writeUInt32BE(data.length); const td = Buffer.concat([Buffer.from(type), data]); const c = Buffer.alloc(4); c.writeUInt32BE(crc32(td)); return Buffer.concat([len, td, c]); };
+  const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(size, 0); ihdr.writeUInt32BE(size, 4); ihdr.set([8, 6, 0, 0, 0], 8);
+  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', ihdr), chunk('IDAT', deflateSync(raw, { level: 9 })), chunk('IEND', Buffer.alloc(0))]);
+}
+const ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="12" fill="${BASALT}"/><rect x="22" y="22" width="20" height="20" fill="${ORANGE}"/></svg>`;
+export const MANIFEST = {
+  id: './golem.html', name: 'golem', short_name: 'golem',
+  description: 'An assistant with no model at runtime. It reads what you type, or says it cannot. Works offline once installed.',
+  start_url: './golem.html', scope: './', display: 'standalone', background_color: BASALT, theme_color: BASALT,
+  icons: [{ src: 'icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' }, { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+    { src: 'icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }, { src: 'icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }],
+  shortcuts: [{ name: 'New session', url: './golem.html?new', icons: [{ src: 'icon-192.png', sizes: '192x192' }] }],
+};
+// The worker's text stays the same from build to build (its cache name is fixed): the browser re-reads sw.js on its own
+// about once a day, and an identical file changes nothing. A new golem.html arrives only through "Check for updates".
+// Bump SW_CACHE only when the precache list or this config changes.
+const SW_CACHE = 'golem-shell-v1';
+const SW_PRECACHE = ['./golem.html', './manifest.webmanifest', './icon.svg', './icon-192.png', './icon-512.png', './icon-maskable-512.png'];
+async function installable(dir) {
+  const { makeSw } = await import(pathToFileURL(join(src, 'vendor', 'sw', 'make.mjs')).href);
+  writeFileSync(join(dir, 'sw.js'), makeSw({ app: 'golem', cache: SW_CACHE, precache: SW_PRECACHE, autoCheck: false, navFallback: './golem.html', routes: [] }));
+  writeFileSync(join(dir, 'manifest.webmanifest'), JSON.stringify(MANIFEST, null, 2) + '\n');
+  writeFileSync(join(dir, 'icon.svg'), ICON_SVG + '\n');
+  writeFileSync(join(dir, 'icon-192.png'), png(192, 0.34));
+  writeFileSync(join(dir, 'icon-512.png'), png(512, 0.34));
+  writeFileSync(join(dir, 'icon-maskable-512.png'), png(512, 0.28));   // inside the maskable safe zone (the middle 80%)
+}
+const HEAD_PWA = `<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="data:image/svg+xml,${encodeURIComponent(ICON_SVG)}">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="${STONE}" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="${BASALT}" media="(prefers-color-scheme: dark)">
+`;
+
 if (process.argv[1] && posix(process.argv[1]).endsWith('/build.mjs')) {
   const shell = readFileSync(join(src, 'shell', 'index.html'), 'utf8');
   if (!shell.includes('/*__FONTS__*/')) throw new Error('build: src/shell/index.html needs a /*__FONTS__*/ marker inside a <style>');
@@ -146,10 +191,11 @@ if (process.argv[1] && posix(process.argv[1]).endsWith('/build.mjs')) {
   // the shell file starts with <title> and <style>; everything after the <!--__BODY__--> marker is the body
   const cut = shell.indexOf("<!--__BODY__-->"); if (cut < 0) throw new Error("build: src/shell/index.html needs a <!--__BODY__--> marker");
   const head = shell.slice(0, cut).replace('/*__FONTS__*/', fontFaces());
-  const out = `<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n${head}</head>\n<body>\n${shell.slice(cut)}\n<script>\n'use strict';\n${js}</script>\n</body>\n</html>\n`;
+  const out = `<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n${HEAD_PWA}${head}</head>\n<body>\n${shell.slice(cut)}\n<script>\n'use strict';\n${js}</script>\n</body>\n</html>\n`;
   mkdirSync(join(root, 'dist'), { recursive: true });
   writeFileSync(join(root, 'dist', 'golem.html'), out);
+  await installable(join(root, 'dist'));
   const { ontology } = await import(pathToFileURL(join(src, 'engine', 'index.js')).href);
   writeFileSync(join(root, 'dist', 'golem.json'), JSON.stringify(ontology(), null, 2) + '\n');
-  console.log(`dist/golem.html  ${(out.length / 1024).toFixed(1)} kB  from ${js.split('/* ==== src/').length - 1} modules · dist/golem.json written`);
+  console.log(`dist/golem.html  ${(out.length / 1024).toFixed(1)} kB  from ${js.split('/* ==== src/').length - 1} modules · dist/golem.json written · sw.js, manifest and icons for installing`);
 }

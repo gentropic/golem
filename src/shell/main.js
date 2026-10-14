@@ -9,6 +9,7 @@ import { sessions, current, newSession, openSession, renameSession, deleteSessio
 import { skills, PACKS, STARTERS } from '../engine/skills.js';
 import { shell } from '../vendor/leadacid.js';
 import { escHtml, pad, cardEl } from './render.js';
+import { registerGcuSw } from '../vendor/sw-register.js';
 
 const $ = id => document.getElementById(id);
 const KEY = 'golem.state.v2', OLD_KEY = 'golem.mock.v2', THEME = 'golem.theme', FOLD = 'golem.side';   // the old key is read once, then moved
@@ -73,13 +74,37 @@ function renderSkills() {
   });
   $('v-skills').innerHTML = h;
 }
+// The installed app (SPEC 13.11). A service worker keeps golem.html, the manifest and the icons for offline use and makes
+// no request on its own; "Check for updates" asks it to, and the header counts that request (principle 6). Opened as a
+// file there is no worker, and nothing to install or update.
+let requests = 0, update = { at: null, ready: false, note: '' };
+const countRequest = () => { requests++; $('st-req').textContent = `${requests} request${requests === 1 ? '' : 's'}`; };
+const sw = registerGcuSw({ url: 'sw.js', persist: true, onUpdateAvailable: () => { update.ready = true; renderPacks(); } });
+async function checkUpdates() {
+  countRequest(); update.note = 'Checking…'; renderPacks();
+  const r = await sw.checkNow();
+  update.at = Date.now();
+  update.note = !r ? 'No worker controls this page yet. Reload once, then check again.' : r.changed ? '' : 'golem is up to date.';
+  if (r && r.changed) update.ready = true;
+  renderPacks();
+}
+function appItem() {
+  if (!sw.supported) return '<div class="item"><h3>This app</h3><p>Opened as a file, so there is nothing to install or update. Served over https, golem installs as an app and works offline.</p></div>';
+  const at = update.at ? ` Last checked ${new Date(update.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}.` : '';
+  return `<div class="item"><h3>This app</h3><p>Kept on this device and works offline. It looks for a new version only when you ask; that is one request to where golem came from.${at}</p>`
+    + `<div class="opts">${update.ready ? '<button class="btn go" type="button" id="sw-apply">Reload to the new golem</button>' : '<button class="btn" type="button" id="sw-check">Check for updates</button>'}${update.note ? `<span class="sub">${escHtml(update.note)}</span>` : ''}</div></div>`;
+}
 function renderPacks() {
   const lab = { live: 'installed', samp: 'sample', plan: 'not wired' };
   let h = '<h1 class="vhead">Packs and this device</h1><div class="sub">golem knows what its installed packs hold. These are the gcu-library entries plus packs worth adding.</div><div class="lbl">Library</div>';
   PACKS.forEach(([id, name, meta, st, d]) => { h += `<div class="item"><h3>${escHtml(name)} <span class="tag ${st}">${lab[st]}</span></h3><p>${escHtml(d)}</p><div class="from">${escHtml(id)} · ${escHtml(meta)}</div></div>`; });
   const al = Object.entries(S.aliases);
   h += `<div class="lbl">On this device</div><div class="item"><h3>Taught words</h3><p>${al.length ? al.map(([k, v]) => `${escHtml(k)} → ${escHtml(v)}`).join('<br>') : 'None yet. Try “pop means population”.'}</p></div><div class="item"><h3>Notes</h3><p>${S.facts.length ? S.facts.map(escHtml).join('<br>') : 'None yet. Try “remember that …”.'}</p></div><div class="item"><h3>Open table</h3><p>${S.table ? `${escHtml(S.table.name)} · ${S.table.rows.length} rows · ${S.table.source === 'sample' ? 'sample data' : 'from your files'}` : 'None.'}</p></div><div class="item"><h3>Files on this device</h3><p>${Object.values(S.files).length ? Object.values(S.files).map(f => `${escHtml(f.name)} · ${(f.size / 1024).toFixed(0)} kB`).join('<br>') : 'None yet. Tap the paperclip to open a CSV.'}</p></div>`;
+  h += appItem();
   $('v-packs').innerHTML = h;
+  const ck = $('sw-check'), ap = $('sw-apply');
+  if (ck) ck.addEventListener('click', checkUpdates);
+  if (ap) ap.addEventListener('click', () => sw.applyUpdate());
 }
 
 /* ── the drawer: sessions and history ── */
@@ -256,5 +281,7 @@ $('starts').innerHTML = STARTERS.map(([t, q]) => `<button class="start" type="bu
 renderSkills();
 if (shell.present) $('st-where').textContent = 'in the lead-acid shell';
 if (!restore()) seedExamples();
+// the "New session" shortcut of the installed app
+if (new URLSearchParams(location.search).has('new')) { newSession(); try { history.replaceState(null, '', location.pathname); } catch (e) { /* file:// */ } }
 renderStream(); renderDrawer();
 $('status').textContent = '';
