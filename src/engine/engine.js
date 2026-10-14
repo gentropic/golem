@@ -8,6 +8,7 @@ import './orientation.js';
 import './table.js';
 import './knowledge.js';
 import './factbook.js';
+import './books.js';
 import './device.js';
 import './structure.js';
 import './geo.js';

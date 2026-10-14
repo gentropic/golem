@@ -87,76 +87,6 @@
       }
     },
     {
-      "type": "term",
-      "words": {
-        "skiplist": [
-          "skiplist",
-          "skip list"
-        ],
-        "hash table": [
-          "hash table",
-          "hashtable"
-        ],
-        "binary heap": [
-          "binary heap",
-          "heap"
-        ],
-        "treap": [
-          "treap"
-        ],
-        "scapegoat tree": [
-          "scapegoat tree"
-        ],
-        "red-black tree": [
-          "red-black tree",
-          "red black tree"
-        ],
-        "b-tree": [
-          "b-tree",
-          "btree",
-          "b tree"
-        ]
-      },
-      "generic": [
-        "term",
-        "word"
-      ],
-      "words_pt": {
-        "skiplist": [
-          "skiplist",
-          "skip list"
-        ],
-        "hash table": [
-          "hash table",
-          "tabela hash"
-        ],
-        "binary heap": [
-          "binary heap",
-          "heap"
-        ],
-        "treap": [
-          "treap"
-        ],
-        "scapegoat tree": [
-          "scapegoat tree"
-        ],
-        "red-black tree": [
-          "red-black tree",
-          "red black tree"
-        ],
-        "b-tree": [
-          "b-tree",
-          "btree",
-          "árvore b",
-          "arvore b"
-        ]
-      },
-      "generic_pt": [
-        "termo",
-        "palavra"
-      ]
-    },
-    {
       "type": "table",
       "words": {
         "assays.csv": [
@@ -2214,6 +2144,75 @@
           "mais pobres"
         ]
       }
+    },
+    {
+      "type": "term",
+      "words": {
+        "skiplist": [
+          "skiplist",
+          "skip list"
+        ],
+        "hash table": [
+          "hash table",
+          "hashtable"
+        ],
+        "binary heap": [
+          "binary heap",
+          "heap"
+        ],
+        "treap": [
+          "treap"
+        ],
+        "scapegoat tree": [
+          "scapegoat tree"
+        ],
+        "red-black tree": [
+          "red-black tree",
+          "red black tree"
+        ],
+        "b-tree": [
+          "b-tree",
+          "btree",
+          "b tree"
+        ]
+      },
+      "generic": [
+        "term",
+        "word"
+      ],
+      "words_pt": {
+        "skiplist": [
+          "skiplist",
+          "skip list"
+        ],
+        "hash table": [
+          "hash table",
+          "hashtable"
+        ],
+        "binary heap": [
+          "binary heap",
+          "heap"
+        ],
+        "treap": [
+          "treap"
+        ],
+        "scapegoat tree": [
+          "scapegoat tree"
+        ],
+        "red-black tree": [
+          "red-black tree",
+          "red black tree"
+        ],
+        "b-tree": [
+          "b-tree",
+          "btree",
+          "b tree"
+        ]
+      },
+      "generic_pt": [
+        "termo",
+        "palavra"
+      ]
     },
     {
       "type": "alarm",
@@ -8893,65 +8892,6 @@
       "label_pt": "Verificar intervalos"
     },
     {
-      "name": "define",
-      "label": "Define",
-      "words": [
-        "define",
-        "explain",
-        "describe"
-      ],
-      "elidable": true,
-      "theme": [
-        "term"
-      ],
-      "required": [
-        "theme"
-      ],
-      "roles": {},
-      "words_pt": [
-        "definir",
-        "define",
-        "defina",
-        "explicar",
-        "explica",
-        "descrever",
-        "descreve"
-      ],
-      "label_pt": "Definir"
-    },
-    {
-      "name": "lint",
-      "label": "Check",
-      "words": [
-        "check",
-        "lint",
-        "review",
-        "proofread",
-        "style check"
-      ],
-      "theme": [],
-      "required": [
-        "text"
-      ],
-      "roles": {
-        "text": {
-          "preps": [
-            ":"
-          ],
-          "types": [
-            "text"
-          ]
-        }
-      },
-      "words_pt": [
-        "revisa",
-        "revise",
-        "confere",
-        "confira"
-      ],
-      "label_pt": "Revisar"
-    },
-    {
       "name": "lookup",
       "label": "Look up",
       "words": [
@@ -9052,6 +8992,65 @@
         "ordena"
       ],
       "label_pt": "Listar"
+    },
+    {
+      "name": "define",
+      "label": "Define",
+      "words": [
+        "define",
+        "explain",
+        "describe"
+      ],
+      "elidable": true,
+      "theme": [
+        "term"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {},
+      "words_pt": [
+        "definir",
+        "define",
+        "defina",
+        "explicar",
+        "explica",
+        "descrever",
+        "descreve"
+      ],
+      "label_pt": "Definir"
+    },
+    {
+      "name": "lint",
+      "label": "Check",
+      "words": [
+        "check",
+        "lint",
+        "review",
+        "proofread",
+        "style check"
+      ],
+      "theme": [],
+      "required": [
+        "text"
+      ],
+      "roles": {
+        "text": {
+          "preps": [
+            ":"
+          ],
+          "types": [
+            "text"
+          ]
+        }
+      },
+      "words_pt": [
+        "revisa",
+        "revise",
+        "confere",
+        "confira"
+      ],
+      "label_pt": "Revisar"
     },
     {
       "name": "timer",

@@ -51,6 +51,19 @@ tamper = true; await page.click('#fb-install');
 await page.waitForFunction(() => /Not installed/.test(document.getElementById('v-packs').textContent), null, { timeout: 30000 }).catch(() => {});
 check(/did not match the registry's checksum/.test(await page.textContent('#v-packs')), 'a download that does not match its checksum is refused');
 
+// the book packs: Open Data Structures from the library, The Elements of Style from a file
+tamper = false; served = [];
+await packs(); await page.click('[data-pk-install="ods"]');
+await page.waitForFunction(() => /Installed: d+ terms/.test(document.getElementById('v-packs').textContent), null, { timeout: 30000 }).catch(() => {});
+check(served.includes('dist/ods.gcudat'), `ods installed from the library (${served.join(', ')})`);
+check((await ask('define sentinel')).includes('called the sentinel'), 'a definition shows the passage that defines the term');
+await page.setInputFiles('#file', join(LIB, 'dist', 'elements-of-style.gcudat')); await page.waitForTimeout(500);
+const style = await ask('check: the data is interesting and owing to the fact that it rained we left');
+check(/V. Interesting/.test(style) && /13. Omit needless words/.test(style), 'the style check cites the rules and chapter V of the installed book');
+await page.reload(); await ready();
+check((await ask('define sentinel')).includes('called the sentinel'), 'the books stay installed after a reload');
+await packs(); await page.click('[data-pk-remove="ods"]'); await page.waitForTimeout(200);
+check(!(await ask('what is a skiplist')).includes('In this chapter'), 'removed: the sample term index answers again');
 errors.forEach(e => console.log('FAIL page error: ' + e));
 await browser.close();
 if (failed || errors.length) { console.log('\npacks test failed'); process.exit(1); }

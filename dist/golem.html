@@ -11631,73 +11631,13 @@ amend({ tools: ['query'], name: 'addagg', label: 'And', words: [], elidable: tru
 
 /* ==== src/engine/knowledge.js ==== */
 const __m15 = (() => {
-const { T, tool, frame, unit, fmt } = __m0;
-const { parseUnit } = __m2;
-// Knowledge from packs: an ODS term index and a style check from The Elements of Style (1918), sample data labelled as such.
-// The Factbook is factbook.js.
+const { unit } = __m0;
+// Words for knowledge the packs carry: the units areas are asked in. The Factbook is factbook.js; definitions and the
+// style check are books.js.
 
-/* ── text: ODS term index + Strunk (1918) check ────────────── */
-const ODS = { skiplist: ['4 Skiplists', '4.1 The Basic Structure'], 'hash table': ['5 Hash Tables', '5.1 ChainedHashTable'], 'binary heap': ['10 Heaps', '10.1 BinaryHeap'], treap: ['7 Random Binary Search Trees', '7.2 Treap'], 'scapegoat tree': ['8 Scapegoat Trees', '8.1 ScapegoatTree'], 'red-black tree': ['9 Red-Black Trees', '9.2 RedBlackTree'], 'b-tree': ['14 External Memory Searching', '14.2 B-Trees'] };
-const ODSA = { 'skip list': 'skiplist', heap: 'binary heap', 'red black tree': 'red-black tree', btree: 'b-tree', 'b tree': 'b-tree', hashtable: 'hash table' };
-tool({
-  name: 'define',
-  skill: { group: 'Knowledge', title: 'Definitions', on: 'ods pack', about: 'Finds where a term is defined and opens the reader there.', examples: ['what is a skiplist'] },
-  topic: a => [a.term, 2],
-  run: a => {
-    const t = a.term.replace(/s$/, ''), k = ODS[t] ? t : ODSA[t];
-    if (k) return {
-      read: ['find the definition of', { v: k }],
-      body: [{ t: 'big', v: `Open Data Structures, ch. ${ODS[k][0]}`, size: 17 }, { t: 'sub', text: `Defined in §${ODS[k][1]}.` }, { t: 'note', text: 'With the ods pack installed, the defining passage shows here. This build carries only the locator.' },
-        { t: 'actions', items: [{ href: 'https://gentropic.github.io/gcu-library/read.html?book=ods', label: 'Open in the library reader' }] }, { t: 'src', text: 'ods pack · CC BY 2.5 · Pat Morin · sample term index' }],
-      trace: [`index.lookup("${k}") across installed packs`, 'hit: ods, glossary facet'], py: `library.define("${k}")`
-    };
-    return null;
-  }
-});
-const LINT = [
-  [/\bthe question as to whether\b/gi, 13, 'whether'], [/\bthere is no doubt but that\b/gi, 13, 'no doubt'], [/\bused for fuel purposes\b/gi, 13, 'used for fuel'],
-  [/\bin a hasty manner\b/gi, 13, 'hastily'], [/\bthis is a subject which\b/gi, 13, 'this subject'], [/\bowing to the fact that\b/gi, 13, 'since'],
-  [/\bin spite of the fact that\b/gi, 13, 'though'], [/\bcall your attention to the fact that\b/gi, 13, 'remind you'], [/\bthe fact that\b/gi, 13, 'recast without it'],
-  [/\bnot honest\b/gi, 12, 'dishonest'], [/\bnot important\b/gi, 12, 'trifling'], [/\bdid not remember\b/gi, 12, 'forgot'], [/\bdid not pay any attention to\b/gi, 12, 'ignored'], [/\bdid not have much confidence in\b/gi, 12, 'distrusted'],
-  [/\b(?:is|are|was|were|be|been|being) (?:\w{3,}ed|lost|taken|given|made|done|found|sent|written|shown)\b(?: by\b)?/gi, 11, 'name who did it']
-];
-const RULE = { 11: 'Use the active voice.', 12: 'Put statements in positive form.', 13: 'Omit needless words.' };
-tool({
-  name: 'lint',
-  skill: { group: 'Knowledge', title: 'Style check', on: 'elements-of-style pack', about: 'Rules compiled into a checker that cites the rule.', examples: ['check: owing to the fact that the samples were lost by the lab, there is no doubt but that the assay was not important'] },
-  topic: () => ['Style check', 2],
-  run: a => {
-    const hits = [];
-    LINT.forEach(([re, rule, fix]) => { re.lastIndex = 0; let m; while ((m = re.exec(a.text))) if (!hits.some(h => m.index < h.e && m.index + m[0].length > h.s)) hits.push({ s: m.index, e: m.index + m[0].length, rule, fix }); });
-    hits.sort((x, y) => x.s - y.s);
-    return {
-      read: ['check text against', { v: 'The Elements of Style (1918)' }],
-      body: [{ t: 'marked', text: a.text, spans: hits.map(h => [h.s, h.e]) },
-        hits.length ? { t: 'table', head: ['Found', 'Rule', 'Try'], rows: hits.map(h => [a.text.slice(h.s, h.e), `${h.rule}. ${RULE[h.rule]}`, h.fix]) } : { t: 'note', kind: 'ok', text: 'No rule in the pack matched this text.' },
-        { t: 'src', text: `elements-of-style pack · public domain · ${LINT.length} patterns compiled from rules 11 to 13` }],
-      trace: [`style.rules("elements-of-style") → ${LINT.length} patterns`, `scan ${a.text.length} characters → ${hits.length} matches`], py: `style.check(text, pack="elements-of-style")`
-    };
-  }
-});
-
-/* ── clause frames over this knowledge ── */
-// "what is the capital of brazil", "population density of mongolia in people per square mile"
-// "what is a skiplist", "define treap", "treap"
-frame({
-  name: 'define', label: 'Define', words: ['define', 'explain', 'describe'], elidable: true,
-  theme: ['term'], required: ['theme'], roles: {},
-  words_pt: ['definir', 'define', 'defina', 'explicar', 'explica', 'descrever', 'descreve'], label_pt: 'Definir',
-  bind: c => { const t = c.theme[0]; return t && t.value ? { tool: 'define', args: { term: t.value } } : null; }
-});
-// "check: …", "review this: …"
-frame({
-  name: 'lint', label: 'Check', words: ['check', 'lint', 'review', 'proofread', 'style check'], theme: [], required: ['text'], roles: { text: { preps: [':'], types: ['text'] } },
-  words_pt: ['revisa', 'revise', 'confere', 'confira'], label_pt: 'Revisar',
-  bind: c => { const t = c.roles.text && c.roles.text[0]; return t && t.type === 'text' ? { tool: 'lint', args: { text: t.value } } : null; }
-});
 // areas the records are asked in: parseUnit knows them, the grammar learns their words here
 for (const [u, words] of [['mi2', ['square miles', 'square mile', 'sq mi', 'mi2']], ['km2', ['square kilometres', 'square kilometers', 'square km', 'sq km', 'km2']], ['ha', ['hectares', 'hectare', 'ha']], ['acres', ['acres', 'acre']]]) unit({ unit: u, dim: 'area', words });
-  return { ODS, ODSA };
+  return {  };
 })();
 
 /* ==== src/engine/factbook.js ==== */
@@ -11903,8 +11843,114 @@ frame({
   return { useFactbook, factbookInfo, profilesOf, fbFind, FIELD, fieldOf };
 })();
 
-/* ==== src/engine/device.js ==== */
+/* ==== src/engine/books.js ==== */
 const __m17 = (() => {
+const { tool, frame, noun } = __m0;
+// Books from packs (SPEC 13.8): definitions from Open Data Structures, a style check from The Elements of Style (1918).
+// Each works from a small sample that ships with golem, or from the gcu-library pack once the shell has installed it and
+// handed its compiled index here (useBook). Packs are compiled at install by packs.js; only the index is kept.
+
+const READER = 'https://gentropic.github.io/gcu-library/read.html?book=';
+
+/* ── Open Data Structures: where a term is defined ───────────── */
+// the sample: a locator per term, no passage
+const ODS_SAMPLE = { skiplist: ['4 Skiplists', '4.1 The Basic Structure'], 'hash table': ['5 Hash Tables', '5.1 ChainedHashTable'], 'binary heap': ['10 Heaps', '10.1 BinaryHeap'], treap: ['7 Random Binary Search Trees', '7.2 Treap'],
+  'scapegoat tree': ['8 Scapegoat Trees', '8.1 ScapegoatTree'], 'red-black tree': ['9 Red-Black Trees', '9.2 RedBlackTree'], 'b-tree': ['14 External Memory Searching', '14.2 B-Trees'] };
+const ODS_ALIAS = { 'skip list': 'skiplist', heap: 'binary heap', 'red black tree': 'red-black tree', btree: 'b-tree', 'b tree': 'b-tree', hashtable: 'hash table' };
+let ODS = null;   // the installed pack's index: { title, author, license, version, terms: { term: { chapter, chapterTitle, section, passage } } }
+const termKey = t => { const k = String(t).toLowerCase().trim(); const all = ODS ? ODS.terms : ODS_SAMPLE; return all[k] ? k : all[k.replace(/s$/, '')] ? k.replace(/s$/, '') : ODS_ALIAS[k] && all[ODS_ALIAS[k]] ? ODS_ALIAS[k] : null; };
+tool({
+  name: 'define',
+  skill: { group: 'Knowledge', title: 'Definitions', on: 'ods pack', about: 'Where a term is defined in Open Data Structures, with the defining passage when the pack is installed, and the reader one tap away.', examples: ['what is a skiplist', 'define sentinel', 'treap'] },
+  topic: a => [a.term, 2],
+  run: a => {
+    const k = termKey(a.term); if (!k) return null;
+    if (!ODS) return {
+      read: ['find the definition of', { v: k }],
+      body: [{ t: 'big', v: `Open Data Structures, ch. ${ODS_SAMPLE[k][0]}`, size: 17 }, { t: 'sub', text: `Defined in §${ODS_SAMPLE[k][1]}.` }, { t: 'note', text: 'With the ods pack installed (Packs and this device), the defining passage shows here. This build carries only the locator.' },
+        { t: 'actions', items: [{ href: READER + 'ods', label: 'Open in the library reader' }] }, { t: 'src', text: 'ods pack · CC BY 2.5 · Pat Morin · the sample term index that ships with golem' }],
+      trace: [`index.lookup("${k}") across installed packs`, 'hit: the sample index (locator only)'], py: `library.define("${k}")`
+    };
+    const d = ODS.terms[k], where = `Chapter ${d.chapter}, ${d.chapterTitle}${d.section ? ` · ${d.section}` : ''}`;
+    return {
+      read: ['find the definition of', { v: k }],
+      body: [{ t: 'lbl', text: where }, { t: 'sub', text: d.passage }, { t: 'actions', items: [{ href: READER + 'ods', label: 'Open the book in the library reader' }] },
+        { t: 'src', text: `${ODS.title} · ${ODS.author} · ${ODS.license} · the passage as published · installed on this device` }],
+      trace: [`index.lookup("${k}") in ods ${ODS.version || ''}`.trim(), `hit: ${where}`, 'passage: the paragraph where the term is first set in italics, or the first of its chapter or section'], py: `library.define("${k}", pack="ods")`
+    };
+  }
+});
+noun(() => {
+  const words = {}; if (ODS) for (const t of Object.keys(ODS.terms)) words[t] = [t];
+  else { for (const k of Object.keys(ODS_SAMPLE)) words[k] = [k]; for (const [a, k] of Object.entries(ODS_ALIAS)) words[k].push(a); }
+  return { type: 'term', words, generic: ['term', 'word'], words_pt: words, generic_pt: ['termo', 'palavra'] };
+});
+// "what is a skiplist", "define treap", "treap"
+frame({
+  name: 'define', label: 'Define', words: ['define', 'explain', 'describe'], elidable: true,
+  theme: ['term'], required: ['theme'], roles: {},
+  words_pt: ['definir', 'define', 'defina', 'explicar', 'explica', 'descrever', 'descreve'], label_pt: 'Definir',
+  bind: c => { const t = c.theme[0]; return t && t.value ? { tool: 'define', args: { term: t.value } } : null; }
+});
+
+/* ── The Elements of Style: a check that cites the book ──────── */
+// the sample: a few phrases of rules 10, 11 and 13 (the 1918 numbering)
+const SAMPLE_RULES = { 10: 'Use the active voice.', 11: 'Put statements in positive form.', 13: 'Omit needless words.' };
+const SAMPLE_PHRASES = [['the question as to whether', 'whether', 13], ['there is no doubt but that', 'no doubt', 13], ['used for fuel purposes', 'used for fuel', 13], ['in a hasty manner', 'hastily', 13],
+  ['this is a subject which', 'this subject', 13], ['owing to the fact that', 'since', 13], ['in spite of the fact that', 'though', 13], ['call your attention to the fact that', 'remind you', 13], ['the fact that', 'recast without it', 13],
+  ['not honest', 'dishonest', 11], ['not important', 'trifling', 11], ['did not remember', 'forgot', 11], ['did not pay any attention to', 'ignored', 11], ['did not have much confidence in', 'distrusted', 11]].map(([find, t, rule]) => ({ find, try: t, rule }));
+let STRUNK = null;   // the installed pack: { title, rules: { n: text }, phrases: [{ find, try, rule }], entries: [{ term, advice }] }
+const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+// the passive: a form of "be" and a past participle (golem's own reading of rule 10, which the book states but does not list)
+const PASSIVE = /\b(?:is|are|was|were|be|been|being) (?:\w{3,}ed|lost|taken|given|made|done|found|sent|written|shown)\b(?: by\b)?/gi;
+function checks() {
+  const rules = STRUNK ? STRUNK.rules : SAMPLE_RULES, phrases = STRUNK ? STRUNK.phrases : SAMPLE_PHRASES;
+  const out = phrases.map(p => ({ re: new RegExp(`\\b${esc(p.find).replace(/\s+/g, '\\s+')}\\b`, 'gi'), cite: `${p.rule}. ${rules[p.rule] || ''}`.trim(), fix: p.try, kind: 'rule' }));
+  out.push({ re: PASSIVE, cite: `10. ${rules[10] || 'Use the active voice.'}`, fix: 'name who did it', kind: 'rule' });
+  // chapter V: each expression, with the book's advice (good in its place, often obtruding: "consider")
+  if (STRUNK) for (const e of STRUNK.entries) { const term = e.term.replace(/,\s*(vb|n|adj)\.?$/i, '').trim(); if (term.length < 3) continue; out.push({ re: new RegExp(`\\b${esc(term).replace(/\s+/g, '\\s+')}\\b`, 'gi'), cite: `V. ${e.term}`, fix: e.advice, kind: 'consider' }); }
+  return out;
+}
+tool({
+  name: 'lint',
+  skill: { group: 'Knowledge', title: 'Style check', on: 'elements-of-style pack', about: 'The rules and expressions of The Elements of Style (1918), compiled into a checker that cites rule or entry for each find. A sample ships; the full book installs on request.', examples: ['check: owing to the fact that the samples were lost by the lab, there is no doubt but that the assay was not important'] },
+  topic: () => ['Style check', 2],
+  run: a => {
+    const C = checks(), hits = [];
+    for (const c of C) { c.re.lastIndex = 0; let m; while ((m = c.re.exec(a.text))) if (!hits.some(h => m.index < h.e && m.index + m[0].length > h.s)) hits.push({ s: m.index, e: m.index + m[0].length, ...c }); }
+    hits.sort((x, y) => x.s - y.s);
+    const rules = hits.filter(h => h.kind === 'rule'), consider = hits.filter(h => h.kind === 'consider');
+    return {
+      read: ['check text against', { v: 'The Elements of Style (1918)' }],
+      body: [{ t: 'marked', text: a.text, spans: hits.map(h => [h.s, h.e]) },
+        rules.length ? { t: 'table', head: ['Found', 'Rule', 'Try'], rows: rules.map(h => [a.text.slice(h.s, h.e), h.cite, h.fix]) } : { t: 'note', kind: 'ok', text: 'No rule matched this text.' },
+        ...(consider.length ? [{ t: 'lbl', text: 'Words and expressions the book warns about' }, { t: 'table', head: ['Found', 'Entry', 'The book says'], rows: consider.map(h => [a.text.slice(h.s, h.e), h.cite, h.fix]) }] : []),
+        { t: 'src', text: STRUNK ? `${STRUNK.title} · ${STRUNK.author} · public domain · ${STRUNK.phrases.length} phrases from its rules, ${STRUNK.entries.length} entries of chapter V, and golem's reading of rule 10 · installed on this device`
+          : `elements-of-style · public domain · ${SAMPLE_PHRASES.length} phrases from rules 11 and 13 and golem's reading of rule 10, the sample that ships with golem` }],
+      trace: [`style.rules(${STRUNK ? 'elements-of-style, installed' : 'the sample'}) → ${C.length} checks`, `scan ${a.text.length} characters → ${rules.length} rule${rules.length === 1 ? '' : 's'}, ${consider.length} to consider`], py: `style.check(text, pack="elements-of-style")`
+    };
+  }
+});
+// "check: …", "review this: …"
+frame({
+  name: 'lint', label: 'Check', words: ['check', 'lint', 'review', 'proofread', 'style check'], theme: [], required: ['text'], roles: { text: { preps: [':'], types: ['text'] } },
+  words_pt: ['revisa', 'revise', 'confere', 'confira'], label_pt: 'Revisar',
+  bind: c => { const t = c.roles.text && c.roles.text[0]; return t && t.type === 'text' ? { tool: 'lint', args: { text: t.value } } : null; }
+});
+
+// a book pack compiled at install (packs.js), or null for the sample
+function useBook(slug, compiled) {
+  if (slug === 'ods') ODS = compiled || null;
+  else if (slug === 'elements-of-style') STRUNK = compiled || null;
+  else throw new Error(`golem has no use for the ${slug} pack yet`);
+  return bookInfo(slug);
+}
+const bookInfo = slug => { const b = slug === 'ods' ? ODS : slug === 'elements-of-style' ? STRUNK : null; return b ? { kind: 'pack', version: b.version, title: b.title, count: slug === 'ods' ? Object.keys(b.terms).length : b.phrases.length + b.entries.length } : { kind: 'sample' }; };
+  return { useBook, bookInfo };
+})();
+
+/* ==== src/engine/device.js ==== */
+const __m18 = (() => {
 const { tool, frame, noun, postmod, fmt, iso } = __m0;
 const { findDate, findTime, today, fmtDate, dateWords } = __m4;
 const { parseUnit } = __m2;
@@ -12001,7 +12047,7 @@ postmod({ prep: '', heads: ['timer'], attr: 'duration', quantity: true });   // 
 })();
 
 /* ==== src/engine/structure.js ==== */
-const __m18 = (() => {
+const __m19 = (() => {
 const { frame, noun, postmod, qmod, tool, fmt, rad, deg, p3, p2 } = __m0;
 const { conversions, vec3, statistics } = __m5;
 const { oriOf } = __m6;
@@ -12177,7 +12223,7 @@ frame({
 })();
 
 /* ==== src/vendor/wmm.js ==== */
-const __m19 = (() => {
+const __m20 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/wmm, the World Magnetic Model (WMM2025) evaluated from NOAA's coefficients,
 // copied from ../auditable/ext/wmm/index.js. Re-vendor by copying that file here when the model is reissued.
 
@@ -12428,9 +12474,9 @@ function declination(lat, lon, date = new Date(), height = 0) {
 })();
 
 /* ==== src/engine/geo.js ==== */
-const __m20 = (() => {
+const __m21 = (() => {
 const { tool, frame, noun, qmod, clock, fmt, iso, p3 } = __m0;
-const { field, MODEL, VALID_FROM, VALID_TO } = __m19;
+const { field, MODEL, VALID_FROM, VALID_TO } = __m20;
 const { findDate, fmtDate, dateWords } = __m4;
 // Magnetic declination from @gcu/wmm (vendored WMM2025), and bearings between magnetic and true north.
 // A place is coordinates in the request; device location stays off (SPEC-skills 0.7).
@@ -12496,7 +12542,7 @@ frame({
 })();
 
 /* ==== src/engine/data/timescale.js ==== */
-const __m21 = (() => {
+const __m22 = (() => {
 // The International Chronostratigraphic Chart as a records pack: one row per unit, five ranks.
 // Source: ICS (Cohen, Finney, Gibbard & Fan 2013; updated chart) as served by Macrostrat
 // (macrostrat.org/api/v2/defs/intervals?timescale_id=11, CC BY 4.0), fetched 8 Oct 2026. The Hadean is
@@ -12681,9 +12727,9 @@ const TIMESCALE = [
 })();
 
 /* ==== src/engine/timescale.js ==== */
-const __m22 = (() => {
+const __m23 = (() => {
 const { tool, frame, noun, unit, fmt } = __m0;
-const { TIMESCALE, TIMESCALE_SOURCE } = __m21;
+const { TIMESCALE, TIMESCALE_SOURCE } = __m22;
 // The geologic timescale: the ICS chart as a records pack (data/timescale.js). Ages, bounds, ranks,
 // what a unit sits in, what came before and after, what it is subdivided into, and which unit an age
 // in Ma falls in. Lookups only; the chart is the answer.
@@ -12783,7 +12829,7 @@ noun({ type: 'chron', words: Object.fromEntries(Object.keys(RETIRED).map(k => [k
 })();
 
 /* ==== src/engine/sample.js ==== */
-const __m23 = (() => {
+const __m24 = (() => {
 const { tool, frame, noun, compound, qmod, postmod, unit, fmt } = __m0;
 const { parseUnit } = __m2;
 const { core, sieve } = __m1;
@@ -12923,7 +12969,7 @@ frame({
 })();
 
 /* ==== src/engine/explain.js ==== */
-const __m24 = (() => {
+const __m25 = (() => {
 const { tool, frame, amend, noun, shape, clock, fmt } = __m0;
 // Explainers: formal notation parsed and described, one row per piece. Cron schedules, epoch times,
 // chmod modes, URLs and ECMAScript regular expressions. Each member has a recogniser so a bare
@@ -13298,7 +13344,7 @@ amend({ tools: ['explain'], name: 'explainas', label: 'Explain as', words: [], e
 })();
 
 /* ==== src/vendor/parquet.js ==== */
-const __m25 = (() => {
+const __m26 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/parquet, Parquet read and write over vendored hyparquet and hyparquet-writer, pure JS, minified by its own build, copied from ../auditable/ext/parquet/index.js at auditable 5fa5f72e (MIT; hyparquet MIT).
 // Re-vendor by copying that file here.
 
@@ -13307,9 +13353,9 @@ const e=["BOOLEAN","INT32","INT64","INT96","FLOAT","DOUBLE","BYTE_ARRAY","FIXED_
 })();
 
 /* ==== src/engine/convert.js ==== */
-const __m26 = (() => {
+const __m27 = (() => {
 const { S, tool, frame, amend, noun, fmt } = __m0;
-const { writeParquet } = __m25;
+const { writeParquet } = __m26;
 // Conversions that need no file format reader: hashes, text encodings both ways, and the open table
 // as CSV, TSV or JSON with a save action. Format readers (xlsx, dm, parquet) are the second pass.
 
@@ -13466,7 +13512,7 @@ for (const op of ['encode', 'decode']) amend({ tools: ['encode'], name: `op${op}
 })();
 
 /* ==== src/vendor/plan-calendar.js ==== */
-const __m27 = (() => {
+const __m28 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/plan's calendar engine and Brazilian holidays, copied from
 // ../auditable/ext/plan/src/calendar.js and src/holidays-br.js (MIT). The scheduling half of the package is not here.
 // Re-vendor by copying those two files here again and keeping the single export block at the end.
@@ -13823,10 +13869,10 @@ function brazilMunicipalities() {
 })();
 
 /* ==== src/engine/calendar.js ==== */
-const __m28 = (() => {
+const __m29 = (() => {
 const { S, tool, frame, amend, noun, shape, postmod, unit, clock, iso } = __m0;
 const { findDate, findTime, today, day0, fmtDate, dateWords } = __m4;
-const { isWorkingDay, addWorkingDays, brazilCalendar, federalHolidays } = __m27;
+const { isWorkingDay, addWorkingDays, brazilCalendar, federalHolidays } = __m28;
 // Working days and rosters over @gcu/plan's calendar engine (vendored), and time zones through Intl.
 // The calendar is a slot and is always shown: Brazil's federal holidays, or weekdays only.
 
@@ -14059,7 +14105,7 @@ amend({ tools: ['workdays'], name: 'workcal', label: 'Calendar', words: [], elid
 })();
 
 /* ==== src/engine/estimate.js ==== */
-const __m29 = (() => {
+const __m30 = (() => {
 const { amend, noun, tool, fmt } = __m0;
 const { U } = __m2;
 // Estimates with ranges: arithmetic over intervals by simulation, units carried through, the seed kept
@@ -14234,7 +14280,7 @@ amend({ tools: ['estimate'], name: 'estdist', label: 'Distribution', words: ['as
 })();
 
 /* ==== src/engine/data/elements.js ==== */
-const __m30 = (() => {
+const __m31 = (() => {
 // The elements with their standard atomic weights, abridged to five significant figures.
 // Source: IUPAC Commission on Isotopic Abundances and Atomic Weights (CIAAW), Standard Atomic Weights 2024
 // (ciaaw.org/atomic-weights.htm, the 2021 report with Gd, Lu and Zr revised in 2024), cross-checked against
@@ -14279,9 +14325,9 @@ const ELEMENTS = [
 })();
 
 /* ==== src/engine/chem.js ==== */
-const __m31 = (() => {
+const __m32 = (() => {
 const { tool, frame, noun, shape, postmod, fmt } = __m0;
-const { ELEMENTS, ELEMENTS_SOURCE } = __m30;
+const { ELEMENTS, ELEMENTS_SOURCE } = __m31;
 const { UNIT_TABLE } = __m2;
 // Molar mass, conversion factors and element fractions from a parsed formula over the IUPAC weights;
 // the periodic table lookup. No mineral names: the minerals pack is not here, so a formula is required.
@@ -14440,7 +14486,7 @@ frame({
 })();
 
 /* ==== src/engine/text.js ==== */
-const __m32 = (() => {
+const __m33 = (() => {
 const { tool, frame, amend, noun, qmod, fmt } = __m0;
 // Text tools over a pasted payload: counts and readability, extracted key sentences, and a diff.
 // The payload is what follows the first colon, or every line after the first of a multi-line input;
@@ -14586,7 +14632,7 @@ amend({ tools: ['diff'], name: 'diffunit', label: 'Diff by', words: [], elidable
 })();
 
 /* ==== src/engine/forms.js ==== */
-const __m33 = (() => {
+const __m34 = (() => {
 const { tool, frame, amend, noun } = __m0;
 // The form card: a tool that still needs answers asks for them one at a time; each answer lands in
 // args and is an editable slot, and the result recomputes when any changes. The decision matrix is the
@@ -14663,10 +14709,10 @@ amend({ tools: ['decide'], name: 'score', label: 'Score', words: ['is', 'scores'
 })();
 
 /* ==== src/engine/econ.js ==== */
-const __m34 = (() => {
+const __m35 = (() => {
 const { tool, frame, noun, shape, postmod, qmod, fmt } = __m0;
-const { ELEMENTS } = __m30;
-const { numberAsk, firstNeed } = __m33;
+const { ELEMENTS } = __m31;
+const { numberAsk, firstNeed } = __m34;
 // Sampling theory and mine economics as declared formulas. Every term is a slot; a term the person did
 // not give is asked for, with the conventional value offered first and never applied on its own. Prices
 // are always the person's input. No geostatistics here: these are formulas over given numbers.
@@ -14830,7 +14876,7 @@ frame({
 })();
 
 /* ==== src/engine/log.js ==== */
-const __m35 = (() => {
+const __m36 = (() => {
 const { S, tool, frame, amend, noun, fmt, iso } = __m0;
 const { parseUnit, dimName } = __m2;
 const { findDate, today, fmtDate, dateWords } = __m4;
@@ -14975,7 +15021,7 @@ amend({ tools: ['logAdd'], name: 'logfix', label: 'Correct', words: ['that was',
 })();
 
 /* ==== src/engine/places.js ==== */
-const __m36 = (() => {
+const __m37 = (() => {
 const { S, tool, frame, amend, noun, shape, postmod, fmt, rad, deg } = __m0;
 // Places, distance and UTM. A place is coordinates in the request or a name saved on this device
 // ("home is -19.92, -43.94"); there is no gazetteer and device location is off, so an unknown name is
@@ -15141,11 +15187,11 @@ amend({ tools: ['utm'], name: 'utmband', label: 'Band', words: [], elidable: tru
 })();
 
 /* ==== src/engine/sky.js ==== */
-const __m37 = (() => {
+const __m38 = (() => {
 const { tool, frame, amend, noun, compound, fmt, rad, deg, iso } = __m0;
 const { findDate, today, fmtDate, dateWords } = __m4;
-const { zonesOf, offsetOf } = __m28;
-const { placeOf } = __m36;
+const { zonesOf, offsetOf } = __m29;
+const { placeOf } = __m37;
 // The sun by NOAA's solar position equations (after Meeus), and the moon's phase from the mean
 // synodic cycle, labelled with its accuracy. Times are given in the place's zone when the place name
 // has one, else in UTC and the card says so.
@@ -15227,7 +15273,7 @@ amend({ tools: ['sun'], name: 'sunzone', label: 'Zone', words: [], elidable: tru
 })();
 
 /* ==== src/engine/apply.js ==== */
-const __m38 = (() => {
+const __m39 = (() => {
 const { S, tool, fmt, rad, deg, p3, p2 } = __m0;
 const { whereOf } = __m14;
 const { evaluatePredicate, predicateToString } = __m13;
@@ -15294,7 +15340,7 @@ tool({
 })();
 
 /* ==== src/vendor/ipynb.js ==== */
-const __m39 = (() => {
+const __m40 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/ipynb, copied from ../auditable/ext/ipynb/index.js (MIT). golem uses importNotebook
 // for its import-substitution table only (numpy → natra, pandas → sadpan, …). Re-vendor by copying that file here.
 
@@ -15843,9 +15889,9 @@ function exportNotebook(cells, opts = {}) {
 })();
 
 /* ==== src/engine/python.js ==== */
-const __m40 = (() => {
+const __m41 = (() => {
 const { tool, frame, amend, result, fmt } = __m0;
-const { importNotebook } = __m39;
+const { importNotebook } = __m40;
 // Run and trace Python with adder, on the device. The tool itself stays synchronous: a first run returns a
 // "running" card carrying a job, the runner (a Web Worker in the page, adder in-process in the tests)
 // answers later, and the card is recomputed from the kept result. Replay reruns the code, which is
@@ -15915,7 +15961,7 @@ amend({ tools: ['python'], name: 'pytraceoff', label: 'Run', words: ['no trace',
 })();
 
 /* ==== src/vendor/librarian.js ==== */
-const __m41 = (() => {
+const __m42 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/librarian, the in-process text search (BM25F, fuzzy expansion, snippets, did-you-mean), copied from ../auditable/ext/librarian/index.js at auditable 5fa5f72e (MIT).
 // Re-vendor by copying that file here.
 
@@ -17191,9 +17237,9 @@ const Librarian = {
 })();
 
 /* ==== src/engine/docs.js ==== */
-const __m42 = (() => {
+const __m43 = (() => {
 const { S, tool, frame, amend, noun, postmod } = __m0;
-const { Librarian } = __m41;
+const { Librarian } = __m42;
 // Search my documents (A7). Markdown, plain text and HTML opened with the paperclip are kept on the device,
 // cut into passages (by heading, then by paragraph) and indexed by @gcu/librarian. A search returns
 // passages verbatim with the matched words marked; golem never rewrites them. The index is derived
@@ -17346,9 +17392,9 @@ amend({ tools: ['docPassage'], name: 'docstep', label: 'Passage', words: [], eli
 })();
 
 /* ==== src/engine/recipes.js ==== */
-const __m43 = (() => {
+const __m44 = (() => {
 const { S, tool, frame, noun, session, runTool } = __m0;
-const { listOf } = __m33;
+const { listOf } = __m34;
 // Recipes (A9): a session's plan saved under a name, with the subjects that may change between runs.
 // A recipe is stored as card specs, plain JSON like a session; running it replays every step with the
 // new subjects into a new session, and stops at the first step that no longer reads. Nothing is skipped
@@ -17542,7 +17588,7 @@ session({
 })();
 
 /* ==== src/vendor/sheet.js ==== */
-const __m44 = (() => {
+const __m45 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sheet, copied from ../auditable/ext/sheet/index.js (built from its src/ by @gcu/build, MIT).
 // Re-vendor by copying that file here. Reading is asynchronous (DecompressionStream), so golem converts at open time, not in a tool.
 
@@ -18774,7 +18820,7 @@ const sheet = {
 })();
 
 /* ==== src/vendor/dm.js ==== */
-const __m45 = (() => {
+const __m46 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/dm, the read-only Datamine .dm reader, copied from ../auditable/ext/dm/index.js (MIT).
 // Re-vendor by copying that file here.
 
@@ -19050,10 +19096,10 @@ function readDM(buffer) {
 })();
 
 /* ==== src/engine/formats.js ==== */
-const __m46 = (() => {
-const { sheet } = __m44;
-const { readDM } = __m45;
-const { readParquet, parquetInfo } = __m25;
+const __m47 = (() => {
+const { sheet } = __m45;
+const { readDM } = __m46;
+const { readParquet, parquetInfo } = __m26;
 // Binary table formats, converted to text when a file is opened: xlsx through @gcu/sheet (one text per
 // sheet), Datamine .dm through @gcu/dm, Parquet through @gcu/parquet. Tools stay synchronous and the device keeps the converted text,
 // so a session replays from it. What did not carry over is said on the card.
@@ -19104,7 +19150,7 @@ async function convertBinary(name, buffer) {
 })();
 
 /* ==== src/engine/notes.js ==== */
-const __m47 = (() => {
+const __m48 = (() => {
 const { S, tool, frame } = __m0;
 // Notes and taught words. Both belong to the device and are shared by every session.
 const textOf = c => c.theme[0] && c.theme[0].type === 'text' ? c.theme[0].value : null;
@@ -19155,7 +19201,7 @@ frame({
 })();
 
 /* ==== src/engine/skills.js ==== */
-const __m48 = (() => {
+const __m49 = (() => {
 const { TOOLS, tool } = __m0;
 // The catalog: skills derived from the declarations, planned skills named here, and the packs golem
 // knows about. Examples feed the Skills tab, the "nearest skills" suggestions and the teach vocabulary.
@@ -19174,8 +19220,8 @@ const PACKS = [
   ['timescale', 'International Chronostratigraphic Chart', 'ICS 2023 · Macrostrat · CC BY 4.0', 'live', 'Every unit of the chart: bounds, rank, parents, neighbours, subdivisions.'],
   ['factbook', 'CIA World Factbook', '2.8 MB · CC0', 'samp', 'Records: lookup, convert, filter, rank.'],
   ['factbook-full', 'Factbook, full profiles', '2.3 MB · CC0', 'samp', 'Installed with the factbook when asked: which countries are landlocked, and their coastlines. More fields later.'],
-  ['ods', 'Open Data Structures', '1.9 MB · CC BY 2.5', 'samp', 'Term index into the reader. Listings can run in adder.'],
-  ['elements-of-style', 'The Elements of Style (1918)', '36 kB · public domain', 'live', 'Rules compiled into a text checker.'],
+  ['ods', 'Open Data Structures', '1.9 MB · CC BY 2.5', 'samp', 'Definitions: where a term is defined, with the defining passage once installed. Listings can run in adder later.'],
+  ['elements-of-style', 'The Elements of Style (1918)', '36 kB · public domain', 'samp', 'Its rules and the expressions of chapter V, compiled into a text checker that cites them.'],
   ['rtow · rtnw · rtrol', 'Ray Tracing series', '11.5 MB · CC0', 'plan', 'Reader only until a term index is built.'],
   ['arcr', 'arcr / gewgaw manual', '26 kB · CC0', 'plan', 'Reader only.'],
   ['geonames', 'Gazetteer', 'proposed · check licence', 'plan', 'Places, coordinates, distances.'],
@@ -19197,12 +19243,11 @@ const SUGGESTIONS = ['pop means population', 'histogram of cu', 'log scale', 'po
 })();
 
 /* ==== src/engine/ontology.js ==== */
-const __m49 = (() => {
+const __m50 = (() => {
 const { FRAMES, LEXICON, S } = __m0;
 const { UNIT_TABLE, COMPOUNDS, DIM, parseUnit, dimName } = __m2;
 const { ELEMENT } = __m14;
-const { ODS, ODSA } = __m15;
-const { TIMESCALE } = __m21;
+const { TIMESCALE } = __m22;
 // The clause ontology, assembled from what golem knows: units from the conversion table, nouns from the
 // sample packs, verb frames from the declarations. Inert data; the build writes it to dist/golem.json.
 // Portuguese synonyms are listed here by hand until packs carry them in their golem facet.
@@ -19223,7 +19268,6 @@ function ontology(only) {
   const have = new Set(units.flatMap(u => u.words));
   for (const u of LEXICON.units) { const words = u.words.filter(w => !have.has(w)); if (words.length) units.push({ ...u, words }); }
   units.push({ unit: 'people per km2', dim: 'population density', words: ['people per km2', 'people per square kilometre', 'people per square km', 'per km2'], words_pt: ['pessoas por km2', 'habitantes por km2', 'por km2'] });
-  const terms = {}; for (const k of Object.keys(ODS)) terms[k] = [k]; for (const [a, k] of Object.entries(ODSA)) terms[k].push(a);
   return {
     $comment: 'golem ontology, generated by the build from src/engine/. Nouns are the sample packs; the real ones arrive with packs.',
     nouns: [
@@ -19232,7 +19276,6 @@ function ontology(only) {
         words_pt: variables(), generic_pt: ['teor', 'teores', 'coluna', 'colunas'] },
       { type: 'plot', words: { histogram: ['histogram', 'hist', 'distribution'] }, generic: ['plot', 'chart'], words_pt: { histogram: ['histograma'] }, generic_pt: ['gráfico', 'grafico'] },
       { type: 'scale', words: { log: ['log', 'logarithmic', 'log scale'], linear: ['linear', 'linear scale'] }, words_pt: { log: ['log', 'logarítmica', 'logaritmica', 'escala log'], linear: ['linear', 'escala linear'] } },
-      { type: 'term', words: terms, generic: ['term', 'word'], words_pt: { ...terms, 'hash table': ['hash table', 'tabela hash'], 'b-tree': ['b-tree', 'btree', 'árvore b', 'arvore b'] }, generic_pt: ['termo', 'palavra'] },
       { type: 'table', words: { 'assays.csv': ['assays.csv', 'assays', 'sample table', 'the sample', 'sample data'] }, generic: ['table', 'csv', 'data', 'file'], words_pt: { 'assays.csv': ['assays.csv', 'assays', 'tabela de amostra'] }, generic_pt: ['tabela', 'arquivo'] },
       { type: 'format', words: { script: ['script', 'python', 'adder'], notebook: ['notebook'], csv: ['csv', 'comma separated'], tsv: ['tsv', 'tab separated'], json: ['json'], parquet: ['parquet'], yaml: ['yaml', 'yml'], wkt: ['wkt'], geojson: ['geojson'] },
         words_pt: { script: ['script', 'python', 'adder'], notebook: ['notebook', 'caderno'], csv: ['csv'], tsv: ['tsv'], json: ['json'], parquet: ['parquet'], yaml: ['yaml', 'yml'], wkt: ['wkt'], geojson: ['geojson'] } },
@@ -19263,7 +19306,7 @@ function ontology(only) {
 })();
 
 /* ==== src/vendor/dispatch.js ==== */
-const __m50 = (() => {
+const __m51 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/dispatch, built from ../auditable/ext/dispatch/src/ by its own build.
 // Source of truth: gentropic/auditable ext/dispatch (local clone: ../auditable). Re-vendor by copying
 // ext/dispatch/index.js here after 'node ext/dispatch/build.js'. golem uses the grammar rung only:
@@ -21416,13 +21459,13 @@ const PORTUGUESE = {
 })();
 
 /* ==== src/engine/reading.js ==== */
-const __m51 = (() => {
+const __m52 = (() => {
 const { S, T, TOOLS, FRAMES, tool, frame, amend, session, noun, toolByName, runTool, iso } = __m0;
-const { examples, vocab } = __m48;
-const { ontology } = __m49;
+const { examples, vocab } = __m49;
+const { ontology } = __m50;
 const { calcOf } = __m3;
-const { estimateOf } = __m29;
-const { createEngine, makeSession, ENGLISH } = __m50;
+const { estimateOf } = __m30;
+const { createEngine, makeSession, ENGLISH } = __m51;
 // The reading ladder: context (amendments, meta-intents), grammar (the clause parser, then the regex
 // rules the declarations carry), taught words (device lexicon rewrites, then grammar again). Plus the
 // tools that talk about the session itself: none, why, export.
@@ -21684,7 +21727,7 @@ function sessionRead(raw) {
 })();
 
 /* ==== src/engine/sessions.js ==== */
-const __m52 = (() => {
+const __m53 = (() => {
 const { S, toolByName, runTool, startJobs, clearResults } = __m0;
 // Sessions: stored as plans (card specs), replayed on open, named from the tools that ran.
 // The shell persists whatever `serialize()` returns and feeds it back through `hydrate()`.
@@ -21795,15 +21838,15 @@ function reset() {
 })();
 
 /* ==== src/engine/engine.js ==== */
-const __m53 = (() => {
+const __m54 = (() => {
 const { S, T, runTool, toolByName, startJobs } = __m0;
 const { DOCUMENT } = __m10;
-const { DOCTEXT } = __m42;
-const { bindingsOf, runSteps } = __m43;
+const { DOCTEXT } = __m43;
+const { bindingsOf, runSteps } = __m44;
 const { tableFromText } = __m14;
-const { convertBinary } = __m46;
-const { norm, grammar, context, taught, sessionRead, readingOf, guessRead } = __m51;
-const { current, newSession, renameSession, touch } = __m52;
+const { convertBinary } = __m47;
+const { norm, grammar, context, taught, sessionRead, readingOf, guessRead } = __m52;
+const { current, newSession, renameSession, touch } = __m53;
 // The entry point: submit(raw) reads a request and returns what happened. Cards are recomputed in
 // place by rerun(); answers and slot flips go through it, so args stay the only state that matters.
 
@@ -21939,7 +21982,7 @@ function seedExamples() {
 })();
 
 /* ==== src/engine/packs.js ==== */
-const __m54 = (() => {
+const __m55 = (() => {
 const { profilesOf } = __m16;
 // Packs as gcu-library ships them: a .gcudat is a gzipped tar holding gcudat.json (the manifest) and the data files
 // (gcu-library tools/build-gcudat.mjs). Read here with the platform's own gunzip (DecompressionStream, in browsers and
@@ -21986,11 +22029,67 @@ async function factbookFromGcudat(bytes, fullBytes) {
   const profiles = fullBytes ? await factbookProfiles(fullBytes) : null;
   return { name: 'factbook', version: p.manifest.version || index.version, attribution: p.manifest.attribution || index.attribution, license: p.manifest.license || index.license, records, ...(profiles ? { profiles } : {}) };
 }
-  return { gunzip, untar, readGcudat, factbookProfiles, factbookFromGcudat };
+
+/* ── book packs (gcu-library books/<slug>: book.json and HTML chapters), compiled at install into what golem uses ── */
+// The chapters are generated HTML (pandoc for ODS, Gutenberg for Strunk), regular enough to read by their tags here;
+// only the compiled index is kept, not the book.
+const ENT = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', ldquo: '“', rdquo: '”', lsquo: '‘', rsquo: '’', mdash: '—', ndash: '–', hellip: '…' };
+const entities = t => t.replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (m, e) => e[0] === '#' ? String.fromCodePoint(e[1] === 'x' || e[1] === 'X' ? parseInt(e.slice(2), 16) : +e.slice(1)) : ENT[e] ?? m);
+// TeX in a math span read as text: \(O(\log n)\) → O(log n)
+const tex = t => t.replace(/\\[()[\]]/g, '').replace(/\\(log|ln|lg|max|min|sum|lceil|rceil|lfloor|rfloor|ldots|cdots|cdot|times|leq?|geq?|neq|in|infty|mathtt|mathrm|mathbf|textrm|text)\b/g, (m, w) => ({ lceil: '⌈', rceil: '⌉', lfloor: '⌊', rfloor: '⌋', ldots: '…', cdots: '⋯', cdot: '·', times: '×', le: '≤', leq: '≤', ge: '≥', geq: '≥', neq: '≠', in: '∈', infty: '∞' })[w] ?? (/^(mathtt|mathrm|mathbf|textrm|text)$/.test(w) ? '' : w)).replace(/\\\{/g, '⦃').replace(/\\\}/g, '⦄').replace(/[{}]/g, '').replace(/⦃/g, '{').replace(/⦄/g, '}').replace(/\\[,;!]/g, ' ').replace(/\\(?=\s|$)/g, '');
+const plain = html => entities(tex(html.replace(/<span class="math[^"]*">([\s\S]*?)<\/span>/g, '$1').replace(/<[^>]+>/g, ''))).replace(/\s+/g, ' ').trim();
+const book = async bytes => {
+  const p = await readGcudat(bytes), b = p.json(p.manifest.index || 'book.json'), files = untar(await gunzip(bytes));
+  const file = path => { const k = Object.keys(files).find(x => x === path || x.endsWith('/' + path)); if (!k) throw new Error(`the pack has no ${path}`); return dec.decode(files[k]); };
+  return { manifest: p.manifest, book: b, chapters: b.chapters.map((c, i) => ({ n: i + 1, id: c.id, title: plain(c.title), html: file(c.file) })) };
+};
+const camel = w => w.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase();
+const singular = w => w.replace(/(ies)$/, 'y').replace(/(ches|shes|sses|xes)$/, m => m.slice(0, -2)).replace(/([^s])s$/, '$1');
+const DEFINING = /\b(called|we call|is called|are called|we say|known as|denote[sd]?|defined?|refer(?:s|red)? to|we use the term|the term|is a|is an|are)\b/i;
+const STOPTERM = new Set(['introduction', 'that', 'a member of', 'share', 'remix', 'attribution', 'average', 'proof', 'not', 'all', 'any', 'only', 'one', 'two', 'each', 'every', 'must', 'some', 'never', 'always', 'very', 'exactly', 'and', 'or', 'the', 'is', 'are', 'can', 'cannot', 'does']);
+// ODS: a term is where the book sets it in italics, a chapter title, or a structure named in a section heading; each with
+// the paragraph that defines it, its chapter and section. The first place a term appears is where it is defined.
+async function compileOds(bytes) {
+  const { manifest, book: b, chapters } = await book(bytes);
+  if (manifest.name !== 'ods') throw new Error(`that is the ${manifest.name} pack, not ods`);
+  const terms = {}, put = (t, where, passage) => { t = t.toLowerCase().replace(/\s+/g, ' ').trim(); if (t.length < 3 || t.length > 40 || STOPTERM.has(t) || terms[t] || !passage) return; terms[t] = { ...where, passage: passage.length > 900 ? passage.slice(0, 900).replace(/\s\S*$/, '') + ' …' : passage }; };
+  chapters.forEach((c, ci) => {
+    if (ci === 0) return;   // "Why This Book?": about the book, defines nothing
+    const n = ci, where = { chapter: n, chapterTitle: c.title, section: null };
+    let section = null, firstP = true;
+    for (const m of c.html.matchAll(/<(h[1-3])[^>]*>([\s\S]*?)<\/\1>|<p>([\s\S]*?)<\/p>/g)) {
+      if (m[1]) {
+        const title = plain(m[2]); if (m[1] === 'h1') continue;
+        section = { title, codes: [...m[2].matchAll(/<code>([A-Za-z][A-Za-z0-9]+)<\/code>/g)].map(x => x[1]) }; firstP = true; continue;
+      }
+      const html = m[3], text = plain(html), at = { ...where, section: section ? section.title : null };
+      if (firstP) { if (!section) put(singular(c.title.toLowerCase()), at, text); else for (const code of section.codes) { put(code, at, text); if (/[a-z][A-Z]/.test(code)) put(camel(code), at, text); } firstP = false; }
+      if (DEFINING.test(text)) for (const e of html.matchAll(/<em>([^<]{3,40})<\/em>/g)) { const t = plain(e[1]); if (/^[A-Za-z][A-Za-z -]*$/.test(t) && t.split(' ').length <= 4) put(t, at, text); }
+    }
+  });
+  return { slug: 'ods', title: b.title, author: b.author, license: b.license, source: b.source, version: manifest.version || b.version || null, chapters: chapters.map(c => c.title), terms };
+}
+// Strunk: the phrase tables of the rules (a needless or negative phrase, and what to write) and the entries of chapter V
+// (an expression and the advice), each with the rule or entry it comes from.
+async function compileStrunk(bytes) {
+  const { manifest, book: b, chapters } = await book(bytes);
+  if (manifest.name !== 'elements-of-style') throw new Error(`that is the ${manifest.name} pack, not elements-of-style`);
+  const rules = {}, phrases = [], entries = [];
+  for (const c of chapters) {
+    let rule = null;
+    for (const m of c.html.matchAll(/<h3>\s*(\d+)\.\s*([\s\S]*?)<\/h3>|<tr>\s*<td class="first">([\s\S]*?)<\/td>\s*<td class="second">([\s\S]*?)<\/td>|<p><b>([\s\S]*?)<\/b>([\s\S]*?)<\/p>/g)) {
+      if (m[1]) { rule = +m[1]; rules[rule] = plain(m[2]); continue; }
+      if (m[3] != null && rule) { const a = plain(m[3]), w = plain(m[4]); if (a.split(' ').length <= 6 && /^[a-z]/.test(a) && !/[.?!]$/.test(a)) phrases.push({ find: a, try: w, rule }); continue; }
+      if (m[5] != null && /^V\./.test(c.title)) { const term = plain(m[5]).replace(/\.$/, ''), advice = plain(m[6]); if (term && term.split(' ').length <= 6) entries.push({ term, advice: advice.split(/(?<=[.;])\s/)[0], full: advice }); }
+    }
+  }
+  return { slug: 'elements-of-style', title: b.title, author: b.author, license: b.license, source: b.source, version: manifest.version || b.version || null, rules, phrases, entries };
+}
+  return { gunzip, untar, readGcudat, factbookProfiles, factbookFromGcudat, plain, compileOds, compileStrunk };
 })();
 
 /* ==== src/vendor/vfs.js ==== */
-const __m55 = (() => {
+const __m56 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/vfs, copied from ../auditable/ext/vfs/index.js (built from its src/ by node ext/vfs/build.js), at
 // auditable 8837da6e. golem's shell keeps sessions, device state, files and packs in it over IndexedDB (src/shell/store.js).
 // golem constructs only IDBBackend and MemoryBackend; the network backends in this bundle (fetch, REST, Dropbox) are
@@ -25801,8 +25900,8 @@ function fromPicker(vfs, destPath, opts) {
 })();
 
 /* ==== src/shell/store.js ==== */
-const __m56 = (() => {
-const { VFS } = __m55;
+const __m57 = (() => {
+const { VFS } = __m56;
 // Where the device keeps golem (SPEC 13.9): @gcu/vfs over IndexedDB, one file per session, one per opened file, the
 // device state and a small meta file, so a session can be exported as itself and nothing has a size cap but the
 // browser's. Only what changed is written. When IndexedDB is not there, the whole state goes to localStorage as before;
@@ -25907,7 +26006,7 @@ function noStore() {
 })();
 
 /* ==== src/vendor/leadacid.js ==== */
-const __m57 = (() => {
+const __m58 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. The lead-acid shell shim, copied from ../auditable/ext/leadacid/index.js
 // (itself vendored from gentropic/lead-acid, lead-acid.js). Re-vendor by copying that file here.
 
@@ -26533,7 +26632,7 @@ function orientationFromRotationVector(v) {
 })();
 
 /* ==== src/shell/render.js ==== */
-const __m58 = (() => {
+const __m59 = (() => {
 const { fmt } = __m0;
 const { conversions, equalArea } = __m5;
 // Rendering. The engine hands over plain blocks; this is the only file that turns them into markup.
@@ -26647,7 +26746,7 @@ function figImage(ctx, x, y, w, h, cols, rows, b64) {
 })();
 
 /* ==== src/vendor/sw-register.js ==== */
-const __m59 = (() => {
+const __m60 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sw's page-side companion, copied from ../auditable/ext/sw/register.js (at auditable 8837da6e).
 
 // @gcu/sw — the page-side companion (ES module). Registration + persistent
@@ -26725,20 +26824,21 @@ function registerGcuSw(opts = {}) {
 })();
 
 /* ==== src/shell/main.js ==== */
-const __m60 = (() => {
+const __m61 = (() => {
 const { S } = __m0;
-const { submit, flipSlot, answer, seedExamples, openFile, openBinary, preview } = __m53;
-const { completions } = __m51;
+const { submit, flipSlot, answer, seedExamples, openFile, openBinary, preview } = __m54;
+const { completions } = __m52;
 const { useFactbook, factbookInfo } = __m16;
-const { factbookFromGcudat, factbookProfiles, readGcudat } = __m54;
-const { BINARY } = __m46;
+const { factbookFromGcudat, factbookProfiles, readGcudat, compileOds, compileStrunk } = __m55;
+const { useBook, bookInfo } = __m17;
+const { BINARY } = __m47;
 const { setRunner, onJobDone } = __m0;
-const { sessions, current, newSession, openSession, renameSession, deleteSession, searchHistory, parts, hydrate, onChange, exportSession, importSession } = __m52;
-const { openStore } = __m56;
-const { skills, PACKS, STARTERS } = __m48;
-const { shell } = __m57;
-const { escHtml, pad, cardEl } = __m58;
-const { registerGcuSw } = __m59;
+const { sessions, current, newSession, openSession, renameSession, deleteSession, searchHistory, parts, hydrate, onChange, exportSession, importSession } = __m53;
+const { openStore } = __m57;
+const { skills, PACKS, STARTERS } = __m49;
+const { shell } = __m58;
+const { escHtml, pad, cardEl } = __m59;
+const { registerGcuSw } = __m60;
 // The shell: wiring, tabs, the session drawer, storage, and the sleep switch. Everything that touches
 // the DOM or the browser lives here or in render.js; the engine never does.
 
@@ -26839,12 +26939,16 @@ async function fetchPack(entry) {
   if (entry.integrity && crypto.subtle) { const want = entry.integrity.replace(/^sha256-/, ''), got = b64(await crypto.subtle.digest('SHA-256', bytes)); if (got !== want) throw new Error(`${entry.name} did not match the registry's checksum, so it was not installed`); }
   return bytes;
 }
+// the library's registry (one request): a lookup of its entries by name
+async function registry() {
+  countRequest();
+  const reg = await (await fetch(new URL('registry.json', LIBRARY))).json(), list = reg.packs || reg.entries || reg;
+  return n => (Array.isArray(list) ? list : Object.values(list)).find(e => e && e.name === n);
+}
 async function installFactbook(full) {
   if (packBusy) return; packBusy = true; packNote = 'Installing…'; renderPacks();
   try {
-    countRequest();
-    const reg = await (await fetch(new URL('registry.json', LIBRARY))).json(), list = reg.packs || reg.entries || reg;
-    const find = n => (Array.isArray(list) ? list : Object.values(list)).find(e => e && e.name === n);
+    const find = await registry();
     const fb = find('factbook'), ff = full ? find('factbook-full') : null; if (!fb || (full && !ff)) throw new Error('the library lists no factbook pack');
     const pack = await factbookFromGcudat(await fetchPack(fb), ff ? await fetchPack(ff) : null);
     await keepFactbook(pack);
@@ -26855,11 +26959,31 @@ async function keepFactbook(pack) {
   await store.writePack('factbook', pack);
   const i = useFactbook(pack); packNote = `Installed: ${i.count} countries${pack.profiles ? ', with the full profiles' : ''}.`; status(packNote);
 }
+// the book packs: compiled at install into the index golem uses (packs.js), kept, handed to books.js
+const BOOKS = {
+  ods: { compile: compileOds, size: '1.9 MB', sample: 'A sample term index ships: where a term is defined, without the passage.', installed: i => `Installed: ${i.count} terms with their defining passages.`, removed: 'Removed. The sample term index answers again.' },
+  'elements-of-style': { compile: compileStrunk, size: '36 kB', sample: 'A sample of rules 10, 11 and 13 ships.', installed: i => `Installed: ${i.count} checks from its rules and chapter V.`, removed: 'Removed. The sample checks answer again.' },
+};
+const bookNote = {};
+async function keepBook(slug, compiled) { await store.writePack(slug, compiled); bookNote[slug] = BOOKS[slug].installed(useBook(slug, compiled)); status(bookNote[slug]); }
+async function installBook(slug) {
+  if (packBusy) return; packBusy = true; bookNote[slug] = 'Installing…'; renderPacks();
+  try { const e = (await registry())(slug); if (!e) throw new Error(`the library lists no ${slug} pack`); await keepBook(slug, await BOOKS[slug].compile(await fetchPack(e))); }
+  catch (err) { bookNote[slug] = `Not installed: ${err.message}.`; }
+  packBusy = false; renderPacks();
+}
+async function removeBook(slug) { await store.removePack(slug); useBook(slug, null); bookNote[slug] = BOOKS[slug].removed; renderPacks(); }
+function bookItem(slug) {
+  const i = bookInfo(slug), B = BOOKS[slug];
+  const acts = i.kind === 'sample' ? `<button class="btn go" type="button" data-pk-install="${slug}">Install from the library (${B.size})</button>` : `<button class="btn" type="button" data-pk-remove="${slug}">Remove</button>`;
+  return `<p>${i.kind === 'sample' ? B.sample : `Installed: version ${escHtml(i.version || '')}, kept on this device.`}</p><div class="opts">${store && store.kind === 'idb' ? acts : '<span class="sub">This browser gives golem no IndexedDB, so a pack cannot be kept.</span>'}${bookNote[slug] ? `<span class="sub">${escHtml(bookNote[slug])}</span>` : ''}</div>`;
+}
 async function removeFactbook() { await store.removePack('factbook'); useFactbook(null); packNote = 'Removed. The 14-country sample answers again.'; renderPacks(); }
 // a .gcudat opened with the paperclip: the factbook, or its full profiles for the factbook already installed
 async function openPackFile(name, bytes) {
   const p = await readGcudat(bytes);
   if (p.manifest.name === 'factbook') return keepFactbook(await factbookFromGcudat(bytes));
+  if (BOOKS[p.manifest.name]) return keepBook(p.manifest.name, await BOOKS[p.manifest.name].compile(bytes));
   if (p.manifest.name === 'factbook-full') {
     const cur = await store.readPack('factbook'); if (!cur) throw new Error('install the factbook pack first; these are its full profiles');
     return keepFactbook({ ...cur, profiles: await factbookProfiles(bytes) });
@@ -26881,7 +27005,8 @@ function renderPacks() {
   PACKS.forEach(([id, name, meta, st, d]) => {
     if (id === 'factbook') st = fbi.kind === 'sample' ? 'samp' : 'live';
     if (id === 'factbook-full') st = fbi.kind === 'pack' && fbi.profiles ? 'live' : 'plan';
-    h += `<div class="item"><h3>${escHtml(name)} <span class="tag ${st}">${lab[st]}</span></h3><p>${escHtml(d)}</p>${id === 'factbook' ? factbookItem() : ''}<div class="from">${escHtml(id)} · ${escHtml(meta)}</div></div>`;
+    if (BOOKS[id]) st = bookInfo(id).kind === 'pack' ? 'live' : 'samp';
+    h += `<div class="item"><h3>${escHtml(name)} <span class="tag ${st}">${lab[st]}</span></h3><p>${escHtml(d)}</p>${id === 'factbook' ? factbookItem() : BOOKS[id] ? bookItem(id) : ''}<div class="from">${escHtml(id)} · ${escHtml(meta)}</div></div>`;
   });
   const al = Object.entries(S.aliases);
   h += `<div class="lbl">On this device</div><div class="item"><h3>Taught words</h3><p>${al.length ? al.map(([k, v]) => `${escHtml(k)} → ${escHtml(v)}`).join('<br>') : 'None yet. Try “pop means population”.'}</p></div><div class="item"><h3>Notes</h3><p>${S.facts.length ? S.facts.map(escHtml).join('<br>') : 'None yet. Try “remember that …”.'}</p></div><div class="item"><h3>Open table</h3><p>${S.table ? `${escHtml(S.table.name)} · ${S.table.rows.length} rows · ${S.table.source === 'sample' ? 'sample data' : 'from your files'}` : 'None.'}</p></div><div class="item"><h3>Files on this device</h3><p>${Object.values(S.files).length ? Object.values(S.files).map(f => `${escHtml(f.name)} · ${(f.size / 1024).toFixed(0)} kB`).join('<br>') : 'None yet. Tap the paperclip to open a CSV.'}</p></div>`;
@@ -27028,6 +27153,7 @@ document.querySelector('.tabs').addEventListener('click', e => { const b = e.tar
 document.querySelector('.sfoot').addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (b) { showTab(b.dataset.tab); closeDrawer(); } });
 $('starts').addEventListener('click', e => { const b = e.target.closest('[data-q]'); if (b) run(b.dataset.q); });
 $('v-skills').addEventListener('click', e => { const b = e.target.closest('[data-q]'); if (b) run(b.dataset.q); });
+$('v-packs').addEventListener('click', e => { const b = e.target.closest('[data-pk-install],[data-pk-remove]'); if (!b) return; if (b.dataset.pkInstall) installBook(b.dataset.pkInstall); else removeBook(b.dataset.pkRemove); });
 $('stream').addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if (!b) return;
   const c = S.cards.find(x => x.id === +b.closest('.card').dataset.id), act = b.dataset.act;
@@ -27086,6 +27212,7 @@ if (shell.present) $('st-where').textContent = 'in the lead-acid shell';
 (async () => {
   store = await openStore();
   const fb = await store.readPack('factbook').catch(() => null); if (fb) useFactbook(fb);   // before the sessions replay, so their cards read it
+  for (const slug of Object.keys(BOOKS)) { const b = await store.readPack(slug).catch(() => null); if (b) useBook(slug, b); }
   const got = await store.load().catch(() => null);
   if (!(got && hydrate(got.state)) && !sessions().length) seedExamples();
   if (got && got.migrated) store.save(parts());

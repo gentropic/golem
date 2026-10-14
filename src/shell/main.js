@@ -4,7 +4,8 @@ import { S } from '../engine/core.js';
 import { submit, flipSlot, answer, seedExamples, openFile, openBinary, preview } from '../engine/engine.js';
 import { completions } from '../engine/reading.js';
 import { useFactbook, factbookInfo } from '../engine/factbook.js';
-import { factbookFromGcudat, factbookProfiles, readGcudat } from '../engine/packs.js';
+import { factbookFromGcudat, factbookProfiles, readGcudat, compileOds, compileStrunk } from '../engine/packs.js';
+import { useBook, bookInfo } from '../engine/books.js';
 import { BINARY } from '../engine/formats.js';
 import { setRunner, onJobDone } from '../engine/core.js';
 import { sessions, current, newSession, openSession, renameSession, deleteSession, searchHistory, parts, hydrate, onChange, exportSession, importSession } from '../engine/sessions.js';
@@ -111,12 +112,16 @@ async function fetchPack(entry) {
   if (entry.integrity && crypto.subtle) { const want = entry.integrity.replace(/^sha256-/, ''), got = b64(await crypto.subtle.digest('SHA-256', bytes)); if (got !== want) throw new Error(`${entry.name} did not match the registry's checksum, so it was not installed`); }
   return bytes;
 }
+// the library's registry (one request): a lookup of its entries by name
+async function registry() {
+  countRequest();
+  const reg = await (await fetch(new URL('registry.json', LIBRARY))).json(), list = reg.packs || reg.entries || reg;
+  return n => (Array.isArray(list) ? list : Object.values(list)).find(e => e && e.name === n);
+}
 async function installFactbook(full) {
   if (packBusy) return; packBusy = true; packNote = 'Installing…'; renderPacks();
   try {
-    countRequest();
-    const reg = await (await fetch(new URL('registry.json', LIBRARY))).json(), list = reg.packs || reg.entries || reg;
-    const find = n => (Array.isArray(list) ? list : Object.values(list)).find(e => e && e.name === n);
+    const find = await registry();
     const fb = find('factbook'), ff = full ? find('factbook-full') : null; if (!fb || (full && !ff)) throw new Error('the library lists no factbook pack');
     const pack = await factbookFromGcudat(await fetchPack(fb), ff ? await fetchPack(ff) : null);
     await keepFactbook(pack);
@@ -127,11 +132,31 @@ async function keepFactbook(pack) {
   await store.writePack('factbook', pack);
   const i = useFactbook(pack); packNote = `Installed: ${i.count} countries${pack.profiles ? ', with the full profiles' : ''}.`; status(packNote);
 }
+// the book packs: compiled at install into the index golem uses (packs.js), kept, handed to books.js
+const BOOKS = {
+  ods: { compile: compileOds, size: '1.9 MB', sample: 'A sample term index ships: where a term is defined, without the passage.', installed: i => `Installed: ${i.count} terms with their defining passages.`, removed: 'Removed. The sample term index answers again.' },
+  'elements-of-style': { compile: compileStrunk, size: '36 kB', sample: 'A sample of rules 10, 11 and 13 ships.', installed: i => `Installed: ${i.count} checks from its rules and chapter V.`, removed: 'Removed. The sample checks answer again.' },
+};
+const bookNote = {};
+async function keepBook(slug, compiled) { await store.writePack(slug, compiled); bookNote[slug] = BOOKS[slug].installed(useBook(slug, compiled)); status(bookNote[slug]); }
+async function installBook(slug) {
+  if (packBusy) return; packBusy = true; bookNote[slug] = 'Installing…'; renderPacks();
+  try { const e = (await registry())(slug); if (!e) throw new Error(`the library lists no ${slug} pack`); await keepBook(slug, await BOOKS[slug].compile(await fetchPack(e))); }
+  catch (err) { bookNote[slug] = `Not installed: ${err.message}.`; }
+  packBusy = false; renderPacks();
+}
+async function removeBook(slug) { await store.removePack(slug); useBook(slug, null); bookNote[slug] = BOOKS[slug].removed; renderPacks(); }
+function bookItem(slug) {
+  const i = bookInfo(slug), B = BOOKS[slug];
+  const acts = i.kind === 'sample' ? `<button class="btn go" type="button" data-pk-install="${slug}">Install from the library (${B.size})</button>` : `<button class="btn" type="button" data-pk-remove="${slug}">Remove</button>`;
+  return `<p>${i.kind === 'sample' ? B.sample : `Installed: version ${escHtml(i.version || '')}, kept on this device.`}</p><div class="opts">${store && store.kind === 'idb' ? acts : '<span class="sub">This browser gives golem no IndexedDB, so a pack cannot be kept.</span>'}${bookNote[slug] ? `<span class="sub">${escHtml(bookNote[slug])}</span>` : ''}</div>`;
+}
 async function removeFactbook() { await store.removePack('factbook'); useFactbook(null); packNote = 'Removed. The 14-country sample answers again.'; renderPacks(); }
 // a .gcudat opened with the paperclip: the factbook, or its full profiles for the factbook already installed
 async function openPackFile(name, bytes) {
   const p = await readGcudat(bytes);
   if (p.manifest.name === 'factbook') return keepFactbook(await factbookFromGcudat(bytes));
+  if (BOOKS[p.manifest.name]) return keepBook(p.manifest.name, await BOOKS[p.manifest.name].compile(bytes));
   if (p.manifest.name === 'factbook-full') {
     const cur = await store.readPack('factbook'); if (!cur) throw new Error('install the factbook pack first; these are its full profiles');
     return keepFactbook({ ...cur, profiles: await factbookProfiles(bytes) });
@@ -153,7 +178,8 @@ function renderPacks() {
   PACKS.forEach(([id, name, meta, st, d]) => {
     if (id === 'factbook') st = fbi.kind === 'sample' ? 'samp' : 'live';
     if (id === 'factbook-full') st = fbi.kind === 'pack' && fbi.profiles ? 'live' : 'plan';
-    h += `<div class="item"><h3>${escHtml(name)} <span class="tag ${st}">${lab[st]}</span></h3><p>${escHtml(d)}</p>${id === 'factbook' ? factbookItem() : ''}<div class="from">${escHtml(id)} · ${escHtml(meta)}</div></div>`;
+    if (BOOKS[id]) st = bookInfo(id).kind === 'pack' ? 'live' : 'samp';
+    h += `<div class="item"><h3>${escHtml(name)} <span class="tag ${st}">${lab[st]}</span></h3><p>${escHtml(d)}</p>${id === 'factbook' ? factbookItem() : BOOKS[id] ? bookItem(id) : ''}<div class="from">${escHtml(id)} · ${escHtml(meta)}</div></div>`;
   });
   const al = Object.entries(S.aliases);
   h += `<div class="lbl">On this device</div><div class="item"><h3>Taught words</h3><p>${al.length ? al.map(([k, v]) => `${escHtml(k)} → ${escHtml(v)}`).join('<br>') : 'None yet. Try “pop means population”.'}</p></div><div class="item"><h3>Notes</h3><p>${S.facts.length ? S.facts.map(escHtml).join('<br>') : 'None yet. Try “remember that …”.'}</p></div><div class="item"><h3>Open table</h3><p>${S.table ? `${escHtml(S.table.name)} · ${S.table.rows.length} rows · ${S.table.source === 'sample' ? 'sample data' : 'from your files'}` : 'None.'}</p></div><div class="item"><h3>Files on this device</h3><p>${Object.values(S.files).length ? Object.values(S.files).map(f => `${escHtml(f.name)} · ${(f.size / 1024).toFixed(0)} kB`).join('<br>') : 'None yet. Tap the paperclip to open a CSV.'}</p></div>`;
@@ -300,6 +326,7 @@ document.querySelector('.tabs').addEventListener('click', e => { const b = e.tar
 document.querySelector('.sfoot').addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (b) { showTab(b.dataset.tab); closeDrawer(); } });
 $('starts').addEventListener('click', e => { const b = e.target.closest('[data-q]'); if (b) run(b.dataset.q); });
 $('v-skills').addEventListener('click', e => { const b = e.target.closest('[data-q]'); if (b) run(b.dataset.q); });
+$('v-packs').addEventListener('click', e => { const b = e.target.closest('[data-pk-install],[data-pk-remove]'); if (!b) return; if (b.dataset.pkInstall) installBook(b.dataset.pkInstall); else removeBook(b.dataset.pkRemove); });
 $('stream').addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if (!b) return;
   const c = S.cards.find(x => x.id === +b.closest('.card').dataset.id), act = b.dataset.act;
@@ -358,6 +385,7 @@ if (shell.present) $('st-where').textContent = 'in the lead-acid shell';
 (async () => {
   store = await openStore();
   const fb = await store.readPack('factbook').catch(() => null); if (fb) useFactbook(fb);   // before the sessions replay, so their cards read it
+  for (const slug of Object.keys(BOOKS)) { const b = await store.readPack(slug).catch(() => null); if (b) useBook(slug, b); }
   const got = await store.load().catch(() => null);
   if (!(got && hydrate(got.state)) && !sessions().length) seedExamples();
   if (got && got.migrated) store.save(parts());
