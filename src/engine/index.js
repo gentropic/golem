@@ -1,7 +1,8 @@
 // The engine's surface, for Node tests and anything else that wants golem without a shell.
 export { S, T, TOOLS, FRAMES, CONDITIONS, clock, fmt, toolByName, runTool, setRunner, onJobDone, settle, result } from './core.js';
 export { rewriteForGcu } from './python.js';
-export { submit, rerun, flipSlot, answer, undo, addCard, seedExamples, openFile, openBinary, hashOf, preview } from './engine.js';
+export { submit, rerun, flipSlot, answer, undo, addCard, seedExamples, openFile, openBinary, openStreamed, hashOf, preview } from './engine.js';
+export { scanTable, STREAM_OVER } from './stream.js';
 export { convertBinary, gridText, BINARY } from './formats.js';
 export { sessions, current, newSession, openSession, renameSession, deleteSession, searchHistory, autoName, tagOf, serialize, parts, hydrate, exportSession, importSession, reset, onChange, spec, load } from './sessions.js';
 export { skills, examples, vocab, PACKS, SUGGESTIONS } from './skills.js';

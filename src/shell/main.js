@@ -1,7 +1,8 @@
 // The shell: wiring, tabs, the session drawer, storage, and the sleep switch. Everything that touches
 // the DOM or the browser lives here or in render.js; the engine never does.
 import { S } from '../engine/core.js';
-import { submit, flipSlot, answer, seedExamples, openFile, openBinary, preview } from '../engine/engine.js';
+import { submit, flipSlot, answer, seedExamples, openFile, openBinary, openStreamed, preview } from '../engine/engine.js';
+import { scanTable, STREAM_OVER } from '../engine/stream.js';
 import { completions } from '../engine/reading.js';
 import { useFactbook, factbookInfo } from '../engine/factbook.js';
 import { factbookFromGcudat, factbookProfiles, readGcudat, compileOds, compileStrunk } from '../engine/packs.js';
@@ -9,7 +10,7 @@ import { useBook, bookInfo } from '../engine/books.js';
 import { BINARY } from '../engine/formats.js';
 import { setRunner, onJobDone } from '../engine/core.js';
 import { sessions, current, newSession, openSession, renameSession, deleteSession, searchHistory, parts, hydrate, onChange, exportSession, importSession } from '../engine/sessions.js';
-import { openStore } from './store.js';
+import { openStore, putBlob, getBlob } from './store.js';
 import { skills, PACKS, STARTERS } from '../engine/skills.js';
 import { shell } from '../vendor/leadacid.js';
 import { escHtml, pad, cardEl } from './render.js';
@@ -254,6 +255,9 @@ setRunner('python', req => new Promise(done => {
   w.postMessage(req);
 }));
 onJobDone(c => { replaceCard(c); });
+// scans of large tables: over the File just picked, or the Blob kept for it (SPEC 13.7)
+const BIG = {};
+setRunner('scan', async req => { const b = BIG[req.hash] || (BIG[req.hash] = await getBlob(req.hash)); if (!b) return { error: 'not kept' }; return scanTable(() => b.stream(), req); });
 
 $('f').addEventListener('submit', e => { e.preventDefault(); const v = $('q').value; $('q').value = ''; grow(); updatePreview(); run(v); });
 function grow() { const q = $('q'); q.style.height = 'auto'; q.style.height = Math.min(q.scrollHeight, window.innerHeight * 0.4) + 'px'; }
@@ -309,7 +313,15 @@ document.addEventListener('keydown', e => {
 $('attach').addEventListener('click', () => { if (awake) $('file').click(); });
 $('file').addEventListener('change', e => {
   const f = e.target.files && e.target.files[0]; if (!f) return;
-  if (f.size > 20e6) { status('That file is over 20 MB. golem reads smaller tables for now.'); e.target.value = ''; return; }
+  if (f.size > STREAM_OVER) {   // a text table too large to hold: kept as it is, typed from its head, scanned per question
+    if (!/\.(csv|tsv|txt)$/i.test(f.name)) { status(`That file is over 20 MB. golem streams large CSV and TSV tables; a ${f.name.split('.').pop()} that large is not read.`); e.target.value = ''; return; }
+    f.slice(0, 1 << 20).text().then(async head => {
+      const o = openStreamed(f.name, f.size, head); if (o.kind !== 'card') { show(o); return; }
+      BIG[o.hash] = f; show(o); status(`Opened ${f.name} as a stream.`);
+      await putBlob(o.hash, f).catch(() => status(`${f.name} could not be kept on this device; it works until the page closes.`));
+    }, () => status('Could not read that file.'));
+    e.target.value = ''; return;
+  }
   if (/\.gcudat$/i.test(f.name)) {   // a pack: installed, not opened as a table
     f.arrayBuffer().then(buf => openPackFile(f.name, new Uint8Array(buf))).then(() => renderPacks(), err => status(`Not installed: ${err.message}.`));
     e.target.value = ''; return;

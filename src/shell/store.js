@@ -24,6 +24,15 @@ function legacy() {
 }
 function dropLegacy() { try { localStorage.removeItem(LS_KEY); localStorage.removeItem(LS_OLD); } catch (e) { /* */ } }
 
+// Large files (a streamed table, SPEC 13.7) are kept as Blobs in an IndexedDB store of their own: the browser writes them
+// to disk without reading them into memory, and a scan reads them back as a stream.
+const BLOBS = 'golem-blobs';
+const blobDb = () => new Promise((res, rej) => { const r = indexedDB.open(BLOBS, 1); r.onupgradeneeded = () => r.result.createObjectStore('blobs'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+const tx = async (mode, fn) => { const db = await blobDb(); return new Promise((res, rej) => { const t = db.transaction('blobs', mode), q = fn(t.objectStore('blobs')); t.oncomplete = () => res(q && q.result); t.onerror = () => rej(t.error); }); };
+export const putBlob = (key, blob) => typeof indexedDB === 'undefined' ? Promise.resolve() : tx('readwrite', s => s.put(blob, key));
+export const getBlob = key => typeof indexedDB === 'undefined' ? Promise.resolve(null) : tx('readonly', s => s.get(key)).catch(() => null);
+export const dropBlob = key => typeof indexedDB === 'undefined' ? Promise.resolve() : tx('readwrite', s => s.delete(key)).catch(() => {});
+
 export async function openStore() {
   let vfs = null;
   try { if (typeof indexedDB !== 'undefined') vfs = await VFS.create({ type: 'idb', name: 'golem' }); } catch (e) { vfs = null; }

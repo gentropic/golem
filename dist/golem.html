@@ -11298,7 +11298,8 @@ function wstats(v, w) {
   const va = v.reduce((a, x, i) => a + w[i] * (x - mean) ** 2, 0) / W * (v.length / Math.max(1, v.length - 1));
   const idx = v.map((_, i) => i).sort((a, b) => v[a] - v[b]);
   const q = p => { let acc = 0; for (const i of idx) { acc += w[i]; if (acc / W >= p) return v[i]; } return v[idx[idx.length - 1]]; };
-  return { n: v.length, mean, sd: Math.sqrt(va), va, min: Math.min(...v), max: Math.max(...v), med: q(.5), q, W };
+  let min = Infinity, max = -Infinity; for (const x of v) { if (x < min) min = x; if (x > max) max = x; }   // a loop: spreading a column of 100,000s overflows the stack
+  return { n: v.length, mean, sd: Math.sqrt(va), va, min, max, med: q(.5), q, W };
 }
 
 /* ── the precondition: a table is open ─────────────────────── */
@@ -11541,14 +11542,14 @@ noun(() => {
 // the values of the category columns ("BRX", "GRD"), so a condition can name them: "lith BRX", "lith is brx"
 noun(() => {
   const T0 = S.table; if (!T0) return null;
-  const vals = [...new Set(T0.cols.filter(c => c.type === 'categorical' && c.name !== T0.roles.hole).flatMap(c => [...new Set(T0.rows.map(r => r[c.name]).filter(v => v != null).map(String))].slice(0, 60)))]
+  const vals = [...new Set(T0.cols.filter(c => c.type === 'categorical' && c.name !== T0.roles.hole).flatMap(c => [...new Set((T0.rows.length ? T0.rows : T0.sampleRows || []).map(r => r[c.name]).filter(v => v != null).map(String))].slice(0, 60)))]
     .filter(v => /^[\w.-]+$/.test(v) && !/^\d/.test(v));
   return vals.length ? { type: 'catvalue', exact: true, words: Object.fromEntries(vals.map(v => [v, [v.toLowerCase()]])), words_pt: Object.fromEntries(vals.map(v => [v, [v.toLowerCase()]])) } : null;
 });
 // the values of the hole column, as written: "in DH-03"
 noun(() => {
   const T0 = S.table, h = T0 && T0.roles.hole; if (!h) return null;
-  const ids = [...new Set(T0.rows.map(r => r[h]).filter(v => v != null).map(String))];
+  const ids = [...new Set((T0.rows.length ? T0.rows : T0.sampleRows || []).map(r => r[h]).filter(v => v != null).map(String))];
   return { type: 'holeid', exact: true, words: Object.fromEntries(ids.map(v => [v, [v.toLowerCase()]])), words_pt: Object.fromEntries(ids.map(v => [v, [v.toLowerCase()]])) };
 });
 noun({ type: 'devtable', words: { log: ['log', 'my log', 'the log'] }, words_pt: { log: ['log', 'meu log', 'registro'] } });
@@ -21837,8 +21838,511 @@ function reset() {
   return { onChange, spec, tagOf, autoName, touch, load, openSession, newSession, renameSession, deleteSession, searchHistory, sessions, current, serialize, parts, exportSession, importSession, hydrate, reset };
 })();
 
-/* ==== src/engine/engine.js ==== */
+/* ==== src/vendor/sluice/accumulator.js ==== */
 const __m54 = (() => {
+// ⚠ VENDORED — DO NOT EDIT. @gcu/sluice src/accumulator.js, copied from ../auditable/ext/sluice/src/accumulator.js at auditable 3a7b253c.
+// golem vendors sluice's accumulator modules only (src/engine/stream.js): its runner builds expressions with new Function,
+// which golem does not ship outside the Python worker.
+
+// @gcu/sluice — the Accumulator protocol + simple value-accumulators.
+//
+// Accumulator<State, Out> = {
+//   create()                      -> State          // fresh, allocation-light
+//   push(state, value, weight=1)  -> void           // hot path: mutate in place
+//   merge(a, b)                   -> State           // combine partial states (parallel/chunked)
+//   result(state)                 -> Out             // finalize
+// }
+// State is plain, structuredClone-transferable data — that is the whole
+// serialization story (worker transfer + cache write are free).
+//
+// Value-accumulators take *values* and are row-agnostic. The row-level fan-out
+// (collect/groupBy/binned, see combinators.js) carries row->value extractors.
+
+// Validate/normalize a custom accumulator so it's first-class.
+function accumulator(spec) {
+  for (const k of ['create', 'push', 'merge', 'result']) {
+    if (typeof spec[k] !== 'function') {
+      throw new Error(`sluice: accumulator needs a ${k}() function`);
+    }
+  }
+  return { create: spec.create, push: spec.push, merge: spec.merge, result: spec.result };
+}
+
+// count() — number of items (weighted: sum of weights).
+function count() {
+  return {
+    create: () => ({ n: 0 }),
+    push: (s, _v, w = 1) => { s.n += w; },
+    merge: (a, b) => ({ n: a.n + b.n }),
+    result: (s) => s.n,
+  };
+}
+
+// sum() — weighted sum of finite values, plus a plain count of contributing values.
+function sum() {
+  return {
+    create: () => ({ n: 0, sum: 0 }),
+    push: (s, v, w = 1) => { if (Number.isFinite(v)) { s.n += 1; s.sum += v * w; } },
+    merge: (a, b) => ({ n: a.n + b.n, sum: a.sum + b.sum }),
+    result: (s) => ({ count: s.n, sum: s.sum }),
+  };
+}
+
+// extent() — min/max only (cheap, no moments).
+function extent() {
+  return {
+    create: () => ({ n: 0, min: Infinity, max: -Infinity }),
+    push: (s, v) => { if (Number.isFinite(v)) { s.n++; if (v < s.min) s.min = v; if (v > s.max) s.max = v; } },
+    merge: (a, b) => ({ n: a.n + b.n, min: Math.min(a.min, b.min), max: Math.max(a.max, b.max) }),
+    result: (s) => ({ count: s.n, min: s.n ? s.min : null, max: s.n ? s.max : null }),
+  };
+}
+
+// welford() — unweighted single-pass mean/variance/std + bias-corrected
+// skewness/kurtosis (count/min/max/m1..m4). push() ignores weight (welford is
+// unweighted; for weighted mean/variance use weightedStats()). merge() uses the
+// Pébay (2008) parallel moment-combination formulas — NOT term-wise addition.
+function welford() {
+  return {
+    create: () => ({ n: 0, min: Infinity, max: -Infinity, m1: 0, m2: 0, m3: 0, m4: 0, zeros: 0 }),
+    push: (s, v) => {
+      if (!Number.isFinite(v)) return;
+      if (v === 0) s.zeros++;
+      if (v < s.min) s.min = v;
+      if (v > s.max) s.max = v;
+      const n = ++s.n;
+      const delta = v - s.m1;
+      const delta_n = delta / n;
+      const delta_n2 = delta_n * delta_n;
+      const term1 = delta * delta_n * (n - 1);
+      s.m4 += term1 * delta_n2 * (n * n - 3 * n + 3) + 6 * delta_n2 * s.m2 - 4 * delta_n * s.m3;
+      s.m3 += term1 * delta_n * (n - 2) - 3 * delta_n * s.m2;
+      s.m2 += term1;
+      s.m1 += delta_n;
+    },
+    merge: combineMoments,
+    result: (s) => {
+      const n = s.n;
+      const variance = n > 1 ? s.m2 / (n - 1) : null;
+      const std = variance !== null ? Math.sqrt(variance) : null;
+      let skewness = null;
+      if (n > 2 && s.m2 > 0) {
+        skewness = (Math.sqrt(n) * s.m3) / Math.pow(s.m2, 1.5);
+        skewness *= Math.sqrt(n * (n - 1)) / (n - 2);
+      }
+      let kurtosis = null;
+      if (n > 3 && s.m2 > 0) {
+        kurtosis = (n * s.m4) / (s.m2 * s.m2) - 3;
+        kurtosis = ((n - 1) / ((n - 2) * (n - 3))) * ((n + 1) * kurtosis + 6);
+      }
+      return {
+        count: n, zeros: s.zeros,
+        min: n > 0 ? s.min : null, max: n > 0 ? s.max : null,
+        mean: n > 0 ? s.m1 : null, variance, std, skewness, kurtosis,
+      };
+    },
+  };
+}
+
+// Pébay parallel combination of two moment partitions (count/mean=m1/M2/M3/M4).
+function combineMoments(a, b) {
+  if (a.n === 0) return { ...b };
+  if (b.n === 0) return { ...a };
+  const nA = a.n, nB = b.n, n = nA + nB;
+  const d = b.m1 - a.m1;       // mean difference
+  const d2 = d * d, d3 = d2 * d, d4 = d2 * d2;
+  const m1 = a.m1 + d * nB / n;
+  const m2 = a.m2 + b.m2 + d2 * nA * nB / n;
+  const m3 = a.m3 + b.m3
+    + d3 * nA * nB * (nA - nB) / (n * n)
+    + 3 * d * (nA * b.m2 - nB * a.m2) / n;
+  const m4 = a.m4 + b.m4
+    + d4 * nA * nB * (nA * nA - nA * nB + nB * nB) / (n * n * n)
+    + 6 * d2 * (nA * nA * b.m2 + nB * nB * a.m2) / (n * n)
+    + 4 * d * (nA * b.m3 - nB * a.m3) / n;
+  return {
+    n, min: Math.min(a.min, b.min), max: Math.max(a.max, b.max),
+    m1, m2, m3, m4, zeros: a.zeros + b.zeros,
+  };
+}
+
+// weightedStats() — weighted count/mean/variance/std (no higher moments).
+// For declustering, volume/density weighting, etc. Variance uses the
+// frequency-weight convention (denominator wSum - 1; reduces to welford for w=1).
+function weightedStats() {
+  return {
+    create: () => ({ n: 0, wSum: 0, mean: 0, m2: 0, min: Infinity, max: -Infinity }),
+    push: (s, v, w = 1) => {
+      if (!Number.isFinite(v) || !(w > 0)) return;
+      if (v < s.min) s.min = v;
+      if (v > s.max) s.max = v;
+      s.n++;
+      const wSumOld = s.wSum;
+      s.wSum += w;
+      const meanOld = s.mean;
+      s.mean = meanOld + (w / s.wSum) * (v - meanOld);
+      s.m2 += w * (v - meanOld) * (v - s.mean);
+      void wSumOld;
+    },
+    merge: (a, b) => {
+      if (a.wSum === 0) return { ...b };
+      if (b.wSum === 0) return { ...a };
+      const wSum = a.wSum + b.wSum;
+      const d = b.mean - a.mean;
+      const mean = a.mean + d * b.wSum / wSum;
+      const m2 = a.m2 + b.m2 + d * d * a.wSum * b.wSum / wSum;
+      return { n: a.n + b.n, wSum, mean, m2, min: Math.min(a.min, b.min), max: Math.max(a.max, b.max) };
+    },
+    result: (s) => {
+      const variance = s.wSum > 1 ? s.m2 / (s.wSum - 1) : null;
+      return {
+        count: s.n, weight: s.wSum,
+        min: s.n ? s.min : null, max: s.n ? s.max : null,
+        mean: s.n ? s.mean : null, variance, std: variance !== null ? Math.sqrt(variance) : null,
+      };
+    },
+  };
+}
+  return { accumulator, count, sum, extent, welford, weightedStats };
+})();
+
+/* ==== src/vendor/sluice/tdigest.js ==== */
+const __m55 = (() => {
+// ⚠ VENDORED — DO NOT EDIT. @gcu/sluice src/tdigest.js, copied from ../auditable/ext/sluice/src/tdigest.js at auditable 3a7b253c.
+// golem vendors sluice's accumulator modules only (src/engine/stream.js): its runner builds expressions with new Function,
+// which golem does not ship outside the Python worker.
+
+// @gcu/sluice — t-digest streaming approximate quantiles.
+//
+// Chosen over P² because it MERGES cleanly (the parallel-scan requirement).
+// result() ships plain centroids; quantileFromCentroids() answers any p later
+// — the "worker accumulates → ships centroids → client queries arbitrary p
+// without re-scanning" pattern.
+
+const DEFAULT_COMPRESSION = 100;
+const BUFFER_SIZE = 2000;
+
+// tdigest() accumulator. State: { centroids:[{mean,count}], buffer:[v…], totalCount, k }.
+// push() ignores weight (weighted quantiles are out of scope for v1).
+function tdigest({ compression = DEFAULT_COMPRESSION } = {}) {
+  return {
+    create: () => ({ centroids: [], buffer: [], totalCount: 0, k: compression }),
+    push: (s, v) => {
+      if (!Number.isFinite(v)) return;
+      s.buffer.push(v);
+      s.totalCount++;
+      if (s.buffer.length >= BUFFER_SIZE) flush(s);
+    },
+    merge: (a, b) => {
+      const k = a.k || b.k || DEFAULT_COMPRESSION;
+      const entries = [
+        ...a.centroids.map((c) => ({ mean: c.mean, count: c.count })),
+        ...a.buffer.map((v) => ({ mean: v, count: 1 })),
+        ...b.centroids.map((c) => ({ mean: c.mean, count: c.count })),
+        ...b.buffer.map((v) => ({ mean: v, count: 1 })),
+      ];
+      entries.sort((x, y) => x.mean - y.mean);
+      const total = a.totalCount + b.totalCount;
+      return { centroids: compress(entries, total, k), buffer: [], totalCount: total, k };
+    },
+    result: (s) => {
+      flush(s);
+      return { count: s.totalCount, centroids: s.centroids.map((c) => [c.mean, c.count]) };
+    },
+  };
+}
+
+function flush(s) {
+  if (s.buffer.length === 0) return;
+  s.buffer.sort((a, b) => a - b);
+  const merged = [];
+  let bi = 0, ci = 0;
+  while (bi < s.buffer.length || ci < s.centroids.length) {
+    if (bi < s.buffer.length && (ci >= s.centroids.length || s.buffer[bi] <= s.centroids[ci].mean)) {
+      merged.push({ mean: s.buffer[bi], count: 1 }); bi++;
+    } else {
+      merged.push({ mean: s.centroids[ci].mean, count: s.centroids[ci].count }); ci++;
+    }
+  }
+  s.buffer = [];
+  s.centroids = compress(merged, s.totalCount, s.k);
+}
+
+function compress(centroids, totalCount, k) {
+  if (centroids.length <= 1) return centroids;
+  const out = [{ mean: centroids[0].mean, count: centroids[0].count }];
+  let cum = centroids[0].count;
+  for (let i = 1; i < centroids.length; i++) {
+    const c = centroids[i];
+    const last = out[out.length - 1];
+    const q = cum / totalCount;
+    const maxSize = Math.max(1, Math.floor(4 * k * q * (1 - q)));
+    if (last.count + c.count <= maxSize) {
+      const nc = last.count + c.count;
+      last.mean += (c.mean - last.mean) * c.count / nc;
+      last.count = nc;
+    } else {
+      out.push({ mean: c.mean, count: c.count });
+    }
+    cum += c.count;
+  }
+  return out;
+}
+
+// Query a quantile from shipped/cached centroids ([[mean,count]…]) + total count.
+function quantileFromCentroids(centroids, totalCount, q) {
+  const n = centroids.length;
+  if (n === 0 || totalCount === 0) return null;
+  if (n === 1) return centroids[0][0];
+  if (q <= 0) return centroids[0][0];
+  if (q >= 1) return centroids[n - 1][0];
+  const target = q * totalCount;
+  let cum = 0;
+  for (let i = 0; i < n; i++) {
+    const cMean = centroids[i][0], cCount = centroids[i][1];
+    const mid = cum + cCount / 2;
+    if (target < mid) {
+      if (i === 0) return cMean;
+      const pMean = centroids[i - 1][0], pCount = centroids[i - 1][1];
+      const prevMid = cum - pCount / 2;
+      const t = (target - prevMid) / (mid - prevMid);
+      return pMean + t * (cMean - pMean);
+    }
+    cum += cCount;
+  }
+  return centroids[n - 1][0];
+}
+
+// Convenience: quantile of a live tdigest state.
+function quantile(state, q) {
+  flush(state);
+  return quantileFromCentroids(state.centroids.map((c) => [c.mean, c.count]), state.totalCount, q);
+}
+  return { tdigest, quantileFromCentroids, quantile };
+})();
+
+/* ==== src/vendor/sluice/histogram.js ==== */
+const __m56 = (() => {
+// ⚠ VENDORED — DO NOT EDIT. @gcu/sluice src/histogram.js, copied from ../auditable/ext/sluice/src/histogram.js at auditable 3a7b253c.
+// golem vendors sluice's accumulator modules only (src/engine/stream.js): its runner builds expressions with new Function,
+// which golem does not ship outside the Python worker.
+
+// @gcu/sluice — fixed-bin weighted histogram (dense Float64Array counts).
+// Bounded by construction. Float64Array state is structuredClone-transferable.
+
+function histogram({ min, max, bins }) {
+  if (!(bins > 0) || !(max > min)) {
+    throw new Error('sluice: histogram needs bins > 0 and max > min');
+  }
+  const width = (max - min) / bins;
+  return {
+    create: () => ({ min, max, bins, width, counts: new Float64Array(bins), under: 0, over: 0, n: 0 }),
+    push: (s, v, w = 1) => {
+      if (!Number.isFinite(v)) return;
+      s.n++;
+      let idx = Math.floor((v - s.min) / s.width);
+      if (idx < 0) { s.under += w; return; }
+      if (idx >= s.bins) { s.over += w; return; }
+      s.counts[idx] += w;
+    },
+    merge: (a, b) => {
+      if (a.bins !== b.bins || a.min !== b.min || a.max !== b.max) {
+        throw new Error('sluice: histogram merge needs matching {min,max,bins}');
+      }
+      const counts = new Float64Array(a.bins);
+      for (let i = 0; i < a.bins; i++) counts[i] = a.counts[i] + b.counts[i];
+      return { min: a.min, max: a.max, bins: a.bins, width: a.width, counts, under: a.under + b.under, over: a.over + b.over, n: a.n + b.n };
+    },
+    result: (s) => {
+      const edges = new Array(s.bins + 1);
+      for (let i = 0; i <= s.bins; i++) edges[i] = s.min + i * s.width;
+      return { edges, counts: Array.from(s.counts), under: s.under, over: s.over, count: s.n };
+    },
+  };
+}
+
+// Cumulative-from-top: out[i] = sum_{j >= i} counts[j]. The grade-tonnage shape
+// (tonnage at-or-above each cutoff). A small util; the GT *node* composes it.
+function cumulativeFromTop(counts) {
+  const n = counts.length;
+  const out = new Float64Array(n);
+  let acc = 0;
+  for (let i = n - 1; i >= 0; i--) { acc += counts[i]; out[i] = acc; }
+  return out;
+}
+  return { histogram, cumulativeFromTop };
+})();
+
+/* ==== src/engine/stream.js ==== */
+const __m57 = (() => {
+const { S, T, fmt, result } = __m0;
+const { colOf, whereSrc, tableFromText, openTable } = __m14;
+const { parsePredicate, evaluatePredicate, predicateToString } = __m13;
+const { NULL_SENTINELS } = __m12;
+const { weightedStats } = __m54;
+const { tdigest, quantile } = __m55;
+const { histogram } = __m56;
+// Tables too large to hold (SPEC 13.7): a CSV or TSV over 20 MB is typed from its first megabyte by recon, like any
+// table, and its questions are answered by scanning the whole file as a job, through @gcu/sluice's accumulators
+// (mergeable, never holding the rows): Welford and weighted moments, t-digest quantiles, histograms. The shell runs the
+// job over the file it keeps (setRunner('scan', …)); the scan itself, scanTable(), is here and plain, so Node runs it too.
+//
+// What needs every row at once (row lists, sorting, correlation, interval checks, a skill on every row, export) says so
+// on a streamed table instead of answering from the first megabyte.
+
+const STREAM_OVER = 20e6;   // bytes: larger text tables are streamed, not held
+const HEAD = 1 << 20;              // what is read to type the columns
+
+/* ── opening: the head types the table; the file stays where the shell keeps it ── */
+// → { table } or { err }. A file whose fields quote the delimiter is refused: the scan splits on it.
+function streamedTable(name, size, headText, hash) {
+  const head = headText.length >= HEAD ? headText.slice(0, headText.lastIndexOf('\n') + 1) : headText;
+  const t = tableFromText(name, head, hash);
+  if (!t) return { err: `${name} has no table in its first megabyte: fewer than two lines.` };
+  const q = new RegExp(`"[^"\\n]*${t.delimiter === '\t' ? '\\t' : t.delimiter.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^"\\n]*"`);
+  if (q.test(head)) return { err: `${name} quotes its delimiter inside fields; golem streams only plain CSV and TSV. Under 20 MB it opens whole.` };
+  const header = head.split(/\r?\n/)[0].split(t.delimiter).map(h => h.trim().replace(/^"|"$/g, ''));
+  return { table: { ...t, source: 'file', streamed: true, size, header, sampleRows: t.rows, rows: [], headRows: t.rows.length } };
+}
+
+/* ── the scan: plain, async, over a stream of bytes ── */
+async function* linesOf(stream) {
+  const reader = stream.getReader(), dec = new TextDecoder(); let buf = '';
+  try {
+    for (;;) {
+      const { done, value } = await reader.read(); if (done) break;
+      buf += typeof value === 'string' ? value : dec.decode(value, { stream: true });
+      const parts = buf.split('\n'); buf = parts.pop();
+      for (const l of parts) yield l.endsWith('\r') ? l.slice(0, -1) : l;
+    }
+    buf += dec.decode(); if (buf) yield buf.endsWith('\r') ? buf.slice(0, -1) : buf;
+  } finally { reader.releaseLock(); }
+}
+async function* rowsOf(open, req) {
+  let first = true;
+  for await (const line of linesOf(open())) {
+    if (first) { first = false; continue; }
+    if (!line.trim()) continue;
+    const f = line.split(req.delimiter), row = {};
+    req.header.forEach((h, i) => { const raw = (f[i] ?? '').trim().replace(/^"|"$/g, ''); row[h] = NULL_SENTINELS.has(raw) ? null : req.types[h] === 'numeric' ? (raw === '' || isNaN(+raw) ? null : +raw) : raw; });
+    yield row;
+  }
+}
+const policy = (v, bdl, skipped) => { if (v == null) { skipped.null++; return null; } if (v < 0) { skipped.bdl++; return bdl === 'exclude' ? null : bdl === 'zero' ? 0 : bdl === 'half' ? -v / 2 : -v; } return v; };
+// req: { delimiter, header, types, kind: agg | count | distinct | hist, cols, by, where, weight, from, to, bdl, aggs, log }
+async function scanTable(open, req) {
+  const t0 = Date.now(), pred = req.where ? parsePredicate(req.where) : null, bdl = req.bdl || 'exclude', skipped = { null: 0, bdl: 0 };
+  let rows = 0, matched = 0;
+  const keyOf = r => (req.by || []).map(c => r[c] ?? '(blank)').join(' / ');
+  if (req.kind === 'hist') {
+    // two passes: the range of the positive values, then 18 bins over it (log10 when asked)
+    const f = req.log ? Math.log10 : x => x; let lo = Infinity, hi = -Infinity, n = 0;
+    for await (const r of rowsOf(open, req)) { rows++; if (pred && !evaluatePredicate(pred, k => r[k])) continue; matched++; const v = policy(r[req.cols[0]], bdl, skipped); if (v == null || !(v > 0)) continue; n++; if (v < lo) lo = v; if (v > hi) hi = v; }
+    if (n < 2) return { rows, matched, n, skipped, ms: Date.now() - t0 };
+    const start = req.log ? f(lo) : 0, end = f(hi), H = histogram({ min: start, max: end + (end - start) * 1e-9 || 1, bins: 18 }), hs = H.create(), W = weightedStats(), ws = W.create(), D = tdigest(), ds = D.create();
+    for await (const r of rowsOf(open, req)) { if (pred && !evaluatePredicate(pred, k => r[k])) continue; const v = policy(r[req.cols[0]], 'exclude', { null: 0, bdl: 0 }); const x = v; if (x == null || !(x > 0)) continue; H.push(hs, f(x)); W.push(ws, x, 1); D.push(ds, x); }
+    return { rows, matched, n, skipped, lo: start, hi: end, bins: H.result(hs).counts, stats: { ...W.result(ws), median: quantile(ds, 0.5) }, ms: Date.now() - t0 };
+  }
+  const groups = new Map(), distinct = new Map(), WS = weightedStats(), TD = tdigest(); let overflow = false;
+  for await (const r of rowsOf(open, req)) {
+    rows++; if (pred && !evaluatePredicate(pred, k => r[k])) continue; matched++;
+    if (req.kind === 'count') { const k = keyOf(r); groups.set(k, (groups.get(k) || 0) + 1); continue; }
+    if (req.kind === 'distinct') { const k = r[req.cols[0]] ?? '(blank)'; if (distinct.has(k)) distinct.set(k, distinct.get(k) + 1); else if (distinct.size < 1000) distinct.set(k, 1); else overflow = true; continue; }
+    const k = keyOf(r); let g = groups.get(k);
+    if (!g) { g = Object.fromEntries(req.cols.map(c => [c, { w: WS.create(), d: TD.create(), sum: 0 }])); groups.set(k, g); }
+    const w = req.weight === 'length' ? (r[req.to] != null && r[req.from] != null ? r[req.to] - r[req.from] : null) : 1;
+    for (const c of req.cols) { const v = policy(r[c], bdl, skipped); if (v == null || w == null || !(w > 0)) continue; WS.push(g[c].w, v, w); TD.push(g[c].d, v); g[c].sum += v * w; }
+  }
+  if (req.kind === 'count') return { rows, matched, groups: [...groups].map(([key, n]) => ({ key, n })), ms: Date.now() - t0 };
+  if (req.kind === 'distinct') return { rows, matched, values: [...distinct].sort((x, y) => y[1] - x[1]), overflow, ms: Date.now() - t0 };
+  const cell = (c, agg) => {
+    const s = WS.result(c.w); if (!s.count) return null;
+    if (agg === 'mean') return s.mean; if (agg === 'sum') return c.sum; if (agg === 'min') return s.min; if (agg === 'max') return s.max; if (agg === 'count') return s.count;
+    if (agg === 'std') return s.std; if (agg === 'var') return s.variance; if (agg === 'cv') return s.std != null && s.mean ? s.std / s.mean : null;
+    if (agg === 'median') return quantile(c.d, 0.5); if (/^p\d/.test(agg)) return quantile(c.d, +agg.slice(1) / 100);
+    return null;
+  };
+  return { rows, matched, skipped, groups: [...groups].map(([key, g]) => ({ key, cells: Object.fromEntries(req.cols.map(c => [c, Object.fromEntries(req.aggs.map(a => [a, cell(g[c], a)]))])) })), ms: Date.now() - t0 };
+}
+
+/* ── the tools on a streamed table: the question becomes a scan job; the card waits for it ── */
+const mb = n => `${fmt(n / 1e6, 3)} MB`;
+const srcOf = t => ({ t: 'src', text: `${t.name} · ${mb(t.size)}, read whole by a scan (@gcu/sluice) · columns typed by @gcu/recon from the first ${t.headRows.toLocaleString('en-US')} rows` });
+const aggLabel = a => a === 'var' ? 'variance' : a;
+const APPROX = a => a === 'median' || /^p\d/.test(a);
+function request(a, T0) {
+  const want = (a.cols || []).map(w => [w, colOf(w, T0)]), miss = want.find(([, c]) => !c) || (a.by || []).map(w => [w, colOf(w, T0)]).find(([, c]) => !c);
+  if (miss) return { err: `No column called "${miss[0]}". The table has ${T0.cols.map(c => c.name).join(', ')}.` };
+  let where = null; if (a.where) { try { where = whereSrc(a.where, T0); parsePredicate(where); } catch (e) { return { err: e.message }; } }
+  return { req: { hash: T0.hash, delimiter: T0.delimiter, header: T0.header, types: Object.fromEntries(T0.cols.map(c => [c.name, c.type])), cols: want.map(([, c]) => c.name), by: (a.by || []).map(w => colOf(w, T0).name), where, bdl: a.bdl || 'exclude' } };
+}
+const waiting = (read, T0) => ({ read, body: [{ t: 'note', text: `Reading all ${mb(T0.size)} of ${T0.name}…` }, srcOf(T0)], trace: ['scan: queued over the whole file'] });
+const noRunner = (read, T0) => ({ read, body: [{ t: 'note', kind: 'err', text: `${T0.name} is not on this device any more, or nothing here can read it. Open it again from your files.` }], trace: ['scan: no runner or no file'] });
+function streamedQuery(a) {
+  const T0 = S.table, R = T0.roles;
+  const refuse = text => ({ read: [a.kind], body: [{ t: 'note', kind: 'err', text }, srcOf(T0)], trace: ['streamed table: stop'] });
+  if (['list', 'corr', 'check'].includes(a.kind)) return refuse(`${T0.name} is ${mb(T0.size)}, read as a stream, not held: ${a.kind === 'list' ? 'listing and sorting rows' : a.kind === 'corr' ? 'a correlation' : 'an interval check'} needs every row at once. Means, medians, counts, values and histograms work.`);
+  const q = request(a, T0); if (q.err) return refuse(q.err);
+  const weight = a.kind === 'agg' ? (a.weight || (R.from ? 'length' : 'count')) : 'count';
+  const req = { ...q.req, kind: a.kind, aggs: a.aggs || [], weight, from: R.from || null, to: R.to || null };
+  const whereText = req.where ? predicateToString(parsePredicate(req.where)) : null;
+  const read = a.kind === 'count' ? ['count rows', ...(req.by.length ? ['by', { v: req.by.join(' and ') }] : [])] : a.kind === 'distinct' ? ['distinct values of', { v: req.cols[0] }] : [a.aggs.map(aggLabel).join(' and '), 'of', { v: req.cols.join(' and ') }, ...(req.by.length ? ['by', { v: req.by.join(' and ') }] : [])];
+  if (whereText) read.push('where', { v: whereText });
+  if (a.kind === 'agg' && R.from) read.push({ v: `weighted by ${weight}`, key: 'weight', alts: ['length', 'count'], cur: weight });
+  const r = result('scan', req);
+  if (r === undefined) return { ...waiting(read, T0), pending: { job: 'scan', req } };
+  if (r === null || r.error) return noRunner(read, T0);
+  const trace = [`scan ${T0.name}: ${r.rows.toLocaleString('en-US')} rows in ${(r.ms / 1000).toFixed(1)} s`, ...(whereText ? [`sift: ${whereText} → ${r.matched.toLocaleString('en-US')} rows`] : [])];
+  if (a.kind === 'count') {
+    if (!req.by.length) return { read, value: r.matched, body: [{ t: 'big', v: r.matched.toLocaleString('en-US'), unit: 'rows' }, srcOf(T0)], trace };
+    const out = [...r.groups].sort((x, y) => y.n - x.n);
+    return { read, body: [{ t: 'table', head: [req.by.join(' / '), 'rows'], num: [false, true], rows: out.map(g => [g.key, g.n.toLocaleString('en-US')]) }, srcOf(T0)], trace };
+  }
+  if (a.kind === 'distinct') return { read, body: [{ t: 'table', head: [req.cols[0], 'rows'], num: [false, true], rows: r.values.map(([k, n]) => [String(k), n.toLocaleString('en-US')]) }, ...(r.overflow ? [{ t: 'note', text: 'More than 1,000 distinct values: the first 1,000 seen are counted.' }] : []), srcOf(T0)], trace };
+  const bad = req.cols.find(c => req.types[c] !== 'numeric'); if (bad) return refuse(`${bad} is a category, not a number. Try "count by ${bad}" or "distinct ${bad}".`);
+  trace.push(`skip ${r.skipped.null} blank, ${r.skipped.bdl} below-detection (${req.bdl})`, `${weight === 'length' ? `length-weighted over ${R.from}–${R.to}` : 'sample-count weighted'} moments (weightedStats)`);
+  const approx = a.aggs.some(APPROX), notes = approx ? [{ t: 'note', text: `Medians and percentiles come from a t-digest: approximate, and counted by sample${weight === 'length' ? ', not by length (the digest takes no weights)' : ''}.` }] : [];
+  const unit = c => { const k = S.table.cols.find(x => x.name === c); return k && k.unit ? ` (${k.unit})` : ''; };
+  if (!req.by.length && req.cols.length === 1 && a.aggs.length === 1) { const v = r.groups[0] && r.groups[0].cells[req.cols[0]][a.aggs[0]]; return { read, value: v, body: [v == null ? { t: 'note', kind: 'err', text: 'No usable values after the filter.' } : { t: 'big', v: (APPROX(a.aggs[0]) ? '≈ ' : '') + fmt(v, 4), unit: unit(req.cols[0]).replace(/[()\s]/g, '') }, ...notes, srcOf(T0)], trace }; }
+  const head = [...(req.by.length ? [req.by.join(' / ')] : []), ...req.cols.flatMap(c => a.aggs.map(g => `${aggLabel(g)}${APPROX(g) ? ' ≈' : ''} ${c}${unit(c)}`))];
+  const rows = r.groups.map(g => [...(req.by.length ? [g.key] : []), ...req.cols.flatMap(c => a.aggs.map(x => g.cells[c][x] == null ? '' : fmt(g.cells[c][x], 4)))]);
+  return { read, body: [{ t: 'table', head, num: head.map((_, i) => i >= (req.by.length ? 1 : 0)), rows }, ...notes, srcOf(T0)], trace };
+}
+function streamedHist(a) {
+  const T0 = S.table, c = colOf(a.col, T0); if (!c) return null;
+  const read = ['histogram of', { v: c.name }, { v: a.log ? 'log scale' : 'linear scale', key: 'log', alts: [false, true], cur: !!a.log }];
+  if (c.type !== 'numeric') return { read, body: [{ t: 'note', kind: 'err', text: `${c.name} is a category, not a number. Try "count by ${c.name}".` }], trace: ['column is categorical'] };
+  const q = request({ cols: [a.col], where: a.where, bdl: a.bdl }, T0); if (q.err) return { read, body: [{ t: 'note', kind: 'err', text: q.err }], trace: ['stop'] };
+  const req = { ...q.req, kind: 'hist', log: !!a.log }, r = result('scan', req);
+  if (r === undefined) return { ...waiting(read, T0), pending: { job: 'scan', req } };
+  if (r === null || r.error) return noRunner(read, T0);
+  if (r.n < 2) return { read, body: [{ t: 'note', kind: 'err', text: `${c.name} has ${r.n} positive value${r.n === 1 ? '' : 's'}; nothing to bin.` }], trace: ['scan: too few values'] };
+  const inv = x => a.log ? Math.pow(10, x) : x, unit = c.unit || '';
+  return { read, body: [{ t: 'bars', label: `Histogram of ${c.name}`, bins: r.bins, ticks: [0, .5, 1].map(t => fmt(inv(r.lo + t * (r.hi - r.lo)), 2)) },
+    { t: 'kv', rows: [['n', r.n.toLocaleString('en-US')], ['mean', `${fmt(r.stats.mean, 3)} ${unit}`], ['median ≈', `${fmt(r.stats.median, 3)} ${unit} (t-digest)`], ['range', `${fmt(r.stats.min, 3)} to ${fmt(r.stats.max, 3)} ${unit}`]] }, srcOf(T0)],
+    trace: [`scan ${T0.name}: ${r.rows.toLocaleString('en-US')} rows, two passes (range, then 18 ${a.log ? 'log10' : 'linear'} bins) in ${(r.ms / 1000).toFixed(1)} s`] };
+}
+function streamedOpen(a) {
+  const f = S.files[a.file.hash], s = streamedTable(f.name, f.size, f.head, f.hash);
+  if (s.err) return { read: ['open table', { v: f.name }], body: [{ t: 'note', kind: 'err', text: s.err }], trace: ['recon: the first megabyte'] };
+  const t = openTable(s.table), rows = [['size', `${mb(t.size)}, read as a stream`], ['columns', t.cols.map(c => `${c.name} (${c.type === 'numeric' ? (c.unit || 'number') : 'category'}${c.analyte ? ', ' + c.analyte : ''})`).join(' · ')]];
+  if (t.roles.from) rows.push(['intervals', `${t.roles.from} to ${t.roles.to}${t.roles.hole ? ' by ' + t.roles.hole : ''}`]);
+  return { read: ['open table', { v: t.name }], body: [{ t: 'kv', rows }, { t: 'note', text: `Too large to hold: questions about it read the whole file each time (means, medians, counts, values, histograms). Columns were typed from its first ${t.headRows.toLocaleString('en-US')} rows.` }, srcOf(t)],
+    trace: [`recon.sniff(${t.name}, first ${mb(f.head.length)}) → delimiter "${t.delimiter}", ${t.cols.length} columns typed`, 'rows: not held; scanned per question'], py: `dh = stream_csv("${t.name}")` };
+}
+// the table tools, taught about streamed tables; the rest refuse on one
+const base = { open: T.open, query: T.query, hist: T.hist, apply: T.apply, tableExport: T.tableExport };
+T.open = a => a && a.file && S.files[a.file.hash] && S.files[a.file.hash].streamed ? streamedOpen(a) : base.open(a);
+T.query = a => S.table && S.table.streamed ? streamedQuery(a) : base.query(a);
+T.hist = a => S.table && S.table.streamed ? streamedHist(a) : base.hist(a);
+for (const k of ['apply', 'tableExport']) T[k] = a => S.table && S.table.streamed
+  ? { read: [k === 'apply' ? 'a skill on every row' : 'export the table'], body: [{ t: 'note', kind: 'err', text: `${S.table.name} is ${mb(S.table.size)}, read as a stream, not held: ${k === 'apply' ? 'a skill on every row' : 'writing it out again'} is not offered for it.` }], trace: ['streamed table: stop'] }
+  : base[k](a);
+  return { STREAM_OVER, streamedTable, scanTable };
+})();
+
+/* ==== src/engine/engine.js ==== */
+const __m58 = (() => {
 const { S, T, runTool, toolByName, startJobs } = __m0;
 const { DOCUMENT } = __m10;
 const { DOCTEXT } = __m43;
@@ -21847,6 +22351,7 @@ const { tableFromText } = __m14;
 const { convertBinary } = __m47;
 const { norm, grammar, context, taught, sessionRead, readingOf, guessRead } = __m52;
 const { current, newSession, renameSession, touch } = __m53;
+const { streamedTable } = __m57;
 // The entry point: submit(raw) reads a request and returns what happened. Cards are recomputed in
 // place by rerun(); answers and slot flips go through it, so args stay the only state that matters.
 
@@ -21946,6 +22451,15 @@ function tabular(name, text, hash) {
   return counts.size === 1;
 }
 // a file the person picked: kept on the device by hash, opened as a card
+// a text table too large to hold (over 20 MB): kept by the shell, typed from its head, scanned per question (stream.js)
+function openStreamed(name, size, head) {
+  if (!current()) newSession();
+  const t0 = performance.now(), hash = hashOf(`${name}:${size}:${head.slice(0, 65536)}`);
+  const s = streamedTable(name, size, head, hash); if (s.err) return { kind: 'nothing', msg: s.err };
+  S.files[hash] = { name, hash, size, streamed: true, head: head.slice(0, 1 << 20), text: '' };
+  const args = { file: { name, hash } }, res = T.open(args);
+  return { kind: 'card', card: addCard(`open ${name}`, { tool: 'open', args, rung: 'grammar', res }, performance.now() - t0), hash };
+}
 function openFile(name, text) {
   if (!current()) newSession();
   const t0 = performance.now(), hash = hashOf(text);
@@ -21978,11 +22492,11 @@ function seedExamples() {
   newSession(true); ['open assays.csv', 'histogram of cu', 'log scale', 'histogram of au'].forEach(x => submit(x));
   newSession(true); ['0.35 oz per short ton in g/t', 'true thickness of a 14 m intercept, hole 270/60, bedding 045/30', 'remind me to send the samples to the lab on friday at 9', 'pop of mongolia'].forEach(x => submit(x));
 }
-  return { addCard, rerun, flipSlot, answer, undo, submit, preview, hashOf, openFile, openBinary, seedExamples };
+  return { addCard, rerun, flipSlot, answer, undo, submit, preview, hashOf, openStreamed, openFile, openBinary, seedExamples };
 })();
 
 /* ==== src/engine/packs.js ==== */
-const __m55 = (() => {
+const __m59 = (() => {
 const { profilesOf } = __m16;
 // Packs as gcu-library ships them: a .gcudat is a gzipped tar holding gcudat.json (the manifest) and the data files
 // (gcu-library tools/build-gcudat.mjs). Read here with the platform's own gunzip (DecompressionStream, in browsers and
@@ -22089,7 +22603,7 @@ async function compileStrunk(bytes) {
 })();
 
 /* ==== src/vendor/vfs.js ==== */
-const __m56 = (() => {
+const __m60 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/vfs, copied from ../auditable/ext/vfs/index.js (built from its src/ by node ext/vfs/build.js), at
 // auditable 8837da6e. golem's shell keeps sessions, device state, files and packs in it over IndexedDB (src/shell/store.js).
 // golem constructs only IDBBackend and MemoryBackend; the network backends in this bundle (fetch, REST, Dropbox) are
@@ -25900,8 +26414,8 @@ function fromPicker(vfs, destPath, opts) {
 })();
 
 /* ==== src/shell/store.js ==== */
-const __m57 = (() => {
-const { VFS } = __m56;
+const __m61 = (() => {
+const { VFS } = __m60;
 // Where the device keeps golem (SPEC 13.9): @gcu/vfs over IndexedDB, one file per session, one per opened file, the
 // device state and a small meta file, so a session can be exported as itself and nothing has a size cap but the
 // browser's. Only what changed is written. When IndexedDB is not there, the whole state goes to localStorage as before;
@@ -25926,6 +26440,15 @@ function legacy() {
   try { const raw = localStorage.getItem(LS_KEY) ?? localStorage.getItem(LS_OLD); return raw == null ? null : JSON.parse(raw); } catch (e) { return null; }
 }
 function dropLegacy() { try { localStorage.removeItem(LS_KEY); localStorage.removeItem(LS_OLD); } catch (e) { /* */ } }
+
+// Large files (a streamed table, SPEC 13.7) are kept as Blobs in an IndexedDB store of their own: the browser writes them
+// to disk without reading them into memory, and a scan reads them back as a stream.
+const BLOBS = 'golem-blobs';
+const blobDb = () => new Promise((res, rej) => { const r = indexedDB.open(BLOBS, 1); r.onupgradeneeded = () => r.result.createObjectStore('blobs'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+const tx = async (mode, fn) => { const db = await blobDb(); return new Promise((res, rej) => { const t = db.transaction('blobs', mode), q = fn(t.objectStore('blobs')); t.oncomplete = () => res(q && q.result); t.onerror = () => rej(t.error); }); };
+const putBlob = (key, blob) => typeof indexedDB === 'undefined' ? Promise.resolve() : tx('readwrite', s => s.put(blob, key));
+const getBlob = key => typeof indexedDB === 'undefined' ? Promise.resolve(null) : tx('readonly', s => s.get(key)).catch(() => null);
+const dropBlob = key => typeof indexedDB === 'undefined' ? Promise.resolve() : tx('readwrite', s => s.delete(key)).catch(() => {});
 
 async function openStore() {
   let vfs = null;
@@ -26002,11 +26525,11 @@ function localStore() {
 function noStore() {
   return { kind: 'none', journal() {}, async load() { return null; }, save() { return Promise.resolve(); }, async readPack() { return null; }, async writePack() { throw new Error('this browser keeps nothing for golem'); }, async removePack() {}, async usage() { return null; } };
 }
-  return { openStore };
+  return { putBlob, getBlob, dropBlob, openStore };
 })();
 
 /* ==== src/vendor/leadacid.js ==== */
-const __m58 = (() => {
+const __m62 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. The lead-acid shell shim, copied from ../auditable/ext/leadacid/index.js
 // (itself vendored from gentropic/lead-acid, lead-acid.js). Re-vendor by copying that file here.
 
@@ -26632,7 +27155,7 @@ function orientationFromRotationVector(v) {
 })();
 
 /* ==== src/shell/render.js ==== */
-const __m59 = (() => {
+const __m63 = (() => {
 const { fmt } = __m0;
 const { conversions, equalArea } = __m5;
 // Rendering. The engine hands over plain blocks; this is the only file that turns them into markup.
@@ -26746,7 +27269,7 @@ function figImage(ctx, x, y, w, h, cols, rows, b64) {
 })();
 
 /* ==== src/vendor/sw-register.js ==== */
-const __m60 = (() => {
+const __m64 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sw's page-side companion, copied from ../auditable/ext/sw/register.js (at auditable 8837da6e).
 
 // @gcu/sw — the page-side companion (ES module). Registration + persistent
@@ -26824,21 +27347,22 @@ function registerGcuSw(opts = {}) {
 })();
 
 /* ==== src/shell/main.js ==== */
-const __m61 = (() => {
+const __m65 = (() => {
 const { S } = __m0;
-const { submit, flipSlot, answer, seedExamples, openFile, openBinary, preview } = __m54;
+const { submit, flipSlot, answer, seedExamples, openFile, openBinary, openStreamed, preview } = __m58;
+const { scanTable, STREAM_OVER } = __m57;
 const { completions } = __m52;
 const { useFactbook, factbookInfo } = __m16;
-const { factbookFromGcudat, factbookProfiles, readGcudat, compileOds, compileStrunk } = __m55;
+const { factbookFromGcudat, factbookProfiles, readGcudat, compileOds, compileStrunk } = __m59;
 const { useBook, bookInfo } = __m17;
 const { BINARY } = __m47;
 const { setRunner, onJobDone } = __m0;
 const { sessions, current, newSession, openSession, renameSession, deleteSession, searchHistory, parts, hydrate, onChange, exportSession, importSession } = __m53;
-const { openStore } = __m57;
+const { openStore, putBlob, getBlob } = __m61;
 const { skills, PACKS, STARTERS } = __m49;
-const { shell } = __m58;
-const { escHtml, pad, cardEl } = __m59;
-const { registerGcuSw } = __m60;
+const { shell } = __m62;
+const { escHtml, pad, cardEl } = __m63;
+const { registerGcuSw } = __m64;
 // The shell: wiring, tabs, the session drawer, storage, and the sleep switch. Everything that touches
 // the DOM or the browser lives here or in render.js; the engine never does.
 
@@ -27081,6 +27605,9 @@ setRunner('python', req => new Promise(done => {
   w.postMessage(req);
 }));
 onJobDone(c => { replaceCard(c); });
+// scans of large tables: over the File just picked, or the Blob kept for it (SPEC 13.7)
+const BIG = {};
+setRunner('scan', async req => { const b = BIG[req.hash] || (BIG[req.hash] = await getBlob(req.hash)); if (!b) return { error: 'not kept' }; return scanTable(() => b.stream(), req); });
 
 $('f').addEventListener('submit', e => { e.preventDefault(); const v = $('q').value; $('q').value = ''; grow(); updatePreview(); run(v); });
 function grow() { const q = $('q'); q.style.height = 'auto'; q.style.height = Math.min(q.scrollHeight, window.innerHeight * 0.4) + 'px'; }
@@ -27136,7 +27663,15 @@ document.addEventListener('keydown', e => {
 $('attach').addEventListener('click', () => { if (awake) $('file').click(); });
 $('file').addEventListener('change', e => {
   const f = e.target.files && e.target.files[0]; if (!f) return;
-  if (f.size > 20e6) { status('That file is over 20 MB. golem reads smaller tables for now.'); e.target.value = ''; return; }
+  if (f.size > STREAM_OVER) {   // a text table too large to hold: kept as it is, typed from its head, scanned per question
+    if (!/\.(csv|tsv|txt)$/i.test(f.name)) { status(`That file is over 20 MB. golem streams large CSV and TSV tables; a ${f.name.split('.').pop()} that large is not read.`); e.target.value = ''; return; }
+    f.slice(0, 1 << 20).text().then(async head => {
+      const o = openStreamed(f.name, f.size, head); if (o.kind !== 'card') { show(o); return; }
+      BIG[o.hash] = f; show(o); status(`Opened ${f.name} as a stream.`);
+      await putBlob(o.hash, f).catch(() => status(`${f.name} could not be kept on this device; it works until the page closes.`));
+    }, () => status('Could not read that file.'));
+    e.target.value = ''; return;
+  }
   if (/\.gcudat$/i.test(f.name)) {   // a pack: installed, not opened as a table
     f.arrayBuffer().then(buf => openPackFile(f.name, new Uint8Array(buf))).then(() => renderPacks(), err => status(`Not installed: ${err.message}.`));
     e.target.value = ''; return;

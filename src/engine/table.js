@@ -90,7 +90,8 @@ function wstats(v, w) {
   const va = v.reduce((a, x, i) => a + w[i] * (x - mean) ** 2, 0) / W * (v.length / Math.max(1, v.length - 1));
   const idx = v.map((_, i) => i).sort((a, b) => v[a] - v[b]);
   const q = p => { let acc = 0; for (const i of idx) { acc += w[i]; if (acc / W >= p) return v[i]; } return v[idx[idx.length - 1]]; };
-  return { n: v.length, mean, sd: Math.sqrt(va), va, min: Math.min(...v), max: Math.max(...v), med: q(.5), q, W };
+  let min = Infinity, max = -Infinity; for (const x of v) { if (x < min) min = x; if (x > max) max = x; }   // a loop: spreading a column of 100,000s overflows the stack
+  return { n: v.length, mean, sd: Math.sqrt(va), va, min, max, med: q(.5), q, W };
 }
 
 /* ── the precondition: a table is open ─────────────────────── */
@@ -333,14 +334,14 @@ noun(() => {
 // the values of the category columns ("BRX", "GRD"), so a condition can name them: "lith BRX", "lith is brx"
 noun(() => {
   const T0 = S.table; if (!T0) return null;
-  const vals = [...new Set(T0.cols.filter(c => c.type === 'categorical' && c.name !== T0.roles.hole).flatMap(c => [...new Set(T0.rows.map(r => r[c.name]).filter(v => v != null).map(String))].slice(0, 60)))]
+  const vals = [...new Set(T0.cols.filter(c => c.type === 'categorical' && c.name !== T0.roles.hole).flatMap(c => [...new Set((T0.rows.length ? T0.rows : T0.sampleRows || []).map(r => r[c.name]).filter(v => v != null).map(String))].slice(0, 60)))]
     .filter(v => /^[\w.-]+$/.test(v) && !/^\d/.test(v));
   return vals.length ? { type: 'catvalue', exact: true, words: Object.fromEntries(vals.map(v => [v, [v.toLowerCase()]])), words_pt: Object.fromEntries(vals.map(v => [v, [v.toLowerCase()]])) } : null;
 });
 // the values of the hole column, as written: "in DH-03"
 noun(() => {
   const T0 = S.table, h = T0 && T0.roles.hole; if (!h) return null;
-  const ids = [...new Set(T0.rows.map(r => r[h]).filter(v => v != null).map(String))];
+  const ids = [...new Set((T0.rows.length ? T0.rows : T0.sampleRows || []).map(r => r[h]).filter(v => v != null).map(String))];
   return { type: 'holeid', exact: true, words: Object.fromEntries(ids.map(v => [v, [v.toLowerCase()]])), words_pt: Object.fromEntries(ids.map(v => [v, [v.toLowerCase()]])) };
 });
 noun({ type: 'devtable', words: { log: ['log', 'my log', 'the log'] }, words_pt: { log: ['log', 'meu log', 'registro'] } });

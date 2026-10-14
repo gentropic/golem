@@ -35,6 +35,7 @@ import { convertBinary } from './formats.js';
 import './notes.js';
 import { norm, grammar, context, taught, sessionRead, readingOf, guessRead } from './reading.js';
 import { current, newSession, renameSession, touch } from './sessions.js';
+import { streamedTable } from './stream.js';   // last: it wraps the table tools the modules above registered
 
 export function addCard(raw, r, ms) {
   const c = { id: ++S.n, raw, tool: r.tool, args: r.args, rung: r.rung, amends: r.amends, res: r.res, ms };
@@ -132,6 +133,15 @@ function tabular(name, text, hash) {
   return counts.size === 1;
 }
 // a file the person picked: kept on the device by hash, opened as a card
+// a text table too large to hold (over 20 MB): kept by the shell, typed from its head, scanned per question (stream.js)
+export function openStreamed(name, size, head) {
+  if (!current()) newSession();
+  const t0 = performance.now(), hash = hashOf(`${name}:${size}:${head.slice(0, 65536)}`);
+  const s = streamedTable(name, size, head, hash); if (s.err) return { kind: 'nothing', msg: s.err };
+  S.files[hash] = { name, hash, size, streamed: true, head: head.slice(0, 1 << 20), text: '' };
+  const args = { file: { name, hash } }, res = T.open(args);
+  return { kind: 'card', card: addCard(`open ${name}`, { tool: 'open', args, rung: 'grammar', res }, performance.now() - t0), hash };
+}
 export function openFile(name, text) {
   if (!current()) newSession();
   const t0 = performance.now(), hash = hashOf(text);
