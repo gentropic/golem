@@ -346,7 +346,15 @@ $('stream').addEventListener('click', e => {
   if (!awake) return status('Asleep. Tap wake at the top right.');
   if (act === 'slot') { flipSlot(c, b.dataset.key); replaceCard(c, b.dataset.key); }
   else if (act === 'answer') { answer(c, +b.dataset.i); replaceCard(c); }
-  else if (act === 'handoff') { const n = document.createElement('div'); n.className = 'note ok'; n.textContent = b.dataset.msg; b.replaceWith(n); }
+  else if (act === 'handoff') {
+    // inside lead-acid: the allowlisted intent, the other app opens for the person to confirm; in a browser: what it would do
+    const say = (text, kind) => { const n = document.createElement('div'); n.className = 'note ' + kind; n.textContent = text; b.replaceWith(n); };
+    const send = b.dataset.send && JSON.parse(b.dataset.send);
+    if (!shell.present || !send) { say(b.dataset.msg, 'ok'); return; }
+    b.disabled = true;
+    shell.intent.send(send.name, send.fields).then(() => say(`Handed to the other app (${send.name}). Confirm it there; nothing more comes back to golem.`, 'ok'),
+      e => say(e && e.status === 503 ? `No app on this phone takes ${send.name}.` : e && e.status === 400 ? `The shell refused the ${e.field || 'request'}: ${e.message || ''}` : `The hand-off failed: ${(e && e.message) || e}`, 'err'));
+  }
   else if (act === 'save' && c.res.file) {
     const f = c.res.file, url = URL.createObjectURL(new Blob([f.bytes || f.text], { type: f.mime })), a = document.createElement('a');
     a.href = url; a.download = f.name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000); status(`Saved ${f.name}.`);

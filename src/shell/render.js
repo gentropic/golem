@@ -58,7 +58,7 @@ function blockHtml(b) {
     case 'marked': { let out = '', p = 0; b.spans.forEach(([s, e]) => { out += escHtml(b.text.slice(p, s)) + '<mark>' + escHtml(b.text.slice(s, e)) + '</mark>'; p = e; }); return `<div class="sub marked">${out + escHtml(b.text.slice(p))}</div>`; }
     case 'chips': return `<div class="opts">${b.items.map(q => `<button class="chip" type="button" data-act="run" data-q="${escHtml(q)}">${escHtml(q)}</button>`).join('')}</div>`;
     case 'actions': return `<div class="opts">${b.items.map(i => i.href ? `<a class="btn" href="${escHtml(i.href)}" target="_blank" rel="noopener">${escHtml(i.label)}</a>`
-      : `<button class="btn${i.go ? ' go' : ''}" type="button" data-act="${escHtml(i.act)}"${i.msg ? ` data-msg="${escHtml(i.msg)}"` : ''}>${escHtml(i.label)}</button>`).join('')}</div>`;
+      : `<button class="btn${i.go ? ' go' : ''}" type="button" data-act="${escHtml(i.act)}"${i.msg ? ` data-msg="${escHtml(i.msg)}"` : ''}${i.send ? ` data-send="${escHtml(JSON.stringify(i.send))}"` : ''}>${escHtml(i.label)}</button>`).join('')}</div>`;
     case 'net': return svgNet(b);
     case 'bars': return svgBars(b);
     case 'figure': return `<figure class="fig"><canvas data-fig width="${+b.w || 400}" height="${+b.h || 300}" role="img" aria-label="${escHtml(b.label || 'Figure')}"></canvas><figcaption>${escHtml(b.label || 'Figure')}</figcaption></figure>`;

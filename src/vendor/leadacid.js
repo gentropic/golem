@@ -104,6 +104,10 @@ export const shell = (() => {
     const res = await native(path + sep + 'transport=port', opts);
     if (!res.ok) throw new Error('stream open failed: ' + res.status);
     const id = (await res.json()).stream;
+    return attachStream(id);
+  }
+  // wire a stream id the shell returned to the port's dispatch — { on, onClose, close, …extra }
+  function attachStream(id, extra) {
     const handlers = new Map();
     const st = { handlers, onclose: null };
     pushStreams.set(id, st);
@@ -114,6 +118,7 @@ export const shell = (() => {
       on(event, cb) { let s = handlers.get(event); if (!s) handlers.set(event, s = new Set()); s.add(cb); return api; },
       onClose(cb) { st.onclose = cb; return api; },
       close() { if (pushStreams.delete(id)) native('shell/closestream?id=' + encodeURIComponent(id)); },
+      ...(extra || {}),
     };
     return api;
   }
@@ -574,7 +579,80 @@ export const shell = (() => {
     };
   })();
 
-  return { present, native, stream, version, keepAwake, publish, publishStream, share, shareText, attest, files, fileSource, fileBlob, fsBackend, orientation, orientationFromRotationVector, intake, gnss, camera, tree };
+  // Allowlisted hand-offs to other apps (SPEC §5.1 `intent`): the page names ONE
+  // of a fixed list and gives typed fields; the shell builds the Android intent
+  // and starts the other app, where the person confirms. No result comes back —
+  // `launched` is all the page learns. A failure throws an Error carrying the
+  // shell's verdict: { status, error, field? (400), capability? (503) }.
+  const intent = {
+    // { 'calendar.insert': true, 'clock.timer': true, 'sendto.sms': false, … } — hide the button, don't discover it on tap
+    async list() {
+      const r = await native('intent/list');
+      if (!r.ok) throw Object.assign(new Error('intent/list → ' + r.status), { status: r.status });
+      return r.json();
+    },
+    async send(name, fields) {
+      const r = await native('intent/' + encodeURIComponent(name), {
+        method: 'POST', body: new TextEncoder().encode(JSON.stringify(fields || {})),
+      });
+      if (r.ok) return r.json();
+      const d = await r.json().catch(() => ({}));
+      throw Object.assign(new Error(d.error || (name + ' → ' + r.status)), { status: r.status, error: d.error, field: d.field, capability: d.capability, detail: d.detail });
+    },
+  };
+
+  // Voice IN (SPEC §5.1 `speech`): the device's ON-DEVICE recognizer only — never the
+  // networked one. The page gets text, never audio. listen() asks for the microphone
+  // inline the first time (the system dialog appears; a refusal throws with
+  // { status: 403, permission: {granted, canRequest} }); no on-device recognizer or
+  // no language pack throws { status: 503, capability: 'speech.ondevice' }.
+  //   const s = await shell.speech.listen({ lang: 'en-US', bias: ['chalcopyrite'] });
+  //   s.on('partial', ({ text }) => …).on('result', ({ alternatives }) => …).on('error', ({ code }) => …);
+  //   s.stop() finishes the utterance · s.close() discards it · s.onClose(cb)
+  async function voiceError(r, what) {
+    const d = await r.json().catch(() => ({}));
+    return Object.assign(new Error(d.error || d.detail || (what + ' -> ' + r.status)), { status: r.status, error: d.error, field: d.field, capability: d.capability, detail: d.detail, info: d });
+  }
+  const speech = {
+    async support(lang) { return (await native('speech/support' + (lang ? '?lang=' + encodeURIComponent(lang) : ''))).json(); },
+    async permission({ request = false } = {}) { return (await native('speech/permission' + (request ? '?request=1' : ''))).json(); },
+    async listen({ lang, bias, partial = true, continuous = false, format = 'quality', rms = false } = {}) {
+      if (!present) throw new Error('no shell — speech is a native feature');
+      const q = ['transport=port', 'partial=' + (partial ? 1 : 0), 'continuous=' + (continuous ? 1 : 0), 'format=' + format, 'rms=' + (rms ? 1 : 0)];
+      if (lang) q.push('lang=' + encodeURIComponent(lang));
+      if (bias && bias.length) q.push('bias=' + encodeURIComponent(bias.map((b) => String(b).replace(/,/g, ' ')).join(',')));
+      await portReady;
+      const r = await native('speech/stream?' + q.join('&'));
+      if (!r.ok) {
+        const e = await voiceError(r, 'speech/stream');
+        if (r.status === 403) { try { e.permission = await speech.permission(); } catch { /* ignore */ } }
+        throw e;
+      }
+      const id = (await r.json()).stream;
+      return attachStream(id, { stop: () => native('speech/stop', { method: 'POST' }) });
+    },
+  };
+
+  // Voice OUT (SPEC §5.1 `tts`): the device's engine, OFFLINE VOICES ONLY; speak()
+  // resolves when the utterance has been spoken ({done, ms, voice} or {stopped}).
+  const tts = {
+    async support() { return (await native('tts/support')).json(); },
+    async voices(lang) { return (await native('tts/voices' + (lang ? '?lang=' + encodeURIComponent(lang) : ''))).json(); },
+    async speak(text, { lang, voice, rate, pitch, queue } = {}) {
+      const q = [];
+      if (lang) q.push('lang=' + encodeURIComponent(lang));
+      if (voice) q.push('voice=' + encodeURIComponent(voice));
+      if (rate != null) q.push('rate=' + rate);
+      if (pitch != null) q.push('pitch=' + pitch);
+      if (queue) q.push('queue=' + queue);
+      const r = await native('tts/speak' + (q.length ? '?' + q.join('&') : ''), { method: 'POST', body: new TextEncoder().encode(String(text)) });
+      if (!r.ok) throw await voiceError(r, 'tts/speak');
+      return r.json();
+    },
+    async stop() { return (await native('tts/stop', { method: 'POST' })).json(); },
+  };
+
+  return { present, native, stream, version, keepAwake, publish, publishStream, share, shareText, attest, files, fileSource, fileBlob, fsBackend, orientation, orientationFromRotationVector, intake, gnss, camera, tree, intent, speech, tts };
 })();
 
 /**

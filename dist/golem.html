@@ -11955,10 +11955,14 @@ const __m18 = (() => {
 const { tool, frame, noun, postmod, fmt, iso } = __m0;
 const { findDate, findTime, today, fmtDate, dateWords } = __m4;
 const { parseUnit } = __m2;
-// Device hand-offs: calendar event, timer, alarm. Simulated in the browser; on Android they become intents.
+// Device hand-offs: calendar event, timer, alarm. Inside the lead-acid shell each card hands its fields to the other app
+// through shell.intent (an allowlisted name and typed fields; the person confirms there); in a browser nothing is sent,
+// and the event can be saved as a .ics file instead.
 
 // the hand-off description every device card carries: the intent, its permission, and the button
-const hand = (label, intent, perm, msg) => [{ t: 'kv', rows: [['hand-off', intent, { mono: true }], ['permission', perm]] }, { act: 'handoff', label, msg, go: true }];
+// send: { name, fields } for lead-acid's intent plugin (calendar.insert, clock.timer, clock.alarm), plain JSON
+const hand = (label, intent, perm, msg, send) => [{ t: 'kv', rows: [['hand-off', intent, { mono: true }], ['permission', perm]] }, { act: 'handoff', label, msg, go: true, ...(send ? { send } : {}) }];
+const local = (x, timed) => iso(x) + (timed ? 'T' + String(x.getHours()).padStart(2, '0') + ':' + String(x.getMinutes()).padStart(2, '0') : '');   // the person's own clock, as the plugin reads it
 function parseEvent(str) {
   const low = str.toLowerCase(), d = findDate(low), t = findTime(low), du = /\bfor (\d+(?:\.\d+)?) ?(h|hr|hrs|hours?|min|mins|minutes?)\b/.exec(low);
   if (!d && !t) return null;
@@ -11978,10 +11982,12 @@ tool({
       a.timed ? `DTSTART:${st(s)}` : `DTSTART;VALUE=DATE:${st(s)}`, ...(a.timed ? [`DTEND:${st(e)}`] : []), `SUMMARY:${a.title}`, 'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
     const read = ['new event', { v: a.title }, 'on', { v: fmtDate(s) }];
     if (a.timed) read.push('at', { v: hm(s) }, 'for', { v: a.dur + ' min', key: 'dur', alts: [30, 60, 120], cur: a.dur }); else read.push({ v: 'all day' });
-    const [kv, go] = hand('Add to calendar', 'ACTION_INSERT → CalendarContract.Events', 'none: your calendar app shows the event for you to save', 'On Android this opens your calendar app with these fields filled in. In the browser nothing is sent; copy the .ics into any calendar.');
+    const [kv, go] = hand('Add to calendar', 'ACTION_INSERT → CalendarContract.Events', 'none: your calendar app shows the event for you to save', 'On Android this opens your calendar app with these fields filled in. In the browser nothing is sent; save or copy the .ics into any calendar.',
+      { name: 'calendar.insert', fields: { title: a.title.slice(0, 200), begin: local(s, a.timed), ...(a.timed ? { end: local(e, true) } : { allDay: true }) } });
+    const file = { name: `${a.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'event'}.ics`, text: ics, mime: 'text/calendar' };
     return {
-      read, copy: ics,
-      body: [{ t: 'big', v: a.title, size: 18 }, { t: 'sub', text: `${fmtDate(s)}${a.timed ? `, ${hm(s)} to ${hm(e)}` : ', all day'}` }, kv, { t: 'actions', items: [go, { act: 'copy', label: 'Copy .ics' }] }],
+      read, copy: ics, file,
+      body: [{ t: 'big', v: a.title, size: 18 }, { t: 'sub', text: `${fmtDate(s)}${a.timed ? `, ${hm(s)} to ${hm(e)}` : ', all day'}` }, kv, { t: 'actions', items: [go, { act: 'save', label: 'Save .ics' }, { act: 'copy', label: 'Copy .ics' }] }],
       trace: [`dates.parse → ${fmtDate(s)}${a.timed ? ' ' + hm(s) : ''}`, 'title = what is left after removing date and time words', 'build intent extras: title, begin, end'], py: `device.calendar.insert(title="${a.title}", begin="${iso(s)}${a.timed ? 'T' + hm(s) : ''}", minutes=${a.dur})`
     };
   }
@@ -11992,7 +11998,8 @@ tool({
   topic: () => ['Timer', 1],
   run: a => {
     if (!a.end) a.end = Date.now() + a.sec * 1000;
-    const [kv, go] = hand('Hand to the Clock app', 'AlarmClock.ACTION_SET_TIMER, EXTRA_LENGTH=' + a.sec, 'SET_ALARM, granted at install', 'On Android the Clock app takes over the timer and rings when golem is closed. Here it counts down in the page.');
+    const [kv, go] = hand('Hand to the Clock app', 'AlarmClock.ACTION_SET_TIMER, EXTRA_LENGTH=' + a.sec, 'SET_ALARM, granted at install', 'On Android the Clock app takes over the timer and rings when golem is closed. Here it counts down in the page.',
+      a.sec <= 86400 ? { name: 'clock.timer', fields: { seconds: a.sec, message: 'golem' } } : null);
     return {
       read: ['start a timer for', { v: a.sec >= 60 ? fmt(a.sec / 60) + ' min' : a.sec + ' s' }],
       body: [{ t: 'big', v: '--:--', end: a.end }, kv, { t: 'actions', items: [go] }],
@@ -12017,7 +12024,7 @@ tool({
   topic: () => ['Alarm', 1],
   run: a => {
     const t = String(a.h).padStart(2, '0') + ':' + String(a.mi).padStart(2, '0');
-    const [kv, go] = hand('Hand to the Clock app', `AlarmClock.ACTION_SET_ALARM, HOUR=${a.h}, MINUTES=${a.mi}`, 'SET_ALARM, granted at install', 'On Android this creates the alarm in the Clock app. In the browser nothing is set.');
+    const [kv, go] = hand('Hand to the Clock app', `AlarmClock.ACTION_SET_ALARM, HOUR=${a.h}, MINUTES=${a.mi}`, 'SET_ALARM, granted at install', 'On Android this creates the alarm in the Clock app. In the browser nothing is set.', { name: 'clock.alarm', fields: { hour: a.h, minutes: a.mi, message: 'golem' } });
     return { read: ['set an alarm at', { v: t }], body: [{ t: 'big', v: t }, kv, { t: 'actions', items: [go] }], trace: [`time → ${t}`, 'build intent: ACTION_SET_ALARM'], py: `device.alarm("${t}")` };
   }
 });
@@ -26636,6 +26643,10 @@ const shell = (() => {
     const res = await native(path + sep + 'transport=port', opts);
     if (!res.ok) throw new Error('stream open failed: ' + res.status);
     const id = (await res.json()).stream;
+    return attachStream(id);
+  }
+  // wire a stream id the shell returned to the port's dispatch — { on, onClose, close, …extra }
+  function attachStream(id, extra) {
     const handlers = new Map();
     const st = { handlers, onclose: null };
     pushStreams.set(id, st);
@@ -26646,6 +26657,7 @@ const shell = (() => {
       on(event, cb) { let s = handlers.get(event); if (!s) handlers.set(event, s = new Set()); s.add(cb); return api; },
       onClose(cb) { st.onclose = cb; return api; },
       close() { if (pushStreams.delete(id)) native('shell/closestream?id=' + encodeURIComponent(id)); },
+      ...(extra || {}),
     };
     return api;
   }
@@ -27106,7 +27118,80 @@ const shell = (() => {
     };
   })();
 
-  return { present, native, stream, version, keepAwake, publish, publishStream, share, shareText, attest, files, fileSource, fileBlob, fsBackend, orientation, orientationFromRotationVector, intake, gnss, camera, tree };
+  // Allowlisted hand-offs to other apps (SPEC §5.1 `intent`): the page names ONE
+  // of a fixed list and gives typed fields; the shell builds the Android intent
+  // and starts the other app, where the person confirms. No result comes back —
+  // `launched` is all the page learns. A failure throws an Error carrying the
+  // shell's verdict: { status, error, field? (400), capability? (503) }.
+  const intent = {
+    // { 'calendar.insert': true, 'clock.timer': true, 'sendto.sms': false, … } — hide the button, don't discover it on tap
+    async list() {
+      const r = await native('intent/list');
+      if (!r.ok) throw Object.assign(new Error('intent/list → ' + r.status), { status: r.status });
+      return r.json();
+    },
+    async send(name, fields) {
+      const r = await native('intent/' + encodeURIComponent(name), {
+        method: 'POST', body: new TextEncoder().encode(JSON.stringify(fields || {})),
+      });
+      if (r.ok) return r.json();
+      const d = await r.json().catch(() => ({}));
+      throw Object.assign(new Error(d.error || (name + ' → ' + r.status)), { status: r.status, error: d.error, field: d.field, capability: d.capability, detail: d.detail });
+    },
+  };
+
+  // Voice IN (SPEC §5.1 `speech`): the device's ON-DEVICE recognizer only — never the
+  // networked one. The page gets text, never audio. listen() asks for the microphone
+  // inline the first time (the system dialog appears; a refusal throws with
+  // { status: 403, permission: {granted, canRequest} }); no on-device recognizer or
+  // no language pack throws { status: 503, capability: 'speech.ondevice' }.
+  //   const s = await shell.speech.listen({ lang: 'en-US', bias: ['chalcopyrite'] });
+  //   s.on('partial', ({ text }) => …).on('result', ({ alternatives }) => …).on('error', ({ code }) => …);
+  //   s.stop() finishes the utterance · s.close() discards it · s.onClose(cb)
+  async function voiceError(r, what) {
+    const d = await r.json().catch(() => ({}));
+    return Object.assign(new Error(d.error || d.detail || (what + ' -> ' + r.status)), { status: r.status, error: d.error, field: d.field, capability: d.capability, detail: d.detail, info: d });
+  }
+  const speech = {
+    async support(lang) { return (await native('speech/support' + (lang ? '?lang=' + encodeURIComponent(lang) : ''))).json(); },
+    async permission({ request = false } = {}) { return (await native('speech/permission' + (request ? '?request=1' : ''))).json(); },
+    async listen({ lang, bias, partial = true, continuous = false, format = 'quality', rms = false } = {}) {
+      if (!present) throw new Error('no shell — speech is a native feature');
+      const q = ['transport=port', 'partial=' + (partial ? 1 : 0), 'continuous=' + (continuous ? 1 : 0), 'format=' + format, 'rms=' + (rms ? 1 : 0)];
+      if (lang) q.push('lang=' + encodeURIComponent(lang));
+      if (bias && bias.length) q.push('bias=' + encodeURIComponent(bias.map((b) => String(b).replace(/,/g, ' ')).join(',')));
+      await portReady;
+      const r = await native('speech/stream?' + q.join('&'));
+      if (!r.ok) {
+        const e = await voiceError(r, 'speech/stream');
+        if (r.status === 403) { try { e.permission = await speech.permission(); } catch { /* ignore */ } }
+        throw e;
+      }
+      const id = (await r.json()).stream;
+      return attachStream(id, { stop: () => native('speech/stop', { method: 'POST' }) });
+    },
+  };
+
+  // Voice OUT (SPEC §5.1 `tts`): the device's engine, OFFLINE VOICES ONLY; speak()
+  // resolves when the utterance has been spoken ({done, ms, voice} or {stopped}).
+  const tts = {
+    async support() { return (await native('tts/support')).json(); },
+    async voices(lang) { return (await native('tts/voices' + (lang ? '?lang=' + encodeURIComponent(lang) : ''))).json(); },
+    async speak(text, { lang, voice, rate, pitch, queue } = {}) {
+      const q = [];
+      if (lang) q.push('lang=' + encodeURIComponent(lang));
+      if (voice) q.push('voice=' + encodeURIComponent(voice));
+      if (rate != null) q.push('rate=' + rate);
+      if (pitch != null) q.push('pitch=' + pitch);
+      if (queue) q.push('queue=' + queue);
+      const r = await native('tts/speak' + (q.length ? '?' + q.join('&') : ''), { method: 'POST', body: new TextEncoder().encode(String(text)) });
+      if (!r.ok) throw await voiceError(r, 'tts/speak');
+      return r.json();
+    },
+    async stop() { return (await native('tts/stop', { method: 'POST' })).json(); },
+  };
+
+  return { present, native, stream, version, keepAwake, publish, publishStream, share, shareText, attest, files, fileSource, fileBlob, fsBackend, orientation, orientationFromRotationVector, intake, gnss, camera, tree, intent, speech, tts };
 })();
 
 /**
@@ -27216,7 +27301,7 @@ function blockHtml(b) {
     case 'marked': { let out = '', p = 0; b.spans.forEach(([s, e]) => { out += escHtml(b.text.slice(p, s)) + '<mark>' + escHtml(b.text.slice(s, e)) + '</mark>'; p = e; }); return `<div class="sub marked">${out + escHtml(b.text.slice(p))}</div>`; }
     case 'chips': return `<div class="opts">${b.items.map(q => `<button class="chip" type="button" data-act="run" data-q="${escHtml(q)}">${escHtml(q)}</button>`).join('')}</div>`;
     case 'actions': return `<div class="opts">${b.items.map(i => i.href ? `<a class="btn" href="${escHtml(i.href)}" target="_blank" rel="noopener">${escHtml(i.label)}</a>`
-      : `<button class="btn${i.go ? ' go' : ''}" type="button" data-act="${escHtml(i.act)}"${i.msg ? ` data-msg="${escHtml(i.msg)}"` : ''}>${escHtml(i.label)}</button>`).join('')}</div>`;
+      : `<button class="btn${i.go ? ' go' : ''}" type="button" data-act="${escHtml(i.act)}"${i.msg ? ` data-msg="${escHtml(i.msg)}"` : ''}${i.send ? ` data-send="${escHtml(JSON.stringify(i.send))}"` : ''}>${escHtml(i.label)}</button>`).join('')}</div>`;
     case 'net': return svgNet(b);
     case 'bars': return svgBars(b);
     case 'figure': return `<figure class="fig"><canvas data-fig width="${+b.w || 400}" height="${+b.h || 300}" role="img" aria-label="${escHtml(b.label || 'Figure')}"></canvas><figcaption>${escHtml(b.label || 'Figure')}</figcaption></figure>`;
@@ -27696,7 +27781,15 @@ $('stream').addEventListener('click', e => {
   if (!awake) return status('Asleep. Tap wake at the top right.');
   if (act === 'slot') { flipSlot(c, b.dataset.key); replaceCard(c, b.dataset.key); }
   else if (act === 'answer') { answer(c, +b.dataset.i); replaceCard(c); }
-  else if (act === 'handoff') { const n = document.createElement('div'); n.className = 'note ok'; n.textContent = b.dataset.msg; b.replaceWith(n); }
+  else if (act === 'handoff') {
+    // inside lead-acid: the allowlisted intent, the other app opens for the person to confirm; in a browser: what it would do
+    const say = (text, kind) => { const n = document.createElement('div'); n.className = 'note ' + kind; n.textContent = text; b.replaceWith(n); };
+    const send = b.dataset.send && JSON.parse(b.dataset.send);
+    if (!shell.present || !send) { say(b.dataset.msg, 'ok'); return; }
+    b.disabled = true;
+    shell.intent.send(send.name, send.fields).then(() => say(`Handed to the other app (${send.name}). Confirm it there; nothing more comes back to golem.`, 'ok'),
+      e => say(e && e.status === 503 ? `No app on this phone takes ${send.name}.` : e && e.status === 400 ? `The shell refused the ${e.field || 'request'}: ${e.message || ''}` : `The hand-off failed: ${(e && e.message) || e}`, 'err'));
+  }
   else if (act === 'save' && c.res.file) {
     const f = c.res.file, url = URL.createObjectURL(new Blob([f.bytes || f.text], { type: f.mime })), a = document.createElement('a');
     a.href = url; a.download = f.name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000); status(`Saved ${f.name}.`);
