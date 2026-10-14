@@ -74,6 +74,27 @@ export function serialize() {
   const files = Object.fromEntries(Object.entries(S.files).filter(([, f]) => f.text.length <= 1e6));
   return { cur: cur && cur.id, sid, aliases: S.aliases, facts: S.facts, files, tables: S.tables, recipes: S.recipes, ss: SS.map(s => ({ ...s, cards: s.cards.map(spec) })) };
 }
+// the same state in parts, for a store that keeps each session and each file on its own (the shell's @gcu/vfs), with no
+// size cap on files; hydrate() takes the parts put back together ({ cur, sid, ...device, files, ss })
+export function parts() {
+  return { meta: { v: 1, cur: cur && cur.id, sid }, device: { aliases: S.aliases, facts: S.facts, tables: S.tables, recipes: S.recipes },
+    sessions: SS.map(s => ({ ...s, cards: s.cards.map(spec) })), files: S.files };
+}
+// A session as a file of its own ("<name>.golem.json"): its card specs and the files they read, so it replays on another
+// device. Importing gives it a new id and keeps the files it brings that this device does not have.
+export function exportSession(id) {
+  const s = SS.find(x => x.id === id); if (!s) return null;
+  const hashes = new Set(), walk = v => { if (v && typeof v === 'object') { if (typeof v.hash === 'string' && S.files[v.hash]) hashes.add(v.hash); Object.values(v).forEach(walk); } };
+  s.cards.forEach(c => walk(c.args));
+  const { id: _, ...rest } = s;
+  return { golem: 'session', v: 1, session: { ...rest, cards: s.cards.map(spec) }, files: Object.fromEntries([...hashes].map(h => [h, S.files[h]])) };
+}
+export function importSession(d) {
+  if (!d || d.golem !== 'session' || !d.session || !Array.isArray(d.session.cards)) return null;
+  for (const [h, f] of Object.entries(d.files || {})) if (!S.files[h] && f && f.hash === h) S.files[h] = f;
+  const s = { ...d.session, id: ++sid, example: false, updated: Date.now() };
+  SS.push(s); load(s); changed(); return s;
+}
 export function hydrate(d) {
   if (!d || !Array.isArray(d.ss) || !d.ss.length) return false;
   SS = d.ss; sid = d.sid || Math.max(...SS.map(s => s.id)); S.aliases = d.aliases || {}; S.facts = d.facts || []; S.files = d.files || {}; S.tables = d.tables || {}; S.recipes = d.recipes || {};

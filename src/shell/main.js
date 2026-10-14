@@ -5,14 +5,15 @@ import { submit, flipSlot, answer, seedExamples, openFile, openBinary, preview }
 import { completions } from '../engine/reading.js';
 import { BINARY } from '../engine/formats.js';
 import { setRunner, onJobDone } from '../engine/core.js';
-import { sessions, current, newSession, openSession, renameSession, deleteSession, searchHistory, serialize, hydrate, onChange } from '../engine/sessions.js';
+import { sessions, current, newSession, openSession, renameSession, deleteSession, searchHistory, parts, hydrate, onChange, exportSession, importSession } from '../engine/sessions.js';
+import { openStore } from './store.js';
 import { skills, PACKS, STARTERS } from '../engine/skills.js';
 import { shell } from '../vendor/leadacid.js';
 import { escHtml, pad, cardEl } from './render.js';
 import { registerGcuSw } from '../vendor/sw-register.js';
 
 const $ = id => document.getElementById(id);
-const KEY = 'golem.state.v2', OLD_KEY = 'golem.mock.v2', THEME = 'golem.theme', FOLD = 'golem.side';   // the old key is read once, then moved
+const THEME = 'golem.theme', FOLD = 'golem.side';
 const narrow = () => window.matchMedia('(max-width: 860px)').matches;
 let awake = true, statusT;
 
@@ -47,7 +48,9 @@ function replaceCard(c, focusKey) {
   if (open) old.querySelector('details.trace').open = true;
   if (focusKey) { const s = old.querySelector(`.slot[data-key="${focusKey}"]`); if (s) s.focus({ preventScroll: true }); }
 }
+let ready = false;   // the device state is back (see the start, below): until then a query would land in a session about to be replaced
 function run(raw) {
+  if (!ready) { status('Opening your sessions…'); return; }
   if (!awake) { status('Asleep. Tap wake at the top right.'); return; }
   show(submit(raw));
 }
@@ -121,7 +124,7 @@ function renderDrawer() {
     [...sessions()].sort((x, y) => y.updated - x.updated || y.id - x.id).forEach(s => {
       if (age(s.updated) !== g) { g = age(s.updated); h += `<div class="lbl">${g}</div>`; }
       const name = ren === s.id ? `<input class="ren" data-id="${s.id}" value="${escHtml(s.name)}" aria-label="Session name. Leave empty to name it automatically.">` : `<button class="open" type="button" data-s="${s.id}" title="${escHtml(s.name)}">${escHtml(s.name)}</button>`;
-      h += `<div class="srow" aria-current="${s === cur}">${name}<div class="meta"><span>${s.cards.length} card${s.cards.length === 1 ? '' : 's'} · ${when(s.updated)}</span>${s.example ? '<span class="tag samp">example</span>' : ''}<span class="acts"><button class="link" type="button" data-ren="${s.id}">rename</button><button class="link" type="button" data-del="${s.id}">${del === s.id ? 'confirm delete' : 'delete'}</button></span></div></div>`;
+      h += `<div class="srow" aria-current="${s === cur}">${name}<div class="meta"><span>${s.cards.length} card${s.cards.length === 1 ? '' : 's'} · ${when(s.updated)}</span>${s.example ? '<span class="tag samp">example</span>' : ''}<span class="acts"><button class="link" type="button" data-ren="${s.id}">rename</button><button class="link" type="button" data-exp="${s.id}">export</button><button class="link" type="button" data-del="${s.id}">${del === s.id ? 'confirm delete' : 'delete'}</button></span></div></div>`;
     });
   }
   $('dlist').innerHTML = h;
@@ -136,14 +139,17 @@ try { if (localStorage.getItem(FOLD) === 'folded') $('app').classList.add('folde
 function commitName(inp) { ren = null; renameSession(+inp.dataset.id, inp.value); renderDrawer(); }
 
 /* ── storage ── */
-function persist() { try { localStorage.setItem(KEY, JSON.stringify(serialize())); } catch (e) { /* storage is optional */ } }
-function restore() {
-  try {
-    let raw = localStorage.getItem(KEY);
-    if (raw == null && (raw = localStorage.getItem(OLD_KEY)) != null) { localStorage.setItem(KEY, raw); localStorage.removeItem(OLD_KEY); }
-    return hydrate(JSON.parse(raw));
-  } catch (e) { return false; }
+// saved on the device through store.js (@gcu/vfs over IndexedDB): a moment after each change, and at once when the page
+// is hidden, so a closed tab keeps its last card
+// (a moment after the last change, but never more than a second behind while changes keep coming)
+let store = null, saveT = 0, firstUnsaved = 0;
+function persist() {
+  if (!store) return;
+  store.journal(parts());
+  const now = Date.now(); if (!firstUnsaved) firstUnsaved = now;
+  clearTimeout(saveT); saveT = setTimeout(() => { firstUnsaved = 0; store.save(parts()); }, now - firstUnsaved > 1000 ? 0 : 80);
 }
+document.addEventListener('visibilitychange', () => { if (document.hidden && store) { clearTimeout(saveT); firstUnsaved = 0; store.save(parts()); } });
 onChange(() => { renderBar(); persist(); if (!$('hq').value.trim() && ren == null) renderDrawer(); });
 
 /* ── theme: auto follows the system; a choice is kept on this device ── */
@@ -223,6 +229,10 @@ $('attach').addEventListener('click', () => { if (awake) $('file').click(); });
 $('file').addEventListener('change', e => {
   const f = e.target.files && e.target.files[0]; if (!f) return;
   if (f.size > 20e6) { status('That file is over 20 MB. golem reads smaller tables for now.'); e.target.value = ''; return; }
+  if (/\.golem\.json$/i.test(f.name)) {   // a session exported from golem: it comes back as a session of its own
+    f.text().then(t => { let s = null; try { s = importSession(JSON.parse(t)); } catch (err) { s = null; } if (!s) { status('That is not a golem session file.'); return; } renderStream(); renderDrawer(); status(`Imported "${s.name}".`); }, () => status('Could not read that file.'));
+    e.target.value = ''; return;
+  }
   if (BINARY.test(f.name)) f.arrayBuffer().then(buf => openBinary(f.name, buf)).then(o => { show(o); if (o.kind === 'card') status(`Opened ${f.name}.`); }, () => status('Could not read that file.'));
   else f.text().then(text => { show(openFile(f.name, text)); status(`Opened ${f.name}.`); }, () => status('Could not read that file.'));
   e.target.value = '';
@@ -269,6 +279,11 @@ $('dlist').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
   if (b.dataset.s) { openSession(+b.dataset.s); renderStream(b.dataset.c); renderDrawer(); closeDrawer(); }
   else if (b.dataset.ren) { ren = +b.dataset.ren; del = null; renderDrawer(); }
+  else if (b.dataset.exp) {   // the session as a file of its own; the paperclip opens it again
+    const d = exportSession(+b.dataset.exp), slug = (d.session.name || 'session').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'session';
+    const url = URL.createObjectURL(new Blob([JSON.stringify(d, null, 1)], { type: 'application/json' })), a = document.createElement('a');
+    a.href = url; a.download = `${slug}.golem.json`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000); status(`Saved ${slug}.golem.json.`);
+  }
   else if (b.dataset.del) {
     const id = +b.dataset.del;
     if (del !== id) { del = id; renderDrawer(); return; }
@@ -280,8 +295,15 @@ $('starts').innerHTML = STARTERS.map(([t, q]) => `<button class="start" type="bu
 /* ── start: restore saved sessions, or seed two examples ── */
 renderSkills();
 if (shell.present) $('st-where').textContent = 'in the lead-acid shell';
-if (!restore()) seedExamples();
-// the "New session" shortcut of the installed app
-if (new URLSearchParams(location.search).has('new')) { newSession(); try { history.replaceState(null, '', location.pathname); } catch (e) { /* file:// */ } }
-renderStream(); renderDrawer();
-$('status').textContent = '';
+// the device's sessions come back from the store (moved from localStorage once, the first time), or two examples are seeded
+(async () => {
+  store = await openStore();
+  const got = await store.load().catch(() => null);
+  if (!(got && hydrate(got.state)) && !sessions().length) seedExamples();
+  if (got && got.migrated) store.save(parts());
+  // the "New session" shortcut of the installed app
+  if (new URLSearchParams(location.search).has('new')) { newSession(); try { history.replaceState(null, '', location.pathname); } catch (e) { /* file:// */ } }
+  renderStream(); renderDrawer(); renderPacks();
+  $('status').textContent = store.kind === 'none' ? 'This browser keeps nothing for golem: sessions last until the page closes.' : '';
+  ready = true; document.documentElement.dataset.ready = '1';   // tests wait for this
+})();

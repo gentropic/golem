@@ -115,3 +115,14 @@ test('the sample table still answers the old questions', () => {
   assert.equal(ask('mean cu by lith').res.body[0].rows.length, 3);
   assert.equal(g.current().name, 'assays.csv: Cu histogram, Cu mean');
 });
+
+test('a session exports as a file of its own, with the files its cards read, and imports as a new session', () => {
+  g.reset(); g.openFile('holes.csv', CSV); ask('mean cu by litho'); g.renameSession(g.current().id, 'litho means');
+  const d = JSON.parse(JSON.stringify(g.exportSession(g.current().id)));
+  assert.equal(d.golem, 'session'); assert.equal(Object.keys(d.files).length, 1, 'the file the session read travels with it');
+  g.reset();
+  const s = g.importSession(d);
+  assert.equal(s.name, 'litho means'); assert.equal(g.S.cards.length, 2);
+  assert.ok(g.textOf(g.S.cards[1]).includes('BRX'), 'the table question replays from the file it brought');
+  assert.equal(g.importSession({ golem: 'nope' }), null);
+});

@@ -3,7 +3,7 @@ export { S, T, TOOLS, FRAMES, CONDITIONS, clock, fmt, toolByName, runTool, setRu
 export { rewriteForGcu } from './python.js';
 export { submit, rerun, flipSlot, answer, undo, addCard, seedExamples, openFile, openBinary, hashOf, preview } from './engine.js';
 export { convertBinary, gridText, BINARY } from './formats.js';
-export { sessions, current, newSession, openSession, renameSession, deleteSession, searchHistory, autoName, tagOf, serialize, hydrate, reset, onChange, spec, load } from './sessions.js';
+export { sessions, current, newSession, openSession, renameSession, deleteSession, searchHistory, autoName, tagOf, serialize, parts, hydrate, exportSession, importSession, reset, onChange, spec, load } from './sessions.js';
 export { skills, examples, vocab, PACKS, SUGGESTIONS } from './skills.js';
 export { norm, grammar, context, taught, clauseRead, clauseEngine, readingOf, completions } from './reading.js';
 export { ontology } from './ontology.js';

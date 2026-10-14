@@ -60,7 +60,7 @@ const errors = [];
 page.on('pageerror', e => errors.push('page error: ' + e.message));
 page.on('console', m => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
 await page.goto('file://' + file);
-await page.waitForSelector('#stream .card');
+await page.waitForSelector('html[data-ready]'); await page.waitForSelector('#stream .card');
 
 let failed = 0;
 for (const [q, rung, text] of STEPS) {
@@ -74,7 +74,7 @@ for (const [q, rung, text] of STEPS) {
 const name = await page.textContent('#sname');
 const nameOk = name === 'assays.csv: Au histogram, Cu histogram';
 console.log(`${nameOk ? 'ok  ' : 'FAIL'} session auto-name: ${name}`);
-await page.reload(); await page.waitForSelector('#stream .card');
+await page.reload(); await page.waitForSelector('html[data-ready]'); await page.waitForSelector('#stream .card');
 const kept = await page.locator('#stream .card').count();
 console.log(`${kept === 22 ? 'ok  ' : 'FAIL'} session replays after reload: ${kept} cards`);
 const overflow = await page.evaluate(() => Math.max(...[document.documentElement, document.getElementById('v-ask')].map(e => e.scrollWidth - e.clientWidth)));
