@@ -9,6 +9,12 @@ const pin = () => { g.clock.now = () => new Date(2026, 9, 13, 10, 0); g.clock.zo
 const refusal = c => (c.res.body || []).find(b => b.t === 'note' && b.kind === 'err');
 
 const GROUPS = [
+  ['what golem can do', [
+    'what can you do',
+    'what can you do?',
+    'help',
+    'what skills do you have',
+    'hey golem, what else can you do?']],
   ['true thickness', [
     'true thickness of a 14 m intercept, hole 270/60, bedding 045/30',
     'what is the true thickness of a 14 m intercept with hole 270/60 and bedding 045/30?',
@@ -115,7 +121,7 @@ test('guess: no exact reading offers repaired readings, runs none until one is p
   g.reset(); pin(); g.newSession();
   const c = g.submit('population mongolia').card;
   assert.equal(c.tool, 'guess'); assert.equal(c.rung, 'guess');
-  assert.deepEqual(c.res.ask.options.map(o => o.label), ['Look up population; of mongolia']);
+  assert.deepEqual(c.res.ask.options.map(o => o.label), ['Look up population of mongolia']);
   assert.ok(g.textOf(c).includes('assumed a preposition'), 'the card says what the reading changed');
   assert.equal(g.S.cards.length, 1, 'nothing ran');
   g.answer(c, 0);

@@ -5,9 +5,10 @@ import { tool, frame, noun, postmod, fmt, iso } from './core.js';
 import { findDate, findTime, today, fmtDate, dateWords } from './dates.js';
 import { parseUnit } from './units.js';
 
-// the hand-off description every device card carries: the intent, its permission, and the button
-// send: { name, fields } for lead-acid's intent plugin (calendar.insert, clock.timer, clock.alarm), plain JSON
-const hand = (label, intent, perm, msg, send) => [{ t: 'kv', rows: [['hand-off', intent, { mono: true }], ['permission', perm]] }, { act: 'handoff', label, msg, go: true, ...(send ? { send } : {}) }];
+// the hand-off every device card carries, in the person's words: which app opens and what happens there, and the button.
+// The Android intent itself is in the trace. send: { name, fields } for lead-acid's intent plugin (calendar.insert,
+// clock.timer, clock.alarm), plain JSON
+const hand = (label, opens, then, msg, send) => [{ t: 'kv', rows: [['opens', opens], ['then', then]] }, { act: 'handoff', label, msg, go: true, ...(send ? { send } : {}) }];
 const local = (x, timed) => iso(x) + (timed ? 'T' + String(x.getHours()).padStart(2, '0') + ':' + String(x.getMinutes()).padStart(2, '0') : '');   // the person's own clock, as the plugin reads it
 function parseEvent(str) {
   const low = str.toLowerCase(), d = findDate(low), t = findTime(low), du = /\bfor (\d+(?:\.\d+)?) ?(h|hr|hrs|hours?|min|mins|minutes?)\b/.exec(low);
@@ -28,13 +29,13 @@ tool({
       a.timed ? `DTSTART:${st(s)}` : `DTSTART;VALUE=DATE:${st(s)}`, ...(a.timed ? [`DTEND:${st(e)}`] : []), `SUMMARY:${a.title}`, 'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
     const read = ['new event', { v: a.title }, 'on', { v: fmtDate(s) }];
     if (a.timed) read.push('at', { v: hm(s) }, 'for', { v: a.dur + ' min', key: 'dur', alts: [30, 60, 120], cur: a.dur }); else read.push({ v: 'all day' });
-    const [kv, go] = hand('Add to calendar', 'ACTION_INSERT → CalendarContract.Events', 'none: your calendar app shows the event for you to save', 'On Android this opens your calendar app with these fields filled in. In the browser nothing is sent; save or copy the .ics into any calendar.',
+    const [kv, go] = hand('Add to calendar', 'your calendar app, with this event filled in', 'you save it there; nothing comes back to golem', 'On Android this opens your calendar app with these fields filled in. In the browser nothing is sent; save or copy the .ics into any calendar.',
       { name: 'calendar.insert', fields: { title: a.title.slice(0, 200), begin: local(s, a.timed), ...(a.timed ? { end: local(e, true) } : { allDay: true }) } });
     const file = { name: `${a.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'event'}.ics`, text: ics, mime: 'text/calendar' };
     return {
       read, copy: ics, file,
       body: [{ t: 'big', v: a.title, size: 18 }, { t: 'sub', text: `${fmtDate(s)}${a.timed ? `, ${hm(s)} to ${hm(e)}` : ', all day'}` }, kv, { t: 'actions', items: [go, { act: 'save', label: 'Save .ics' }, { act: 'copy', label: 'Copy .ics' }] }],
-      trace: [`dates.parse → ${fmtDate(s)}${a.timed ? ' ' + hm(s) : ''}`, 'title = what is left after removing date and time words', 'build intent extras: title, begin, end'], py: `device.calendar.insert(title="${a.title}", begin="${iso(s)}${a.timed ? 'T' + hm(s) : ''}", minutes=${a.dur})`
+      trace: [`dates.parse → ${fmtDate(s)}${a.timed ? ' ' + hm(s) : ''}`, 'title = what is left after removing date and time words', 'intent: calendar.insert (ACTION_INSERT on CalendarContract.Events): title, begin, end; no permission'], py: `device.calendar.insert(title="${a.title}", begin="${iso(s)}${a.timed ? 'T' + hm(s) : ''}", minutes=${a.dur})`
     };
   }
 });
@@ -44,12 +45,12 @@ tool({
   topic: () => ['Timer', 1],
   run: a => {
     if (!a.end) a.end = Date.now() + a.sec * 1000;
-    const [kv, go] = hand('Hand to the Clock app', 'AlarmClock.ACTION_SET_TIMER, EXTRA_LENGTH=' + a.sec, 'SET_ALARM, granted at install', 'On Android the Clock app takes over the timer and rings when golem is closed. Here it counts down in the page.',
+    const [kv, go] = hand('Hand to the Clock app', 'the Clock app, with this timer', 'it rings even with golem closed', 'On Android the Clock app takes over the timer and rings when golem is closed. Here it counts down in the page.',
       a.sec <= 86400 ? { name: 'clock.timer', fields: { seconds: a.sec, message: 'golem' } } : null);
     return {
       read: ['start a timer for', { v: a.sec >= 60 ? fmt(a.sec / 60) + ' min' : a.sec + ' s' }],
       body: [{ t: 'big', v: '--:--', end: a.end }, kv, { t: 'actions', items: [go] }],
-      trace: [`duration → ${a.sec} s`, 'build intent: ACTION_SET_TIMER'], py: `device.timer(${a.sec})`
+      trace: [`duration → ${a.sec} s`, `intent: clock.timer (AlarmClock.ACTION_SET_TIMER, EXTRA_LENGTH=${a.sec}); SET_ALARM, granted at install`], py: `device.timer(${a.sec})`
     };
   }
 });
@@ -70,8 +71,8 @@ tool({
   topic: () => ['Alarm', 1],
   run: a => {
     const t = String(a.h).padStart(2, '0') + ':' + String(a.mi).padStart(2, '0');
-    const [kv, go] = hand('Hand to the Clock app', `AlarmClock.ACTION_SET_ALARM, HOUR=${a.h}, MINUTES=${a.mi}`, 'SET_ALARM, granted at install', 'On Android this creates the alarm in the Clock app. In the browser nothing is set.', { name: 'clock.alarm', fields: { hour: a.h, minutes: a.mi, message: 'golem' } });
-    return { read: ['set an alarm at', { v: t }], body: [{ t: 'big', v: t }, kv, { t: 'actions', items: [go] }], trace: [`time → ${t}`, 'build intent: ACTION_SET_ALARM'], py: `device.alarm("${t}")` };
+    const [kv, go] = hand('Hand to the Clock app', 'the Clock app, with this alarm', 'it rings even with golem closed', 'On Android this creates the alarm in the Clock app. In the browser nothing is set.', { name: 'clock.alarm', fields: { hour: a.h, minutes: a.mi, message: 'golem' } });
+    return { read: ['set an alarm at', { v: t }], body: [{ t: 'big', v: t }, kv, { t: 'actions', items: [go] }], trace: [`time → ${t}`, `intent: clock.alarm (AlarmClock.ACTION_SET_ALARM, HOUR=${a.h}, MINUTES=${a.mi}); SET_ALARM, granted at install`], py: `device.alarm("${t}")` };
   }
 });
 // "remind me to send the samples to the lab on friday at 9": the title as typed, then a date, a time, a length

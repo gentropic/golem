@@ -99,7 +99,9 @@ function wstats(v, w) {
 condition('table', {
   holds: () => !!S.table,
   prompt: 'No table is open. Open {one} first?',
-  establish: () => [{ label: 'open assays.csv', tool: 'open', args: {} }, ...Object.entries(S.tables).filter(([, t]) => t.rows.length).map(([k]) => ({ label: `open the ${k}`, tool: 'open', args: { device: k } })), ...Object.values(S.files).map(f => ({ label: `open ${f.name}`, tool: 'open', args: { file: { name: f.name, hash: f.hash } } }))]
+  many: 'No table is open. Open one first?',
+  // name: the table as the prompt says it; label: the option's button
+  establish: () => [{ label: 'open assays.csv', name: 'assays.csv, the sample', tool: 'open', args: {} }, ...Object.entries(S.tables).filter(([, t]) => t.rows.length).map(([k]) => ({ label: `open the ${k}`, name: `the ${k}`, tool: 'open', args: { device: k } })), ...Object.values(S.files).map(f => ({ label: `open ${f.name}`, name: f.name, tool: 'open', args: { file: { name: f.name, hash: f.hash } } }))]
 });
 tool({
   name: 'open',

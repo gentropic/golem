@@ -94,7 +94,7 @@ export function runTool(name, args) {
     const options = C.establish();
     if (!options.length) return { read: [name], body: [{ t: 'note', kind: 'err', text: C.none || `${c} is needed and nothing here can provide it.` }], trace: [...traces, `blocked: ${c} (precondition, no step can establish it)`] };
     return { read: [name], body: [], trace: [...traces, `blocked: ${c} (precondition)`],
-      ask: { prompt: options.length === 1 ? C.prompt.replace('{one}', options[0].label) : C.prompt.replace('{one}', 'which?'), options: options.map(o => ({ label: o.label, value: o })), set: (a, v) => { a.plan = [...(a.plan || []), { label: v.label, tool: v.tool, args: v.args }]; } } };
+      ask: { prompt: options.length === 1 ? C.prompt.replace('{one}', options[0].name || options[0].label) : C.many || C.prompt.replace('{one}', 'which?'), options: options.map(o => ({ label: o.label, value: o })), set: (a, v) => { a.plan = [...(a.plan || []), { label: v.label, tool: v.tool, args: v.args }]; } } };
   }
   const res = T[name](args);
   if (res && traces.length) res.trace.unshift(...traces);

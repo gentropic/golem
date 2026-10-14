@@ -60,9 +60,14 @@ const errors = [];
 page.on('pageerror', e => errors.push('page error: ' + e.message));
 page.on('console', m => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
 await page.goto('file://' + file);
-await page.waitForSelector('html[data-ready]'); await page.waitForSelector('#stream .card');
+await page.waitForSelector('html[data-ready]');
 
 let failed = 0;
+// a first visit opens on the welcome, its starters grouped, with the seeded examples under Examples in the sidebar
+const first = await page.evaluate(() => ({ welcome: !document.getElementById('welcome').hidden, cards: document.querySelectorAll('#stream .card').length, groups: document.querySelectorAll('#starts .sgroup').length,
+  examples: [...document.querySelectorAll('#dlist .lbl')].some(l => l.textContent === 'Examples') }));
+console.log(`${first.welcome && !first.cards && first.groups === 4 && first.examples ? 'ok  ' : 'FAIL'} a first visit opens on the welcome, examples in the sidebar (${JSON.stringify(first)})`);
+if (!(first.welcome && !first.cards && first.groups === 4 && first.examples)) failed++;
 for (const [q, rung, text] of STEPS) {
   await page.fill('#q', q); await page.press('#q', 'Enter'); await page.waitForTimeout(40);
   if (rung === null) continue;

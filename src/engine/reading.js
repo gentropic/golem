@@ -165,6 +165,27 @@ function lev(a, b) { const d = Array.from({ length: a.length + 1 }, (_, i) => [i
 // (A statistical model trained from the frames was tried as well and added one hit and one wrong offer for 3 s of
 // training; dispatch keeps it as an experiment, golem does not use it.)
 const GUESS_BUDGET = 3;
+// dispatch's echo ("True thickness true thickness; of 12 m; in hole 270/60") as a phrase: the frame's label once, its
+// parts in order. Nothing runs to describe a guess: some tools write device state.
+function phraseOf(echo) {
+  const [head, ...rest] = echo.replace(/\.$/, '').split('; ');
+  const w = head.split(' '), h = w.length % 2 === 0 && w.slice(0, w.length / 2).join(' ').toLowerCase() === w.slice(w.length / 2).join(' ').toLowerCase() ? w.slice(0, w.length / 2).join(' ') : head;
+  return [h, ...rest].join(' ');
+}
+// what the reading changed, word by word: a typed word it reads as a near one, or one it leaves out (not the small words
+// a reading rephrases anyway)
+const GLUE = new Set(['a', 'an', 'the', 'of', 'to', 'in', 'into', 'at', 'on', 'by', 'for', 'with', 'and', 'or', 'is', 'are', 'me', 'i', 'my', 'you', 'your', 'it', 'this', 'that',
+  'do', 'did', 'does', 'can', 'how', 'where', 'when', 'which', 'who', 'about', 'please', 'what', 'whats']);
+function changesOf(raw, phrase) {
+  const has = new Set(phrase.toLowerCase().split(/[^a-z0-9./]+/).filter(Boolean)), out = [];
+  for (const t of raw.toLowerCase().split(/[^a-z0-9./]+/).filter(Boolean)) {
+    if (has.has(t) || /^[\d./]+$/.test(t) || GLUE.has(t)) continue;
+    // a typo only for words long enough to have one: "convrt", "lithh"; a short word that is not there was left out
+    const near = t.length < 4 ? null : [...has].filter(x => x.length >= 3 && !/^[\d./]+$/.test(x) && Math.abs(x.length - t.length) <= 2).map(x => [x, lev(x, t)]).filter(([, d]) => d > 0 && d <= (t.length >= 7 ? 2 : 1)).sort((a, b) => a[1] - b[1])[0];
+    out.push(near ? `"${t}" read as "${near[0]}"` : `"${t}" left out`);
+  }
+  return out;
+}
 export function guessesOf(raw) {
   const E = clauseEngine(), r = E.understand(raw, clauseSession(), { repair: { budget: GUESS_BUDGET } });
   const cmds = r.status === 'ok' ? r.commands.slice(0, 1) : r.status === 'clarify' && r.repaired && r.commands ? r.commands.slice(0, 1) : r.status === 'ambiguous' ? (r.alternatives || []).map(a => a[0]) : [];
@@ -173,7 +194,8 @@ export function guessesOf(raw) {
   for (const c of cmds) {
     const b = bindOf(c); if (!b) continue;
     const k = JSON.stringify(b); if (seen.has(k)) continue; seen.add(k);
-    out.push({ tool: b.tool, args: b.args, echo: E.echo(c).replace(/\.$/, ''), changes });
+    const echo = phraseOf(E.echo(c));
+    out.push({ tool: b.tool, args: b.args, echo, changes: [...new Set([...changes, ...changesOf(raw, echo)])] });
   }
   return out.slice(0, 3);
 }
@@ -187,7 +209,7 @@ tool({
   run: a => ({
     read: ['no exact reading of', { v: a.q }],
     body: [{ t: 'note', text: `I could not read that as written. ${a.cands.length > 1 ? 'Each reading below changes it' : 'The reading below changes it'} slightly; pick one to run it, or rephrase. I do not run a guess on my own.` },
-      { t: 'list', items: a.cands.map(c => `${c.echo}: ${c.changes.length ? c.changes.join('; ') : 'one of several exact readings'}`) }],
+      { t: 'list', items: a.cands.map(c => `${c.echo}${c.changes.length ? ` (${c.changes.join('; ')})` : ''}`) }],
     ask: { prompt: a.cands.length > 1 ? 'Run one of these?' : 'Run it?', options: a.cands.map((c, i) => ({ label: c.echo, value: i })), set: () => {} },
     trace: ['grammar: no exact reading', `repair (budget ${GUESS_BUDGET}): ${a.cands.length} reading${a.cands.length > 1 ? 's' : ''} a tool takes`, ...a.cands.map(c => `offer: ${c.echo} — ${c.changes.join('; ') || 'as written'}`), 'wait: nothing runs until one is picked']
   })
@@ -196,8 +218,9 @@ tool({
 tool({
   name: 'none',
   run: a => {
-    const qt = new Set(a.q.split(/[^a-z0-9]+/).filter(Boolean));
-    const near = examples().map(e => { const et = e.toLowerCase().split(/[^a-z0-9]+/); return { e, s: et.filter(t => qt.has(t)).length / Math.sqrt(et.length * (qt.size || 1)) }; }).filter(x => x.s > 0).sort((x, y) => y.s - x.s).slice(0, 3);
+    // nearest by the words that carry meaning: "of" in common is no reason to suggest a skill
+    const qt = new Set(a.q.split(/[^a-z0-9]+/).filter(t => t && !GLUE.has(t)));
+    const near = examples().map(e => { const et = e.toLowerCase().split(/[^a-z0-9]+/).filter(t => t && !GLUE.has(t)); return { e, s: et.filter(t => qt.has(t)).length / Math.sqrt(et.length * (qt.size || 1)) }; }).filter(x => x.s > 0 && !/ means /.test(x.e)).sort((x, y) => y.s - x.s).slice(0, 3);
     let teach = null;
     for (const t of a.q.split(/[^a-z]+/)) {
       if (t.length < 3 || vocab().has(t) || S.aliases[t]) continue;
@@ -209,7 +232,7 @@ tool({
     return {
       read: partial ? ['read so far', { v: partial }] : [],
       body: [partial ? { t: 'note', kind: 'err', text: `Not enough to act on: ${verdict.reasons.join('; ')}. I do not guess.` } : { t: 'note', kind: 'err', text: 'No reading, so no answer. I do not guess.' },
-        ...(near.length ? [{ t: 'lbl', text: 'Nearest skills' }, { t: 'chips', items: near.map(x => x.e) }] : [{ t: 'sub', text: 'Nothing close. The Skills tab lists what I can do.' }]),
+        ...(near.length ? [{ t: 'lbl', text: 'Nearest skills' }, { t: 'chips', items: near.map(x => x.e) }] : [{ t: 'sub', text: 'Nothing close. This lists what I can do:' }, { t: 'chips', items: ['what can you do'] }]),
         ...(teach ? [{ t: 'lbl', text: 'Teach me the word' }, { t: 'chips', items: [teach] }] : [])],
       trace: ['context: no open question, no amendment fits', describeVerdict(verdict), 'grammar: no rule matched', 'lexicon: no taught phrase applies', 'stop']
     };

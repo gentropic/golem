@@ -135,8 +135,11 @@ button{cursor:pointer}
 .welcome .mark{font:700 34px/1 var(--mono);letter-spacing:.02em}
 .welcome .mark i{display:inline-block;width:16px;height:16px;background:var(--au-action);margin-right:12px;vertical-align:2px}
 .welcome p{margin:0;color:var(--au-fg-muted);max-width:46ch}
-.starts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;width:100%;max-width:640px;text-align:left;margin-top:6px}
-@media (max-width:520px){.starts{grid-template-columns:minmax(0,1fr)}}
+.welcome p.hint{font-size:13px;margin-top:-8px}
+.starts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px 14px;width:100%;max-width:720px;text-align:left;margin-top:6px}
+@media (max-width:620px){.starts{grid-template-columns:minmax(0,1fr)}}
+.sgroup{display:grid;gap:6px;align-content:start;min-width:0}
+.sgroup h2{margin:0 0 2px;font:600 11px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--au-fg-muted)}
 .start{background:var(--au-surface-raised);border:1px solid var(--au-border);border-radius:8px;padding:10px 12px;display:grid;gap:3px;text-align:left;min-width:0}
 .start:hover{border-color:var(--au-rule);background:var(--au-surface-bright)}
 .start b{font:600 13px var(--sans);color:var(--au-fg-muted)}
@@ -273,15 +276,16 @@ svg text{font:10px var(--mono);fill:var(--au-fg-muted)}
   <main class="main" id="phone">
     <header class="top">
       <button class="ibtn only-narrow" id="menu" type="button" aria-label="Sessions and history" title="Show the sidebar (Ctrl+B)"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M2 4h14M2 9h14M2 14h14"/></svg></button>
-      <div class="ttl"><button class="sbtn" id="sname" type="button" title="Sessions and history">New session</button><span class="stat">golem · <b id="st-on">awake</b> · <span id="st-where">offline</span> · <span id="st-req">0 requests</span></span></div>
+      <div class="ttl"><button class="sbtn" id="sname" type="button" title="Sessions and history">New session</button><span class="stat"><b id="st-on">awake</b><span class="only-wide"> · <span id="st-where">on this device</span></span> · <span id="st-req" title="Requests golem has made to the network. Only installing a pack or checking for updates makes one.">0 requests</span></span></div>
       <button class="ibtn only-narrow" id="newtop" type="button" aria-label="New session" title="New session (Ctrl+Shift+O)"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M9 3v12M3 9h12"/></svg></button>
-      <button class="power" id="power" type="button" title="Put golem to sleep or wake it" aria-pressed="false">sleep</button>
+      <button class="power" id="power" type="button" title="Sleep: golem reads and runs nothing until you wake it" aria-pressed="false">sleep</button>
     </header>
 
     <div class="view" id="v-ask">
       <div class="welcome" id="welcome" hidden>
         <div class="mark"><i aria-hidden="true"></i>golem</div>
         <p>Ask, compute, or act. Nothing here calls a model: every answer is a reading you can check and a tool that computes. If I cannot read something, I say so.</p>
+        <p class="hint">Tap one to start, or type below. A few sessions already run are under Examples in the sidebar.</p>
         <div class="starts" id="starts"></div>
       </div>
       <div class="lbl" id="exlbl" hidden>Example session</div>
@@ -458,7 +462,7 @@ function runTool(name, args) {
     const options = C.establish();
     if (!options.length) return { read: [name], body: [{ t: 'note', kind: 'err', text: C.none || `${c} is needed and nothing here can provide it.` }], trace: [...traces, `blocked: ${c} (precondition, no step can establish it)`] };
     return { read: [name], body: [], trace: [...traces, `blocked: ${c} (precondition)`],
-      ask: { prompt: options.length === 1 ? C.prompt.replace('{one}', options[0].label) : C.prompt.replace('{one}', 'which?'), options: options.map(o => ({ label: o.label, value: o })), set: (a, v) => { a.plan = [...(a.plan || []), { label: v.label, tool: v.tool, args: v.args }]; } } };
+      ask: { prompt: options.length === 1 ? C.prompt.replace('{one}', options[0].name || options[0].label) : C.many || C.prompt.replace('{one}', 'which?'), options: options.map(o => ({ label: o.label, value: o })), set: (a, v) => { a.plan = [...(a.plan || []), { label: v.label, tool: v.tool, args: v.args }]; } } };
   }
   const res = T[name](args);
   if (res && traces.length) res.trace.unshift(...traces);
@@ -11307,7 +11311,9 @@ function wstats(v, w) {
 condition('table', {
   holds: () => !!S.table,
   prompt: 'No table is open. Open {one} first?',
-  establish: () => [{ label: 'open assays.csv', tool: 'open', args: {} }, ...Object.entries(S.tables).filter(([, t]) => t.rows.length).map(([k]) => ({ label: `open the ${k}`, tool: 'open', args: { device: k } })), ...Object.values(S.files).map(f => ({ label: `open ${f.name}`, tool: 'open', args: { file: { name: f.name, hash: f.hash } } }))]
+  many: 'No table is open. Open one first?',
+  // name: the table as the prompt says it; label: the option's button
+  establish: () => [{ label: 'open assays.csv', name: 'assays.csv, the sample', tool: 'open', args: {} }, ...Object.entries(S.tables).filter(([, t]) => t.rows.length).map(([k]) => ({ label: `open the ${k}`, name: `the ${k}`, tool: 'open', args: { device: k } })), ...Object.values(S.files).map(f => ({ label: `open ${f.name}`, name: f.name, tool: 'open', args: { file: { name: f.name, hash: f.hash } } }))]
 });
 tool({
   name: 'open',
@@ -11959,9 +11965,10 @@ const { parseUnit } = __m2;
 // through shell.intent (an allowlisted name and typed fields; the person confirms there); in a browser nothing is sent,
 // and the event can be saved as a .ics file instead.
 
-// the hand-off description every device card carries: the intent, its permission, and the button
-// send: { name, fields } for lead-acid's intent plugin (calendar.insert, clock.timer, clock.alarm), plain JSON
-const hand = (label, intent, perm, msg, send) => [{ t: 'kv', rows: [['hand-off', intent, { mono: true }], ['permission', perm]] }, { act: 'handoff', label, msg, go: true, ...(send ? { send } : {}) }];
+// the hand-off every device card carries, in the person's words: which app opens and what happens there, and the button.
+// The Android intent itself is in the trace. send: { name, fields } for lead-acid's intent plugin (calendar.insert,
+// clock.timer, clock.alarm), plain JSON
+const hand = (label, opens, then, msg, send) => [{ t: 'kv', rows: [['opens', opens], ['then', then]] }, { act: 'handoff', label, msg, go: true, ...(send ? { send } : {}) }];
 const local = (x, timed) => iso(x) + (timed ? 'T' + String(x.getHours()).padStart(2, '0') + ':' + String(x.getMinutes()).padStart(2, '0') : '');   // the person's own clock, as the plugin reads it
 function parseEvent(str) {
   const low = str.toLowerCase(), d = findDate(low), t = findTime(low), du = /\bfor (\d+(?:\.\d+)?) ?(h|hr|hrs|hours?|min|mins|minutes?)\b/.exec(low);
@@ -11982,13 +11989,13 @@ tool({
       a.timed ? `DTSTART:${st(s)}` : `DTSTART;VALUE=DATE:${st(s)}`, ...(a.timed ? [`DTEND:${st(e)}`] : []), `SUMMARY:${a.title}`, 'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
     const read = ['new event', { v: a.title }, 'on', { v: fmtDate(s) }];
     if (a.timed) read.push('at', { v: hm(s) }, 'for', { v: a.dur + ' min', key: 'dur', alts: [30, 60, 120], cur: a.dur }); else read.push({ v: 'all day' });
-    const [kv, go] = hand('Add to calendar', 'ACTION_INSERT → CalendarContract.Events', 'none: your calendar app shows the event for you to save', 'On Android this opens your calendar app with these fields filled in. In the browser nothing is sent; save or copy the .ics into any calendar.',
+    const [kv, go] = hand('Add to calendar', 'your calendar app, with this event filled in', 'you save it there; nothing comes back to golem', 'On Android this opens your calendar app with these fields filled in. In the browser nothing is sent; save or copy the .ics into any calendar.',
       { name: 'calendar.insert', fields: { title: a.title.slice(0, 200), begin: local(s, a.timed), ...(a.timed ? { end: local(e, true) } : { allDay: true }) } });
     const file = { name: `${a.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'event'}.ics`, text: ics, mime: 'text/calendar' };
     return {
       read, copy: ics, file,
       body: [{ t: 'big', v: a.title, size: 18 }, { t: 'sub', text: `${fmtDate(s)}${a.timed ? `, ${hm(s)} to ${hm(e)}` : ', all day'}` }, kv, { t: 'actions', items: [go, { act: 'save', label: 'Save .ics' }, { act: 'copy', label: 'Copy .ics' }] }],
-      trace: [`dates.parse → ${fmtDate(s)}${a.timed ? ' ' + hm(s) : ''}`, 'title = what is left after removing date and time words', 'build intent extras: title, begin, end'], py: `device.calendar.insert(title="${a.title}", begin="${iso(s)}${a.timed ? 'T' + hm(s) : ''}", minutes=${a.dur})`
+      trace: [`dates.parse → ${fmtDate(s)}${a.timed ? ' ' + hm(s) : ''}`, 'title = what is left after removing date and time words', 'intent: calendar.insert (ACTION_INSERT on CalendarContract.Events): title, begin, end; no permission'], py: `device.calendar.insert(title="${a.title}", begin="${iso(s)}${a.timed ? 'T' + hm(s) : ''}", minutes=${a.dur})`
     };
   }
 });
@@ -11998,12 +12005,12 @@ tool({
   topic: () => ['Timer', 1],
   run: a => {
     if (!a.end) a.end = Date.now() + a.sec * 1000;
-    const [kv, go] = hand('Hand to the Clock app', 'AlarmClock.ACTION_SET_TIMER, EXTRA_LENGTH=' + a.sec, 'SET_ALARM, granted at install', 'On Android the Clock app takes over the timer and rings when golem is closed. Here it counts down in the page.',
+    const [kv, go] = hand('Hand to the Clock app', 'the Clock app, with this timer', 'it rings even with golem closed', 'On Android the Clock app takes over the timer and rings when golem is closed. Here it counts down in the page.',
       a.sec <= 86400 ? { name: 'clock.timer', fields: { seconds: a.sec, message: 'golem' } } : null);
     return {
       read: ['start a timer for', { v: a.sec >= 60 ? fmt(a.sec / 60) + ' min' : a.sec + ' s' }],
       body: [{ t: 'big', v: '--:--', end: a.end }, kv, { t: 'actions', items: [go] }],
-      trace: [`duration → ${a.sec} s`, 'build intent: ACTION_SET_TIMER'], py: `device.timer(${a.sec})`
+      trace: [`duration → ${a.sec} s`, `intent: clock.timer (AlarmClock.ACTION_SET_TIMER, EXTRA_LENGTH=${a.sec}); SET_ALARM, granted at install`], py: `device.timer(${a.sec})`
     };
   }
 });
@@ -12024,8 +12031,8 @@ tool({
   topic: () => ['Alarm', 1],
   run: a => {
     const t = String(a.h).padStart(2, '0') + ':' + String(a.mi).padStart(2, '0');
-    const [kv, go] = hand('Hand to the Clock app', `AlarmClock.ACTION_SET_ALARM, HOUR=${a.h}, MINUTES=${a.mi}`, 'SET_ALARM, granted at install', 'On Android this creates the alarm in the Clock app. In the browser nothing is set.', { name: 'clock.alarm', fields: { hour: a.h, minutes: a.mi, message: 'golem' } });
-    return { read: ['set an alarm at', { v: t }], body: [{ t: 'big', v: t }, kv, { t: 'actions', items: [go] }], trace: [`time → ${t}`, 'build intent: ACTION_SET_ALARM'], py: `device.alarm("${t}")` };
+    const [kv, go] = hand('Hand to the Clock app', 'the Clock app, with this alarm', 'it rings even with golem closed', 'On Android this creates the alarm in the Clock app. In the browser nothing is set.', { name: 'clock.alarm', fields: { hour: a.h, minutes: a.mi, message: 'golem' } });
+    return { read: ['set an alarm at', { v: t }], body: [{ t: 'big', v: t }, kv, { t: 'actions', items: [go] }], trace: [`time → ${t}`, `intent: clock.alarm (AlarmClock.ACTION_SET_ALARM, HOUR=${a.h}, MINUTES=${a.mi}); SET_ALARM, granted at install`], py: `device.alarm("${t}")` };
   }
 });
 // "remind me to send the samples to the lab on friday at 9": the title as typed, then a date, a time, a length
@@ -19210,7 +19217,7 @@ frame({
 
 /* ==== src/engine/skills.js ==== */
 const __m49 = (() => {
-const { TOOLS, tool } = __m0;
+const { TOOLS, tool, frame } = __m0;
 // The catalog: skills derived from the declarations, planned skills named here, and the packs golem
 // knows about. Examples feed the Skills tab, the "nearest skills" suggestions and the teach vocabulary.
 
@@ -19241,11 +19248,34 @@ const GROUPS = ['Compute', 'Field', 'Table', 'Knowledge', 'Device', 'Session'];
 // the Skills tab, grouped, in declaration order; computed on demand so every module has registered
 const skills = () => GROUPS.flatMap(g => TOOLS.filter(d => d.skill && d.skill.group === g).map(d => ({ group: g, title: d.skill.title, on: d.skill.on, about: d.skill.about, examples: d.skill.examples || [], live: !d.planned })));
 const examples = () => skills().flatMap(s => s.examples);
+// "what can you do": the catalog as a card, a group per row, one example of each group to tap, and the full list a tap away
+tool({
+  name: 'abilities',
+  skill: { group: 'Session', title: 'What I can do', on: 'the catalog', about: 'The skills that run here, by group, with one to try from each.', examples: ['what can you do'] },
+  run: () => {
+    const rows = skills(), live = rows.filter(s => s.live), plan = rows.length - live.length;
+    const by = GROUPS.map(g => [g, live.filter(s => s.group === g)]).filter(([, l]) => l.length);
+    return { read: ['list the skills'], value: live.length,
+      body: [{ t: 'big', v: String(live.length), unit: 'skills run here' }, { t: 'sub', text: `${plan} more are planned. Each one reads plain words; none of them calls a model.` },
+        { t: 'kv', rows: by.map(([g, l]) => [g.toLowerCase(), l.map(s => s.title).join(' · ')]) },
+        { t: 'lbl', text: 'one to try from each' }, { t: 'chips', items: by.map(([, l]) => (l.find(s => s.examples.length) || { examples: [] }).examples[0]).filter(Boolean) },
+        { t: 'actions', items: [{ act: 'skills', label: 'All skills, with examples' }] }],
+      trace: [`catalog → ${live.length} live, ${plan} planned`] };
+  }
+});
+frame({ name: 'abilities', label: 'What I can do', words: ['what can you do', 'what can i ask', 'what do you do', 'what can i do here', 'what are your skills', 'what skills do you have', 'help', 'skills', 'list the skills', 'list skills', 'show the skills', 'show me what you can do', 'what else can you do'],
+  theme: [], required: [], roles: {}, words_pt: ['o que você faz', 'o que voce faz', 'o que você sabe fazer', 'ajuda', 'habilidades'], label_pt: 'O que sei fazer', bind: () => ({ tool: 'abilities', args: {} }) });
 let VOCAB = null;
 const vocab = () => VOCAB || (VOCAB = new Set(examples().filter(e => !/ means /.test(e)).join(' ').toLowerCase().split(/[^a-z]+/).filter(w => w.length > 3)));
 // the example chips in the dock
 // the welcome of an empty session: one line of what, one query that shows it
-const STARTERS = [['Convert a grade', '0.35 oz per short ton in g/t'], ['True thickness', 'true thickness of a 14 m intercept, hole 270/60, bedding 045/30'], ['Look at a table (sample data)', 'open assays.csv'], ['Run some Python', 'run this: sum(x * x for x in range(10))'], ['Set a reminder', 'remind me to send the samples to the lab on friday at 9'], ['What can you do?', 'what can you do']];
+// the welcome's starters, by what they are for: [group, [[title, query], …]]
+const STARTERS = [
+  ['In the field', [['True thickness', 'true thickness of a 14 m intercept, hole 270/60, bedding 045/30'], ['Declination here', 'declination at -19.92, -43.94'], ['Apparent dip', 'apparent dip of 000/30 on a section at 045']]],
+  ['Lab and tables', [['A table to try (sample data)', 'open assays.csv'], ['Core mass', 'mass of 1 m of nq core at 2.7'], ['Molar mass', 'molar mass of CuFeS2']]],
+  ['Units and numbers', [['Convert a grade', '0.35 oz per short ton in g/t'], ['With uncertainty', '2.7 ± 0.1 t/m3 * 1.35 Mm3'], ['Run some Python', 'run this: sum(x * x for x in range(10))']]],
+  ['Every day', [['Set a reminder', 'remind me to send the samples to the lab on friday at 9'], ['Two time zones', '9am sao paulo in perth'], ['What can you do?', 'what can you do']]],
+];
 const SUGGESTIONS = ['pop means population', 'histogram of cu', 'log scale', 'population density of mongolia in people per square mile', 'and chile', 'set a timer for 5 min', 'what is a skiplist', 'why', 'export as script', 'undo'];
   return { PACKS, skills, examples, vocab, STARTERS, SUGGESTIONS };
 })();
@@ -21635,6 +21665,27 @@ function lev(a, b) { const d = Array.from({ length: a.length + 1 }, (_, i) => [i
 // (A statistical model trained from the frames was tried as well and added one hit and one wrong offer for 3 s of
 // training; dispatch keeps it as an experiment, golem does not use it.)
 const GUESS_BUDGET = 3;
+// dispatch's echo ("True thickness true thickness; of 12 m; in hole 270/60") as a phrase: the frame's label once, its
+// parts in order. Nothing runs to describe a guess: some tools write device state.
+function phraseOf(echo) {
+  const [head, ...rest] = echo.replace(/\.$/, '').split('; ');
+  const w = head.split(' '), h = w.length % 2 === 0 && w.slice(0, w.length / 2).join(' ').toLowerCase() === w.slice(w.length / 2).join(' ').toLowerCase() ? w.slice(0, w.length / 2).join(' ') : head;
+  return [h, ...rest].join(' ');
+}
+// what the reading changed, word by word: a typed word it reads as a near one, or one it leaves out (not the small words
+// a reading rephrases anyway)
+const GLUE = new Set(['a', 'an', 'the', 'of', 'to', 'in', 'into', 'at', 'on', 'by', 'for', 'with', 'and', 'or', 'is', 'are', 'me', 'i', 'my', 'you', 'your', 'it', 'this', 'that',
+  'do', 'did', 'does', 'can', 'how', 'where', 'when', 'which', 'who', 'about', 'please', 'what', 'whats']);
+function changesOf(raw, phrase) {
+  const has = new Set(phrase.toLowerCase().split(/[^a-z0-9./]+/).filter(Boolean)), out = [];
+  for (const t of raw.toLowerCase().split(/[^a-z0-9./]+/).filter(Boolean)) {
+    if (has.has(t) || /^[\d./]+$/.test(t) || GLUE.has(t)) continue;
+    // a typo only for words long enough to have one: "convrt", "lithh"; a short word that is not there was left out
+    const near = t.length < 4 ? null : [...has].filter(x => x.length >= 3 && !/^[\d./]+$/.test(x) && Math.abs(x.length - t.length) <= 2).map(x => [x, lev(x, t)]).filter(([, d]) => d > 0 && d <= (t.length >= 7 ? 2 : 1)).sort((a, b) => a[1] - b[1])[0];
+    out.push(near ? `"${t}" read as "${near[0]}"` : `"${t}" left out`);
+  }
+  return out;
+}
 function guessesOf(raw) {
   const E = clauseEngine(), r = E.understand(raw, clauseSession(), { repair: { budget: GUESS_BUDGET } });
   const cmds = r.status === 'ok' ? r.commands.slice(0, 1) : r.status === 'clarify' && r.repaired && r.commands ? r.commands.slice(0, 1) : r.status === 'ambiguous' ? (r.alternatives || []).map(a => a[0]) : [];
@@ -21643,7 +21694,8 @@ function guessesOf(raw) {
   for (const c of cmds) {
     const b = bindOf(c); if (!b) continue;
     const k = JSON.stringify(b); if (seen.has(k)) continue; seen.add(k);
-    out.push({ tool: b.tool, args: b.args, echo: E.echo(c).replace(/\.$/, ''), changes });
+    const echo = phraseOf(E.echo(c));
+    out.push({ tool: b.tool, args: b.args, echo, changes: [...new Set([...changes, ...changesOf(raw, echo)])] });
   }
   return out.slice(0, 3);
 }
@@ -21657,7 +21709,7 @@ tool({
   run: a => ({
     read: ['no exact reading of', { v: a.q }],
     body: [{ t: 'note', text: `I could not read that as written. ${a.cands.length > 1 ? 'Each reading below changes it' : 'The reading below changes it'} slightly; pick one to run it, or rephrase. I do not run a guess on my own.` },
-      { t: 'list', items: a.cands.map(c => `${c.echo}: ${c.changes.length ? c.changes.join('; ') : 'one of several exact readings'}`) }],
+      { t: 'list', items: a.cands.map(c => `${c.echo}${c.changes.length ? ` (${c.changes.join('; ')})` : ''}`) }],
     ask: { prompt: a.cands.length > 1 ? 'Run one of these?' : 'Run it?', options: a.cands.map((c, i) => ({ label: c.echo, value: i })), set: () => {} },
     trace: ['grammar: no exact reading', `repair (budget ${GUESS_BUDGET}): ${a.cands.length} reading${a.cands.length > 1 ? 's' : ''} a tool takes`, ...a.cands.map(c => `offer: ${c.echo} — ${c.changes.join('; ') || 'as written'}`), 'wait: nothing runs until one is picked']
   })
@@ -21666,8 +21718,9 @@ tool({
 tool({
   name: 'none',
   run: a => {
-    const qt = new Set(a.q.split(/[^a-z0-9]+/).filter(Boolean));
-    const near = examples().map(e => { const et = e.toLowerCase().split(/[^a-z0-9]+/); return { e, s: et.filter(t => qt.has(t)).length / Math.sqrt(et.length * (qt.size || 1)) }; }).filter(x => x.s > 0).sort((x, y) => y.s - x.s).slice(0, 3);
+    // nearest by the words that carry meaning: "of" in common is no reason to suggest a skill
+    const qt = new Set(a.q.split(/[^a-z0-9]+/).filter(t => t && !GLUE.has(t)));
+    const near = examples().map(e => { const et = e.toLowerCase().split(/[^a-z0-9]+/).filter(t => t && !GLUE.has(t)); return { e, s: et.filter(t => qt.has(t)).length / Math.sqrt(et.length * (qt.size || 1)) }; }).filter(x => x.s > 0 && !/ means /.test(x.e)).sort((x, y) => y.s - x.s).slice(0, 3);
     let teach = null;
     for (const t of a.q.split(/[^a-z]+/)) {
       if (t.length < 3 || vocab().has(t) || S.aliases[t]) continue;
@@ -21679,7 +21732,7 @@ tool({
     return {
       read: partial ? ['read so far', { v: partial }] : [],
       body: [partial ? { t: 'note', kind: 'err', text: `Not enough to act on: ${verdict.reasons.join('; ')}. I do not guess.` } : { t: 'note', kind: 'err', text: 'No reading, so no answer. I do not guess.' },
-        ...(near.length ? [{ t: 'lbl', text: 'Nearest skills' }, { t: 'chips', items: near.map(x => x.e) }] : [{ t: 'sub', text: 'Nothing close. The Skills tab lists what I can do.' }]),
+        ...(near.length ? [{ t: 'lbl', text: 'Nearest skills' }, { t: 'chips', items: near.map(x => x.e) }] : [{ t: 'sub', text: 'Nothing close. This lists what I can do:' }, { t: 'chips', items: ['what can you do'] }]),
         ...(teach ? [{ t: 'lbl', text: 'Teach me the word' }, { t: 'chips', items: [teach] }] : [])],
       trace: ['context: no open question, no amendment fits', describeVerdict(verdict), 'grammar: no rule matched', 'lexicon: no taught phrase applies', 'stop']
     };
@@ -27654,8 +27707,11 @@ function renderDrawer() {
   } else {
     const cur = current(), day = 864e5, today = new Date().setHours(0, 0, 0, 0), age = t => t >= today ? 'Today' : t >= today - 6 * day ? 'This week' : 'Earlier';
     let g = ''; h = '';
-    [...sessions()].sort((x, y) => y.updated - x.updated || y.id - x.id).forEach(s => {
-      if (age(s.updated) !== g) { g = age(s.updated); h += `<div class="lbl">${g}</div>`; }
+    // yours by when they were last used, then the examples golem seeded on the first visit
+    const all = [...sessions()].sort((x, y) => y.updated - x.updated || y.id - x.id);
+    [...all.filter(s => !s.example), ...all.filter(s => s.example)].forEach(s => {
+      const grp = s.example ? 'Examples' : age(s.updated);
+      if (grp !== g) { g = grp; h += `<div class="lbl">${g}</div>`; }
       const name = ren === s.id ? `<input class="ren" data-id="${s.id}" value="${escHtml(s.name)}" aria-label="Session name. Leave empty to name it automatically.">` : `<button class="open" type="button" data-s="${s.id}" title="${escHtml(s.name)}">${escHtml(s.name)}</button>`;
       h += `<div class="srow" aria-current="${s === cur}">${name}<div class="meta"><span>${s.cards.length} card${s.cards.length === 1 ? '' : 's'} · ${when(s.updated)}</span>${s.example ? '<span class="tag samp">example</span>' : ''}<span class="acts"><button class="link" type="button" data-ren="${s.id}">rename</button><button class="link" type="button" data-exp="${s.id}">export</button><button class="link" type="button" data-del="${s.id}">${del === s.id ? 'confirm delete' : 'delete'}</button></span></div></div>`;
     });
@@ -27797,6 +27853,7 @@ $('stream').addEventListener('click', e => {
   if (!awake) return status('Asleep. Tap wake at the top right.');
   if (act === 'slot') { flipSlot(c, b.dataset.key); replaceCard(c, b.dataset.key); }
   else if (act === 'answer') { answer(c, +b.dataset.i); replaceCard(c); }
+  else if (act === 'skills') showTab('skills');
   else if (act === 'handoff') {
     // inside lead-acid: the allowlisted intent, the other app opens for the person to confirm; in a browser: what it would do
     const say = (text, kind) => { const n = document.createElement('div'); n.className = 'note ' + kind; n.textContent = text; b.replaceWith(n); };
@@ -27845,7 +27902,7 @@ $('dlist').addEventListener('click', e => {
     deleteSession(id); del = null; renderStream(); renderDrawer();
   }
 });
-$('starts').innerHTML = STARTERS.map(([t, q]) => `<button class="start" type="button" data-q="${escHtml(q)}"><b>${escHtml(t)}</b><span>${escHtml(q)}</span></button>`).join('');
+$('starts').innerHTML = STARTERS.map(([g, items]) => `<section class="sgroup"><h2>${escHtml(g)}</h2>${items.map(([t, q]) => `<button class="start" type="button" data-q="${escHtml(q)}"><b>${escHtml(t)}</b><span>${escHtml(q)}</span></button>`).join('')}</section>`).join('');
 
 /* ── start: restore saved sessions, or seed two examples ── */
 renderSkills();
@@ -27856,7 +27913,8 @@ if (shell.present) $('st-where').textContent = 'in the lead-acid shell';
   const fb = await store.readPack('factbook').catch(() => null); if (fb) useFactbook(fb);   // before the sessions replay, so their cards read it
   for (const slug of Object.keys(BOOKS)) { const b = await store.readPack(slug).catch(() => null); if (b) useBook(slug, b); }
   const got = await store.load().catch(() => null);
-  if (!(got && hydrate(got.state)) && !sessions().length) seedExamples();
+  // a first visit: the examples are kept in the sidebar, and golem opens on the welcome in a session of its own
+  if (!(got && hydrate(got.state)) && !sessions().length) { seedExamples(); newSession(); }
   if (got && got.migrated) store.save(parts());
   // the "New session" shortcut of the installed app
   if (new URLSearchParams(location.search).has('new')) { newSession(); try { history.replaceState(null, '', location.pathname); } catch (e) { /* file:// */ } }

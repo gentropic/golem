@@ -121,8 +121,11 @@ button{cursor:pointer}
 .welcome .mark{font:700 34px/1 var(--mono);letter-spacing:.02em}
 .welcome .mark i{display:inline-block;width:16px;height:16px;background:var(--au-action);margin-right:12px;vertical-align:2px}
 .welcome p{margin:0;color:var(--au-fg-muted);max-width:46ch}
-.starts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;width:100%;max-width:640px;text-align:left;margin-top:6px}
-@media (max-width:520px){.starts{grid-template-columns:minmax(0,1fr)}}
+.welcome p.hint{font-size:13px;margin-top:-8px}
+.starts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px 14px;width:100%;max-width:720px;text-align:left;margin-top:6px}
+@media (max-width:620px){.starts{grid-template-columns:minmax(0,1fr)}}
+.sgroup{display:grid;gap:6px;align-content:start;min-width:0}
+.sgroup h2{margin:0 0 2px;font:600 11px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--au-fg-muted)}
 .start{background:var(--au-surface-raised);border:1px solid var(--au-border);border-radius:8px;padding:10px 12px;display:grid;gap:3px;text-align:left;min-width:0}
 .start:hover{border-color:var(--au-rule);background:var(--au-surface-bright)}
 .start b{font:600 13px var(--sans);color:var(--au-fg-muted)}
@@ -257,15 +260,16 @@ svg text{font:10px var(--mono);fill:var(--au-fg-muted)}
   <main class="main" id="phone">
     <header class="top">
       <button class="ibtn only-narrow" id="menu" type="button" aria-label="Sessions and history" title="Show the sidebar (Ctrl+B)"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M2 4h14M2 9h14M2 14h14"/></svg></button>
-      <div class="ttl"><button class="sbtn" id="sname" type="button" title="Sessions and history">New session</button><span class="stat">golem · <b id="st-on">awake</b> · <span id="st-where">offline</span> · <span id="st-req">0 requests</span></span></div>
+      <div class="ttl"><button class="sbtn" id="sname" type="button" title="Sessions and history">New session</button><span class="stat"><b id="st-on">awake</b><span class="only-wide"> · <span id="st-where">on this device</span></span> · <span id="st-req" title="Requests golem has made to the network. Only installing a pack or checking for updates makes one.">0 requests</span></span></div>
       <button class="ibtn only-narrow" id="newtop" type="button" aria-label="New session" title="New session (Ctrl+Shift+O)"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M9 3v12M3 9h12"/></svg></button>
-      <button class="power" id="power" type="button" title="Put golem to sleep or wake it" aria-pressed="false">sleep</button>
+      <button class="power" id="power" type="button" title="Sleep: golem reads and runs nothing until you wake it" aria-pressed="false">sleep</button>
     </header>
 
     <div class="view" id="v-ask">
       <div class="welcome" id="welcome" hidden>
         <div class="mark"><i aria-hidden="true"></i>golem</div>
         <p>Ask, compute, or act. Nothing here calls a model: every answer is a reading you can check and a tool that computes. If I cannot read something, I say so.</p>
+        <p class="hint">Tap one to start, or type below. A few sessions already run are under Examples in the sidebar.</p>
         <div class="starts" id="starts"></div>
       </div>
       <div class="lbl" id="exlbl" hidden>Example session</div>

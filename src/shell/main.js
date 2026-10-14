@@ -219,8 +219,11 @@ function renderDrawer() {
   } else {
     const cur = current(), day = 864e5, today = new Date().setHours(0, 0, 0, 0), age = t => t >= today ? 'Today' : t >= today - 6 * day ? 'This week' : 'Earlier';
     let g = ''; h = '';
-    [...sessions()].sort((x, y) => y.updated - x.updated || y.id - x.id).forEach(s => {
-      if (age(s.updated) !== g) { g = age(s.updated); h += `<div class="lbl">${g}</div>`; }
+    // yours by when they were last used, then the examples golem seeded on the first visit
+    const all = [...sessions()].sort((x, y) => y.updated - x.updated || y.id - x.id);
+    [...all.filter(s => !s.example), ...all.filter(s => s.example)].forEach(s => {
+      const grp = s.example ? 'Examples' : age(s.updated);
+      if (grp !== g) { g = grp; h += `<div class="lbl">${g}</div>`; }
       const name = ren === s.id ? `<input class="ren" data-id="${s.id}" value="${escHtml(s.name)}" aria-label="Session name. Leave empty to name it automatically.">` : `<button class="open" type="button" data-s="${s.id}" title="${escHtml(s.name)}">${escHtml(s.name)}</button>`;
       h += `<div class="srow" aria-current="${s === cur}">${name}<div class="meta"><span>${s.cards.length} card${s.cards.length === 1 ? '' : 's'} · ${when(s.updated)}</span>${s.example ? '<span class="tag samp">example</span>' : ''}<span class="acts"><button class="link" type="button" data-ren="${s.id}">rename</button><button class="link" type="button" data-exp="${s.id}">export</button><button class="link" type="button" data-del="${s.id}">${del === s.id ? 'confirm delete' : 'delete'}</button></span></div></div>`;
     });
@@ -362,6 +365,7 @@ $('stream').addEventListener('click', e => {
   if (!awake) return status('Asleep. Tap wake at the top right.');
   if (act === 'slot') { flipSlot(c, b.dataset.key); replaceCard(c, b.dataset.key); }
   else if (act === 'answer') { answer(c, +b.dataset.i); replaceCard(c); }
+  else if (act === 'skills') showTab('skills');
   else if (act === 'handoff') {
     // inside lead-acid: the allowlisted intent, the other app opens for the person to confirm; in a browser: what it would do
     const say = (text, kind) => { const n = document.createElement('div'); n.className = 'note ' + kind; n.textContent = text; b.replaceWith(n); };
@@ -410,7 +414,7 @@ $('dlist').addEventListener('click', e => {
     deleteSession(id); del = null; renderStream(); renderDrawer();
   }
 });
-$('starts').innerHTML = STARTERS.map(([t, q]) => `<button class="start" type="button" data-q="${escHtml(q)}"><b>${escHtml(t)}</b><span>${escHtml(q)}</span></button>`).join('');
+$('starts').innerHTML = STARTERS.map(([g, items]) => `<section class="sgroup"><h2>${escHtml(g)}</h2>${items.map(([t, q]) => `<button class="start" type="button" data-q="${escHtml(q)}"><b>${escHtml(t)}</b><span>${escHtml(q)}</span></button>`).join('')}</section>`).join('');
 
 /* ── start: restore saved sessions, or seed two examples ── */
 renderSkills();
@@ -421,7 +425,8 @@ if (shell.present) $('st-where').textContent = 'in the lead-acid shell';
   const fb = await store.readPack('factbook').catch(() => null); if (fb) useFactbook(fb);   // before the sessions replay, so their cards read it
   for (const slug of Object.keys(BOOKS)) { const b = await store.readPack(slug).catch(() => null); if (b) useBook(slug, b); }
   const got = await store.load().catch(() => null);
-  if (!(got && hydrate(got.state)) && !sessions().length) seedExamples();
+  // a first visit: the examples are kept in the sidebar, and golem opens on the welcome in a session of its own
+  if (!(got && hydrate(got.state)) && !sessions().length) { seedExamples(); newSession(); }
   if (got && got.migrated) store.save(parts());
   // the "New session" shortcut of the installed app
   if (new URLSearchParams(location.search).has('new')) { newSession(); try { history.replaceState(null, '', location.pathname); } catch (e) { /* file:// */ } }
