@@ -92,6 +92,16 @@ await p2.waitForTimeout(100);
 const live2 = (await p2.locator('#stream .card').last().locator('.capture .live').textContent()).trim();
 check(/^080[/]30/.test(live2), `where requestPermission exists but motion is allowed, the compass reads without a tap (${live2})`);
 
+// a fix over two minutes old is not "here": the app's gnss hands over Android's last known fix first (seen on a phone, the
+// fix from ten minutes before); a geolocation that does the same is skipped until a fresh fix comes
+const p3 = await ctx.newPage(); p3.on('pageerror', e => errors.push(e.message));
+await p3.addInitScript(() => { navigator.geolocation.watchPosition = ok => { const fix = (lat, lon, ago) => ok({ coords: { latitude: lat, longitude: lon, accuracy: 5 }, timestamp: Date.now() - ago }); setTimeout(() => fix(10, 10, 3600e3), 50); setTimeout(() => fix(-23.52, -46.19, 0), 300); return 1; }; navigator.geolocation.clearWatch = () => {}; });
+await p3.goto(url); await p3.waitForSelector('html[data-ready]'); await p3.waitForTimeout(200);
+await p3.fill('#q', 'declination here'); await p3.press('#q', 'Enter'); await p3.waitForTimeout(250);
+await p3.locator('#stream .card').last().locator('[data-act="take"]').dispatchEvent('click'); await p3.waitForTimeout(900);
+const fresh = await p3.locator('#stream .card').last().textContent();
+check(/declination at -23.52, -46.19/.test(fresh), 'an hour-old fix is skipped; the fresh one is the position');
+
 errors.forEach(e => console.log('FAIL page error: ' + e));
 await browser.close();
 if (failed || errors.length) { console.log('\ncards test failed'); process.exit(1); }

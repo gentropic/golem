@@ -297,7 +297,8 @@ function takeReading(c) {
   capture(c, { alpha: s.alpha, beta: s.beta, gamma: s.gamma, acc: s.acc, spread: Math.round(spread * 10) / 10, at: s.t, ...(inApp ? {} : { via: 'browser' }) });
   replaceCard(c); armCaptures(); status(spread > 2 ? 'Measured. The phone moved while measuring; hold it still for a steadier reading.' : 'Measured.');
 }
-// One position fix: the first good one in 15 seconds, or the best of them. In the app, lead-acid's gnss; in a browser, its
+// One position fix: the first good one in 15 seconds, or the best of them; a fix over two minutes old is not "here" (the
+// gnss plugin hands over Android's last known fix first, which may be from anywhere). In the app, lead-acid's gnss; in a browser, its
 // geolocation with high accuracy (the browser may ask its own location service for it; golem sends nothing).
 function browserFix(got, fail) {
   const id = navigator.geolocation.watchPosition(p => got({ lat: p.coords.latitude, lon: p.coords.longitude, acc: p.coords.accuracy, t: p.timestamp }),
@@ -312,7 +313,7 @@ async function takePosition(c) {
     show(t('Waiting for a fix…'));
     await new Promise((done, fail) => {
       const stop = setTimeout(done, 15000);
-      const got = f => { if (f.lat == null) return; if (!best || (f.acc != null && f.acc < best.acc)) best = f; show(`±${Math.round(f.acc)} m…`); if (f.acc != null && f.acc <= 20) { clearTimeout(stop); done(); } };
+      const got = f => { if (f.lat == null || (f.t && Date.now() - f.t > 120000)) return; if (!best || (f.acc != null && f.acc < best.acc)) best = f; show(`±${Math.round(f.acc)} m…`); if (f.acc != null && f.acc <= 20) { clearTimeout(stop); done(); } };
       if (inApp) st.on('fix', d => got(data(d)));
       else st = browserFix(got, e => { clearTimeout(stop); if (best) done(); else fail(e); });
     });
