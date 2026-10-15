@@ -5,8 +5,8 @@
 // table, `aliases` the taught words, `facts` the notes and `files` the opened files by hash (those three
 // belong to the device, not a session). `clause` is the parser's session, rebuilt when a session is opened.
 // `misses` (what did not read) and `picks` (guesses picked, by tool) are the device's too: learn.js. So are `formulas`
-// (taught: lore.js) and `orders` (standing orders: orders.js).
-export const S = { cards: [], n: 0, aliases: {}, facts: [], files: {}, tables: {}, recipes: {}, misses: [], picks: {}, formulas: {}, orders: [], table: null, clause: null };
+// (taught: lore.js), `orders` (standing orders: orders.js) and `strata` (what was said of the units' ages: strata.js).
+export const S = { cards: [], n: 0, aliases: {}, facts: [], files: {}, tables: {}, recipes: {}, misses: [], picks: {}, formulas: {}, orders: [], strata: [], table: null, clause: null };
 
 // The tool table: T.name = args => Result | null. A tool returns null when its arguments do not apply.
 //   Result = { read: (string | Slot)[], body: Block[], trace: string[], py?, value?, ask?, copy? }

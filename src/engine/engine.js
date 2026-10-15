@@ -21,6 +21,7 @@ import './lore.js';
 import './orders.js';
 import './selftest.js';
 import './vocab.js';
+import './strata.js';
 import './timescale.js';
 import './sample.js';
 import './explain.js';

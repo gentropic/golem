@@ -4619,6 +4619,29 @@
       }
     },
     {
+      "type": "strataorder",
+      "words": {
+        "order": [
+          "the order of the units",
+          "the order",
+          "the sequence",
+          "the relative ages",
+          "relative ages",
+          "the stratigraphic order",
+          "the age order",
+          "the order of events"
+        ]
+      },
+      "words_pt": {
+        "order": [
+          "a ordem das unidades",
+          "a ordem",
+          "as idades relativas",
+          "a sequência"
+        ]
+      }
+    },
+    {
       "type": "chronpart",
       "words": {
         "age": [
@@ -12277,6 +12300,265 @@
         "palavras"
       ],
       "label_pt": "Palavras"
+    },
+    {
+      "name": "strata0",
+      "label": "Relative ages",
+      "words": [
+        "overlies",
+        "lies above",
+        "rests on",
+        "sits on",
+        "lies on",
+        "is on top of",
+        "covers"
+      ],
+      "subject": [
+        "text"
+      ],
+      "theme": [
+        "text"
+      ],
+      "required": [
+        "theme",
+        "subject"
+      ],
+      "roles": {},
+      "words_pt": [
+        "sobrepõe",
+        "está acima de",
+        "recobre",
+        "fica sobre"
+      ],
+      "label_pt": "Idades relativas"
+    },
+    {
+      "name": "strata1",
+      "label": "Relative ages",
+      "words": [
+        "underlies",
+        "lies below",
+        "lies under",
+        "is beneath",
+        "lies beneath"
+      ],
+      "subject": [
+        "text"
+      ],
+      "theme": [
+        "text"
+      ],
+      "required": [
+        "theme",
+        "subject"
+      ],
+      "roles": {},
+      "words_pt": [
+        "está abaixo de",
+        "fica sob"
+      ],
+      "label_pt": "Idades relativas"
+    },
+    {
+      "name": "strata2",
+      "label": "Relative ages",
+      "words": [
+        "cuts",
+        "intrudes",
+        "crosscuts",
+        "cross-cuts",
+        "cuts across",
+        "offsets",
+        "truncates",
+        "displaces"
+      ],
+      "subject": [
+        "text"
+      ],
+      "theme": [
+        "text"
+      ],
+      "required": [
+        "theme",
+        "subject"
+      ],
+      "roles": {},
+      "words_pt": [
+        "corta",
+        "intrude",
+        "desloca",
+        "trunca"
+      ],
+      "label_pt": "Idades relativas"
+    },
+    {
+      "name": "strata3",
+      "label": "Relative ages",
+      "words": [
+        "is cut by",
+        "is intruded by",
+        "is offset by",
+        "is truncated by"
+      ],
+      "subject": [
+        "text"
+      ],
+      "theme": [
+        "text"
+      ],
+      "required": [
+        "theme",
+        "subject"
+      ],
+      "roles": {},
+      "words_pt": [
+        "é cortado por",
+        "é cortada por",
+        "é intrudido por"
+      ],
+      "label_pt": "Idades relativas"
+    },
+    {
+      "name": "strata4",
+      "label": "Relative ages",
+      "words": [
+        "contains clasts of",
+        "has clasts of",
+        "contains xenoliths of",
+        "has xenoliths of",
+        "has inclusions of",
+        "contains pebbles of",
+        "contains fragments of"
+      ],
+      "subject": [
+        "text"
+      ],
+      "theme": [
+        "text"
+      ],
+      "required": [
+        "theme",
+        "subject"
+      ],
+      "roles": {},
+      "words_pt": [
+        "contém clastos de",
+        "contém xenólitos de",
+        "tem clastos de"
+      ],
+      "label_pt": "Idades relativas"
+    },
+    {
+      "name": "strata5",
+      "label": "Relative ages",
+      "words": [
+        "is younger than"
+      ],
+      "subject": [
+        "text"
+      ],
+      "theme": [
+        "text"
+      ],
+      "required": [
+        "theme",
+        "subject"
+      ],
+      "roles": {},
+      "words_pt": [
+        "é mais jovem que",
+        "é mais nova que"
+      ],
+      "label_pt": "Idades relativas"
+    },
+    {
+      "name": "strata6",
+      "label": "Relative ages",
+      "words": [
+        "is older than"
+      ],
+      "subject": [
+        "text"
+      ],
+      "theme": [
+        "text"
+      ],
+      "required": [
+        "theme",
+        "subject"
+      ],
+      "roles": {},
+      "words_pt": [
+        "é mais velho que",
+        "é mais antigo que",
+        "é mais velha que",
+        "é mais antiga que"
+      ],
+      "label_pt": "Idades relativas"
+    },
+    {
+      "name": "strataOrder",
+      "label": "Relative ages",
+      "words": [
+        "show",
+        "what is",
+        "give me",
+        "work out"
+      ],
+      "elidable": true,
+      "theme": [
+        "strataorder"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {},
+      "words_pt": [
+        "mostra",
+        "qual é"
+      ],
+      "label_pt": "Idades relativas"
+    },
+    {
+      "name": "strataAsk",
+      "label": "Relative ages",
+      "words": [
+        "is",
+        "are"
+      ],
+      "theme": [
+        "text"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {},
+      "words_pt": [
+        "é"
+      ],
+      "label_pt": "Idades relativas"
+    },
+    {
+      "name": "strataWhy",
+      "label": "Relative ages",
+      "words": [
+        "why is",
+        "how do you know",
+        "prove"
+      ],
+      "theme": [
+        "text"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {},
+      "words_pt": [
+        "por que",
+        "por que o",
+        "por que a"
+      ],
+      "label_pt": "Idades relativas"
     },
     {
       "name": "date",

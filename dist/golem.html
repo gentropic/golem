@@ -451,8 +451,8 @@ const __m0 = (() => {
 // table, `aliases` the taught words, `facts` the notes and `files` the opened files by hash (those three
 // belong to the device, not a session). `clause` is the parser's session, rebuilt when a session is opened.
 // `misses` (what did not read) and `picks` (guesses picked, by tool) are the device's too: learn.js. So are `formulas`
-// (taught: lore.js) and `orders` (standing orders: orders.js).
-const S = { cards: [], n: 0, aliases: {}, facts: [], files: {}, tables: {}, recipes: {}, misses: [], picks: {}, formulas: {}, orders: [], table: null, clause: null };
+// (taught: lore.js), `orders` (standing orders: orders.js) and `strata` (what was said of the units' ages: strata.js).
+const S = { cards: [], n: 0, aliases: {}, facts: [], files: {}, tables: {}, recipes: {}, misses: [], picks: {}, formulas: {}, orders: [], strata: [], table: null, clause: null };
 
 // The tool table: T.name = args => Result | null. A tool returns null when its arguments do not apply.
 //   Result = { read: (string | Slot)[], body: Block[], trace: string[], py?, value?, ask?, copy? }
@@ -13442,12 +13442,12 @@ const current = () => cur;
 function serialize() {
   // files under a megabyte travel with the device state; larger ones stay in memory and say so on replay
   const files = Object.fromEntries(Object.entries(S.files).filter(([, f]) => f.text.length <= 1e6));
-  return { cur: cur && cur.id, sid, aliases: S.aliases, facts: S.facts, files, tables: S.tables, recipes: S.recipes, misses: S.misses, picks: S.picks, formulas: S.formulas, orders: S.orders, ss: SS.map(s => ({ ...s, cards: s.cards.map(spec) })) };
+  return { cur: cur && cur.id, sid, aliases: S.aliases, facts: S.facts, files, tables: S.tables, recipes: S.recipes, misses: S.misses, picks: S.picks, formulas: S.formulas, orders: S.orders, strata: S.strata, ss: SS.map(s => ({ ...s, cards: s.cards.map(spec) })) };
 }
 // the same state in parts, for a store that keeps each session and each file on its own (the shell's @gcu/vfs), with no
 // size cap on files; hydrate() takes the parts put back together ({ cur, sid, ...device, files, ss })
 function parts() {
-  return { meta: { v: 1, cur: cur && cur.id, sid }, device: { aliases: S.aliases, facts: S.facts, tables: S.tables, recipes: S.recipes, misses: S.misses, picks: S.picks, formulas: S.formulas, orders: S.orders },
+  return { meta: { v: 1, cur: cur && cur.id, sid }, device: { aliases: S.aliases, facts: S.facts, tables: S.tables, recipes: S.recipes, misses: S.misses, picks: S.picks, formulas: S.formulas, orders: S.orders, strata: S.strata },
     sessions: SS.map(s => ({ ...s, cards: s.cards.map(spec) })), files: S.files };
 }
 // A session as a file of its own ("<name>.golem.json"): its card specs and the files they read, so it replays on another
@@ -13467,12 +13467,12 @@ function importSession(d) {
 }
 function hydrate(d) {
   if (!d || !Array.isArray(d.ss) || !d.ss.length) return false;
-  SS = d.ss; sid = d.sid || Math.max(...SS.map(s => s.id)); S.aliases = d.aliases || {}; S.facts = d.facts || []; S.files = d.files || {}; S.tables = d.tables || {}; S.recipes = d.recipes || {}; S.misses = d.misses || []; S.picks = d.picks || {}; S.formulas = d.formulas || {}; S.orders = d.orders || [];
+  SS = d.ss; sid = d.sid || Math.max(...SS.map(s => s.id)); S.aliases = d.aliases || {}; S.facts = d.facts || []; S.files = d.files || {}; S.tables = d.tables || {}; S.recipes = d.recipes || {}; S.misses = d.misses || []; S.picks = d.picks || {}; S.formulas = d.formulas || {}; S.orders = d.orders || []; S.strata = d.strata || [];
   load(SS.find(s => s.id === d.cur) || SS[0]); return true;
 }
 // forget everything: sessions, device state, working state (tests start here)
 function reset() {
-  SS = []; cur = null; sid = 0; S.cards = []; S.n = 0; S.aliases = {}; S.facts = []; S.files = {}; S.tables = {}; S.recipes = {}; S.misses = []; S.picks = {}; S.formulas = {}; S.orders = []; S.table = null; S.clause = null; clearResults();
+  SS = []; cur = null; sid = 0; S.cards = []; S.n = 0; S.aliases = {}; S.facts = []; S.files = {}; S.tables = {}; S.recipes = {}; S.misses = []; S.picks = {}; S.formulas = {}; S.orders = []; S.strata = []; S.table = null; S.clause = null; clearResults();
 }
   return { onChange, spec, tagOf, autoName, touch, load, openSession, newSession, renameSession, deleteSession, pinCard, branchSession, searchHistory, sessions, current, serialize, parts, exportSession, importSession, hydrate, reset };
 })();
@@ -17517,8 +17517,191 @@ const frameCount = () => FRAMES.length;
   return { frameCount };
 })();
 
-/* ==== src/engine/timescale.js ==== */
+/* ==== src/engine/logic.js ==== */
 const __m46 = (() => {
+// A small Datalog (SPEC 13: inference, not only computation). Facts are { rel, args }, rules are { name, head, body },
+// a term is a constant or a variable (a string starting with an upper-case letter or "_"). infer() applies the rules
+// until nothing new follows (naive evaluation: the fact sets here are a notebook's, tens to hundreds), and keeps for
+// every derived fact how it was derived, so proofOf() can say why. No negation, no arithmetic: what follows from what
+// was said, and nothing else.
+const isVar = t => typeof t === 'string' && /^[A-Z_]/.test(t);
+const keyOf = f => `${f.rel}(${f.args.join(',')})`;
+function match(pat, fact, env) {
+  if (pat.rel !== fact.rel || pat.args.length !== fact.args.length) return null;
+  const e = { ...env };
+  for (let i = 0; i < pat.args.length; i++) {
+    const p = pat.args[i], v = fact.args[i];
+    if (isVar(p)) { if (p in e) { if (e[p] !== v) return null; } else e[p] = v; } else if (p !== v) return null;
+  }
+  return e;
+}
+const ground = (pat, env) => ({ rel: pat.rel, args: pat.args.map(a => isVar(a) ? env[a] : a) });
+// → Map key → { rel, args, why: { said } | { rule, from: [keys] } }
+function infer(facts, rules, limit = 100000) {
+  const known = new Map();
+  for (const f of facts) { const k = keyOf(f); if (!known.has(k)) known.set(k, { rel: f.rel, args: f.args, why: { said: f.said ?? null } }); }
+  let changed = true, steps = 0;
+  while (changed) {
+    changed = false;
+    const all = [...known.values()];
+    for (const r of rules) {
+      let envs = [{ env: {}, from: [] }];
+      for (const b of r.body) {
+        const next = [];
+        for (const { env, from } of envs) for (const f of all) { const e = match(b, f, env); if (e) next.push({ env: e, from: [...from, keyOf(f)] }); }
+        envs = next; if (!envs.length) break;
+      }
+      for (const { env, from } of envs) {
+        const h = ground(r.head, env), k = keyOf(h);
+        if (!known.has(k)) { known.set(k, { ...h, why: { rule: r.name, from } }); changed = true; if (++steps > limit) throw new Error('too many conclusions'); }
+      }
+    }
+  }
+  return known;
+}
+// the derivation of a fact, deepest first: [{ fact, rule | said }], each step once
+function proofOf(known, key, seen = new Set()) {
+  const f = known.get(key); if (!f || seen.has(key)) return []; seen.add(key);
+  if (f.why.rule == null) return [{ fact: f, said: f.why.said }];
+  return [...f.why.from.flatMap(k => proofOf(known, k, seen)), { fact: f, rule: f.why.rule }];
+}
+  return { keyOf, infer, proofOf };
+})();
+
+/* ==== src/engine/strata.js ==== */
+const __m47 = (() => {
+const { S, tool, frame, noun } = __m0;
+const { infer, proofOf, keyOf } = __m46;
+// Relative ages by Steno's principles (SPEC 13: inference). What you say of the units — "the sandstone overlies the
+// granite", "the dyke cuts the sandstone", "the conglomerate contains clasts of the granite", "the basalt is younger than
+// the dyke" — is kept on the device (S.strata) as facts; the principles are Datalog rules (logic.js): superposition
+// (what overlies is younger, the beds taken as the right way up), cross-cutting relationships (what cuts is younger),
+// inclusions (what is enclosed is older), what you said outright, and that "younger" carries through. Asked, golem gives
+// the order as far as it follows, says which units it cannot place against each other, answers "is X older than Y" with
+// the chain that proves it or says it cannot tell, and reports any contradiction with both chains. Nothing is assumed
+// beyond what was said.
+
+const RULES = [
+  { name: 'superposition: what overlies is younger (the beds the right way up)', head: { rel: 'younger', args: ['X', 'Y'] }, body: [{ rel: 'overlies', args: ['X', 'Y'] }] },
+  { name: 'cross-cutting relationships: what cuts is younger', head: { rel: 'younger', args: ['X', 'Y'] }, body: [{ rel: 'cuts', args: ['X', 'Y'] }] },
+  { name: 'inclusions: what is enclosed is older', head: { rel: 'younger', args: ['X', 'Y'] }, body: [{ rel: 'encloses', args: ['X', 'Y'] }] },
+  { name: 'as you said', head: { rel: 'younger', args: ['X', 'Y'] }, body: [{ rel: 'said_younger', args: ['X', 'Y'] }] },
+  { name: '"younger than" carries through', head: { rel: 'younger', args: ['X', 'Z'] }, body: [{ rel: 'younger', args: ['X', 'Y'] }, { rel: 'younger', args: ['Y', 'Z'] }] }
+];
+const SAID = { overlies: 'overlies', cuts: 'cuts', encloses: 'contains clasts of', said_younger: 'is younger than' };
+const norm = s => String(s).toLowerCase().replace(/[.?!,;]+$/, '').replace(/^(?:the|a|an|unit|o|os|as|um|uma|unidade)\s+/, '').trim();
+const newId = () => Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36);
+// the names as first said ("the Bambuí sandstone" → "Bambuí sandstone"), keyed by their folded form
+const names = () => { const m = new Map(); for (const f of S.strata) for (const [k, n] of [[f.a, f.na], [f.b, f.nb]]) if (!m.has(k)) m.set(k, n || k); return m; };
+const facts = () => S.strata.map(f => ({ rel: f.rel, args: [f.a, f.b], said: f.id }));
+function world() {
+  const known = infer(facts(), RULES), units = [...names().keys()], nm = names();
+  const younger = (a, b) => known.has(`younger(${a},${b})`);
+  const loops = units.filter(u => younger(u, u));
+  return { known, units, nm, younger, loops };
+}
+// a proof as lines a person reads: what was said (with the card it came from), then each rule that follows
+function because(w, a, b) {
+  const steps = proofOf(w.known, `younger(${a},${b})`), line = s => {
+    const [x, y] = s.fact.args.map(u => w.nm.get(u) || u);
+    if (s.rule == null) { const said = S.strata.find(f => f.id === s.said); return `${x} ${SAID[s.fact.rel] || s.fact.rel} ${y}: as said${said && said.card ? ` (#${String(said.card).padStart(2, '0')})` : ''}`; }
+    return `so ${x} is younger than ${y}: ${s.rule}`;
+  };
+  return steps.filter(s => !(s.rule && s.rule === 'as you said')).map(line);   // a thing said outright needs no second line
+}
+// the order as far as it follows: layers, youngest first; units in one layer are not ordered against each other
+function layers(w) {
+  const left = new Set(w.units.filter(u => !w.loops.includes(u))), out = [];
+  while (left.size) {
+    const top = [...left].filter(u => ![...left].some(v => v !== u && w.younger(v, u)));
+    if (!top.length) break;
+    out.push(top); top.forEach(u => left.delete(u));
+  }
+  return out;
+}
+
+tool({
+  name: 'strataSay', effects: ['device'],
+  skill: { group: 'Field', title: 'Relative ages', on: 'Steno\'s principles as Datalog rules', about: 'Say how the units relate ("the sandstone overlies the granite", "the dyke cuts the sandstone", "the conglomerate contains clasts of the granite") and golem infers their order by superposition, cross-cutting relationships and inclusions, answers "is X older than Y" with the chain that proves it, says what it cannot tell, and points out a contradiction.', examples: ['the sandstone overlies the granite', 'the dyke cuts the sandstone', 'the order of the units', 'is the dyke older than the granite', 'why is the dyke younger than the granite'] },
+  topic: a => ['Relative ages', 1],
+  undo: a => { S.strata = S.strata.filter(f => f.id !== a.id); },
+  run: a => {
+    if (!S.strata.some(f => f.id === a.id)) S.strata.push({ id: a.id, rel: a.rel, a: a.a, b: a.b, na: a.na, nb: a.nb, card: a.card || null });
+    // every relation is kept with the younger first: what overlies, cuts or encloses (flipped forms were turned round)
+    const w = world(), younger = a.na, older = a.nb;
+    const body = [{ t: 'note', kind: 'ok', text: `Kept: ${a.na} ${SAID[a.rel]} ${a.nb}, so ${younger} is younger than ${older} (${RULES.find(r => r.body[0].rel === a.rel).name}).` }];
+    if (w.loops.length) body.push({ t: 'note', kind: 'err', text: `That contradicts what was said before: ${w.loops.map(u => w.nm.get(u)).join(', ')} would be younger than ${w.loops.length > 1 ? 'themselves' : 'itself'}.` }, { t: 'steps', items: because(w, w.loops[0], w.loops[0]) });
+    const ls = layers(w);
+    if (!w.loops.length && ls.length > 1) body.push({ t: 'sub', text: `The order so far, youngest first: ${ls.map(l => l.map(u => w.nm.get(u)).join(' / ')).join(' → ')}.` });
+    body.push({ t: 'chips', items: ['the order of the units'] });
+    return { read: [{ v: a.na }, SAID[a.rel], { v: a.nb }], body, trace: [`fact: ${a.rel}(${a.a}, ${a.b})`, `${w.known.size} facts follow from ${S.strata.length} said, by ${RULES.length} rules`] };
+  }
+});
+tool({
+  name: 'strataOrder',
+  topic: () => ['Relative ages', 1],
+  run: () => {
+    if (!S.strata.length) return { read: ['the order of the units'], body: [{ t: 'note', text: 'Nothing said yet. Tell me how the units relate: "the sandstone overlies the granite", "the dyke cuts the sandstone".' }], trace: ['no facts'] };
+    const w = world(), ls = layers(w);
+    const body = [];
+    if (w.loops.length) body.push({ t: 'note', kind: 'err', text: `What was said contradicts itself: ${w.loops.map(u => w.nm.get(u)).join(', ')} would be younger than ${w.loops.length > 1 ? 'themselves' : 'itself'}. Here is how:` }, { t: 'steps', items: because(w, w.loops[0], w.loops[0]) });
+    body.push({ t: 'table', head: ['', 'youngest first', ''], rows: ls.map((l, i) => [String(i + 1), l.map(u => w.nm.get(u)).join(' · '), l.length > 1 ? 'not ordered against each other: nothing said decides it' : '']) });
+    const pairs = [], all = w.units.filter(u => !w.loops.includes(u));
+    for (let i = 0; i < all.length; i++) for (let j = i + 1; j < all.length; j++) if (!w.younger(all[i], all[j]) && !w.younger(all[j], all[i])) pairs.push(`${w.nm.get(all[i])} and ${w.nm.get(all[j])}`);
+    if (pairs.length) body.push({ t: 'sub', text: `I cannot tell the ages of ${pairs.slice(0, 6).join('; ')}${pairs.length > 6 ? `; and ${pairs.length - 6} more pairs` : ''}. A contact, a cut or an inclusion between them would.` });
+    return { read: ['the order of the units'], value: ls.length, body: [...body, { t: 'src', text: `Steno's principles as ${RULES.length} rules over ${S.strata.length} things said, on this device` }],
+      trace: [`${w.known.size} facts follow from ${S.strata.length} said`, `layered by "younger": ${ls.length} layers`] };
+  }
+});
+tool({
+  name: 'strataAsk',
+  topic: () => ['Relative ages', 1],
+  run: a => {
+    const w = world(), x = norm(a.x), y = norm(a.y), nx = w.nm.get(x) || a.x, ny = w.nm.get(y) || a.y, wantOlder = a.q === 'older';
+    const read = [a.why ? 'why is' : 'is', { v: nx }, wantOlder ? 'older than' : 'younger than', { v: ny }];
+    const missing = [x, y].filter(u => !w.nm.has(u));
+    if (missing.length) return { read, body: [{ t: 'note', text: `Nothing was said about ${missing.map(u => u === x ? a.x : a.y).join(' or ')}. I know ${[...w.nm.values()].join(', ') || 'no units yet'}.` }], trace: ['unknown unit'] };
+    const yes = wantOlder ? w.younger(y, x) : w.younger(x, y), no = wantOlder ? w.younger(x, y) : w.younger(y, x);
+    if (yes && no) return { read, body: [{ t: 'note', kind: 'err', text: 'Both, which means what was said contradicts itself. Both chains:' }, { t: 'steps', items: [...because(w, x, y), ...because(w, y, x)] }], trace: ['contradiction'] };
+    if (!yes && !no) return { read, value: null, body: [{ t: 'note', text: `I cannot tell: nothing said links ${nx} and ${ny}, directly or through other units.` }], trace: ['neither follows'] };
+    const [p, q] = yes ? (wantOlder ? [y, x] : [x, y]) : (wantOlder ? [x, y] : [y, x]);
+    return { read, value: yes,
+      body: [{ t: 'big', v: yes ? (a.why ? 'Because' : 'Yes') : 'No', unit: yes ? '' : `${w.nm.get(p)} is younger than ${w.nm.get(q)}` }, { t: 'steps', items: because(w, p, q) }],
+      trace: [`younger(${p}, ${q}) follows`, `${because(w, p, q).length} steps`] };
+  }
+});
+
+/* ── what reads them ─────────────────────────────────────────── */
+const REL = [['overlies', ['overlies', 'lies above', 'rests on', 'sits on', 'lies on', 'is on top of', 'covers'], ['sobrepõe', 'está acima de', 'recobre', 'fica sobre'], false],
+  ['overlies', ['underlies', 'lies below', 'lies under', 'is beneath', 'lies beneath'], ['está abaixo de', 'fica sob'], true],
+  ['cuts', ['cuts', 'intrudes', 'crosscuts', 'cross-cuts', 'cuts across', 'offsets', 'truncates', 'displaces'], ['corta', 'intrude', 'desloca', 'trunca'], false],
+  ['cuts', ['is cut by', 'is intruded by', 'is offset by', 'is truncated by'], ['é cortado por', 'é cortada por', 'é intrudido por'], true],
+  ['encloses', ['contains clasts of', 'has clasts of', 'contains xenoliths of', 'has xenoliths of', 'has inclusions of', 'contains pebbles of', 'contains fragments of'], ['contém clastos de', 'contém xenólitos de', 'tem clastos de'], false],
+  ['said_younger', ['is younger than'], ['é mais jovem que', 'é mais nova que'], false],
+  ['said_younger', ['is older than'], ['é mais velho que', 'é mais antigo que', 'é mais velha que', 'é mais antiga que'], true]];
+REL.forEach(([rel, words, words_pt, flip], i) => frame({
+  name: `strata${i}`, label: 'Relative ages', words, subject: ['text'], theme: ['text'], required: ['theme', 'subject'], roles: {}, words_pt, label_pt: 'Idades relativas',
+  bind: c => {
+    const s = c.roles.subject && c.roles.subject[0], t = c.theme[0]; if (!s || !t) return null;
+    let [na, nb] = [String(s.value).trim(), String(t.value).trim()].map(x => x.replace(/^(?:the|a|an|o|os|as|um|uma)\s+/i, '').replace(/[.?!]+$/, '')); if (flip) [na, nb] = [nb, na];
+    const a = norm(na), b = norm(nb); if (!a || !b || a === b || a.split(/\s+/).length > 5 || b.split(/\s+/).length > 5) return null;
+    return { tool: 'strataSay', args: { id: newId(), rel, a, b, na, nb } };
+  }
+}));
+noun({ type: 'strataorder', words: { order: ['the order of the units', 'the order', 'the sequence', 'the relative ages', 'relative ages', 'the stratigraphic order', 'the age order', 'the order of events'] }, words_pt: { order: ['a ordem das unidades', 'a ordem', 'as idades relativas', 'a sequência'] } });
+frame({ name: 'strataOrder', label: 'Relative ages', words: ['show', 'what is', 'give me', 'work out'], elidable: true, theme: ['strataorder'], required: ['theme'], roles: {}, words_pt: ['mostra', 'qual é'], label_pt: 'Idades relativas', bind: () => ({ tool: 'strataOrder', args: {} }) });
+// "is the dyke older than the granite", "why is the dyke younger than the granite": the words after the verb, cut at the comparison
+const askBind = why => c => {
+  const m = /^(.+?)\s+(older|younger|mais velho|mais velha|mais antigo|mais antiga|mais jovem|mais novo|mais nova)\s+(?:than|que|do que)\s+(.+?)\??$/i.exec(String(c.theme[0].value).trim()); if (!m) return null;
+  return { tool: 'strataAsk', args: { x: m[1].replace(/^(?:the|a|an|o|os|as|um|uma)\s+/i, ''), y: m[3].replace(/^(?:the|a|an|o|os|as|um|uma)\s+/i, ''), q: /older|velh|antig/i.test(m[2]) ? 'older' : 'younger', ...(why ? { why: true } : {}) } };
+};
+frame({ name: 'strataAsk', label: 'Relative ages', words: ['is', 'are'], theme: ['text'], required: ['theme'], roles: {}, words_pt: ['é'], label_pt: 'Idades relativas', bind: askBind(false) });
+frame({ name: 'strataWhy', label: 'Relative ages', words: ['why is', 'how do you know', 'prove'], theme: ['text'], required: ['theme'], roles: {}, words_pt: ['por que', 'por que o', 'por que a'], label_pt: 'Idades relativas', bind: askBind(true) });
+  return {  };
+})();
+
+/* ==== src/engine/timescale.js ==== */
+const __m48 = (() => {
 const { tool, frame, noun, unit, fmt } = __m0;
 const { TIMESCALE, TIMESCALE_SOURCE } = __m39;
 // The geologic timescale: the ICS chart as a records pack (data/timescale.js). Ages, bounds, ranks,
@@ -17620,7 +17803,7 @@ noun({ type: 'chron', words: Object.fromEntries(Object.keys(RETIRED).map(k => [k
 })();
 
 /* ==== src/engine/sample.js ==== */
-const __m47 = (() => {
+const __m49 = (() => {
 const { tool, frame, noun, compound, qmod, postmod, unit, fmt } = __m0;
 const { parseUnit } = __m2;
 const { core, sieve } = __m1;
@@ -17760,7 +17943,7 @@ frame({
 })();
 
 /* ==== src/engine/explain.js ==== */
-const __m48 = (() => {
+const __m50 = (() => {
 const { tool, frame, amend, noun, shape, clock, fmt } = __m0;
 // Explainers: formal notation parsed and described, one row per piece. Cron schedules, epoch times,
 // chmod modes, URLs and ECMAScript regular expressions. Each member has a recogniser so a bare
@@ -18135,7 +18318,7 @@ amend({ tools: ['explain'], name: 'explainas', label: 'Explain as', words: [], e
 })();
 
 /* ==== src/vendor/plan-calendar.js ==== */
-const __m49 = (() => {
+const __m51 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/plan's calendar engine and Brazilian holidays, copied from
 // ../auditable/ext/plan/src/calendar.js and src/holidays-br.js (MIT). The scheduling half of the package is not here.
 // Re-vendor by copying those two files here again and keeping the single export block at the end.
@@ -18492,10 +18675,10 @@ function brazilMunicipalities() {
 })();
 
 /* ==== src/engine/calendar.js ==== */
-const __m50 = (() => {
+const __m52 = (() => {
 const { S, tool, frame, amend, noun, shape, postmod, unit, clock, iso } = __m0;
 const { findDate, findTime, today, day0, fmtDate, dateWords } = __m4;
-const { isWorkingDay, addWorkingDays, brazilCalendar, federalHolidays } = __m49;
+const { isWorkingDay, addWorkingDays, brazilCalendar, federalHolidays } = __m51;
 // Working days and rosters over @gcu/plan's calendar engine (vendored), and time zones through Intl.
 // The calendar is a slot and is always shown: Brazil's federal holidays, or weekdays only.
 
@@ -18728,7 +18911,7 @@ amend({ tools: ['workdays'], name: 'workcal', label: 'Calendar', words: [], elid
 })();
 
 /* ==== src/engine/text.js ==== */
-const __m51 = (() => {
+const __m53 = (() => {
 const { tool, frame, amend, noun, qmod, fmt } = __m0;
 // Text tools over a pasted payload: counts and readability, extracted key sentences, and a diff.
 // The payload is what follows the first colon, or every line after the first of a multi-line input;
@@ -18874,7 +19057,7 @@ amend({ tools: ['diff'], name: 'diffunit', label: 'Diff by', words: [], elidable
 })();
 
 /* ==== src/engine/econ.js ==== */
-const __m52 = (() => {
+const __m54 = (() => {
 const { tool, frame, noun, shape, postmod, qmod, fmt } = __m0;
 const { ELEMENTS } = __m34;
 const { numberAsk, firstNeed } = __m26;
@@ -19041,7 +19224,7 @@ frame({
 })();
 
 /* ==== src/engine/log.js ==== */
-const __m53 = (() => {
+const __m55 = (() => {
 const { S, tool, frame, amend, noun, fmt, iso, checksOf } = __m0;
 const { parseUnit, dimName } = __m2;
 const { findDate, today, fmtDate, dateWords } = __m4;
@@ -19189,10 +19372,10 @@ amend({ tools: ['logAdd'], name: 'logfix', label: 'Correct', words: ['that was',
 })();
 
 /* ==== src/engine/sky.js ==== */
-const __m54 = (() => {
+const __m56 = (() => {
 const { tool, frame, amend, noun, compound, fmt, rad, deg, iso } = __m0;
 const { findDate, today, fmtDate, dateWords } = __m4;
-const { zonesOf, offsetOf } = __m50;
+const { zonesOf, offsetOf } = __m52;
 const { placeOf } = __m36;
 // The sun by NOAA's solar position equations (after Meeus), and the moon's phase from the mean
 // synodic cycle, labelled with its accuracy. Times are given in the place's zone when the place name
@@ -19275,7 +19458,7 @@ amend({ tools: ['sun'], name: 'sunzone', label: 'Zone', words: [], elidable: tru
 })();
 
 /* ==== src/engine/apply.js ==== */
-const __m55 = (() => {
+const __m57 = (() => {
 const { S, tool, fmt, rad, deg, p3, p2 } = __m0;
 const { whereOf } = __m16;
 const { evaluatePredicate, predicateToString } = __m15;
@@ -19342,7 +19525,7 @@ tool({
 })();
 
 /* ==== src/vendor/ipynb.js ==== */
-const __m56 = (() => {
+const __m58 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/ipynb, copied from ../auditable/ext/ipynb/index.js (MIT). golem uses importNotebook
 // for its import-substitution table only (numpy → natra, pandas → sadpan, …). Re-vendor by copying that file here.
 
@@ -19891,9 +20074,9 @@ function exportNotebook(cells, opts = {}) {
 })();
 
 /* ==== src/engine/python.js ==== */
-const __m57 = (() => {
+const __m59 = (() => {
 const { tool, frame, amend, result, fmt } = __m0;
-const { importNotebook } = __m56;
+const { importNotebook } = __m58;
 // Run and trace Python with adder, on the device. The tool itself stays synchronous: a first run returns a
 // "running" card carrying a job, the runner (a Web Worker in the page, adder in-process in the tests)
 // answers later, and the card is recomputed from the kept result. Replay reruns the code, which is
@@ -19963,7 +20146,7 @@ amend({ tools: ['python'], name: 'pytraceoff', label: 'Run', words: ['no trace',
 })();
 
 /* ==== src/vendor/librarian.js ==== */
-const __m58 = (() => {
+const __m60 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/librarian, the in-process text search (BM25F, fuzzy expansion, snippets, did-you-mean), copied from ../auditable/ext/librarian/index.js at auditable 5fa5f72e (MIT).
 // Re-vendor by copying that file here.
 
@@ -21239,9 +21422,9 @@ const Librarian = {
 })();
 
 /* ==== src/engine/docs.js ==== */
-const __m59 = (() => {
+const __m61 = (() => {
 const { S, tool, frame, amend, noun, postmod } = __m0;
-const { Librarian } = __m58;
+const { Librarian } = __m60;
 // Search my documents (A7). Markdown, plain text and HTML opened with the paperclip are kept on the device,
 // cut into passages (by heading, then by paragraph) and indexed by @gcu/librarian. A search returns
 // passages verbatim with the matched words marked; golem never rewrites them. The index is derived
@@ -21394,7 +21577,7 @@ amend({ tools: ['docPassage'], name: 'docstep', label: 'Passage', words: [], eli
 })();
 
 /* ==== src/engine/recipes.js ==== */
-const __m60 = (() => {
+const __m62 = (() => {
 const { S, tool, frame, noun, session, runTool } = __m0;
 const { listOf } = __m26;
 // Recipes (A9): a session's plan saved under a name, with the subjects that may change between runs.
@@ -21590,7 +21773,7 @@ session({
 })();
 
 /* ==== src/vendor/sheet.js ==== */
-const __m61 = (() => {
+const __m63 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sheet, copied from ../auditable/ext/sheet/index.js (built from its src/ by @gcu/build, MIT).
 // Re-vendor by copying that file here. Reading is asynchronous (DecompressionStream), so golem converts at open time, not in a tool.
 
@@ -22822,7 +23005,7 @@ const sheet = {
 })();
 
 /* ==== src/vendor/dm.js ==== */
-const __m62 = (() => {
+const __m64 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/dm, the read-only Datamine .dm reader, copied from ../auditable/ext/dm/index.js (MIT).
 // Re-vendor by copying that file here.
 
@@ -23098,9 +23281,9 @@ function readDM(buffer) {
 })();
 
 /* ==== src/engine/formats.js ==== */
-const __m63 = (() => {
-const { sheet } = __m61;
-const { readDM } = __m62;
+const __m65 = (() => {
+const { sheet } = __m63;
+const { readDM } = __m64;
 const { readParquet, parquetInfo } = __m32;
 // Binary table formats, converted to text when a file is opened: xlsx through @gcu/sheet (one text per
 // sheet), Datamine .dm through @gcu/dm, Parquet through @gcu/parquet. Tools stay synchronous and the device keeps the converted text,
@@ -23152,7 +23335,7 @@ async function convertBinary(name, buffer) {
 })();
 
 /* ==== src/engine/notes.js ==== */
-const __m64 = (() => {
+const __m66 = (() => {
 const { S, tool, frame } = __m0;
 // Notes and taught words. Both belong to the device and are shared by every session.
 const textOf = c => c.theme[0] && c.theme[0].type === 'text' ? c.theme[0].value : null;
@@ -23203,7 +23386,7 @@ frame({
 })();
 
 /* ==== src/vendor/sluice/accumulator.js ==== */
-const __m65 = (() => {
+const __m67 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sluice src/accumulator.js, copied from ../auditable/ext/sluice/src/accumulator.js at auditable 3a7b253c.
 // golem vendors sluice's accumulator modules only (src/engine/stream.js): its runner builds expressions with new Function,
 // which golem does not ship outside the Python worker.
@@ -23371,7 +23554,7 @@ function weightedStats() {
 })();
 
 /* ==== src/vendor/sluice/tdigest.js ==== */
-const __m66 = (() => {
+const __m68 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sluice src/tdigest.js, copied from ../auditable/ext/sluice/src/tdigest.js at auditable 3a7b253c.
 // golem vendors sluice's accumulator modules only (src/engine/stream.js): its runner builds expressions with new Function,
 // which golem does not ship outside the Python worker.
@@ -23486,7 +23669,7 @@ function quantile(state, q) {
 })();
 
 /* ==== src/vendor/sluice/histogram.js ==== */
-const __m67 = (() => {
+const __m69 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sluice src/histogram.js, copied from ../auditable/ext/sluice/src/histogram.js at auditable 3a7b253c.
 // golem vendors sluice's accumulator modules only (src/engine/stream.js): its runner builds expressions with new Function,
 // which golem does not ship outside the Python worker.
@@ -23538,14 +23721,14 @@ function cumulativeFromTop(counts) {
 })();
 
 /* ==== src/engine/stream.js ==== */
-const __m68 = (() => {
+const __m70 = (() => {
 const { S, T, fmt, result } = __m0;
 const { colOf, whereSrc, tableFromText, openTable } = __m16;
 const { parsePredicate, evaluatePredicate, predicateToString } = __m15;
 const { NULL_SENTINELS } = __m14;
-const { weightedStats } = __m65;
-const { tdigest, quantile } = __m66;
-const { histogram } = __m67;
+const { weightedStats } = __m67;
+const { tdigest, quantile } = __m68;
+const { histogram } = __m69;
 // Tables too large to hold (SPEC 13.7): a CSV or TSV over 20 MB is typed from its first megabyte by recon, like any
 // table, and its questions are answered by scanning the whole file as a job, through @gcu/sluice's accumulators
 // (mergeable, never holding the rows): Welford and weighted moments, t-digest quantiles, histograms. The shell runs the
@@ -23706,20 +23889,21 @@ for (const k of ['apply', 'tableExport']) T[k] = a => S.table && S.table.streame
 })();
 
 /* ==== src/engine/engine.js ==== */
-const __m69 = (() => {
+const __m71 = (() => {
 const { S, T, runTool, toolByName, startJobs, tool, CONDITIONS, EFFECTS, clock, iso } = __m0;
 const { DOCUMENT } = __m12;
-const { DOCTEXT } = __m59;
-const { bindingsOf, runSteps } = __m60;
+const { DOCTEXT } = __m61;
+const { bindingsOf, runSteps } = __m62;
 const { tableFromText } = __m16;
-const { convertBinary } = __m63;
+const { convertBinary } = __m65;
 const { noteMiss, clearMiss, correctionOf, teachOfPick, notePick, setReader } = __m38;
 const { norm, grammar, context, taught, sessionRead, readingOf, guessRead, clauseEngine } = __m43;
 const { makeSession } = __m42;
 const { current, newSession, renameSession, touch } = __m28;
-const { streamedTable } = __m68;
+const { streamedTable } = __m70;
 // The entry point: submit(raw) reads a request and returns what happened. Cards are recomputed in
-// place by rerun(); answers and slot flips go through it, so args stay the only state that matters.
+// place by rerun(); answers and slot flips go through it, so args stay the only state that matters.
+
 function addCard(raw, r, ms) {
   const c = { id: ++S.n, raw, tool: r.tool, args: r.args, rung: r.rung, amends: r.amends, res: r.res, ms };
   if (r.cmd !== undefined) Object.defineProperty(c, 'cmd', { value: r.cmd, writable: true, enumerable: false });   // the clause command, for amendments; not stored
@@ -23982,7 +24166,7 @@ function seedExamples() {
 })();
 
 /* ==== src/engine/packs.js ==== */
-const __m70 = (() => {
+const __m72 = (() => {
 const { profilesOf } = __m18;
 // Packs as gcu-library ships them: a .gcudat is a gzipped tar holding gcudat.json (the manifest) and the data files
 // (gcu-library tools/build-gcudat.mjs). Read here with the platform's own gunzip (DecompressionStream, in browsers and
@@ -24097,7 +24281,7 @@ async function compileStrunk(bytes) {
 })();
 
 /* ==== src/vendor/vfs.js ==== */
-const __m71 = (() => {
+const __m73 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/vfs, copied from ../auditable/ext/vfs/index.js (built from its src/ by node ext/vfs/build.js), at
 // auditable 8837da6e. golem's shell keeps sessions, device state, files and packs in it over IndexedDB (src/shell/store.js).
 // golem constructs only IDBBackend and MemoryBackend; the network backends in this bundle (fetch, REST, Dropbox) are
@@ -27908,8 +28092,8 @@ function fromPicker(vfs, destPath, opts) {
 })();
 
 /* ==== src/shell/store.js ==== */
-const __m72 = (() => {
-const { VFS } = __m71;
+const __m74 = (() => {
+const { VFS } = __m73;
 // Where the device keeps golem (SPEC 13.9): @gcu/vfs over IndexedDB, one file per session, one per opened file, the
 // device state and a small meta file, so a session can be exported as itself and nothing has a size cap but the
 // browser's. Only what changed is written. When IndexedDB is not there, the whole state goes to localStorage as before;
@@ -28023,7 +28207,7 @@ function noStore() {
 })();
 
 /* ==== src/vendor/leadacid.js ==== */
-const __m73 = (() => {
+const __m75 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. The lead-acid shell shim, copied from ../auditable/ext/leadacid/index.js
 // (itself vendored from gentropic/lead-acid, lead-acid.js). Re-vendor by copying that file here.
 
@@ -28727,7 +28911,7 @@ function orientationFromRotationVector(v) {
 })();
 
 /* ==== src/vendor/plot.js ==== */
-const __m74 = (() => {
+const __m76 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/plot (matplotlib-shaped plotting; figures leave the worker as draw lists), copied from ../auditable/ext/plot/index.js at auditable 774234c3 (9 Oct 2026, MIT).
 // Loaded only inside the Python worker. Re-vendor by copying that file here.
 
@@ -30761,7 +30945,7 @@ if (typeof window !== 'undefined') {
 })();
 
 /* ==== src/shell/i18n.js ==== */
-const __m75 = (() => {
+const __m77 = (() => {
 // The interface in English or Brazilian Portuguese. golem's own words (the page, the sidebar, the composer, the cards'
 // frame, the messages) go through t(); the English is the key, so a sentence not translated yet shows in English and a
 // placeholder ({name}) is filled in after the lookup. What a tool answers is the tool's, in English for now.
@@ -30874,11 +31058,11 @@ const PT = {
 })();
 
 /* ==== src/shell/render.js ==== */
-const __m76 = (() => {
+const __m78 = (() => {
 const { fmt } = __m0;
 const { conversions, equalArea } = __m5;
-const { Figure } = __m74;
-const { t } = __m75;
+const { Figure } = __m76;
+const { t } = __m77;
 const { stationNow } = __m25;
 // Rendering. The engine hands over plain blocks; this is the only file that turns them into markup.
 
@@ -31024,7 +31208,7 @@ function figImage(ctx, x, y, w, h, cols, rows, b64) {
 })();
 
 /* ==== src/vendor/sw-register.js ==== */
-const __m77 = (() => {
+const __m79 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sw's page-side companion, copied from ../auditable/ext/sw/register.js (at auditable 8837da6e).
 
 // @gcu/sw — the page-side companion (ES module). Registration + persistent
@@ -31102,8 +31286,8 @@ function registerGcuSw(opts = {}) {
 })();
 
 /* ==== src/shell/sign.js ==== */
-const __m78 = (() => {
-const { shell } = __m73;
+const __m80 = (() => {
+const { shell } = __m75;
 // Signing what golem exports, and checking what it opens (SPEC 13: things you can trust). One signature format for both
 // homes, ECDSA P-256 over SHA-256, the signature raw (r‖s) and the public key as SPKI, both base64: inside the lead-acid
 // app the phone's hardware key signs (lead-acid's attest plugin: StrongBox, else the TEE); in a browser, a WebCrypto key
@@ -31154,28 +31338,28 @@ async function fingerprint(pubB64) {
 })();
 
 /* ==== src/shell/main.js ==== */
-const __m79 = (() => {
+const __m81 = (() => {
 const { S } = __m0;
-const { submit, flipSlot, answer, capture, seedExamples, openFile, openBinary, openStreamed, preview } = __m69;
-const { scanTable, STREAM_OVER } = __m68;
+const { submit, flipSlot, answer, capture, seedExamples, openFile, openBinary, openStreamed, preview } = __m71;
+const { scanTable, STREAM_OVER } = __m70;
 const { completions } = __m43;
 const { fromDevice } = __m24;
 const { conversions } = __m5;
 const { useFactbook, factbookInfo } = __m18;
-const { factbookFromGcudat, factbookProfiles, readGcudat, compileOds, compileStrunk, mineralsFromGcudat } = __m70;
+const { factbookFromGcudat, factbookProfiles, readGcudat, compileOds, compileStrunk, mineralsFromGcudat } = __m72;
 const { useMinerals, mineralsInfo } = __m8;
 const { useBook, bookInfo } = __m19;
-const { BINARY } = __m63;
+const { BINARY } = __m65;
 const { setRunner, onJobDone } = __m0;
 const { sessions, current, newSession, openSession, renameSession, deleteSession, searchHistory, parts, hydrate, onChange, exportSession, importSession, pinCard, branchSession } = __m28;
-const { openStore, putBlob, getBlob } = __m72;
+const { openStore, putBlob, getBlob } = __m74;
 const { skills, PACKS, STARTERS, STARTERS_PT } = __m37;
-const { shell } = __m73;
-const { escHtml, pad, cardEl, drawCharts } = __m76;
-const { registerGcuSw } = __m77;
-const { sign, verify, fingerprint, deviceKey, canSign } = __m78;
+const { shell } = __m75;
+const { escHtml, pad, cardEl, drawCharts } = __m78;
+const { registerGcuSw } = __m79;
+const { sign, verify, fingerprint, deviceKey, canSign } = __m80;
 const { canonical, unsigned } = __m29;
-const { t, plural, setUiLang, uiLang, applyStatic } = __m75;
+const { t, plural, setUiLang, uiLang, applyStatic } = __m77;
 const { setLanguage } = __m43;
 // The shell: wiring, tabs, the session drawer, storage, and the sleep switch. Everything that touches
 // the DOM or the browser lives here or in render.js; the engine never does.
