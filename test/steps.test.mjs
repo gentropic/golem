@@ -40,4 +40,53 @@ test('the preview names the steps before anything runs', () => {
   g.reset(); pin(); g.newSession();
   const p = g.preview('open assays.csv then mean cu by lith');
   assert.equal(p.steps, 2); assert.match(p.echo, /open assays\.csv → mean cu by lith/); assert.equal(g.S.cards.length, 0);
+  // a word that is a column only once the table is open (the sample's columns are all words golem knows already)
+  assert.match(g.preview('open assays.csv then histogram of cu_ppm').echo, /step 2 is read once step 1 has run/, 'a step that reads only after the open says so');
+});
+
+/* ── the plan, checked before it runs (effects and post on the declarations) ── */
+test('what a tool does beyond its card is declared, and an unknown effect is refused', () => {
+  const d = n => g.toolByName(n);
+  assert.deepEqual(d('open').post, ['table']);
+  for (const n of ['logAdd', 'place', 'remember', 'teach', 'recipeSave', 'recipeForget']) assert.deepEqual(d(n).effects, ['device'], n);
+  for (const n of ['event', 'timer', 'alarm']) assert.deepEqual(d(n).effects, ['handoff'], n);
+  for (const n of ['tableExport', 'convertText', 'convertFile']) assert.deepEqual(d(n).effects, ['save'], n);
+  // a tool that can undo what it did wrote something, so it says so
+  for (const t of g.TOOLS.filter(t => t.undo)) assert.ok((t.effects || []).includes('device'), `${t.name} has undo but no device effect`);
+  assert.ok(Object.keys(g.EFFECTS).length === 3);
+});
+
+test('a plan with a step that does not read runs none of it', () => {
+  g.reset(); pin(); g.newSession();
+  const plan = g.planOf(['remind me to call the lab on friday at 9', 'write me a poem']);
+  assert.equal(plan.stop.n, 2); assert.equal(plan.stop.why, 'none');
+  const p = g.preview('remind me to call the lab on friday at 9 then write me a poem then set a timer for 5 min');
+  assert.equal(p.rung, 'none'); assert.match(p.echo, /step 2, "write me a poem", does not read: none would run/);
+  const o = g.submit('remind me to call the lab on friday at 9 then write me a poem then set a timer for 5 min');
+  assert.equal(o.kind, 'card'); assert.equal(o.card.tool, 'planStop'); assert.equal(g.S.cards.length, 1, 'only the card that says why');
+  assert.match(g.textOf(o.card), /Step 2 of 3, "write me a poem", does not read\. None of the steps ran/);
+});
+
+test('a step that needs what a later step provides is out of order: nothing runs, and the reordered plan is offered', () => {
+  g.reset(); pin(); g.newSession();
+  const o = g.submit('histogram of cu then open assays.csv');
+  assert.equal(o.card.tool, 'planStop'); assert.equal(o.card.args.why, 'order'); assert.equal(o.card.args.by, 2);
+  assert.match(g.textOf(o.card), /needs a table, and step 2 is what provides it: say that step first/);
+  assert.deepEqual(o.card.res.body.find(b => b.t === 'chips').items, ['open assays.csv then histogram of cu']);
+  assert.equal(g.S.table, null, 'the open did not run');
+  const two = g.submit('open assays.csv then histogram of cu'); assert.deepEqual(two.cards.map(c => c.tool), ['open', 'hist'], 'the offered order runs');
+  // the stop card is a card like any other: it replays from its args
+  const saved = JSON.parse(JSON.stringify(g.serialize())); g.reset(); pin(); g.hydrate(saved);
+  assert.equal(g.S.cards[0].tool, 'planStop'); assert.match(g.textOf(g.S.cards[0]), /say that step first/);
+});
+
+test('the preview says what each step does beyond its card', () => {
+  g.reset(); pin(); g.newSession();
+  let p = g.preview('remind me to call the lab on friday at 9 then set a timer for 5 min');
+  assert.deepEqual(p.notes, ['step 1 hands off to another app on a tap', 'step 2 hands off to another app on a tap']);
+  p = g.preview('open assays.csv then export as tsv'); assert.ok(p.notes.includes('step 2 offers a file to save'), p.echo);
+  p = g.preview('log 5 km run then total run by week'); assert.ok(p.notes.includes('step 1 writes to this device'), p.echo);
+  // a session command is a step too; an amendment reads against the card the step before it will make
+  assert.deepEqual(g.planOf(['new session', '2 km in miles']).steps.map(s => s.now), [true, true]);
+  const a = g.planOf(['open assays.csv', 'histogram of au', 'log scale']); assert.equal(a.stop, undefined); assert.equal(a.steps[2].tool, 'hist');
 });

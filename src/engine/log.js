@@ -48,7 +48,7 @@ export function readLog(text) {
   return { id: newId(), activity, value, unit, date, note };
 }
 tool({
-  name: 'logAdd',
+  name: 'logAdd', effects: ['device'],
   skill: { group: 'Device', title: 'Log', on: 'device table', about: 'Log what you did with a quantity and a date, ask totals and means by week or month, and open the log as a table. Rows stay on this device.', examples: ['log 30 min run', 'log 5 km run yesterday', 'log weight 78.4 kg', 'how many km did i run this month', 'mean weight by week', 'open the log'] },
   topic: a => [`Log: ${a.activity}`, 1],
   undo: a => { const t = logTable(); t.rows = t.rows.filter(r => r.id !== a.id); },

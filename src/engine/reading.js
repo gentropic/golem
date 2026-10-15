@@ -110,8 +110,8 @@ function fragmentRead(raw, last, dry) {
   const base = commandOf(last); if (!base) return null;
   const s = makeSession([]); s.last = base;
   const { r, b } = verdictOf(raw, s, { fragment: true }); if (!b || b.tool !== last.tool) return null;
-  if (dry) return { amends: last.id, echo: r.echo };
   const before = bindOf(base), args = changed(last, before && before.tool === last.tool ? before.args : null, b.args);
+  if (dry) return { amends: last.id, echo: r.echo, tool: last.tool, args };
   const res = runTool(last.tool, args); if (!res) return null;
   res.trace.unshift(`clause: amends #${String(last.id).padStart(2, '0')}: ${r.echo}`);
   return { tool: last.tool, args, rung: 'context', amends: last.id, res, cmd: r.commands[0] };
@@ -137,7 +137,7 @@ function amendIn(raw, last, dry, loc, exact) {
   let r = E.understand(text, makeSession([])), hit = pick(r);
   for (const f of frames) { if (hit) break; const s = makeSession([]); s.last = { verb: f.name, theme: [], roles: {} }; const rf = E.understand(text, s, { fragment: true }); hit = pick(rf); if (hit) r = rf; }
   if (!hit || (exact && repaired(r))) return null;
-  if (dry) return { amends: last.id, echo: r.echo || r.readings[0] };
+  if (dry) return { amends: last.id, echo: r.echo || r.readings[0], tool: hit.tool, args: hit.args };
   const res = runTool(hit.tool, hit.args); if (!res) return null;
   res.trace.unshift(`clause: amends #${String(last.id).padStart(2, '0')}: ${(r.echo || r.readings[0]).replace(/\.$/, '')}`);
   return { tool: hit.tool, args: hit.args, rung: 'context', amends: last.id, res, cmd: hit.tool === last.tool ? commandOf(last) : null };
@@ -155,12 +155,12 @@ const clean = e => e.replace(/\.$/, '');
 export function readingOf(raw, last) {
   if (!raw.trim()) return null;
   const v = verdictOf(raw, clauseSession());
-  if (v.b) return { rung: 'grammar', echo: clean(v.r.echo) };
-  const x = expressionOf(raw); if (x && (calcOf(x) || estimateOf(x))) return { rung: 'grammar', echo: `expression: ${x}` };
-  const a = last && (amendRead(raw, last, true) || fragmentRead(raw, last, true)); if (a) return { rung: 'context', echo: `amends #${String(a.amends).padStart(2, '0')}: ${clean(a.echo)}`, amends: a.amends };
+  if (v.b) return { rung: 'grammar', echo: clean(v.r.echo), tool: v.b.tool, args: v.b.args };
+  const x = expressionOf(raw), xc = x && calcOf(x), xe = x && !xc && estimateOf(x); if (xc || xe) return { rung: 'grammar', echo: `expression: ${x}`, tool: xc ? 'calc' : 'estimate', args: xc || xe };
+  const a = last && (amendRead(raw, last, true) || fragmentRead(raw, last, true)); if (a) return { rung: 'context', echo: `amends #${String(a.amends).padStart(2, '0')}: ${clean(a.echo)}`, amends: a.amends, tool: a.tool, args: a.args };
   if (Object.keys(S.aliases).length) {
     let t2 = ' ' + raw + ' '; Object.entries(S.aliases).forEach(([k, w]) => { t2 = t2.replace(new RegExp('(?<=\\s)' + k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?=\\s)', 'gi'), w); });
-    if (t2.trim() !== raw.trim()) { const t = verdictOf(t2.trim(), clauseSession()); if (t.b) return { rung: 'taught', echo: clean(t.r.echo) }; }
+    if (t2.trim() !== raw.trim()) { const t = verdictOf(t2.trim(), clauseSession()); if (t.b) return { rung: 'taught', echo: clean(t.r.echo), tool: t.b.tool, args: t.b.args }; }
   }
   if (v.r.status === 'ambiguous') return { rung: 'ambiguous', readings: v.r.readings.map(clean) };
   const p = clauseEngine().preview(raw, makeSession([]));

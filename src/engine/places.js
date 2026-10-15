@@ -21,7 +21,7 @@ const SRC_PLACES = { t: 'src', text: 'places · a table on this device · no gaz
 
 /* ── places ─────────────────────────────────────────────────── */
 tool({
-  name: 'place',
+  name: 'place', effects: ['device'],
   skill: { group: 'Device', title: 'Places, distance and UTM', on: 'own geodesy', about: 'Save a place by coordinates; distance and bearings between two places over the WGS84 ellipsoid (Vincenty); latitude and longitude to UTM and back (Krüger series). No gazetteer: a name you have not saved is asked for.', examples: ['home is -19.92, -43.94', 'distance from -19.92,-43.94 to -6.07,-50.16', '-19.92, -43.94 in utm', 'utm 23k 611000 7797000 to lat long'] },
   topic: () => ['Places', .5],
   undo: a => { const t = placesTable(); t.rows = t.rows.filter(r => r.name !== a.name); },

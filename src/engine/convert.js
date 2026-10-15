@@ -107,7 +107,7 @@ function parquetOut(t) {
   };
 }
 tool({
-  name: 'tableExport', pre: ['table'],
+  name: 'tableExport', pre: ['table'], effects: ['save'],
   skill: { group: 'Table', title: 'Table as CSV, TSV, JSON or Parquet', on: 'built in · @gcu/parquet', about: 'The open table written out, with what the format cannot hold stated. Copy or save it; Parquet is saved, not copied.', examples: ['the table as json', 'export the table as tsv', 'the table as parquet'] },
   topic: a => [`Table as ${a.fmt === 'parquet' ? 'Parquet' : a.fmt.toUpperCase()}`, 1],
   run: a => {

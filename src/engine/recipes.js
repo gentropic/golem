@@ -80,7 +80,7 @@ export function recipeAt(text) {
 
 /* ── save ───────────────────────────────────────────────────── */
 tool({
-  name: 'recipeSave',
+  name: 'recipeSave', effects: ['device'],
   skill: { group: 'Session', title: 'Recipes', on: 'session plans', about: 'Save this session\'s steps under a name, choose which subjects change between runs (the file, the columns), then run it again for other ones, or on every kept table. A step that no longer reads stops the run there; nothing is skipped or guessed.', examples: ['save this as a recipe called cu check', 'run cu check for au', 'run cu check on every table', 'recipes'] },
   topic: a => [`recipe ${a.name}`, 1],
   run: a => {
@@ -121,7 +121,7 @@ tool({
   }
 });
 tool({
-  name: 'recipeForget',
+  name: 'recipeForget', effects: ['device'],
   run: a => {
     const read = ['forget recipe', { v: a.name }];
     if (!S.recipes[a.name]) return { read, body: [{ t: 'note', text: `There is no recipe called ${a.name}; it may be forgotten already.` }], trace: ['recipe: absent'] };

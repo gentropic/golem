@@ -135,7 +135,7 @@ const PY = (from, to) => from === 'yaml' ? 'json.dumps(yaml.safe_load(text), ind
 const KIND = { json: 'json', yaml: 'yaml', yml: 'yaml', wkt: 'wkt', geojson: 'geojson' };
 const sniff = body => /^\s*[[{]/.test(body) ? (/"type"\s*:\s*"(Feature|FeatureCollection|Point|LineString|Polygon|Multi\w+|GeometryCollection)"/.test(body) ? 'geojson' : 'json') : /^\s*(?:SRID=\d+;\s*)?(POINT|LINESTRING|POLYGON|MULTIPOINT|MULTILINESTRING|MULTIPOLYGON|GEOMETRYCOLLECTION)\b/i.test(body) ? 'wkt' : 'yaml';
 tool({
-  name: 'convertText',
+  name: 'convertText', effects: ['save'],
   skill: { group: 'Compute', title: 'YAML, JSON, WKT and GeoJSON', on: '@gcu/yaml · wkt · dxf', about: 'JSON to YAML and back (the strict YAML subset, where every string is quoted), WKT to GeoJSON and back, and DXF drawings to GeoJSON or WKT from your files. What does not carry over is said.', examples: ['json to yaml: {"hole": "DH-12", "depth": 240.5}', 'wkt to geojson: POINT (30 10)', 'convert to wkt: {"type": "LineString", "coordinates": [[0, 0], [10, 5]]}'] },
   topic: a => [`${LABEL[a.from]} to ${LABEL[a.to]}`, 1],
   run: a => {
@@ -150,7 +150,7 @@ tool({
 /* ── a file the device keeps ────────────────────────────────── */
 const fileNamed = name => Object.values(S.files).find(f => f.name.toLowerCase() === name.toLowerCase());
 tool({
-  name: 'convertFile',
+  name: 'convertFile', effects: ['save'],
   topic: a => [a.file.name, 2],
   run: a => {
     const from = kindOfName(a.file.name), targets = TARGETS[from] || [], to = a.to || targets[0], f = S.files[a.file.hash];

@@ -25,8 +25,18 @@ export const T = {};
 //   topic(args) → [label, weight]         what a card contributes to its session's name
 //   skill: { group, title, on, about, examples }   a row in the Skills tab (one row may cover several tools)
 //   planned: true                         a skill named but not built
+//   pre: ['table']                        the conditions it needs (condition() below)
+// What a tool does beyond its card, declared so a plan can be checked before it runs (SPEC 13.6):
+//   post: ['table']                       the conditions it establishes: a later step's `pre` is met by it, and a
+//                                         later step may read only once it has run (open makes the columns words)
+//   effects: ['device' | 'handoff' | 'save']   writes to this device (the log, places, notes, taught words, recipes);
+//                                         offers to hand something to another app, or a file to save, on a tap
+export const EFFECTS = { device: 'writes to this device', handoff: 'hands off to another app on a tap', save: 'offers a file to save' };
 export const TOOLS = [];
-export function tool(d) { TOOLS.push(d); if (d.run) T[d.name] = d.run; return d; }
+export function tool(d) {
+  for (const e of d.effects || []) if (!EFFECTS[e]) throw new Error(`tool ${d.name} declares an unknown effect ${e}`);
+  TOOLS.push(d); if (d.run) T[d.name] = d.run; return d;
+}
 export const toolByName = name => TOOLS.find(d => d.name === name);
 
 // Clause verb frames: what the parser reads, and how a reading becomes a tool call.

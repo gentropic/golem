@@ -104,7 +104,7 @@ condition('table', {
   establish: () => [{ label: 'open assays.csv', name: 'assays.csv, the sample', tool: 'open', args: {} }, ...Object.entries(S.tables).filter(([, t]) => t.rows.length).map(([k]) => ({ label: `open the ${k}`, name: `the ${k}`, tool: 'open', args: { device: k } })), ...Object.values(S.files).map(f => ({ label: `open ${f.name}`, name: f.name, tool: 'open', args: { file: { name: f.name, hash: f.hash } } }))]
 });
 tool({
-  name: 'open',
+  name: 'open', post: ['table'],
   skill: { group: 'Table', title: 'Open and validate', on: '@gcu/recon · sheet · dm · parquet', about: 'A CSV, TSV, xlsx, Parquet or Datamine .dm from your files, typed by recon: numbers, categories, units, analytes, hole and interval columns. A workbook with several sheets asks which.', examples: ['open assays.csv'] },
   topic: () => null,
   run: a => {

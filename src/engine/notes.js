@@ -3,7 +3,7 @@ import { S, tool, frame } from './core.js';
 const textOf = c => c.theme[0] && c.theme[0].type === 'text' ? c.theme[0].value : null;
 
 tool({
-  name: 'remember',
+  name: 'remember', effects: ['device'],
   skill: { group: 'Session', title: 'Notes', on: 'glass', about: 'Remembers only what you ask it to.', examples: ['remember that hole 12 collar was resurveyed in march', 'what do you know about hole 12'] },
   topic: () => ['Notes', 1],
   run: a => {
@@ -20,7 +20,7 @@ tool({
   }
 });
 tool({
-  name: 'teach',
+  name: 'teach', effects: ['device'],
   skill: { group: 'Session', title: 'Teach a word', on: 'lexicon', about: 'Stays on the device.', examples: ['pop means population'] },
   run: a => {
     S.aliases[a.word] = a.means;

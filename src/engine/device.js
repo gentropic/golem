@@ -19,7 +19,7 @@ function parseEvent(str) {
   return { title: title ? title[0].toUpperCase() + title.slice(1) : 'Event', date: +(d ? d.d : today()), timed: !!t, h: t ? t.h : 0, mi: t ? t.mi : 0, dur: du ? Math.round(du[1] * (du[2][0] === 'h' ? 60 : 1)) : 60 };
 }
 tool({
-  name: 'event',
+  name: 'event', effects: ['handoff'],
   skill: { group: 'Device', title: 'Calendar event', on: 'lead-acid intent', about: 'Fills the event and hands it to your calendar app.', examples: ['remind me to send the samples to the lab on friday at 9', 'schedule core shed visit tomorrow at 14:30 for 2 hours'] },
   topic: a => [a.title, 2],
   run: a => {
@@ -40,7 +40,7 @@ tool({
   }
 });
 tool({
-  name: 'timer',
+  name: 'timer', effects: ['handoff'],
   skill: { group: 'Device', title: 'Timer and alarm', on: 'lead-acid intent', about: 'Handed to the Clock app.', examples: ['set a timer for 5 min', 'set an alarm for 6:15'] },
   topic: () => ['Timer', 1],
   run: a => {
@@ -67,7 +67,7 @@ frame({
   }
 });
 tool({
-  name: 'alarm',
+  name: 'alarm', effects: ['handoff'],
   topic: () => ['Alarm', 1],
   run: a => {
     const t = String(a.h).padStart(2, '0') + ':' + String(a.mi).padStart(2, '0');

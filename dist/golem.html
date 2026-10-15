@@ -471,8 +471,18 @@ const T = {};
 //   topic(args) → [label, weight]         what a card contributes to its session's name
 //   skill: { group, title, on, about, examples }   a row in the Skills tab (one row may cover several tools)
 //   planned: true                         a skill named but not built
+//   pre: ['table']                        the conditions it needs (condition() below)
+// What a tool does beyond its card, declared so a plan can be checked before it runs (SPEC 13.6):
+//   post: ['table']                       the conditions it establishes: a later step's `pre` is met by it, and a
+//                                         later step may read only once it has run (open makes the columns words)
+//   effects: ['device' | 'handoff' | 'save']   writes to this device (the log, places, notes, taught words, recipes);
+//                                         offers to hand something to another app, or a file to save, on a tap
+const EFFECTS = { device: 'writes to this device', handoff: 'hands off to another app on a tap', save: 'offers a file to save' };
 const TOOLS = [];
-function tool(d) { TOOLS.push(d); if (d.run) T[d.name] = d.run; return d; }
+function tool(d) {
+  for (const e of d.effects || []) if (!EFFECTS[e]) throw new Error(`tool ${d.name} declares an unknown effect ${e}`);
+  TOOLS.push(d); if (d.run) T[d.name] = d.run; return d;
+}
 const toolByName = name => TOOLS.find(d => d.name === name);
 
 // Clause verb frames: what the parser reads, and how a reading becomes a tool call.
@@ -563,7 +573,7 @@ const p3 = x => String(Math.round(x) % 360).padStart(3, '0');
 const p2 = x => String(Math.round(x)).padStart(2, '0');
 // a quantity node from the parser as a number in a base unit, given the unit's factor
 const qty = (node, f) => node && node.type === 'quantity' ? node.n * f(node.unit) : null;
-  return { S, T, TOOLS, tool, toolByName, FRAMES, frame, amend, session, LEXICON, noun, shape, postmod, unit, qmod, compound, CONDITIONS, condition, setRunner, onJobDone, result, clearResults, startJobs, settle, runTool, clock, fmt, iso, rad, deg, p3, p2, qty };
+  return { S, T, EFFECTS, TOOLS, tool, toolByName, FRAMES, frame, amend, session, LEXICON, noun, shape, postmod, unit, qmod, compound, CONDITIONS, condition, setRunner, onJobDone, result, clearResults, startJobs, settle, runTool, clock, fmt, iso, rad, deg, p3, p2, qty };
 })();
 
 /* ==== src/vendor/units.js ==== */
@@ -8349,7 +8359,7 @@ const PY = (from, to) => from === 'yaml' ? 'json.dumps(yaml.safe_load(text), ind
 const KIND = { json: 'json', yaml: 'yaml', yml: 'yaml', wkt: 'wkt', geojson: 'geojson' };
 const sniff = body => /^\s*[[{]/.test(body) ? (/"type"\s*:\s*"(Feature|FeatureCollection|Point|LineString|Polygon|Multi\w+|GeometryCollection)"/.test(body) ? 'geojson' : 'json') : /^\s*(?:SRID=\d+;\s*)?(POINT|LINESTRING|POLYGON|MULTIPOINT|MULTILINESTRING|MULTIPOLYGON|GEOMETRYCOLLECTION)\b/i.test(body) ? 'wkt' : 'yaml';
 tool({
-  name: 'convertText',
+  name: 'convertText', effects: ['save'],
   skill: { group: 'Compute', title: 'YAML, JSON, WKT and GeoJSON', on: '@gcu/yaml · wkt · dxf', about: 'JSON to YAML and back (the strict YAML subset, where every string is quoted), WKT to GeoJSON and back, and DXF drawings to GeoJSON or WKT from your files. What does not carry over is said.', examples: ['json to yaml: {"hole": "DH-12", "depth": 240.5}', 'wkt to geojson: POINT (30 10)', 'convert to wkt: {"type": "LineString", "coordinates": [[0, 0], [10, 5]]}'] },
   topic: a => [`${LABEL[a.from]} to ${LABEL[a.to]}`, 1],
   run: a => {
@@ -8364,7 +8374,7 @@ tool({
 /* ── a file the device keeps ────────────────────────────────── */
 const fileNamed = name => Object.values(S.files).find(f => f.name.toLowerCase() === name.toLowerCase());
 tool({
-  name: 'convertFile',
+  name: 'convertFile', effects: ['save'],
   topic: a => [a.file.name, 2],
   run: a => {
     const from = kindOfName(a.file.name), targets = TARGETS[from] || [], to = a.to || targets[0], f = S.files[a.file.hash];
@@ -11405,7 +11415,7 @@ condition('table', {
   establish: () => [{ label: 'open assays.csv', name: 'assays.csv, the sample', tool: 'open', args: {} }, ...Object.entries(S.tables).filter(([, t]) => t.rows.length).map(([k]) => ({ label: `open the ${k}`, name: `the ${k}`, tool: 'open', args: { device: k } })), ...Object.values(S.files).map(f => ({ label: `open ${f.name}`, name: f.name, tool: 'open', args: { file: { name: f.name, hash: f.hash } } }))]
 });
 tool({
-  name: 'open',
+  name: 'open', post: ['table'],
   skill: { group: 'Table', title: 'Open and validate', on: '@gcu/recon · sheet · dm · parquet', about: 'A CSV, TSV, xlsx, Parquet or Datamine .dm from your files, typed by recon: numbers, categories, units, analytes, hole and interval columns. A workbook with several sheets asks which.', examples: ['open assays.csv'] },
   topic: () => null,
   run: a => {
@@ -12069,7 +12079,7 @@ function parseEvent(str) {
   return { title: title ? title[0].toUpperCase() + title.slice(1) : 'Event', date: +(d ? d.d : today()), timed: !!t, h: t ? t.h : 0, mi: t ? t.mi : 0, dur: du ? Math.round(du[1] * (du[2][0] === 'h' ? 60 : 1)) : 60 };
 }
 tool({
-  name: 'event',
+  name: 'event', effects: ['handoff'],
   skill: { group: 'Device', title: 'Calendar event', on: 'lead-acid intent', about: 'Fills the event and hands it to your calendar app.', examples: ['remind me to send the samples to the lab on friday at 9', 'schedule core shed visit tomorrow at 14:30 for 2 hours'] },
   topic: a => [a.title, 2],
   run: a => {
@@ -12090,7 +12100,7 @@ tool({
   }
 });
 tool({
-  name: 'timer',
+  name: 'timer', effects: ['handoff'],
   skill: { group: 'Device', title: 'Timer and alarm', on: 'lead-acid intent', about: 'Handed to the Clock app.', examples: ['set a timer for 5 min', 'set an alarm for 6:15'] },
   topic: () => ['Timer', 1],
   run: a => {
@@ -12117,7 +12127,7 @@ frame({
   }
 });
 tool({
-  name: 'alarm',
+  name: 'alarm', effects: ['handoff'],
   topic: () => ['Alarm', 1],
   run: a => {
     const t = String(a.h).padStart(2, '0') + ':' + String(a.mi).padStart(2, '0');
@@ -13650,7 +13660,7 @@ function parquetOut(t) {
   };
 }
 tool({
-  name: 'tableExport', pre: ['table'],
+  name: 'tableExport', pre: ['table'], effects: ['save'],
   skill: { group: 'Table', title: 'Table as CSV, TSV, JSON or Parquet', on: 'built in · @gcu/parquet', about: 'The open table written out, with what the format cannot hold stated. Copy or save it; Parquet is saved, not copied.', examples: ['the table as json', 'export the table as tsv', 'the table as parquet'] },
   topic: a => [`Table as ${a.fmt === 'parquet' ? 'Parquet' : a.fmt.toUpperCase()}`, 1],
   run: a => {
@@ -15114,7 +15124,7 @@ function readLog(text) {
   return { id: newId(), activity, value, unit, date, note };
 }
 tool({
-  name: 'logAdd',
+  name: 'logAdd', effects: ['device'],
   skill: { group: 'Device', title: 'Log', on: 'device table', about: 'Log what you did with a quantity and a date, ask totals and means by week or month, and open the log as a table. Rows stay on this device.', examples: ['log 30 min run', 'log 5 km run yesterday', 'log weight 78.4 kg', 'how many km did i run this month', 'mean weight by week', 'open the log'] },
   topic: a => [`Log: ${a.activity}`, 1],
   undo: a => { const t = logTable(); t.rows = t.rows.filter(r => r.id !== a.id); },
@@ -15236,7 +15246,7 @@ const SRC_PLACES = { t: 'src', text: 'places · a table on this device · no gaz
 
 /* ── places ─────────────────────────────────────────────────── */
 tool({
-  name: 'place',
+  name: 'place', effects: ['device'],
   skill: { group: 'Device', title: 'Places, distance and UTM', on: 'own geodesy', about: 'Save a place by coordinates; distance and bearings between two places over the WGS84 ellipsoid (Vincenty); latitude and longitude to UTM and back (Krüger series). No gazetteer: a name you have not saved is asked for.', examples: ['home is -19.92, -43.94', 'distance from -19.92,-43.94 to -6.07,-50.16', '-19.92, -43.94 in utm', 'utm 23k 611000 7797000 to lat long'] },
   topic: () => ['Places', .5],
   undo: a => { const t = placesTable(); t.rows = t.rows.filter(r => r.name !== a.name); },
@@ -17666,7 +17676,7 @@ function recipeAt(text) {
 
 /* ── save ───────────────────────────────────────────────────── */
 tool({
-  name: 'recipeSave',
+  name: 'recipeSave', effects: ['device'],
   skill: { group: 'Session', title: 'Recipes', on: 'session plans', about: 'Save this session\'s steps under a name, choose which subjects change between runs (the file, the columns), then run it again for other ones, or on every kept table. A step that no longer reads stops the run there; nothing is skipped or guessed.', examples: ['save this as a recipe called cu check', 'run cu check for au', 'run cu check on every table', 'recipes'] },
   topic: a => [`recipe ${a.name}`, 1],
   run: a => {
@@ -17707,7 +17717,7 @@ tool({
   }
 });
 tool({
-  name: 'recipeForget',
+  name: 'recipeForget', effects: ['device'],
   run: a => {
     const read = ['forget recipe', { v: a.name }];
     if (!S.recipes[a.name]) return { read, body: [{ t: 'note', text: `There is no recipe called ${a.name}; it may be forgotten already.` }], trace: ['recipe: absent'] };
@@ -19347,7 +19357,7 @@ const { S, tool, frame } = __m0;
 const textOf = c => c.theme[0] && c.theme[0].type === 'text' ? c.theme[0].value : null;
 
 tool({
-  name: 'remember',
+  name: 'remember', effects: ['device'],
   skill: { group: 'Session', title: 'Notes', on: 'glass', about: 'Remembers only what you ask it to.', examples: ['remember that hole 12 collar was resurveyed in march', 'what do you know about hole 12'] },
   topic: () => ['Notes', 1],
   run: a => {
@@ -19364,7 +19374,7 @@ tool({
   }
 });
 tool({
-  name: 'teach',
+  name: 'teach', effects: ['device'],
   skill: { group: 'Session', title: 'Teach a word', on: 'lexicon', about: 'Stays on the device.', examples: ['pop means population'] },
   run: a => {
     S.aliases[a.word] = a.means;
@@ -21810,8 +21820,8 @@ function fragmentRead(raw, last, dry) {
   const base = commandOf(last); if (!base) return null;
   const s = makeSession([]); s.last = base;
   const { r, b } = verdictOf(raw, s, { fragment: true }); if (!b || b.tool !== last.tool) return null;
-  if (dry) return { amends: last.id, echo: r.echo };
   const before = bindOf(base), args = changed(last, before && before.tool === last.tool ? before.args : null, b.args);
+  if (dry) return { amends: last.id, echo: r.echo, tool: last.tool, args };
   const res = runTool(last.tool, args); if (!res) return null;
   res.trace.unshift(`clause: amends #${String(last.id).padStart(2, '0')}: ${r.echo}`);
   return { tool: last.tool, args, rung: 'context', amends: last.id, res, cmd: r.commands[0] };
@@ -21837,7 +21847,7 @@ function amendIn(raw, last, dry, loc, exact) {
   let r = E.understand(text, makeSession([])), hit = pick(r);
   for (const f of frames) { if (hit) break; const s = makeSession([]); s.last = { verb: f.name, theme: [], roles: {} }; const rf = E.understand(text, s, { fragment: true }); hit = pick(rf); if (hit) r = rf; }
   if (!hit || (exact && repaired(r))) return null;
-  if (dry) return { amends: last.id, echo: r.echo || r.readings[0] };
+  if (dry) return { amends: last.id, echo: r.echo || r.readings[0], tool: hit.tool, args: hit.args };
   const res = runTool(hit.tool, hit.args); if (!res) return null;
   res.trace.unshift(`clause: amends #${String(last.id).padStart(2, '0')}: ${(r.echo || r.readings[0]).replace(/\.$/, '')}`);
   return { tool: hit.tool, args: hit.args, rung: 'context', amends: last.id, res, cmd: hit.tool === last.tool ? commandOf(last) : null };
@@ -21855,12 +21865,12 @@ const clean = e => e.replace(/\.$/, '');
 function readingOf(raw, last) {
   if (!raw.trim()) return null;
   const v = verdictOf(raw, clauseSession());
-  if (v.b) return { rung: 'grammar', echo: clean(v.r.echo) };
-  const x = expressionOf(raw); if (x && (calcOf(x) || estimateOf(x))) return { rung: 'grammar', echo: `expression: ${x}` };
-  const a = last && (amendRead(raw, last, true) || fragmentRead(raw, last, true)); if (a) return { rung: 'context', echo: `amends #${String(a.amends).padStart(2, '0')}: ${clean(a.echo)}`, amends: a.amends };
+  if (v.b) return { rung: 'grammar', echo: clean(v.r.echo), tool: v.b.tool, args: v.b.args };
+  const x = expressionOf(raw), xc = x && calcOf(x), xe = x && !xc && estimateOf(x); if (xc || xe) return { rung: 'grammar', echo: `expression: ${x}`, tool: xc ? 'calc' : 'estimate', args: xc || xe };
+  const a = last && (amendRead(raw, last, true) || fragmentRead(raw, last, true)); if (a) return { rung: 'context', echo: `amends #${String(a.amends).padStart(2, '0')}: ${clean(a.echo)}`, amends: a.amends, tool: a.tool, args: a.args };
   if (Object.keys(S.aliases).length) {
     let t2 = ' ' + raw + ' '; Object.entries(S.aliases).forEach(([k, w]) => { t2 = t2.replace(new RegExp('(?<=\\s)' + k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?=\\s)', 'gi'), w); });
-    if (t2.trim() !== raw.trim()) { const t = verdictOf(t2.trim(), clauseSession()); if (t.b) return { rung: 'taught', echo: clean(t.r.echo) }; }
+    if (t2.trim() !== raw.trim()) { const t = verdictOf(t2.trim(), clauseSession()); if (t.b) return { rung: 'taught', echo: clean(t.r.echo), tool: t.b.tool, args: t.b.args }; }
   }
   if (v.r.status === 'ambiguous') return { rung: 'ambiguous', readings: v.r.readings.map(clean) };
   const p = clauseEngine().preview(raw, makeSession([]));
@@ -22635,7 +22645,7 @@ for (const k of ['apply', 'tableExport']) T[k] = a => S.table && S.table.streame
 
 /* ==== src/engine/engine.js ==== */
 const __m59 = (() => {
-const { S, T, runTool, toolByName, startJobs } = __m0;
+const { S, T, runTool, toolByName, startJobs, tool, CONDITIONS, EFFECTS } = __m0;
 const { DOCUMENT } = __m10;
 const { DOCTEXT } = __m44;
 const { bindingsOf, runSteps } = __m45;
@@ -22746,9 +22756,64 @@ function stepsOf(raw, last) {
   // the whole does not read: steps if the first one does (the later ones read after it runs)
   return done(out[0]) ? out : null;
 }
+// The plan, checked before any of it runs: every step is read now, against the state as it is, and against the step
+// before it (an amendment such as "log scale" reads against the card that step will make). What a step needs (`pre`)
+// is met when it holds now or an earlier step establishes it (`post`); what each step does beyond its card
+// (`effects`) is said. A step that does not read now may still read once an earlier step has run, but only when one
+// could change what reads (it establishes something: open makes the columns words), or when the step before it could
+// not be read ahead either; otherwise nothing runs. A step needing what only a later step establishes is out of order.
+// → { steps: [{ raw, tool?, echo?, now, needs, post, effects, after? }], stop?: { n, raw, why, readings?, by? } }
+function planOf(pieces) {
+  const steps = [], have = new Set(); let prev = S.cards[S.cards.length - 1] || null, changes = 0, blind = false;
+  for (const [i, p] of pieces.entries()) {
+    const s = sessionRead(p); if (s && s.session) { steps.push({ raw: p, session: s.session, now: true, needs: [], post: [], effects: [] }); if (s.session === 'new') prev = null; continue; }
+    let r = null; try { r = readingOf(p, prev); } catch (e) { r = null; }
+    if (r && r.tool && ['grammar', 'context', 'taught'].includes(r.rung)) {
+      const d = toolByName(r.tool) || {}, post = d.post || [];
+      const needs = (d.pre || []).filter(c => !have.has(c) && !(CONDITIONS[c] && CONDITIONS[c].holds()));
+      const by = needs.length && pieces.slice(i + 1).findIndex((q, j) => { try { const x = readingOf(q, null); return x && x.tool && ((toolByName(x.tool) || {}).post || []).some(c => needs.includes(c)); } catch (e) { return false; } });
+      if (needs.length && by >= 0) return { steps, stop: { n: i + 1, raw: p, why: 'order', needs, by: i + by + 2 } };
+      steps.push({ raw: p, tool: r.tool, echo: r.echo, now: true, needs, post, effects: d.effects || [] });
+      post.forEach(c => have.add(c)); if (post.length) changes = i + 1;
+      prev = { id: 0, raw: p, tool: r.tool, args: r.args, rung: r.rung, res: { read: [] } }; blind = false;
+    } else if (changes || blind) {
+      steps.push({ raw: p, now: false, needs: [], post: [], effects: [], after: changes || i }); prev = null; blind = true;
+    } else return { steps, stop: { n: i + 1, raw: p, why: r && r.rung === 'ambiguous' ? 'ambiguous' : 'none', readings: r && r.readings } };
+  }
+  return { steps };
+}
+// what the preview and the card say about a plan: its effects and what waits for an earlier step
+function planNotes(plan) {
+  const out = [];
+  plan.steps.forEach((s, i) => {
+    for (const e of s.effects) out.push(`step ${i + 1} ${EFFECTS[e]}`);
+    if (s.needs.length) out.push(`step ${i + 1} asks for a ${s.needs.join(', ')} first`);
+    if (!s.now) out.push(`step ${i + 1} is read once step ${s.after} has run`);
+  });
+  return out;
+}
+// the card a plan ends with when it was stopped before anything ran
+tool({
+  name: 'planStop',
+  run: a => {
+    const why = a.why === 'order' ? `needs a ${a.needs.join(', ')}, and step ${a.by} is what provides it: say that step first`
+      : a.why === 'ambiguous' ? `reads more than one way (${(a.readings || []).join(' | ')})` : 'does not read';
+    return { read: ['plan of', { v: String(a.of) }, 'steps, stopped at step', { v: String(a.n) }],
+      body: [{ t: 'note', kind: 'err', text: `Step ${a.n} of ${a.of}, "${a.raw}", ${why}. None of the steps ran: I check a plan before running any of it.` },
+        ...(a.order ? [{ t: 'chips', items: [a.order] }] : [])],
+      trace: [`plan: "${a.whole}" checked, step ${a.n} ${a.why === 'order' ? 'out of order' : a.why === 'ambiguous' ? 'ambiguous' : 'does not read'}; nothing ran`] };
+  }
+});
 // Each step is read and run after the one before it, so the second reads what the first opened ("lith" is a column
-// only once the table is open). A step that does not read, or asks a question, stops the chain on its own card.
+// only once the table is open). The plan is checked first (planOf): one that cannot run as said runs nothing. A step
+// read once the one before it has run that then does not read, or one that asks a question, stops the chain there.
 function chain(pieces, raw) {
+  const plan = planOf(pieces);
+  if (plan.stop) {
+    const st = plan.stop, order = st.why === 'order' ? [pieces[st.by - 1], ...pieces.filter((_, k) => k !== st.by - 1)].join(' then ') : null;
+    const args = { whole: raw, of: pieces.length, n: st.n, raw: st.raw, why: st.why, ...(st.needs ? { needs: st.needs, by: st.by } : {}), ...(st.readings ? { readings: st.readings } : {}), ...(order ? { order } : {}) };
+    return { kind: 'card', card: addCard(raw, { tool: 'planStop', args, rung: 'none', res: T.planStop(args) }, 0) };
+  }
   const cards = []; let fresh = false;
   for (const [i, p] of pieces.entries()) {
     const o = submit(p);
@@ -22764,7 +22829,11 @@ function chain(pieces, raw) {
 // A request in steps previews as its steps.
 function preview(raw) {
   raw = raw.trim(); if (!raw) return null;
-  const steps = stepsOf(raw); return steps ? { rung: 'grammar', echo: `${steps.length} steps: ${steps.join(' → ')}`, steps: steps.length } : previewOne(raw);
+  const steps = stepsOf(raw); if (!steps) return previewOne(raw);
+  const plan = planOf(steps), st = plan.stop;
+  if (st) return { rung: 'none', echo: `${steps.length} steps; step ${st.n}, "${st.raw}", ${st.why === 'order' ? `needs what step ${st.by} provides` : st.why === 'ambiguous' ? 'reads more than one way' : 'does not read'}: none would run`, steps: steps.length, stop: st.n };
+  const notes = planNotes(plan);
+  return { rung: 'grammar', echo: `${steps.length} steps: ${steps.join(' → ')}${notes.length ? ' · ' + notes.join('; ') : ''}`, steps: steps.length, notes };
 }
 function previewOne(raw) {
   raw = raw.trim(); if (!raw) return null;
@@ -22839,7 +22908,7 @@ function seedExamples() {
   newSession(true); ['open assays.csv', 'histogram of cu', 'log scale', 'histogram of au'].forEach(x => submit(x));
   newSession(true); ['0.35 oz per short ton in g/t', 'true thickness of a 14 m intercept, hole 270/60, bedding 045/30', 'remind me to send the samples to the lab on friday at 9', 'pop of mongolia'].forEach(x => submit(x));
 }
-  return { addCard, rerun, flipSlot, answer, capture, undo, submit, preview, hashOf, openStreamed, openFile, openBinary, seedExamples };
+  return { addCard, rerun, flipSlot, answer, capture, undo, submit, planOf, preview, hashOf, openStreamed, openFile, openBinary, seedExamples };
 })();
 
 /* ==== src/engine/packs.js ==== */

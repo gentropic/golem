@@ -1,6 +1,6 @@
 // The entry point: submit(raw) reads a request and returns what happened. Cards are recomputed in
 // place by rerun(); answers and slot flips go through it, so args stay the only state that matters.
-import { S, T, runTool, toolByName, startJobs } from './core.js';
+import { S, T, runTool, toolByName, startJobs, tool, CONDITIONS, EFFECTS } from './core.js';
 import './units.js';
 import './calc.js';
 import './dates.js';
@@ -137,9 +137,64 @@ function stepsOf(raw, last) {
   // the whole does not read: steps if the first one does (the later ones read after it runs)
   return done(out[0]) ? out : null;
 }
+// The plan, checked before any of it runs: every step is read now, against the state as it is, and against the step
+// before it (an amendment such as "log scale" reads against the card that step will make). What a step needs (`pre`)
+// is met when it holds now or an earlier step establishes it (`post`); what each step does beyond its card
+// (`effects`) is said. A step that does not read now may still read once an earlier step has run, but only when one
+// could change what reads (it establishes something: open makes the columns words), or when the step before it could
+// not be read ahead either; otherwise nothing runs. A step needing what only a later step establishes is out of order.
+// → { steps: [{ raw, tool?, echo?, now, needs, post, effects, after? }], stop?: { n, raw, why, readings?, by? } }
+export function planOf(pieces) {
+  const steps = [], have = new Set(); let prev = S.cards[S.cards.length - 1] || null, changes = 0, blind = false;
+  for (const [i, p] of pieces.entries()) {
+    const s = sessionRead(p); if (s && s.session) { steps.push({ raw: p, session: s.session, now: true, needs: [], post: [], effects: [] }); if (s.session === 'new') prev = null; continue; }
+    let r = null; try { r = readingOf(p, prev); } catch (e) { r = null; }
+    if (r && r.tool && ['grammar', 'context', 'taught'].includes(r.rung)) {
+      const d = toolByName(r.tool) || {}, post = d.post || [];
+      const needs = (d.pre || []).filter(c => !have.has(c) && !(CONDITIONS[c] && CONDITIONS[c].holds()));
+      const by = needs.length && pieces.slice(i + 1).findIndex((q, j) => { try { const x = readingOf(q, null); return x && x.tool && ((toolByName(x.tool) || {}).post || []).some(c => needs.includes(c)); } catch (e) { return false; } });
+      if (needs.length && by >= 0) return { steps, stop: { n: i + 1, raw: p, why: 'order', needs, by: i + by + 2 } };
+      steps.push({ raw: p, tool: r.tool, echo: r.echo, now: true, needs, post, effects: d.effects || [] });
+      post.forEach(c => have.add(c)); if (post.length) changes = i + 1;
+      prev = { id: 0, raw: p, tool: r.tool, args: r.args, rung: r.rung, res: { read: [] } }; blind = false;
+    } else if (changes || blind) {
+      steps.push({ raw: p, now: false, needs: [], post: [], effects: [], after: changes || i }); prev = null; blind = true;
+    } else return { steps, stop: { n: i + 1, raw: p, why: r && r.rung === 'ambiguous' ? 'ambiguous' : 'none', readings: r && r.readings } };
+  }
+  return { steps };
+}
+// what the preview and the card say about a plan: its effects and what waits for an earlier step
+function planNotes(plan) {
+  const out = [];
+  plan.steps.forEach((s, i) => {
+    for (const e of s.effects) out.push(`step ${i + 1} ${EFFECTS[e]}`);
+    if (s.needs.length) out.push(`step ${i + 1} asks for a ${s.needs.join(', ')} first`);
+    if (!s.now) out.push(`step ${i + 1} is read once step ${s.after} has run`);
+  });
+  return out;
+}
+// the card a plan ends with when it was stopped before anything ran
+tool({
+  name: 'planStop',
+  run: a => {
+    const why = a.why === 'order' ? `needs a ${a.needs.join(', ')}, and step ${a.by} is what provides it: say that step first`
+      : a.why === 'ambiguous' ? `reads more than one way (${(a.readings || []).join(' | ')})` : 'does not read';
+    return { read: ['plan of', { v: String(a.of) }, 'steps, stopped at step', { v: String(a.n) }],
+      body: [{ t: 'note', kind: 'err', text: `Step ${a.n} of ${a.of}, "${a.raw}", ${why}. None of the steps ran: I check a plan before running any of it.` },
+        ...(a.order ? [{ t: 'chips', items: [a.order] }] : [])],
+      trace: [`plan: "${a.whole}" checked, step ${a.n} ${a.why === 'order' ? 'out of order' : a.why === 'ambiguous' ? 'ambiguous' : 'does not read'}; nothing ran`] };
+  }
+});
 // Each step is read and run after the one before it, so the second reads what the first opened ("lith" is a column
-// only once the table is open). A step that does not read, or asks a question, stops the chain on its own card.
+// only once the table is open). The plan is checked first (planOf): one that cannot run as said runs nothing. A step
+// read once the one before it has run that then does not read, or one that asks a question, stops the chain there.
 function chain(pieces, raw) {
+  const plan = planOf(pieces);
+  if (plan.stop) {
+    const st = plan.stop, order = st.why === 'order' ? [pieces[st.by - 1], ...pieces.filter((_, k) => k !== st.by - 1)].join(' then ') : null;
+    const args = { whole: raw, of: pieces.length, n: st.n, raw: st.raw, why: st.why, ...(st.needs ? { needs: st.needs, by: st.by } : {}), ...(st.readings ? { readings: st.readings } : {}), ...(order ? { order } : {}) };
+    return { kind: 'card', card: addCard(raw, { tool: 'planStop', args, rung: 'none', res: T.planStop(args) }, 0) };
+  }
   const cards = []; let fresh = false;
   for (const [i, p] of pieces.entries()) {
     const o = submit(p);
@@ -155,7 +210,11 @@ function chain(pieces, raw) {
 // A request in steps previews as its steps.
 export function preview(raw) {
   raw = raw.trim(); if (!raw) return null;
-  const steps = stepsOf(raw); return steps ? { rung: 'grammar', echo: `${steps.length} steps: ${steps.join(' → ')}`, steps: steps.length } : previewOne(raw);
+  const steps = stepsOf(raw); if (!steps) return previewOne(raw);
+  const plan = planOf(steps), st = plan.stop;
+  if (st) return { rung: 'none', echo: `${steps.length} steps; step ${st.n}, "${st.raw}", ${st.why === 'order' ? `needs what step ${st.by} provides` : st.why === 'ambiguous' ? 'reads more than one way' : 'does not read'}: none would run`, steps: steps.length, stop: st.n };
+  const notes = planNotes(plan);
+  return { rung: 'grammar', echo: `${steps.length} steps: ${steps.join(' → ')}${notes.length ? ' · ' + notes.join('; ') : ''}`, steps: steps.length, notes };
 }
 function previewOne(raw) {
   raw = raw.trim(); if (!raw) return null;
