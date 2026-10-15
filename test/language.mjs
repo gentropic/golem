@@ -21,6 +21,14 @@ check(await page.getAttribute('#q', 'placeholder') === 'Pergunte, calcule ou pe�
 const c = await ask('converte 5 km para milhas'); const txt = await c.textContent();
 check(/3\.10686/.test(txt) && /gramática/.test(txt) && /lido como/.test(txt) && /copiar/.test(txt), `a Portuguese question reads, in a Portuguese frame (${txt.replace(/\s+/g, ' ').slice(0, 70)})`);
 check(/0\.8 km/.test(await (await ask('800 m in km')).textContent()), 'English still reads with Portuguese first');
+// the answers in Portuguese: the reading's words, the labels, a sentence with values; a table's own columns untouched
+check(/converter/.test(txt) && /para/.test(txt), `the reading's words are Portuguese (${txt.replace(/\s+/g, ' ').slice(0, 60)})`);
+const st = await (await ask('o arenito sobrepõe o granito')).textContent();
+check(/Guardado: arenito sobrepõe granito, então arenito é mais jovem que granito \(superposição/.test(st), `a sentence with values, in Portuguese (${st.replace(/\s+/g, ' ').slice(0, 90)})`);
+const mi = await (await ask('dureza do quartzo')).textContent();
+check(/sistema cristalino/.test(mi) && /densidade/.test(mi), 'key-value labels in Portuguese');
+await ask('abre assays.csv'); const tb = await (await ask('média de cu por lith')).textContent();
+check(/lith/.test(tb) && !/lito\b/.test(tb), 'a table\'s own column names are left as they are');
 await page.evaluate(() => document.querySelector('[data-tab="about"]').click()); await page.waitForTimeout(100);
 check(await page.isVisible('.notes[data-lang="pt"]') && !(await page.isVisible('.notes[data-lang="en"]')), 'the About view is the Portuguese one');
 await page.evaluate(() => document.querySelector('[data-tab="ask"]').click());

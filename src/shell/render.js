@@ -2,7 +2,7 @@
 import { fmt } from '../engine/core.js';
 import { conversions, equalArea } from '../vendor/bearing.js';
 import { Figure } from '../vendor/plot.js';
-import { t } from './i18n.js';
+import { t, th, tx } from './i18n.js';
 import { stationNow } from '../engine/notebook.js';
 import { staleOf, staleText } from '../engine/tms.js';
 
@@ -84,13 +84,13 @@ function svgCurve(b) {
 /* ── blocks ── */
 function blockHtml(b) {
   switch (b.t) {
-    case 'big': return `<div class="big"${b.size ? ` style="font-size:${b.size}px"` : ''}${b.end ? ` data-end="${b.end}"` : ''}>${escHtml(b.v)}${b.unit ? ` <small>${escHtml(b.unit)}</small>` : ''}</div>`;
-    case 'sub': return `<div class="sub">${escHtml(b.text)}</div>`;
-    case 'note': return `<div class="note${b.kind ? ' ' + b.kind : ''}">${escHtml(b.text)}</div>`;
+    case 'big': return `<div class="big"${b.size ? ` style="font-size:${b.size}px"` : ''}${b.end ? ` data-end="${b.end}"` : ''}>${escHtml(b.v)}${b.unit ? ` <small>${escHtml(t(b.unit))}</small>` : ''}</div>`;
+    case 'sub': return `<div class="sub">${escHtml(tx(b))}</div>`;
+    case 'note': return `<div class="note${b.kind ? ' ' + b.kind : ''}">${escHtml(tx(b))}</div>`;
     case 'src': return `<div class="src">${escHtml(b.text)}</div>`;
-    case 'lbl': return `<div class="lbl">${escHtml(b.text)}</div>`;
-    case 'kv': return `<dl class="kv">${b.rows.map(([k, v, o]) => `<dt>${escHtml(k)}</dt><dd>${o && o.mono ? `<code>${escHtml(v)}</code>` : escHtml(v)}</dd>`).join('')}</dl>`;
-    case 'table': return `<div class="tbl"><table><tr>${b.head.map((h, i) => `<th${b.num && b.num[i] ? ' class="n"' : ''}>${escHtml(h)}</th>`).join('')}</tr>${b.rows.map(r => `<tr>${r.map((v, i) => `<td${b.num && b.num[i] ? ' class="n"' : ''}>${escHtml(v)}</td>`).join('')}</tr>`).join('')}</table></div>`;
+    case 'lbl': return `<div class="lbl">${escHtml(tx(b))}</div>`;
+    case 'kv': return `<dl class="kv">${b.rows.map(([k, v, o]) => `<dt>${escHtml(t(k))}</dt><dd>${o && o.mono ? `<code>${escHtml(v)}</code>` : escHtml(t(String(v)))}</dd>`).join('')}</dl>`;
+    case 'table': return `<div class="tbl"><table><tr>${b.head.map((h, i) => `<th${b.num && b.num[i] ? ' class="n"' : ''}>${escHtml(th(h))}</th>`).join('')}</tr>${b.rows.map(r => `<tr>${r.map((v, i) => `<td${b.num && b.num[i] ? ' class="n"' : ''}>${escHtml(b.tr && b.tr.includes(i) && typeof v === 'string' ? t(v) : v)}</td>`).join('')}</tr>`).join('')}</table></div>`;
     case 'list': return `<ul class="plain">${b.items.map(i => `<li>${escHtml(i)}</li>`).join('')}</ul>`;
     case 'steps': return `<ol class="steps">${b.items.map(i => `<li>${escHtml(i)}</li>`).join('')}</ol>`;
     case 'pre': return `<pre>${escHtml(b.text)}</pre>`;
@@ -114,7 +114,7 @@ export function cardEl(c) {
   const el = document.createElement('article');
   el.className = 'card'; el.dataset.id = c.id; el.dataset.rung = c.rung; el.tabIndex = -1;
   el.setAttribute('aria-label', `#${pad(c.id)}: ${c.raw}`); if (c.pinned) el.dataset.pinned = '1';
-  const r = c.res, read = r.read.map(x => typeof x === 'string' ? escHtml(x) : x.alts ? `<button class="slot" type="button" data-act="slot" data-key="${x.key}" title="${escHtml(t('Tap to change this reading'))}" aria-label="${escHtml(t('{v}: tap to read it another way', { v: x.v }))}">${escHtml(x.v)}</button>` : `<span class="slot">${escHtml(x.v)}</span>`).join(' ');
+  const r = c.res, read = r.read.map(x => typeof x === 'string' ? escHtml(t(x)) : x.alts ? `<button class="slot" type="button" data-act="slot" data-key="${x.key}" title="${escHtml(t('Tap to change this reading'))}" aria-label="${escHtml(t('{v}: tap to read it another way', { v: x.v }))}">${escHtml(x.v)}</button>` : `<span class="slot">${escHtml(x.v)}</span>`).join(' ');
   const ask = r.ask ? `<div class="note">${escHtml(r.ask.prompt)}</div>${r.ask.options.length ? `<div class="opts">${r.ask.options.map((o, i) => `<button class="btn" type="button" data-act="answer" data-i="${i}">${escHtml(o.label)}</button>`).join('')}${r.ask.parse ? `<span class="sub">${t('or type it')}</span>` : ''}</div>` : ''}` : '';
   el.innerHTML = `<div class="q">${escHtml(c.raw)}</div>
     <div class="reply"><div class="chead"><span class="rung ${c.rung}">${t(RUNG[c.rung])}</span><span>#${pad(c.id)}</span>${c.amends ? `<span>${t('from #{n}', { n: pad(c.amends) })}</span>` : ''}<span class="ms">${c.ms < 10 ? c.ms.toFixed(1) : Math.round(c.ms)} ms</span></div>

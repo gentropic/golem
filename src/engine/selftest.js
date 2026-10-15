@@ -69,7 +69,7 @@ tool({
     return { read: ['check myself'], value: n - bad,
       body: [{ t: 'big', v: `${n - bad} of ${n}`, unit: bad ? `checks pass: ${bad} failed` : 'checks pass' },
         ...(bad ? [{ t: 'note', kind: 'err', text: `Failed: ${fails.join('; ')}. Do not rely on those answers on this device until it is fixed.` }] : [{ t: 'note', kind: 'ok', text: 'Every known answer came out as it should, on this device, just now.' }]),
-        { t: 'table', head: ['check', 'expected', 'got', ''], rows }, { t: 'lbl', text: 'What this device holds' }, { t: 'kv', rows: held }],
+        { t: 'table', head: ['check', 'expected', 'got', ''], tr: [3], rows }, { t: 'lbl', text: 'What this device holds' }, { t: 'kv', rows: held }],
       trace: [`${CHECKS.length} known answers, ${st.n} starters read dry, in ${Date.now() - t0} ms`, 'no card or session touched'] };
   }
 });

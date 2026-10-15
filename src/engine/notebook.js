@@ -4,7 +4,7 @@
 // the open station. A compass reading at a station with a position is corrected to true north with the World Magnetic
 // Model there, on the day it was taken, and the correction is kept with the row. Rows belong to the device, like the
 // log; a card writes its row once (by id) and undo removes it. Typed attitudes are kept as typed, north as you read it.
-import { S, tool, frame, noun, shape, postmod, condition, fmt, iso, p3, p2, clock, checksOf } from './core.js';
+import { S, tool, frame, noun, shape, postmod, condition, fmt, iso, p3, p2, clock, checksOf, said } from './core.js';
 import { conversions, statistics } from '../vendor/bearing.js';
 import { field as wmm } from '../vendor/wmm.js';
 import { fromDevice } from './field.js';
@@ -46,7 +46,7 @@ tool({
     return {
       read, capture,
       body: [...(capture ? [{ t: 'capture', kind: 'position', how: 'The station\'s position: one fix, kept with the station. Without one, the station has no place, and compass readings stay magnetic.' }] : []),
-        { t: 'note', kind: 'ok', text: `Station ${a.name} is open. ${n} station${n === 1 ? '' : 's'} in the notebook. Add to it: "add bedding 045/30", "add sample ${a.name}-a".` },
+        { t: 'note', kind: 'ok', ...said('Station {name} is open. Stations in the notebook: {n}. Add to it: "add bedding 045/30", "add sample {name}-a".', { name: a.name, n }) },
         { t: 'kv', rows: [['started', `${row.date} ${row.time}`], ['position', a.lat != null ? `${fmtLL(a.lat, a.lon)}${a.acc != null ? ` ±${a.acc} m` : ''}` : 'none yet']] }, SRC],
       trace: [`field.station(${JSON.stringify(a.name)})`, a.lat != null ? `position ${a.fix ? 'from one fix' : 'as typed'}` : 'wait: a position fix, or none'], py: `field.station("${a.name}"${a.lat != null ? `, lat=${a.lat}, lon=${a.lon}` : ''})`
     };
@@ -77,7 +77,7 @@ tool({
     const t = put(row), here = t.rows.filter(r => r.station === a.station && r.feature !== 'station'), orders = checksOf(t, [row]);
     const isLine = LINES.has(a.feature) || a.what === 'line';
     const read = ['add', { v: a.sample ? `sample ${a.sample}` : `${a.feature} ${p3(row.azimuth)}/${p2(row.dip)}` }, 'to station', { v: a.station }];
-    const body = [{ t: 'note', kind: 'ok', text: `Added to station ${a.station}: ${here.length} entr${here.length === 1 ? 'y' : 'ies'} there.` }, ...orders];
+    const body = [{ t: 'note', kind: 'ok', ...said('Added to station {station}. Entries there: {n}.', { station: a.station, n: here.length }) }, ...orders];
     if (at) body.push({ t: 'big', v: `${p3(row.azimuth)}/${p2(row.dip)}`, unit: `${isLine ? 'trend/plunge' : 'dip direction/dip'}, ${a.feature}` }, isLine ? { t: 'net', planes: [], lines: [{ tr: row.azimuth, pl: row.dip, label: a.feature }] } : { t: 'net', planes: [{ dd: row.azimuth, dip: row.dip }], lines: [] });
     body.push({ t: 'kv', rows: [...(at ? [['north', at.north], ['from', at.via + (a.from ? `, card #${String(a.from).padStart(2, '0')}` : '')]] : []), ...(a.note ? [['note', a.note]] : []), ['station', `${a.station}${st.lat != null ? ` at ${fmtLL(st.lat, st.lon)}` : ', no position'}`]] }, SRC);
     return { read, value: at ? [row.azimuth, row.dip] : a.sample, body, trace: [...(at ? at.trace : [`sample ${a.sample}`]), `field.add(${JSON.stringify({ station: a.station, feature: a.feature, azimuth: row.azimuth, dip: row.dip, sample: row.sample })})`, 'undo removes the row'],

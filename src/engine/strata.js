@@ -6,7 +6,7 @@
 // the order as far as it follows, says which units it cannot place against each other, answers "is X older than Y" with
 // the chain that proves it or says it cannot tell, and reports any contradiction with both chains. Nothing is assumed
 // beyond what was said.
-import { S, tool, frame, noun } from './core.js';
+import { S, tool, frame, noun, said } from './core.js';
 import { infer, proofOf, keyOf } from './logic.js';
 
 const RULES = [
@@ -57,10 +57,10 @@ tool({
     if (!S.strata.some(f => f.id === a.id)) S.strata.push({ id: a.id, rel: a.rel, a: a.a, b: a.b, na: a.na, nb: a.nb, card: a.card || null });
     // every relation is kept with the younger first: what overlies, cuts or encloses (flipped forms were turned round)
     const w = world(), younger = a.na, older = a.nb;
-    const body = [{ t: 'note', kind: 'ok', text: `Kept: ${a.na} ${SAID[a.rel]} ${a.nb}, so ${younger} is younger than ${older} (${RULES.find(r => r.body[0].rel === a.rel).name}).` }];
+    const body = [{ t: 'note', kind: 'ok', ...said('Kept: {na} {rel} {nb}, so {younger} is younger than {older} ({rule}).', { na: a.na, rel: SAID[a.rel], nb: a.nb, younger, older, rule: RULES.find(r => r.body[0].rel === a.rel).name }) }];
     if (w.loops.length) body.push({ t: 'note', kind: 'err', text: `That contradicts what was said before: ${w.loops.map(u => w.nm.get(u)).join(', ')} would be younger than ${w.loops.length > 1 ? 'themselves' : 'itself'}.` }, { t: 'steps', items: because(w, w.loops[0], w.loops[0]) });
     const ls = layers(w);
-    if (!w.loops.length && ls.length > 1) body.push({ t: 'sub', text: `The order so far, youngest first: ${ls.map(l => l.map(u => w.nm.get(u)).join(' / ')).join(' → ')}.` });
+    if (!w.loops.length && ls.length > 1) body.push({ t: 'sub', ...said('The order so far, youngest first: {order}.', { order: ls.map(l => l.map(u => w.nm.get(u)).join(' / ')).join(' → ') }) });
     body.push({ t: 'chips', items: ['the order of the units'] });
     return { read: [{ v: a.na }, SAID[a.rel], { v: a.nb }], body, trace: [`fact: ${a.rel}(${a.a}, ${a.b})`, `${w.known.size} facts follow from ${S.strata.length} said, by ${RULES.length} rules`] };
   }
@@ -91,7 +91,7 @@ tool({
     if (missing.length) return { read, body: [{ t: 'note', text: `Nothing was said about ${missing.map(u => u === x ? a.x : a.y).join(' or ')}. I know ${[...w.nm.values()].join(', ') || 'no units yet'}.` }], trace: ['unknown unit'] };
     const yes = wantOlder ? w.younger(y, x) : w.younger(x, y), no = wantOlder ? w.younger(x, y) : w.younger(y, x);
     if (yes && no) return { read, body: [{ t: 'note', kind: 'err', text: 'Both, which means what was said contradicts itself. Both chains:' }, { t: 'steps', items: [...because(w, x, y), ...because(w, y, x)] }], trace: ['contradiction'] };
-    if (!yes && !no) return { read, value: null, body: [{ t: 'note', text: `I cannot tell: nothing said links ${nx} and ${ny}, directly or through other units.` }], trace: ['neither follows'] };
+    if (!yes && !no) return { read, value: null, body: [{ t: 'note', ...said('I cannot tell: nothing said links {x} and {y}, directly or through other units.', { x: nx, y: ny }) }], trace: ['neither follows'] };
     const [p, q] = yes ? (wantOlder ? [y, x] : [x, y]) : (wantOlder ? [x, y] : [y, x]);
     return { read, value: yes,
       body: [{ t: 'big', v: yes ? (a.why ? 'Because' : 'Yes') : 'No', unit: yes ? '' : `${w.nm.get(p)} is younger than ${w.nm.get(q)}` }, { t: 'steps', items: because(w, p, q) }],

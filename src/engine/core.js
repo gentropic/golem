@@ -139,4 +139,8 @@ export const qty = (node, f) => node && node.type === 'quantity' ? node.n * f(no
 // Checks that run whenever a table opens or a row is written to a device table (standing orders, orders.js): each
 // f(table, rows) → blocks for the card that opened or wrote it; rows, when given, are the ones just written.
 export const CHECKS = [];
+
+// A sentence that carries values: the English, and its template and values, so the shell can say it in Portuguese
+// (shell/i18n-answers.js): { t: 'note', ...said('Added to station {station}: {n} there.', { station, n }) }
+export const said = (tpl, params = {}) => ({ text: tpl.replace(/\{(\w+)\}/g, (m, k) => params[k] != null ? String(params[k]) : m), tpl, params });
 export const checksOf = (table, rows) => { try { return CHECKS.flatMap(f => f(table, rows)); } catch (e) { return []; } };

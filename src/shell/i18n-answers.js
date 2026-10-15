@@ -1,0 +1,92 @@
+// What golem's answers say, in Portuguese (pt-BR): the fixed words of the "read as" line, the labels of key-value rows,
+// units and labels, and the templates of sentences that carry values (a block's tpl, filled with its params). The engine
+// answers in English, its canonical form; the shell shows these when the interface is in Portuguese. A string with no
+// entry here is shown as the engine wrote it. Table headings are a dictionary of their own, so a table's own column
+// names ("from", "to", "lith") are never translated.
+export const ANSWERS_PT = {
+  // the "read as" line
+  'run': 'rodar', 'with': 'com', 'trace': 'rastreamento', 'convert': 'converter', 'to': 'para', 'decide between': 'decidir entre', 'evaluate': 'calcular', 'trig in degrees': 'trigonometria em graus',
+  'estimate': 'estimar', 'days from': 'dias desde', 'weekday of': 'dia da semana de', 'time for': 'tempo para', 'mass for': 'massa para', 'length for': 'comprimento para', 'volume for': 'volume para', 'reckon': 'calcular',
+  'Two-product recovery': 'Recuperação de dois produtos', 'solved for': 'resolvido para', 'Break-even cutoff': 'Teor de corte de equilíbrio', 'Stokes settling': 'Sedimentação de Stokes', 'Tonnage': 'Tonelagem',
+  'Contained metal': 'Metal contido', 'Strip ratio': 'Relação estéril-minério', 'Lithostatic pressure': 'Pressão litostática', "Darcy's law": 'Lei de Darcy', 'the formulas I can solve': 'as fórmulas que sei resolver',
+  'SHA-256 of': 'SHA-256 de', 'molar mass of': 'massa molar de', 'factor': 'fator', 'fraction of': 'fração de', 'in': 'em', 'element': 'elemento', 'explain cron': 'explicar cron', 'time': 'hora',
+  'explain regex': 'explicar regex', 'explain url': 'explicar url', 'working days from': 'dias úteis de', 'is': 'é', 'a working day in': 'um dia útil em', 'from': 'de', 'time now in': 'hora agora em',
+  'overlap of': 'sobreposição de', 'count': 'contar', 'extract': 'extrair', 'of': 'de', 'diff': 'diferença', 'true thickness of': 'espessura verdadeira de', 'in hole': 'no furo', 'through': 'através de',
+  'plot plane': 'plotar plano', 'apparent dip of': 'mergulho aparente de', 'on a section at': 'numa seção a', 'intersection of': 'interseção de', 'and': 'e', 'plane through': 'plano por', 'mean of': 'média de',
+  'core': 'testemunho', 'declination at': 'declinação em', 'on': 'em', 'magnetic': 'magnético', 'true': 'verdadeiro', 'at': 'em', 'measure': 'medir', 'measured': 'medido', 'with the phone': 'com o celular',
+  'station': 'estação', 'add': 'adicionar', 'to station': 'à estação', 'summary': 'resumo', 'the field notebook as': 'a caderneta de campo como', 'the field notebook': 'a caderneta de campo',
+  'field notebook on': 'caderneta de campo em', 'overlies': 'sobrepõe', 'cuts': 'corta', 'contains clasts of': 'contém clastos de', 'is younger than': 'é mais jovem que', 'the order of the units': 'a ordem das unidades',
+  'older than': 'mais antigo que', 'why is': 'por que', 'younger than': 'mais jovem que', 'mass of': 'massa de', 'sieve': 'peneira', 'in microns': 'em mícrons', 'specific gravity from': 'densidade relativa a partir de',
+  'RQD of': 'RQD de', 'in a': 'em um', 'Gy: error of a': 'Gy: erro de uma', 'Gy: sample mass for': 'Gy: massa de amostra para', 'cutoff grade for': 'teor de corte para', 'open table': 'abrir tabela',
+  'check the QC of': 'verificar o QC de', 'for': 'para', 'histogram of': 'histograma de', 'mean': 'média', 'by': 'por', 'where': 'onde', 'count rows': 'contar linhas', 'list': 'listar', 'sorted by': 'ordenado por',
+  'check intervals of': 'verificar os intervalos de', 'the table': 'a tabela', 'as': 'como', 'true thickness of every intercept': 'espessura verdadeira de cada intercepto', 'apparent dip of every plane': 'mergulho aparente de cada plano',
+  'mineral': 'mineral', 'Mohs hardness': 'dureza de Mohs', 'minerals': 'minerais', 'population density': 'densidade populacional', 'countries': 'países', 'that are': 'que são', 'area': 'área', 'top': 'maiores',
+  'find the definition of': 'encontrar a definição de', 'check text against': 'verificar o texto segundo', 'units of the chart at': 'unidades da tabela cronoestratigráfica em', 'find': 'encontrar', 'in my documents': 'nos meus documentos',
+  'new event': 'novo evento', 'start a timer for': 'iniciar um cronômetro de', 'set an alarm at': 'definir um alarme para', 'save place': 'salvar lugar', 'distance from': 'distância de', 'in UTM': 'em UTM',
+  'to latitude and longitude': 'para latitude e longitude', 'log': 'registrar', 'moon phase on': 'fase da lua em', 'list the skills': 'listar as habilidades', 'what did not read': 'o que não foi lido',
+  'forget what did not read': 'esquecer o que não foi lido', 'explain card': 'explicar o cartão', 'export session as': 'exportar a sessão como', 'which cards are out of date': 'quais cartões estão desatualizados',
+  'learn that': 'aprender que', 'define': 'definir', 'standing orders': 'ordens permanentes', 'standing order': 'ordem permanente', 'forget standing order': 'esquecer a ordem permanente', 'check myself': 'me verificar',
+  'the words I know for': 'as palavras que conheço para', 'the words I know': 'as palavras que conheço', 'save recipe': 'salvar receita', 'run recipe': 'rodar receita', 'on every kept table': 'em cada tabela guardada',
+  'recipes': 'receitas', 'store note': 'guardar nota', 'recall notes about': 'lembrar notas sobre', 'means': 'significa', 'forget': 'esquecer', 'forget the formula': 'esquecer a fórmula', 'teach': 'ensinar',
+  'no exact reading of': 'nenhuma leitura exata de', 'read so far': 'lido até aqui', 'plan of': 'plano de', 'steps, stopped at step': 'passos, parado no passo', 'the minerals': 'os minerais',
+  // labels of key-value rows
+  'geometries': 'geometrias', 'size': 'tamanho', 'spread': 'dispersão', 'dimension': 'dimensão', 'found': 'encontrado', 'equation': 'equação', 'input': 'entrada', 'algorithm': 'algoritmo', 'text': 'texto',
+  'output': 'saída', 'reverse': 'inverso', 'formula mass': 'massa da fórmula', 'symbol': 'símbolo', 'atomic number': 'número atômico', 'name': 'nome', 'next runs': 'próximas execuções', 'weekday': 'dia da semana',
+  'from now': 'a partir de agora', 'read as': 'lido como', 'matches': 'casa com', 'does not match': 'não casa com', 'scheme': 'esquema', 'host': 'servidor', 'port': 'porta', 'path': 'caminho', 'query': 'consulta',
+  'fragment': 'fragmento', 'calendar days': 'dias corridos', 'holidays in the span': 'feriados no período', 'weekends': 'fins de semana', 'holidays skipped': 'feriados pulados', 'this swing': 'esta escala',
+  'next change': 'próxima troca', 'difference': 'diferença', 'offset': 'fuso', 'here': 'aqui', 'characters': 'caracteres', 'words': 'palavras', 'sentences': 'frases', 'paragraphs': 'parágrafos',
+  'mean sentence': 'frase média', 'longest sentence': 'frase mais longa', 'Flesch reading ease': 'facilidade de leitura de Flesch', 'Flesch–Kincaid grade': 'nível de Flesch–Kincaid', 'syllables': 'sílabas',
+  'hole to pole': 'furo ao polo', 'hole to plane': 'furo ao plano', 'strike': 'direção', 'dip': 'mergulho', 'pole': 'polo', 'plunges toward': 'cai para', 'section to dip direction': 'seção à direção de mergulho',
+  'true dip': 'mergulho verdadeiro', 'trend': 'rumo', 'plunge': 'caimento', 'triangle': 'triângulo', 'convention': 'convenção', 'inclination': 'inclinação', 'total intensity': 'intensidade total',
+  'horizontal': 'componente horizontal', 'annual change': 'variação anual', 'declination': 'declinação', 'applied': 'aplicado', 'started': 'iniciada', 'position': 'posição', 'north': 'norte', 'stations': 'estações',
+  'planes': 'planos', 'lines': 'linhas', 'samples': 'amostras', 'rows': 'linhas', 'with a position': 'com posição', 'coordinates': 'coordenadas', 'volume': 'volume', 'density': 'densidade',
+  'displaced water': 'água deslocada', 'assumes': 'supõe', 'recovery': 'recuperação', 'pieces of 10 cm or more': 'peças de 10 cm ou mais', 'class': 'classe', 'price': 'preço', 'processing': 'beneficiamento',
+  'columns': 'colunas', 'intervals': 'intervalos', 'median': 'mediana', 'range': 'amplitude', 'holes': 'furos', 'gaps': 'lacunas', 'overlaps': 'sobreposições', 'bad intervals': 'intervalos ruins',
+  'compression': 'compressão', 'binding': 'vínculo', 'crystal system': 'sistema cristalino', 'IMA symbol': 'símbolo IMA', 'elements': 'elementos', 'duration': 'duração', 'within': 'dentro de', 'before': 'antes',
+  'after': 'depois', 'subdivided into': 'subdividido em', 'eon': 'éon', 'era': 'era', 'period': 'período', 'epoch': 'época', 'age': 'idade', 'rank': 'categoria', 'opens': 'abre', 'then': 'depois',
+  'metres': 'metros', 'initial bearing': 'azimute inicial', 'final bearing': 'azimute final', 'easting': 'leste (E)', 'northing': 'norte (N)', 'zone': 'zona', 'grid convergence': 'convergência meridiana',
+  'scale factor': 'fator de escala', 'datum': 'datum', 'decimal': 'decimal', 'hemisphere': 'hemisfério', 'round trip': 'ida e volta', 'written': 'escrito', 'entries': 'registros', 'dates': 'datas', 'unit': 'unidade',
+  'sunrise': 'nascer do sol', 'solar noon': 'meio-dia solar', 'sunset': 'pôr do sol', 'day length': 'duração do dia', 'civil twilight': 'crepúsculo civil', "sun's declination": 'declinação do sol',
+  'next new moon': 'próxima lua nova', 'next full moon': 'próxima lua cheia', 'cards': 'cartões', 'cells': 'células', 'replay': 'repetição', 'terms': 'termos', 'parsed by': 'lido por',
+  'magnetic model': 'modelo magnético', 'commands': 'comandos', 'things': 'coisas', 'units': 'unidades', 'taught on this device': 'ensinado neste aparelho', 'steps': 'passos', 'changes between runs': 'mudanças entre execuções',
+  'fixed': 'fixo', 'compass accuracy': 'precisão da bússola', 'steadiness': 'estabilidade', 'taken': 'medido em', 'as measured': 'como medido', 'note': 'nota', 'standards': 'padrões', 'blanks': 'brancos',
+  'duplicates': 'duplicatas', 'certified values': 'valores certificados', 'quantities': 'quantidades', 'mean z': 'z médio', 'cuttings': 'calha', 'none': 'nenhum',
+  // units and the like
+  'days': 'dias', 'working days': 'dias úteis', 'm true thickness': 'm de espessura verdadeira', '° apparent dip': '° de mergulho aparente', 'trend/plunge': 'rumo/caimento', 'dip direction/dip': 'direção de mergulho/mergulho',
+  'dip direction/dip (magnetic)': 'direção de mergulho/mergulho (magnético)', 'dip direction/dip (true)': 'direção de mergulho/mergulho (verdadeiro)', 'mean plane': 'plano médio', '° true': '° verdadeiro',
+  'specific gravity': 'densidade relativa', 'symbolic': 'simbólico', 'median (50th percentile)': 'mediana (percentil 50)', 'g/mol, standard atomic weight': 'g/mol, peso atômico padrão',
+  'km over the ellipsoid, not by road': 'km sobre o elipsoide, não por estrada', 'metres, to the metre': 'metros, ao metro', 'km in total': 'km no total', 'checks pass': 'verificações passam',
+  'skills run here': 'habilidades rodam aqui', 'people per sq mi': 'pessoas por milha²', 'mean pole': 'polo médio', 'mean line': 'linha média',
+  // labels
+  'Nearest skills': 'Habilidades mais próximas', 'one to try from each': 'uma para testar de cada', 'Teach me the word': 'Me ensine a palavra', 'What this device holds': 'O que este aparelho guarda', 'Try': 'Tente',
+  // values that are fixed phrases
+  'not in Wikidata': 'não está no Wikidata', 'pass': 'passou', 'FAIL': 'FALHOU', 'passing': 'aprovado', 'suspect': 'suspeito', 'to review': 'a revisar', 'unchecked: no standard': 'não verificado: sem padrão',
+  'this one': 'esta', 'not reported': 'não informada', 'high': 'alta', 'medium': 'média', 'low': 'baixa',
+  // sentences with values (a block's tpl)
+  'Kept: {na} {rel} {nb}, so {younger} is younger than {older} ({rule}).': 'Guardado: {na} {rel} {nb}, então {younger} é mais jovem que {older} ({rule}).',
+  'The order so far, youngest first: {order}.': 'A ordem até aqui, da mais jovem: {order}.',
+  'I cannot tell: nothing said links {x} and {y}, directly or through other units.': 'Não sei dizer: nada do que foi dito liga {x} e {y}, diretamente ou por outras unidades.',
+  'Station {name} is open. Stations in the notebook: {n}. Add to it: "add bedding 045/30", "add sample {name}-a".': 'A estação {name} está aberta. Estações na caderneta: {n}. Para adicionar: "adiciona acamamento 045/30", "amostra {name}-a".',
+  'Added to station {station}. Entries there: {n}.': 'Adicionado à estação {station}. Registros lá: {n}.',
+  // Steno's rules, which appear inside sentences
+  'superposition: what overlies is younger (the beds the right way up)': 'superposição: o que está por cima é mais jovem (camadas na posição normal)',
+  'cross-cutting relationships: what cuts is younger': 'relações de corte: o que corta é mais jovem',
+  'inclusions: what is enclosed is older': 'inclusões: o que está incluído é mais antigo',
+  'as you said': 'como você disse', '"younger than" carries through': '"mais jovem que" se transmite',
+  'No station is open: start one where you stand with "station 14", or at coordinates with "station 14 at -19.92, -43.94".': 'Nenhuma estação está aberta: abra uma onde você está com "estação 14", ou em coordenadas com "estação 14 em -19.92, -43.94".',
+  'Learned. "{name}" now reads as {now} on this device.': 'Aprendido. "{name}" agora é lido como {now} neste aparelho.',
+  'Every known answer came out as it should, on this device, just now.': 'Todas as respostas conhecidas saíram como deviam, neste aparelho, agora.',
+  'Standing order {n}: {label}. I check it every time a table opens and every time a row is written to the log or the field notebook, on any table with those columns.': 'Ordem permanente {n}: {label}. Eu a confiro sempre que uma tabela abre e sempre que uma linha é escrita no log ou na caderneta de campo, em qualquer tabela com essas colunas.',
+  'This is the synthetic QC sample: its batches, values and certified standard are generated, with failures planted to show the rules.': 'Esta é a amostra sintética de QC: lotes, valores e padrão certificado são gerados, com falhas plantadas para mostrar as regras.',
+  '{n} earlier cards read with the old {what}: their answers stay as they were, true of what they were given.': '{n} cartões anteriores foram lidos com {what} antigo: as respostas ficam como estavam, verdadeiras para o que receberam.',
+  'Read with {what}.': 'Lido com {what}.'
+};
+// table headings: golem's own words only, never a table's column names
+export const HEADS_PT = {
+  'Element': 'Elemento', 'Count': 'Quantidade', 'Atomic weight': 'Peso atômico', 'Contribution': 'Contribuição', 'Mass %': '% em massa', 'Field': 'Campo', 'Value': 'Valor', 'Means': 'Significa',
+  'Who': 'Quem', 'Piece': 'Parte', 'feature': 'feição', 'attitude': 'atitude', 'youngest first': 'da mais jovem', 'true thickness': 'espessura verdadeira', 'Country': 'País', 'Population': 'População',
+  'Area km²': 'Área km²', 'Found': 'Encontrado', 'Rule': 'Regra', 'Try': 'Tente', 'from (Ma)': 'de (Ma)', 'to (Ma)': 'até (Ma)', 'entries': 'registros', 'request': 'pedido', 'times': 'vezes', 'last': 'última',
+  'check': 'verificação', 'expected': 'esperado', 'got': 'obtido', 'what': 'o quê', 'words': 'palavras', 'Recipe': 'Receita', 'Steps': 'Passos', 'Changes between runs': 'Mudanças entre execuções',
+  'batch': 'lote', 'verdict': 'veredito', 'because': 'porque', 'card': 'cartão', 'session': 'sessão', 'read with': 'lido com', 'order': 'ordem', 'mineral': 'mineral', 'formula': 'fórmula', 'class': 'classe',
+  'system': 'sistema', 'hardness': 'dureza', 'density': 'densidade'
+};

@@ -1,6 +1,8 @@
 // The interface in English or Brazilian Portuguese. golem's own words (the page, the sidebar, the composer, the cards'
 // frame, the messages) go through t(); the English is the key, so a sentence not translated yet shows in English and a
-// placeholder ({name}) is filled in after the lookup. What a tool answers is the tool's, in English for now.
+// placeholder ({name}) is filled in after the lookup. What a tool answers is shown through the same table where i18n-answers.js
+// has an entry (the engine answers in English, its canonical form).
+import { ANSWERS_PT, HEADS_PT } from './i18n-answers.js';
 let cur = 'en';
 export const uiLang = () => cur;
 export function setUiLang(l) {
@@ -106,3 +108,9 @@ const PT = {
   'Removed. The sample term index answers again.': 'Removido. O índice de amostra responde de novo.', 'A sample of rules 10, 11 and 13 ships.': 'Vem uma amostra das regras 10, 11 e 13.',
   'Installed: {n} checks from its rules and chapter V.': 'Instalado: {n} verificações das regras e do capítulo V.', 'Removed. The sample checks answer again.': 'Removido. As verificações de amostra respondem de novo.'
 };
+// what the answers say (i18n-answers.js), merged under golem's own words, which win where both have a key
+for (const [k, v] of Object.entries(ANSWERS_PT)) if (!(k in PT)) PT[k] = v;
+// a table heading: golem's own words only (a table's column names stay as they are)
+export const th = s => cur === 'pt' && HEADS_PT[s] != null ? HEADS_PT[s] : s;
+// a block's text: its template in the interface's language, filled with its values (fixed words among them translated)
+export const tx = b => b.tpl ? t(b.tpl, Object.fromEntries(Object.entries(b.params || {}).map(([k, v]) => [k, typeof v === 'string' ? t(v) : v]))) : t(b.text || '');

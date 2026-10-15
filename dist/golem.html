@@ -586,8 +586,12 @@ const qty = (node, f) => node && node.type === 'quantity' ? node.n * f(node.unit
 // Checks that run whenever a table opens or a row is written to a device table (standing orders, orders.js): each
 // f(table, rows) → blocks for the card that opened or wrote it; rows, when given, are the ones just written.
 const CHECKS = [];
+
+// A sentence that carries values: the English, and its template and values, so the shell can say it in Portuguese
+// (shell/i18n-answers.js): { t: 'note', ...said('Added to station {station}: {n} there.', { station, n }) }
+const said = (tpl, params = {}) => ({ text: tpl.replace(/\{(\w+)\}/g, (m, k) => params[k] != null ? String(params[k]) : m), tpl, params });
 const checksOf = (table, rows) => { try { return CHECKS.flatMap(f => f(table, rows)); } catch (e) { return []; } };
-  return { S, T, EFFECTS, TOOLS, tool, toolByName, FRAMES, frame, amend, session, LEXICON, noun, shape, postmod, unit, qmod, compound, CONDITIONS, condition, setRunner, onJobDone, result, clearResults, startJobs, settle, STATE, bump, runTool, clock, fmt, iso, rad, deg, p3, p2, qty, CHECKS, checksOf };
+  return { S, T, EFFECTS, TOOLS, tool, toolByName, FRAMES, frame, amend, session, LEXICON, noun, shape, postmod, unit, qmod, compound, CONDITIONS, condition, setRunner, onJobDone, result, clearResults, startJobs, settle, STATE, bump, runTool, clock, fmt, iso, rad, deg, p3, p2, qty, CHECKS, said, checksOf };
 })();
 
 /* ==== src/vendor/units.js ==== */
@@ -5616,7 +5620,7 @@ tool({
     const why = b => { const k = known.has(`suspect(${b})`) ? `suspect(${b})` : known.has(`review(${b})`) ? `review(${b})` : null; if (!k) return []; return proofOf(known, k).map(s => s.rule ? s.rule : notes[s.said]).filter(Boolean); };
     const counts = { suspect: 0, 'to review': 0, passing: 0, unchecked: 0 }; batches.forEach(b => { const v = verdict(b); counts[v.startsWith('unchecked') ? 'unchecked' : v]++; });
     const body = [{ t: 'big', v: `${counts.suspect} suspect`, unit: `of ${batches.length} batches · ${counts['to review']} to review · ${counts.passing} passing${counts.unchecked ? ` · ${counts.unchecked} unchecked` : ''}` },
-      { t: 'table', head: ['batch', 'verdict', 'because'], rows: batches.map(b => [b, verdict(b), why(b).filter((_, i, a) => i < a.length - 1 || !/makes the batch|puts the batch/.test(_)).join('; ') || (verdict(b) === 'passing' ? 'standards within 2 SD, blanks under the limit, duplicates within the threshold' : '')]) },
+      { t: 'table', head: ['batch', 'verdict', 'because'], tr: [1], rows: batches.map(b => [b, verdict(b), why(b).filter((_, i, a) => i < a.length - 1 || !/makes the batch|puts the batch/.test(_)).join('; ') || (verdict(b) === 'passing' ? 'standards within 2 SD, blanks under the limit, duplicates within the threshold' : '')]) },
       { t: 'kv', rows: [['standards', zs.length ? `${zs.length}, mean z ${fmt(zs.reduce((s, x) => s + (x.z || 0), 0) / zs.length, 3)} (bias ${fmt(100 * zs.reduce((s, x) => s + (x.v - x.e) / x.e, 0) / zs.length, 3)} %)` : 'none'], ['blanks', blanks.length ? `${blanks.length}, limit ${fmt(a.blankLimit, 4)}` : 'none'], ['duplicates', hards.length ? `${hards.length} pairs, median HARD ${fmt([...hards].sort((x, y) => x - y)[Math.floor(hards.length / 2)], 3)} %, limit ${fmt(a.hard, 3)} %` : dups.length ? `${dups.length}, but no column links them to their originals` : 'none'], ['certified values', [...new Set(stds.map(stdName))].map(s => { const c = certOf(s); return `${s}: ${fmt(c[0], 4)} ± ${fmt(c[1], 3)} (${c[2]})`; }).join('; ') || 'none']] },
       ...(t.source === 'sample' ? [{ t: 'note', text: 'This is the synthetic QC sample: its batches, values and certified standard are generated, with failures planted to show the rules.' }] : []),
       { t: 'src', text: `${RULES.length} rules (Westgard 1-3s and 2-2s, blank limit, duplicate HARD), chained by logic.js` }];
@@ -13121,7 +13125,7 @@ frame({
 
 /* ==== src/engine/notebook.js ==== */
 const __m28 = (() => {
-const { S, tool, frame, noun, shape, postmod, condition, fmt, iso, p3, p2, clock, checksOf } = __m0;
+const { S, tool, frame, noun, shape, postmod, condition, fmt, iso, p3, p2, clock, checksOf, said } = __m0;
 const { conversions, statistics } = __m5;
 const { field: wmm } = __m25;
 const { fromDevice } = __m27;
@@ -13168,7 +13172,7 @@ tool({
     return {
       read, capture,
       body: [...(capture ? [{ t: 'capture', kind: 'position', how: 'The station\'s position: one fix, kept with the station. Without one, the station has no place, and compass readings stay magnetic.' }] : []),
-        { t: 'note', kind: 'ok', text: `Station ${a.name} is open. ${n} station${n === 1 ? '' : 's'} in the notebook. Add to it: "add bedding 045/30", "add sample ${a.name}-a".` },
+        { t: 'note', kind: 'ok', ...said('Station {name} is open. Stations in the notebook: {n}. Add to it: "add bedding 045/30", "add sample {name}-a".', { name: a.name, n }) },
         { t: 'kv', rows: [['started', `${row.date} ${row.time}`], ['position', a.lat != null ? `${fmtLL(a.lat, a.lon)}${a.acc != null ? ` ±${a.acc} m` : ''}` : 'none yet']] }, SRC],
       trace: [`field.station(${JSON.stringify(a.name)})`, a.lat != null ? `position ${a.fix ? 'from one fix' : 'as typed'}` : 'wait: a position fix, or none'], py: `field.station("${a.name}"${a.lat != null ? `, lat=${a.lat}, lon=${a.lon}` : ''})`
     };
@@ -13199,7 +13203,7 @@ tool({
     const t = put(row), here = t.rows.filter(r => r.station === a.station && r.feature !== 'station'), orders = checksOf(t, [row]);
     const isLine = LINES.has(a.feature) || a.what === 'line';
     const read = ['add', { v: a.sample ? `sample ${a.sample}` : `${a.feature} ${p3(row.azimuth)}/${p2(row.dip)}` }, 'to station', { v: a.station }];
-    const body = [{ t: 'note', kind: 'ok', text: `Added to station ${a.station}: ${here.length} entr${here.length === 1 ? 'y' : 'ies'} there.` }, ...orders];
+    const body = [{ t: 'note', kind: 'ok', ...said('Added to station {station}. Entries there: {n}.', { station: a.station, n: here.length }) }, ...orders];
     if (at) body.push({ t: 'big', v: `${p3(row.azimuth)}/${p2(row.dip)}`, unit: `${isLine ? 'trend/plunge' : 'dip direction/dip'}, ${a.feature}` }, isLine ? { t: 'net', planes: [], lines: [{ tr: row.azimuth, pl: row.dip, label: a.feature }] } : { t: 'net', planes: [{ dd: row.azimuth, dip: row.dip }], lines: [] });
     body.push({ t: 'kv', rows: [...(at ? [['north', at.north], ['from', at.via + (a.from ? `, card #${String(a.from).padStart(2, '0')}` : '')]] : []), ...(a.note ? [['note', a.note]] : []), ['station', `${a.station}${st.lat != null ? ` at ${fmtLL(st.lat, st.lon)}` : ', no position'}`]] }, SRC);
     return { read, value: at ? [row.azimuth, row.dip] : a.sample, body, trace: [...(at ? at.trace : [`sample ${a.sample}`]), `field.add(${JSON.stringify({ station: a.station, feature: a.feature, azimuth: row.azimuth, dip: row.dip, sample: row.sample })})`, 'undo removes the row'],
@@ -17674,7 +17678,7 @@ tool({
     return { read: ['check myself'], value: n - bad,
       body: [{ t: 'big', v: `${n - bad} of ${n}`, unit: bad ? `checks pass: ${bad} failed` : 'checks pass' },
         ...(bad ? [{ t: 'note', kind: 'err', text: `Failed: ${fails.join('; ')}. Do not rely on those answers on this device until it is fixed.` }] : [{ t: 'note', kind: 'ok', text: 'Every known answer came out as it should, on this device, just now.' }]),
-        { t: 'table', head: ['check', 'expected', 'got', ''], rows }, { t: 'lbl', text: 'What this device holds' }, { t: 'kv', rows: held }],
+        { t: 'table', head: ['check', 'expected', 'got', ''], tr: [3], rows }, { t: 'lbl', text: 'What this device holds' }, { t: 'kv', rows: held }],
       trace: [`${CHECKS.length} known answers, ${st.n} starters read dry, in ${Date.now() - t0} ms`, 'no card or session touched'] };
   }
 });
@@ -17750,7 +17754,7 @@ const frameCount = () => FRAMES.length;
 
 /* ==== src/engine/strata.js ==== */
 const __m49 = (() => {
-const { S, tool, frame, noun } = __m0;
+const { S, tool, frame, noun, said } = __m0;
 const { infer, proofOf, keyOf } = __m9;
 // Relative ages by Steno's principles (SPEC 13: inference). What you say of the units — "the sandstone overlies the
 // granite", "the dyke cuts the sandstone", "the conglomerate contains clasts of the granite", "the basalt is younger than
@@ -17809,10 +17813,10 @@ tool({
     if (!S.strata.some(f => f.id === a.id)) S.strata.push({ id: a.id, rel: a.rel, a: a.a, b: a.b, na: a.na, nb: a.nb, card: a.card || null });
     // every relation is kept with the younger first: what overlies, cuts or encloses (flipped forms were turned round)
     const w = world(), younger = a.na, older = a.nb;
-    const body = [{ t: 'note', kind: 'ok', text: `Kept: ${a.na} ${SAID[a.rel]} ${a.nb}, so ${younger} is younger than ${older} (${RULES.find(r => r.body[0].rel === a.rel).name}).` }];
+    const body = [{ t: 'note', kind: 'ok', ...said('Kept: {na} {rel} {nb}, so {younger} is younger than {older} ({rule}).', { na: a.na, rel: SAID[a.rel], nb: a.nb, younger, older, rule: RULES.find(r => r.body[0].rel === a.rel).name }) }];
     if (w.loops.length) body.push({ t: 'note', kind: 'err', text: `That contradicts what was said before: ${w.loops.map(u => w.nm.get(u)).join(', ')} would be younger than ${w.loops.length > 1 ? 'themselves' : 'itself'}.` }, { t: 'steps', items: because(w, w.loops[0], w.loops[0]) });
     const ls = layers(w);
-    if (!w.loops.length && ls.length > 1) body.push({ t: 'sub', text: `The order so far, youngest first: ${ls.map(l => l.map(u => w.nm.get(u)).join(' / ')).join(' → ')}.` });
+    if (!w.loops.length && ls.length > 1) body.push({ t: 'sub', ...said('The order so far, youngest first: {order}.', { order: ls.map(l => l.map(u => w.nm.get(u)).join(' / ')).join(' → ') }) });
     body.push({ t: 'chips', items: ['the order of the units'] });
     return { read: [{ v: a.na }, SAID[a.rel], { v: a.nb }], body, trace: [`fact: ${a.rel}(${a.a}, ${a.b})`, `${w.known.size} facts follow from ${S.strata.length} said, by ${RULES.length} rules`] };
   }
@@ -17843,7 +17847,7 @@ tool({
     if (missing.length) return { read, body: [{ t: 'note', text: `Nothing was said about ${missing.map(u => u === x ? a.x : a.y).join(' or ')}. I know ${[...w.nm.values()].join(', ') || 'no units yet'}.` }], trace: ['unknown unit'] };
     const yes = wantOlder ? w.younger(y, x) : w.younger(x, y), no = wantOlder ? w.younger(x, y) : w.younger(y, x);
     if (yes && no) return { read, body: [{ t: 'note', kind: 'err', text: 'Both, which means what was said contradicts itself. Both chains:' }, { t: 'steps', items: [...because(w, x, y), ...because(w, y, x)] }], trace: ['contradiction'] };
-    if (!yes && !no) return { read, value: null, body: [{ t: 'note', text: `I cannot tell: nothing said links ${nx} and ${ny}, directly or through other units.` }], trace: ['neither follows'] };
+    if (!yes && !no) return { read, value: null, body: [{ t: 'note', ...said('I cannot tell: nothing said links {x} and {y}, directly or through other units.', { x: nx, y: ny }) }], trace: ['neither follows'] };
     const [p, q] = yes ? (wantOlder ? [y, x] : [x, y]) : (wantOlder ? [x, y] : [y, x]);
     return { read, value: yes,
       body: [{ t: 'big', v: yes ? (a.why ? 'Because' : 'Yes') : 'No', unit: yes ? '' : `${w.nm.get(p)} is younger than ${w.nm.get(q)}` }, { t: 'steps', items: because(w, p, q) }],
@@ -31125,11 +31129,110 @@ if (typeof window !== 'undefined') {
   return { subplots, plot, scatter, imshow, hist, bar, cmap, Figure, Axes, LinearScale, getCmap, pltAdder, replay, recordingContext };
 })();
 
-/* ==== src/shell/i18n.js ==== */
+/* ==== src/shell/i18n-answers.js ==== */
 const __m79 = (() => {
+// What golem's answers say, in Portuguese (pt-BR): the fixed words of the "read as" line, the labels of key-value rows,
+// units and labels, and the templates of sentences that carry values (a block's tpl, filled with its params). The engine
+// answers in English, its canonical form; the shell shows these when the interface is in Portuguese. A string with no
+// entry here is shown as the engine wrote it. Table headings are a dictionary of their own, so a table's own column
+// names ("from", "to", "lith") are never translated.
+const ANSWERS_PT = {
+  // the "read as" line
+  'run': 'rodar', 'with': 'com', 'trace': 'rastreamento', 'convert': 'converter', 'to': 'para', 'decide between': 'decidir entre', 'evaluate': 'calcular', 'trig in degrees': 'trigonometria em graus',
+  'estimate': 'estimar', 'days from': 'dias desde', 'weekday of': 'dia da semana de', 'time for': 'tempo para', 'mass for': 'massa para', 'length for': 'comprimento para', 'volume for': 'volume para', 'reckon': 'calcular',
+  'Two-product recovery': 'Recuperação de dois produtos', 'solved for': 'resolvido para', 'Break-even cutoff': 'Teor de corte de equilíbrio', 'Stokes settling': 'Sedimentação de Stokes', 'Tonnage': 'Tonelagem',
+  'Contained metal': 'Metal contido', 'Strip ratio': 'Relação estéril-minério', 'Lithostatic pressure': 'Pressão litostática', "Darcy's law": 'Lei de Darcy', 'the formulas I can solve': 'as fórmulas que sei resolver',
+  'SHA-256 of': 'SHA-256 de', 'molar mass of': 'massa molar de', 'factor': 'fator', 'fraction of': 'fração de', 'in': 'em', 'element': 'elemento', 'explain cron': 'explicar cron', 'time': 'hora',
+  'explain regex': 'explicar regex', 'explain url': 'explicar url', 'working days from': 'dias úteis de', 'is': 'é', 'a working day in': 'um dia útil em', 'from': 'de', 'time now in': 'hora agora em',
+  'overlap of': 'sobreposição de', 'count': 'contar', 'extract': 'extrair', 'of': 'de', 'diff': 'diferença', 'true thickness of': 'espessura verdadeira de', 'in hole': 'no furo', 'through': 'através de',
+  'plot plane': 'plotar plano', 'apparent dip of': 'mergulho aparente de', 'on a section at': 'numa seção a', 'intersection of': 'interseção de', 'and': 'e', 'plane through': 'plano por', 'mean of': 'média de',
+  'core': 'testemunho', 'declination at': 'declinação em', 'on': 'em', 'magnetic': 'magnético', 'true': 'verdadeiro', 'at': 'em', 'measure': 'medir', 'measured': 'medido', 'with the phone': 'com o celular',
+  'station': 'estação', 'add': 'adicionar', 'to station': 'à estação', 'summary': 'resumo', 'the field notebook as': 'a caderneta de campo como', 'the field notebook': 'a caderneta de campo',
+  'field notebook on': 'caderneta de campo em', 'overlies': 'sobrepõe', 'cuts': 'corta', 'contains clasts of': 'contém clastos de', 'is younger than': 'é mais jovem que', 'the order of the units': 'a ordem das unidades',
+  'older than': 'mais antigo que', 'why is': 'por que', 'younger than': 'mais jovem que', 'mass of': 'massa de', 'sieve': 'peneira', 'in microns': 'em mícrons', 'specific gravity from': 'densidade relativa a partir de',
+  'RQD of': 'RQD de', 'in a': 'em um', 'Gy: error of a': 'Gy: erro de uma', 'Gy: sample mass for': 'Gy: massa de amostra para', 'cutoff grade for': 'teor de corte para', 'open table': 'abrir tabela',
+  'check the QC of': 'verificar o QC de', 'for': 'para', 'histogram of': 'histograma de', 'mean': 'média', 'by': 'por', 'where': 'onde', 'count rows': 'contar linhas', 'list': 'listar', 'sorted by': 'ordenado por',
+  'check intervals of': 'verificar os intervalos de', 'the table': 'a tabela', 'as': 'como', 'true thickness of every intercept': 'espessura verdadeira de cada intercepto', 'apparent dip of every plane': 'mergulho aparente de cada plano',
+  'mineral': 'mineral', 'Mohs hardness': 'dureza de Mohs', 'minerals': 'minerais', 'population density': 'densidade populacional', 'countries': 'países', 'that are': 'que são', 'area': 'área', 'top': 'maiores',
+  'find the definition of': 'encontrar a definição de', 'check text against': 'verificar o texto segundo', 'units of the chart at': 'unidades da tabela cronoestratigráfica em', 'find': 'encontrar', 'in my documents': 'nos meus documentos',
+  'new event': 'novo evento', 'start a timer for': 'iniciar um cronômetro de', 'set an alarm at': 'definir um alarme para', 'save place': 'salvar lugar', 'distance from': 'distância de', 'in UTM': 'em UTM',
+  'to latitude and longitude': 'para latitude e longitude', 'log': 'registrar', 'moon phase on': 'fase da lua em', 'list the skills': 'listar as habilidades', 'what did not read': 'o que não foi lido',
+  'forget what did not read': 'esquecer o que não foi lido', 'explain card': 'explicar o cartão', 'export session as': 'exportar a sessão como', 'which cards are out of date': 'quais cartões estão desatualizados',
+  'learn that': 'aprender que', 'define': 'definir', 'standing orders': 'ordens permanentes', 'standing order': 'ordem permanente', 'forget standing order': 'esquecer a ordem permanente', 'check myself': 'me verificar',
+  'the words I know for': 'as palavras que conheço para', 'the words I know': 'as palavras que conheço', 'save recipe': 'salvar receita', 'run recipe': 'rodar receita', 'on every kept table': 'em cada tabela guardada',
+  'recipes': 'receitas', 'store note': 'guardar nota', 'recall notes about': 'lembrar notas sobre', 'means': 'significa', 'forget': 'esquecer', 'forget the formula': 'esquecer a fórmula', 'teach': 'ensinar',
+  'no exact reading of': 'nenhuma leitura exata de', 'read so far': 'lido até aqui', 'plan of': 'plano de', 'steps, stopped at step': 'passos, parado no passo', 'the minerals': 'os minerais',
+  // labels of key-value rows
+  'geometries': 'geometrias', 'size': 'tamanho', 'spread': 'dispersão', 'dimension': 'dimensão', 'found': 'encontrado', 'equation': 'equação', 'input': 'entrada', 'algorithm': 'algoritmo', 'text': 'texto',
+  'output': 'saída', 'reverse': 'inverso', 'formula mass': 'massa da fórmula', 'symbol': 'símbolo', 'atomic number': 'número atômico', 'name': 'nome', 'next runs': 'próximas execuções', 'weekday': 'dia da semana',
+  'from now': 'a partir de agora', 'read as': 'lido como', 'matches': 'casa com', 'does not match': 'não casa com', 'scheme': 'esquema', 'host': 'servidor', 'port': 'porta', 'path': 'caminho', 'query': 'consulta',
+  'fragment': 'fragmento', 'calendar days': 'dias corridos', 'holidays in the span': 'feriados no período', 'weekends': 'fins de semana', 'holidays skipped': 'feriados pulados', 'this swing': 'esta escala',
+  'next change': 'próxima troca', 'difference': 'diferença', 'offset': 'fuso', 'here': 'aqui', 'characters': 'caracteres', 'words': 'palavras', 'sentences': 'frases', 'paragraphs': 'parágrafos',
+  'mean sentence': 'frase média', 'longest sentence': 'frase mais longa', 'Flesch reading ease': 'facilidade de leitura de Flesch', 'Flesch–Kincaid grade': 'nível de Flesch–Kincaid', 'syllables': 'sílabas',
+  'hole to pole': 'furo ao polo', 'hole to plane': 'furo ao plano', 'strike': 'direção', 'dip': 'mergulho', 'pole': 'polo', 'plunges toward': 'cai para', 'section to dip direction': 'seção à direção de mergulho',
+  'true dip': 'mergulho verdadeiro', 'trend': 'rumo', 'plunge': 'caimento', 'triangle': 'triângulo', 'convention': 'convenção', 'inclination': 'inclinação', 'total intensity': 'intensidade total',
+  'horizontal': 'componente horizontal', 'annual change': 'variação anual', 'declination': 'declinação', 'applied': 'aplicado', 'started': 'iniciada', 'position': 'posição', 'north': 'norte', 'stations': 'estações',
+  'planes': 'planos', 'lines': 'linhas', 'samples': 'amostras', 'rows': 'linhas', 'with a position': 'com posição', 'coordinates': 'coordenadas', 'volume': 'volume', 'density': 'densidade',
+  'displaced water': 'água deslocada', 'assumes': 'supõe', 'recovery': 'recuperação', 'pieces of 10 cm or more': 'peças de 10 cm ou mais', 'class': 'classe', 'price': 'preço', 'processing': 'beneficiamento',
+  'columns': 'colunas', 'intervals': 'intervalos', 'median': 'mediana', 'range': 'amplitude', 'holes': 'furos', 'gaps': 'lacunas', 'overlaps': 'sobreposições', 'bad intervals': 'intervalos ruins',
+  'compression': 'compressão', 'binding': 'vínculo', 'crystal system': 'sistema cristalino', 'IMA symbol': 'símbolo IMA', 'elements': 'elementos', 'duration': 'duração', 'within': 'dentro de', 'before': 'antes',
+  'after': 'depois', 'subdivided into': 'subdividido em', 'eon': 'éon', 'era': 'era', 'period': 'período', 'epoch': 'época', 'age': 'idade', 'rank': 'categoria', 'opens': 'abre', 'then': 'depois',
+  'metres': 'metros', 'initial bearing': 'azimute inicial', 'final bearing': 'azimute final', 'easting': 'leste (E)', 'northing': 'norte (N)', 'zone': 'zona', 'grid convergence': 'convergência meridiana',
+  'scale factor': 'fator de escala', 'datum': 'datum', 'decimal': 'decimal', 'hemisphere': 'hemisfério', 'round trip': 'ida e volta', 'written': 'escrito', 'entries': 'registros', 'dates': 'datas', 'unit': 'unidade',
+  'sunrise': 'nascer do sol', 'solar noon': 'meio-dia solar', 'sunset': 'pôr do sol', 'day length': 'duração do dia', 'civil twilight': 'crepúsculo civil', "sun's declination": 'declinação do sol',
+  'next new moon': 'próxima lua nova', 'next full moon': 'próxima lua cheia', 'cards': 'cartões', 'cells': 'células', 'replay': 'repetição', 'terms': 'termos', 'parsed by': 'lido por',
+  'magnetic model': 'modelo magnético', 'commands': 'comandos', 'things': 'coisas', 'units': 'unidades', 'taught on this device': 'ensinado neste aparelho', 'steps': 'passos', 'changes between runs': 'mudanças entre execuções',
+  'fixed': 'fixo', 'compass accuracy': 'precisão da bússola', 'steadiness': 'estabilidade', 'taken': 'medido em', 'as measured': 'como medido', 'note': 'nota', 'standards': 'padrões', 'blanks': 'brancos',
+  'duplicates': 'duplicatas', 'certified values': 'valores certificados', 'quantities': 'quantidades', 'mean z': 'z médio', 'cuttings': 'calha', 'none': 'nenhum',
+  // units and the like
+  'days': 'dias', 'working days': 'dias úteis', 'm true thickness': 'm de espessura verdadeira', '° apparent dip': '° de mergulho aparente', 'trend/plunge': 'rumo/caimento', 'dip direction/dip': 'direção de mergulho/mergulho',
+  'dip direction/dip (magnetic)': 'direção de mergulho/mergulho (magnético)', 'dip direction/dip (true)': 'direção de mergulho/mergulho (verdadeiro)', 'mean plane': 'plano médio', '° true': '° verdadeiro',
+  'specific gravity': 'densidade relativa', 'symbolic': 'simbólico', 'median (50th percentile)': 'mediana (percentil 50)', 'g/mol, standard atomic weight': 'g/mol, peso atômico padrão',
+  'km over the ellipsoid, not by road': 'km sobre o elipsoide, não por estrada', 'metres, to the metre': 'metros, ao metro', 'km in total': 'km no total', 'checks pass': 'verificações passam',
+  'skills run here': 'habilidades rodam aqui', 'people per sq mi': 'pessoas por milha²', 'mean pole': 'polo médio', 'mean line': 'linha média',
+  // labels
+  'Nearest skills': 'Habilidades mais próximas', 'one to try from each': 'uma para testar de cada', 'Teach me the word': 'Me ensine a palavra', 'What this device holds': 'O que este aparelho guarda', 'Try': 'Tente',
+  // values that are fixed phrases
+  'not in Wikidata': 'não está no Wikidata', 'pass': 'passou', 'FAIL': 'FALHOU', 'passing': 'aprovado', 'suspect': 'suspeito', 'to review': 'a revisar', 'unchecked: no standard': 'não verificado: sem padrão',
+  'this one': 'esta', 'not reported': 'não informada', 'high': 'alta', 'medium': 'média', 'low': 'baixa',
+  // sentences with values (a block's tpl)
+  'Kept: {na} {rel} {nb}, so {younger} is younger than {older} ({rule}).': 'Guardado: {na} {rel} {nb}, então {younger} é mais jovem que {older} ({rule}).',
+  'The order so far, youngest first: {order}.': 'A ordem até aqui, da mais jovem: {order}.',
+  'I cannot tell: nothing said links {x} and {y}, directly or through other units.': 'Não sei dizer: nada do que foi dito liga {x} e {y}, diretamente ou por outras unidades.',
+  'Station {name} is open. Stations in the notebook: {n}. Add to it: "add bedding 045/30", "add sample {name}-a".': 'A estação {name} está aberta. Estações na caderneta: {n}. Para adicionar: "adiciona acamamento 045/30", "amostra {name}-a".',
+  'Added to station {station}. Entries there: {n}.': 'Adicionado à estação {station}. Registros lá: {n}.',
+  // Steno's rules, which appear inside sentences
+  'superposition: what overlies is younger (the beds the right way up)': 'superposição: o que está por cima é mais jovem (camadas na posição normal)',
+  'cross-cutting relationships: what cuts is younger': 'relações de corte: o que corta é mais jovem',
+  'inclusions: what is enclosed is older': 'inclusões: o que está incluído é mais antigo',
+  'as you said': 'como você disse', '"younger than" carries through': '"mais jovem que" se transmite',
+  'No station is open: start one where you stand with "station 14", or at coordinates with "station 14 at -19.92, -43.94".': 'Nenhuma estação está aberta: abra uma onde você está com "estação 14", ou em coordenadas com "estação 14 em -19.92, -43.94".',
+  'Learned. "{name}" now reads as {now} on this device.': 'Aprendido. "{name}" agora é lido como {now} neste aparelho.',
+  'Every known answer came out as it should, on this device, just now.': 'Todas as respostas conhecidas saíram como deviam, neste aparelho, agora.',
+  'Standing order {n}: {label}. I check it every time a table opens and every time a row is written to the log or the field notebook, on any table with those columns.': 'Ordem permanente {n}: {label}. Eu a confiro sempre que uma tabela abre e sempre que uma linha é escrita no log ou na caderneta de campo, em qualquer tabela com essas colunas.',
+  'This is the synthetic QC sample: its batches, values and certified standard are generated, with failures planted to show the rules.': 'Esta é a amostra sintética de QC: lotes, valores e padrão certificado são gerados, com falhas plantadas para mostrar as regras.',
+  '{n} earlier cards read with the old {what}: their answers stay as they were, true of what they were given.': '{n} cartões anteriores foram lidos com {what} antigo: as respostas ficam como estavam, verdadeiras para o que receberam.',
+  'Read with {what}.': 'Lido com {what}.'
+};
+// table headings: golem's own words only, never a table's column names
+const HEADS_PT = {
+  'Element': 'Elemento', 'Count': 'Quantidade', 'Atomic weight': 'Peso atômico', 'Contribution': 'Contribuição', 'Mass %': '% em massa', 'Field': 'Campo', 'Value': 'Valor', 'Means': 'Significa',
+  'Who': 'Quem', 'Piece': 'Parte', 'feature': 'feição', 'attitude': 'atitude', 'youngest first': 'da mais jovem', 'true thickness': 'espessura verdadeira', 'Country': 'País', 'Population': 'População',
+  'Area km²': 'Área km²', 'Found': 'Encontrado', 'Rule': 'Regra', 'Try': 'Tente', 'from (Ma)': 'de (Ma)', 'to (Ma)': 'até (Ma)', 'entries': 'registros', 'request': 'pedido', 'times': 'vezes', 'last': 'última',
+  'check': 'verificação', 'expected': 'esperado', 'got': 'obtido', 'what': 'o quê', 'words': 'palavras', 'Recipe': 'Receita', 'Steps': 'Passos', 'Changes between runs': 'Mudanças entre execuções',
+  'batch': 'lote', 'verdict': 'veredito', 'because': 'porque', 'card': 'cartão', 'session': 'sessão', 'read with': 'lido com', 'order': 'ordem', 'mineral': 'mineral', 'formula': 'fórmula', 'class': 'classe',
+  'system': 'sistema', 'hardness': 'dureza', 'density': 'densidade'
+};
+  return { ANSWERS_PT, HEADS_PT };
+})();
+
+/* ==== src/shell/i18n.js ==== */
+const __m80 = (() => {
+const { ANSWERS_PT, HEADS_PT } = __m79;
 // The interface in English or Brazilian Portuguese. golem's own words (the page, the sidebar, the composer, the cards'
 // frame, the messages) go through t(); the English is the key, so a sentence not translated yet shows in English and a
-// placeholder ({name}) is filled in after the lookup. What a tool answers is the tool's, in English for now.
+// placeholder ({name}) is filled in after the lookup. What a tool answers is shown through the same table where i18n-answers.js
+// has an entry (the engine answers in English, its canonical form).
 let cur = 'en';
 const uiLang = () => cur;
 function setUiLang(l) {
@@ -31235,15 +31338,21 @@ const PT = {
   'Removed. The sample term index answers again.': 'Removido. O índice de amostra responde de novo.', 'A sample of rules 10, 11 and 13 ships.': 'Vem uma amostra das regras 10, 11 e 13.',
   'Installed: {n} checks from its rules and chapter V.': 'Instalado: {n} verificações das regras e do capítulo V.', 'Removed. The sample checks answer again.': 'Removido. As verificações de amostra respondem de novo.'
 };
-  return { uiLang, setUiLang, t, plural, applyStatic };
+// what the answers say (i18n-answers.js), merged under golem's own words, which win where both have a key
+for (const [k, v] of Object.entries(ANSWERS_PT)) if (!(k in PT)) PT[k] = v;
+// a table heading: golem's own words only (a table's column names stay as they are)
+const th = s => cur === 'pt' && HEADS_PT[s] != null ? HEADS_PT[s] : s;
+// a block's text: its template in the interface's language, filled with its values (fixed words among them translated)
+const tx = b => b.tpl ? t(b.tpl, Object.fromEntries(Object.entries(b.params || {}).map(([k, v]) => [k, typeof v === 'string' ? t(v) : v]))) : t(b.text || '');
+  return { uiLang, setUiLang, t, plural, applyStatic, th, tx };
 })();
 
 /* ==== src/shell/render.js ==== */
-const __m80 = (() => {
+const __m81 = (() => {
 const { fmt } = __m0;
 const { conversions, equalArea } = __m5;
 const { Figure } = __m78;
-const { t } = __m79;
+const { t, th, tx } = __m80;
 const { stationNow } = __m28;
 const { staleOf, staleText } = __m32;
 // Rendering. The engine hands over plain blocks; this is the only file that turns them into markup.
@@ -31325,13 +31434,13 @@ function svgCurve(b) {
 /* ── blocks ── */
 function blockHtml(b) {
   switch (b.t) {
-    case 'big': return `<div class="big"${b.size ? ` style="font-size:${b.size}px"` : ''}${b.end ? ` data-end="${b.end}"` : ''}>${escHtml(b.v)}${b.unit ? ` <small>${escHtml(b.unit)}</small>` : ''}</div>`;
-    case 'sub': return `<div class="sub">${escHtml(b.text)}</div>`;
-    case 'note': return `<div class="note${b.kind ? ' ' + b.kind : ''}">${escHtml(b.text)}</div>`;
+    case 'big': return `<div class="big"${b.size ? ` style="font-size:${b.size}px"` : ''}${b.end ? ` data-end="${b.end}"` : ''}>${escHtml(b.v)}${b.unit ? ` <small>${escHtml(t(b.unit))}</small>` : ''}</div>`;
+    case 'sub': return `<div class="sub">${escHtml(tx(b))}</div>`;
+    case 'note': return `<div class="note${b.kind ? ' ' + b.kind : ''}">${escHtml(tx(b))}</div>`;
     case 'src': return `<div class="src">${escHtml(b.text)}</div>`;
-    case 'lbl': return `<div class="lbl">${escHtml(b.text)}</div>`;
-    case 'kv': return `<dl class="kv">${b.rows.map(([k, v, o]) => `<dt>${escHtml(k)}</dt><dd>${o && o.mono ? `<code>${escHtml(v)}</code>` : escHtml(v)}</dd>`).join('')}</dl>`;
-    case 'table': return `<div class="tbl"><table><tr>${b.head.map((h, i) => `<th${b.num && b.num[i] ? ' class="n"' : ''}>${escHtml(h)}</th>`).join('')}</tr>${b.rows.map(r => `<tr>${r.map((v, i) => `<td${b.num && b.num[i] ? ' class="n"' : ''}>${escHtml(v)}</td>`).join('')}</tr>`).join('')}</table></div>`;
+    case 'lbl': return `<div class="lbl">${escHtml(tx(b))}</div>`;
+    case 'kv': return `<dl class="kv">${b.rows.map(([k, v, o]) => `<dt>${escHtml(t(k))}</dt><dd>${o && o.mono ? `<code>${escHtml(v)}</code>` : escHtml(t(String(v)))}</dd>`).join('')}</dl>`;
+    case 'table': return `<div class="tbl"><table><tr>${b.head.map((h, i) => `<th${b.num && b.num[i] ? ' class="n"' : ''}>${escHtml(th(h))}</th>`).join('')}</tr>${b.rows.map(r => `<tr>${r.map((v, i) => `<td${b.num && b.num[i] ? ' class="n"' : ''}>${escHtml(b.tr && b.tr.includes(i) && typeof v === 'string' ? t(v) : v)}</td>`).join('')}</tr>`).join('')}</table></div>`;
     case 'list': return `<ul class="plain">${b.items.map(i => `<li>${escHtml(i)}</li>`).join('')}</ul>`;
     case 'steps': return `<ol class="steps">${b.items.map(i => `<li>${escHtml(i)}</li>`).join('')}</ol>`;
     case 'pre': return `<pre>${escHtml(b.text)}</pre>`;
@@ -31355,7 +31464,7 @@ function cardEl(c) {
   const el = document.createElement('article');
   el.className = 'card'; el.dataset.id = c.id; el.dataset.rung = c.rung; el.tabIndex = -1;
   el.setAttribute('aria-label', `#${pad(c.id)}: ${c.raw}`); if (c.pinned) el.dataset.pinned = '1';
-  const r = c.res, read = r.read.map(x => typeof x === 'string' ? escHtml(x) : x.alts ? `<button class="slot" type="button" data-act="slot" data-key="${x.key}" title="${escHtml(t('Tap to change this reading'))}" aria-label="${escHtml(t('{v}: tap to read it another way', { v: x.v }))}">${escHtml(x.v)}</button>` : `<span class="slot">${escHtml(x.v)}</span>`).join(' ');
+  const r = c.res, read = r.read.map(x => typeof x === 'string' ? escHtml(t(x)) : x.alts ? `<button class="slot" type="button" data-act="slot" data-key="${x.key}" title="${escHtml(t('Tap to change this reading'))}" aria-label="${escHtml(t('{v}: tap to read it another way', { v: x.v }))}">${escHtml(x.v)}</button>` : `<span class="slot">${escHtml(x.v)}</span>`).join(' ');
   const ask = r.ask ? `<div class="note">${escHtml(r.ask.prompt)}</div>${r.ask.options.length ? `<div class="opts">${r.ask.options.map((o, i) => `<button class="btn" type="button" data-act="answer" data-i="${i}">${escHtml(o.label)}</button>`).join('')}${r.ask.parse ? `<span class="sub">${t('or type it')}</span>` : ''}</div>` : ''}` : '';
   el.innerHTML = `<div class="q">${escHtml(c.raw)}</div>
     <div class="reply"><div class="chead"><span class="rung ${c.rung}">${t(RUNG[c.rung])}</span><span>#${pad(c.id)}</span>${c.amends ? `<span>${t('from #{n}', { n: pad(c.amends) })}</span>` : ''}<span class="ms">${c.ms < 10 ? c.ms.toFixed(1) : Math.round(c.ms)} ms</span></div>
@@ -31396,7 +31505,7 @@ function figImage(ctx, x, y, w, h, cols, rows, b64) {
 })();
 
 /* ==== src/vendor/sw-register.js ==== */
-const __m81 = (() => {
+const __m82 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sw's page-side companion, copied from ../auditable/ext/sw/register.js (at auditable 8837da6e).
 
 // @gcu/sw — the page-side companion (ES module). Registration + persistent
@@ -31474,7 +31583,7 @@ function registerGcuSw(opts = {}) {
 })();
 
 /* ==== src/shell/sign.js ==== */
-const __m82 = (() => {
+const __m83 = (() => {
 const { shell } = __m77;
 // Signing what golem exports, and checking what it opens (SPEC 13: things you can trust). One signature format for both
 // homes, ECDSA P-256 over SHA-256, the signature raw (r‖s) and the public key as SPKI, both base64: inside the lead-acid
@@ -31526,7 +31635,7 @@ async function fingerprint(pubB64) {
 })();
 
 /* ==== src/shell/main.js ==== */
-const __m83 = (() => {
+const __m84 = (() => {
 const { S } = __m0;
 const { submit, flipSlot, answer, capture, seedExamples, openFile, openBinary, openStreamed, preview } = __m73;
 const { scanTable, STREAM_OVER } = __m72;
@@ -31543,12 +31652,12 @@ const { sessions, current, newSession, openSession, renameSession, deleteSession
 const { openStore, putBlob, getBlob } = __m76;
 const { skills, PACKS, STARTERS, STARTERS_PT } = __m40;
 const { shell } = __m77;
-const { escHtml, pad, cardEl, drawCharts } = __m80;
-const { registerGcuSw } = __m81;
-const { sign, verify, fingerprint, deviceKey, canSign } = __m82;
+const { escHtml, pad, cardEl, drawCharts } = __m81;
+const { registerGcuSw } = __m82;
+const { sign, verify, fingerprint, deviceKey, canSign } = __m83;
 const { canonical, unsigned } = __m31;
 const { staleOf } = __m32;
-const { t, plural, setUiLang, uiLang, applyStatic } = __m79;
+const { t, plural, setUiLang, uiLang, applyStatic } = __m80;
 const { setLanguage } = __m46;
 // The shell: wiring, tabs, the session drawer, storage, and the sleep switch. Everything that touches
 // the DOM or the browser lives here or in render.js; the engine never does.
