@@ -16,6 +16,7 @@ import './field.js';
 import './notebook.js';
 import './minerals.js';
 import './reckon.js';
+import './share.js';
 import './timescale.js';
 import './sample.js';
 import './explain.js';

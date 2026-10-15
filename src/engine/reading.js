@@ -284,7 +284,7 @@ frame({
   name: 'export', label: 'Export', words: ['export', 'save', 'write', 'give me'], elidable: true, theme: ['table'], required: ['as'], roles: { as: { preps: ['as', 'to', 'in'], types: ['format'] } },
   words_pt: ['exportar', 'exporta', 'salvar', 'salva'], label_pt: 'Exportar',
   // csv, tsv, json and parquet are the open table as a file; script and notebook are the session as code
-  bind: c => { const as = c.roles.as && c.roles.as[0] && c.roles.as[0].value; return ['csv', 'tsv', 'json', 'parquet'].includes(as) ? { tool: 'tableExport', args: { fmt: as } } : ['script', 'notebook'].includes(as) ? { tool: 'export', args: {} } : null; }
+  bind: c => { const as = c.roles.as && c.roles.as[0] && c.roles.as[0].value; return ['csv', 'tsv', 'json', 'parquet'].includes(as) ? { tool: 'tableExport', args: { fmt: as } } : as === 'notebook' ? { tool: 'exportNotebook', args: {} } : as === 'script' ? { tool: 'export', args: {} } : null; }
 });
 // "why", "show the plan": the steps behind the last card, whatever its tool
 amend({ tools: ['*'], name: 'why', label: 'Why', words: ['why', 'how', 'how so', 'show the plan', 'show me the plan', 'show the trace', 'show the work', 'show me the work', 'what did you do', 'explain that'], theme: [], required: [], roles: {},

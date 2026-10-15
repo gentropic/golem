@@ -9,7 +9,7 @@ dependencyResolutionManagement {
     versionCatalogs { create("libs") { from(files(leadacidDir.resolve("gradle/libs.versions.toml"))) } }
 }
 
-for (m in listOf("core", "plugin-intent", "plugin-speech", "plugin-tts", "plugin-intake", "plugin-sensor", "plugin-gnss")) {
+for (m in listOf("core", "plugin-intent", "plugin-speech", "plugin-tts", "plugin-intake", "plugin-sensor", "plugin-gnss", "plugin-attest")) {
     include(":$m")
     project(":$m").projectDir = leadacidDir.resolve(m)
 }

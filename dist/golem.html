@@ -12993,7 +12993,7 @@ tool({
     else { text = JSON.stringify({ type: 'FeatureCollection', features: all.map(r => ({ type: 'Feature', geometry: r.lat != null ? { type: 'Point', coordinates: [r.lon, r.lat] } : null, properties: props(r) })) }, null, 1) + '\n'; name = 'field-notebook.geojson'; mime = 'application/geo+json'; }
     const placed = all.filter(r => r.lat != null).length;
     return { read, value: text, copy: text, file: { name, mime, text },
-      body: [{ t: 'pre', text: text.split('\n').slice(0, 12).join('\n') + '\n…' }, { t: 'kv', rows: [['rows', String(all.length)], ['with a position', `${placed} of ${all.length}${a.fmt === 'csv' ? '' : '; the others have no geometry'}`], ['coordinates', 'WGS84 longitude, latitude, as the phone or the typing gave them']] }, SRC],
+      body: [{ t: 'pre', text: text.split('\n').slice(0, 12).join('\n') + '\n…' }, { t: 'actions', items: [{ act: 'save', label: `Save ${name}` }] }, { t: 'kv', rows: [['rows', String(all.length)], ['with a position', `${placed} of ${all.length}${a.fmt === 'csv' ? '' : '; the others have no geometry'}`], ['coordinates', 'WGS84 longitude, latitude, as the phone or the typing gave them']] }, SRC],
       trace: [`${all.length} rows → ${fmtName}`], py: `field.export("${a.fmt}")` };
   }
 });
@@ -13339,8 +13339,197 @@ frame({
   return { vecOf, quantitiesOf, combos, FORMULAS, roots };
 })();
 
-/* ==== src/engine/data/timescale.js ==== */
+/* ==== src/engine/sessions.js ==== */
 const __m28 = (() => {
+const { S, toolByName, runTool, startJobs, clearResults } = __m0;
+// Sessions: stored as plans (card specs), replayed on open, named from the tools that ran.
+// The shell persists whatever `serialize()` returns and feeds it back through `hydrate()`.
+
+let SS = [], cur = null;
+let sid = 0;
+const listeners = [];
+// the shell registers here to persist and redraw after any change to the session store
+const onChange = fn => { listeners.push(fn); };
+const changed = () => listeners.forEach(f => f());
+
+// what a session keeps of a card: enough to recompute it, and nothing else
+const spec = c => ({ id: c.id, raw: c.raw, tool: c.tool, args: c.args, rung: c.rung, amends: c.amends, ms: c.ms, ...(c.pinned ? { pinned: true } : {}) });
+
+// what a card contributes to its session's name: [label, weight], from the tool's declaration
+function tagOf(c) { const d = toolByName(c.tool); return d && d.topic ? d.topic(c.args) : null; }
+function autoName(cards) {
+  const opened = cards.find(c => c.tool === 'open'), table = opened || cards.some(c => ['hist', 'query'].includes(c.tool)), w = new Map();
+  const tname = opened && opened.args.file ? opened.args.file.name : 'assays.csv';
+  cards.forEach((c, i) => {
+    if (table && !['hist', 'query'].includes(c.tool)) return;
+    const t = tagOf(c); if (t) w.set(t[0], (w.get(t[0]) || 0) + t[1] + i * 1e-3);
+  });
+  const top = [...w.entries()].sort((x, y) => y[1] - x[1]).map(x => x[0]);
+  if (table) return tname + (top.length ? ': ' + top.slice(0, 2).join(', ') : '');
+  if (!top.length) return 'New session';
+  const two = top.slice(0, 2).join(', ');
+  return two.length > 40 ? top[0] : two;
+}
+// the current session changed: refresh its automatic name and tell the shell
+function touch() { cur.updated = Date.now(); if (cur.auto) cur.name = autoName(S.cards); changed(); }
+
+// open a session: clear the working state and recompute every card from its spec
+function load(s) {
+  cur = s; const specs = s.cards;
+  S.cards = []; s.cards = S.cards; S.table = null; S.n = 0; S.clause = null;
+  specs.forEach(c => {
+    let res = null; try { res = runTool(c.tool, c.args); } catch (e) { res = null; }
+    if (!res) return;
+    const card = { ...spec(c), res }; S.cards.push(card); S.n = Math.max(S.n, card.id);
+  });
+  const loaded = S.cards;
+  startJobs(loaded, card => { card.res = runTool(card.tool, card.args); });
+  return S.cards;
+}
+function openSession(id) { const s = SS.find(x => x.id === id); if (!s) return null; load(s); changed(); return s; }
+function newSession(example) {
+  const s = { id: ++sid, name: 'New session', auto: true, example: !!example, created: Date.now(), updated: Date.now(), cards: [] };
+  SS.push(s); load(s); changed(); return s;
+}
+// an empty name hands the session back to automatic naming
+function renameSession(id, name) {
+  const s = SS.find(x => x.id === id); if (!s) return null;
+  const v = name.trim();
+  if (v) { s.name = v; s.auto = false; } else { s.auto = true; s.name = autoName(s.cards); }
+  changed(); return s;
+}
+function deleteSession(id) {
+  SS = SS.filter(x => x.id !== id);
+  if (cur && cur.id === id) { if (SS.length) load([...SS].sort((x, y) => y.updated - x.updated)[0]); else newSession(); }
+  changed();
+}
+// a pinned card stays at hand at the top of its session; the pin is part of the session's plan, so it travels with it
+function pinCard(c) { if (c.pinned) delete c.pinned; else c.pinned = true; cur.updated = Date.now(); changed(); return !!c.pinned; }
+// a new session with this session's cards up to and including one: the same plan, recomputed, to go another way from there
+function branchSession(cardId) {
+  const from = cur, keep = from.cards.filter(c => c.id <= cardId).map(spec);
+  const s = { id: ++sid, name: 'New session', auto: true, example: false, created: Date.now(), updated: Date.now(), cards: keep };
+  SS.push(s); load(s); s.name = autoName(S.cards) + (autoName(S.cards) === from.name ? ' (branch)' : ''); changed(); return s;
+}
+// substring match over what was typed, across every session
+function searchHistory(q) {
+  q = q.trim().toLowerCase(); const hits = [];
+  if (q) SS.forEach(s => s.cards.forEach(c => { if (c.raw.toLowerCase().includes(q)) hits.push({ session: s, card: c }); }));
+  return hits;
+}
+const sessions = () => SS;
+const current = () => cur;
+
+function serialize() {
+  // files under a megabyte travel with the device state; larger ones stay in memory and say so on replay
+  const files = Object.fromEntries(Object.entries(S.files).filter(([, f]) => f.text.length <= 1e6));
+  return { cur: cur && cur.id, sid, aliases: S.aliases, facts: S.facts, files, tables: S.tables, recipes: S.recipes, misses: S.misses, picks: S.picks, ss: SS.map(s => ({ ...s, cards: s.cards.map(spec) })) };
+}
+// the same state in parts, for a store that keeps each session and each file on its own (the shell's @gcu/vfs), with no
+// size cap on files; hydrate() takes the parts put back together ({ cur, sid, ...device, files, ss })
+function parts() {
+  return { meta: { v: 1, cur: cur && cur.id, sid }, device: { aliases: S.aliases, facts: S.facts, tables: S.tables, recipes: S.recipes, misses: S.misses, picks: S.picks },
+    sessions: SS.map(s => ({ ...s, cards: s.cards.map(spec) })), files: S.files };
+}
+// A session as a file of its own ("<name>.golem.json"): its card specs and the files they read, so it replays on another
+// device. Importing gives it a new id and keeps the files it brings that this device does not have.
+function exportSession(id) {
+  const s = SS.find(x => x.id === id); if (!s) return null;
+  const hashes = new Set(), walk = v => { if (v && typeof v === 'object') { if (typeof v.hash === 'string' && S.files[v.hash]) hashes.add(v.hash); Object.values(v).forEach(walk); } };
+  s.cards.forEach(c => walk(c.args));
+  const { id: _, ...rest } = s;
+  return { golem: 'session', v: 1, session: { ...rest, cards: s.cards.map(spec) }, files: Object.fromEntries([...hashes].map(h => [h, S.files[h]])) };
+}
+function importSession(d) {
+  if (!d || d.golem !== 'session' || !d.session || !Array.isArray(d.session.cards)) return null;
+  for (const [h, f] of Object.entries(d.files || {})) if (!S.files[h] && f && f.hash === h) S.files[h] = f;
+  const s = { ...d.session, id: ++sid, example: false, updated: Date.now() };
+  SS.push(s); load(s); changed(); return s;
+}
+function hydrate(d) {
+  if (!d || !Array.isArray(d.ss) || !d.ss.length) return false;
+  SS = d.ss; sid = d.sid || Math.max(...SS.map(s => s.id)); S.aliases = d.aliases || {}; S.facts = d.facts || []; S.files = d.files || {}; S.tables = d.tables || {}; S.recipes = d.recipes || {}; S.misses = d.misses || []; S.picks = d.picks || {};
+  load(SS.find(s => s.id === d.cur) || SS[0]); return true;
+}
+// forget everything: sessions, device state, working state (tests start here)
+function reset() {
+  SS = []; cur = null; sid = 0; S.cards = []; S.n = 0; S.aliases = {}; S.facts = []; S.files = {}; S.tables = {}; S.recipes = {}; S.misses = []; S.picks = {}; S.table = null; S.clause = null; clearResults();
+}
+  return { onChange, spec, tagOf, autoName, touch, load, openSession, newSession, renameSession, deleteSession, pinCard, branchSession, searchHistory, sessions, current, serialize, parts, exportSession, importSession, hydrate, reset };
+})();
+
+/* ==== src/engine/share.js ==== */
+const __m29 = (() => {
+const { S, tool, iso, clock } = __m0;
+const { current, exportSession } = __m28;
+// Sharing a session so it can be checked (SPEC 13: things you can trust). Two pieces the shell builds on:
+//
+// canonical(v): the session file as bytes that do not depend on key order, which is what a signature covers. The shell
+// signs those bytes with a key that never leaves the device (the phone's hardware key in the app, a WebCrypto key kept
+// in IndexedDB in a browser) and checks them on import; the engine only says what the bytes are.
+//
+// The session as a notebook (.ipynb): each card's question, reading, answer, steps and source as Markdown, its Python
+// line as a code cell (illustrative: golem's names for the call, not a published API), and the session's own replay
+// file in the notebook's metadata (metadata.golem), so golem opens the notebook again as the session and recomputes
+// every card from its { tool, args }. That replay is what makes the numbers checkable.
+
+function canonical(v) {
+  if (Array.isArray(v)) return '[' + v.map(canonical).join(',') + ']';
+  if (v && typeof v === 'object') return '{' + Object.keys(v).filter(k => v[k] !== undefined).sort().map(k => JSON.stringify(k) + ':' + canonical(v[k])).join(',') + '}';
+  return JSON.stringify(v === undefined ? null : v);
+}
+// a session file without its signature: what was signed
+const unsigned = d => { const { signature, ...rest } = d || {}; return rest; };
+
+/* ── a card as Markdown ──────────────────────────────────────── */
+const esc = s => String(s ?? '').replace(/\|/g, '\\|').replace(/\n/g, ' ');
+function blockMd(b) {
+  switch (b.t) {
+    case 'big': return `**${b.v}** ${b.unit || ''}`.trim();
+    case 'sub': case 'note': case 'lbl': return b.kind === 'err' ? `> ${b.text}` : b.text || '';
+    case 'src': return `*${b.text}*`;
+    case 'kv': return b.rows.map(([k, v]) => `- ${k}: ${v}`).join('\n');
+    case 'table': return [`| ${b.head.map(esc).join(' | ')} |`, `| ${b.head.map(() => '---').join(' | ')} |`, ...b.rows.slice(0, 50).map(r => `| ${r.map(esc).join(' | ')} |`), ...(b.rows.length > 50 ? [`\n(${b.rows.length - 50} more rows)`] : [])].join('\n');
+    case 'list': case 'steps': return b.items.map((x, i) => `${b.t === 'steps' ? i + 1 + '.' : '-'} ${x}`).join('\n');
+    case 'pre': return '```\n' + b.text + '\n```';
+    case 'net': return `(a stereonet: ${(b.planes || []).length} plane${(b.planes || []).length === 1 ? '' : 's'}, ${(b.lines || []).length} line${(b.lines || []).length === 1 ? '' : 's'})`;
+    case 'bars': case 'curve': case 'figure': return '(a chart; golem draws it when the session is opened)';
+    default: return '';
+  }
+}
+const readOf = r => r.read.map(x => typeof x === 'string' ? x : `**${x.v}**`).join(' ');
+const cellId = (n, k) => `golem-${String(n).padStart(3, '0')}-${k}`;
+const lines = s => s.split('\n').map((l, i, a) => i < a.length - 1 ? l + '\n' : l);
+function notebookOf(sess, cards, at) {
+  const cells = [{ cell_type: 'markdown', id: 'golem-head', metadata: {}, source: lines(`# ${sess.name || 'golem session'}\n\nExported from golem on ${at}: ${cards.length} card${cards.length === 1 ? '' : 's'}, each as golem answered it. The Python lines are golem's names for each call, illustrative rather than a published API. The session itself is in this notebook's metadata (\`metadata.golem\`): open the notebook with golem's paperclip and every card is recomputed from what it was given.`) }];
+  for (const c of cards) {
+    const r = c.res; if (!r) continue;
+    const md = [`### #${String(c.id).padStart(2, '0')} · ${c.raw}`, `Read as ${readOf(r)} *(${c.rung})*`, ...r.body.map(blockMd).filter(Boolean),
+      ...(r.trace.length ? [`<details><summary>How · ${r.trace.length} step${r.trace.length === 1 ? '' : 's'}</summary>\n\n${r.trace.map((x, i) => `${i + 1}. ${x}`).join('\n')}\n\n</details>`] : [])].join('\n\n');
+    cells.push({ cell_type: 'markdown', id: cellId(c.id, 'md'), metadata: {}, source: lines(md) });
+    if (r.py) cells.push({ cell_type: 'code', id: cellId(c.id, 'py'), metadata: { golem: { illustrative: true } }, execution_count: null, outputs: [], source: lines(`# #${String(c.id).padStart(2, '0')} ${c.raw}\n${r.py}`) });
+  }
+  return { nbformat: 4, nbformat_minor: 5, metadata: { kernelspec: { name: 'python3', display_name: 'Python 3', language: 'python' }, language_info: { name: 'python' } }, cells };
+}
+
+tool({
+  name: 'exportNotebook',
+  skill: { group: 'Session', title: 'The session as a notebook', on: 'nbformat 4', about: 'The session as a Jupyter notebook: each card as Markdown, its Python line as a code cell, and the session itself in the metadata, so golem reopens it and recomputes every card. Exported session files are signed with this device\'s key, and checked when opened.', examples: ['export as notebook'] },
+  topic: () => ['Notebook', .5],
+  run: () => {
+    const s = current(), cards = S.cards.filter(c => c.tool !== 'exportNotebook'), at = iso(clock.now());
+    const nb = notebookOf(s || {}, cards, at), name = `${((s && s.name) || 'session').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'session'}.ipynb`;
+    // the replay file goes in by the shell, which signs it first (golem.json is the same object)
+    return { read: ['export session as', { v: 'notebook' }], value: cards.length, file: { name, mime: 'application/x-ipynb+json', notebook: nb, session: s ? s.id : null },
+      body: [{ t: 'kv', rows: [['cards', String(cards.length)], ['cells', `${nb.cells.length}: Markdown for each card, a code cell for each Python line`], ['replay', 'the session itself, in metadata.golem, signed with this device\'s key when saved']] }, { t: 'actions', items: [{ act: 'save', label: `Save ${name}` }] }, { t: 'src', text: 'nbformat 4 · opens in Jupyter, auditable, or golem' }],
+      trace: [`${cards.length} cards → ${nb.cells.length} cells`, 'metadata.golem: the session file, added and signed when saved'] };
+  }
+});
+  return { canonical, unsigned, notebookOf, exportSession };
+})();
+
+/* ==== src/engine/data/timescale.js ==== */
+const __m30 = (() => {
 // The International Chronostratigraphic Chart as a records pack: one row per unit, five ranks.
 // Source: ICS (Cohen, Finney, Gibbard & Fan 2013; updated chart) as served by Macrostrat
 // (macrostrat.org/api/v2/defs/intervals?timescale_id=11, CC BY 4.0), fetched 8 Oct 2026. The Hadean is
@@ -13525,9 +13714,9 @@ const TIMESCALE = [
 })();
 
 /* ==== src/engine/timescale.js ==== */
-const __m29 = (() => {
+const __m31 = (() => {
 const { tool, frame, noun, unit, fmt } = __m0;
-const { TIMESCALE, TIMESCALE_SOURCE } = __m28;
+const { TIMESCALE, TIMESCALE_SOURCE } = __m30;
 // The geologic timescale: the ICS chart as a records pack (data/timescale.js). Ages, bounds, ranks,
 // what a unit sits in, what came before and after, what it is subdivided into, and which unit an age
 // in Ma falls in. Lookups only; the chart is the answer.
@@ -13627,7 +13816,7 @@ noun({ type: 'chron', words: Object.fromEntries(Object.keys(RETIRED).map(k => [k
 })();
 
 /* ==== src/engine/sample.js ==== */
-const __m30 = (() => {
+const __m32 = (() => {
 const { tool, frame, noun, compound, qmod, postmod, unit, fmt } = __m0;
 const { parseUnit } = __m2;
 const { core, sieve } = __m1;
@@ -13767,7 +13956,7 @@ frame({
 })();
 
 /* ==== src/engine/explain.js ==== */
-const __m31 = (() => {
+const __m33 = (() => {
 const { tool, frame, amend, noun, shape, clock, fmt } = __m0;
 // Explainers: formal notation parsed and described, one row per piece. Cron schedules, epoch times,
 // chmod modes, URLs and ECMAScript regular expressions. Each member has a recogniser so a bare
@@ -14142,7 +14331,7 @@ amend({ tools: ['explain'], name: 'explainas', label: 'Explain as', words: [], e
 })();
 
 /* ==== src/vendor/parquet.js ==== */
-const __m32 = (() => {
+const __m34 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/parquet, Parquet read and write over vendored hyparquet and hyparquet-writer, pure JS, minified by its own build, copied from ../auditable/ext/parquet/index.js at auditable 5fa5f72e (MIT; hyparquet MIT).
 // Re-vendor by copying that file here.
 
@@ -14151,9 +14340,9 @@ const e=["BOOLEAN","INT32","INT64","INT96","FLOAT","DOUBLE","BYTE_ARRAY","FIXED_
 })();
 
 /* ==== src/engine/convert.js ==== */
-const __m33 = (() => {
+const __m35 = (() => {
 const { S, tool, frame, amend, noun, fmt } = __m0;
-const { writeParquet } = __m32;
+const { writeParquet } = __m34;
 // Conversions that need no file format reader: hashes, text encodings both ways, and the open table
 // as CSV, TSV or JSON with a save action. Format readers (xlsx, dm, parquet) are the second pass.
 
@@ -14310,7 +14499,7 @@ for (const op of ['encode', 'decode']) amend({ tools: ['encode'], name: `op${op}
 })();
 
 /* ==== src/vendor/plan-calendar.js ==== */
-const __m34 = (() => {
+const __m36 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/plan's calendar engine and Brazilian holidays, copied from
 // ../auditable/ext/plan/src/calendar.js and src/holidays-br.js (MIT). The scheduling half of the package is not here.
 // Re-vendor by copying those two files here again and keeping the single export block at the end.
@@ -14667,10 +14856,10 @@ function brazilMunicipalities() {
 })();
 
 /* ==== src/engine/calendar.js ==== */
-const __m35 = (() => {
+const __m37 = (() => {
 const { S, tool, frame, amend, noun, shape, postmod, unit, clock, iso } = __m0;
 const { findDate, findTime, today, day0, fmtDate, dateWords } = __m4;
-const { isWorkingDay, addWorkingDays, brazilCalendar, federalHolidays } = __m34;
+const { isWorkingDay, addWorkingDays, brazilCalendar, federalHolidays } = __m36;
 // Working days and rosters over @gcu/plan's calendar engine (vendored), and time zones through Intl.
 // The calendar is a slot and is always shown: Brazil's federal holidays, or weekdays only.
 
@@ -14903,7 +15092,7 @@ amend({ tools: ['workdays'], name: 'workcal', label: 'Calendar', words: [], elid
 })();
 
 /* ==== src/engine/estimate.js ==== */
-const __m36 = (() => {
+const __m38 = (() => {
 const { amend, noun, tool, fmt } = __m0;
 const { U } = __m2;
 // Estimates with ranges: arithmetic over intervals by simulation, units carried through, the seed kept
@@ -15078,7 +15267,7 @@ amend({ tools: ['estimate'], name: 'estdist', label: 'Distribution', words: ['as
 })();
 
 /* ==== src/engine/data/elements.js ==== */
-const __m37 = (() => {
+const __m39 = (() => {
 // The elements with their standard atomic weights, abridged to five significant figures.
 // Source: IUPAC Commission on Isotopic Abundances and Atomic Weights (CIAAW), Standard Atomic Weights 2024
 // (ciaaw.org/atomic-weights.htm, the 2021 report with Gd, Lu and Zr revised in 2024), cross-checked against
@@ -15123,9 +15312,9 @@ const ELEMENTS = [
 })();
 
 /* ==== src/engine/chem.js ==== */
-const __m38 = (() => {
+const __m40 = (() => {
 const { tool, frame, noun, shape, postmod, fmt } = __m0;
-const { ELEMENTS, ELEMENTS_SOURCE } = __m37;
+const { ELEMENTS, ELEMENTS_SOURCE } = __m39;
 const { UNIT_TABLE } = __m2;
 // Molar mass, conversion factors and element fractions from a parsed formula over the IUPAC weights;
 // the periodic table lookup. No mineral names: the minerals pack is not here, so a formula is required.
@@ -15289,7 +15478,7 @@ frame({
 })();
 
 /* ==== src/engine/text.js ==== */
-const __m39 = (() => {
+const __m41 = (() => {
 const { tool, frame, amend, noun, qmod, fmt } = __m0;
 // Text tools over a pasted payload: counts and readability, extracted key sentences, and a diff.
 // The payload is what follows the first colon, or every line after the first of a multi-line input;
@@ -15435,9 +15624,9 @@ amend({ tools: ['diff'], name: 'diffunit', label: 'Diff by', words: [], elidable
 })();
 
 /* ==== src/engine/econ.js ==== */
-const __m40 = (() => {
+const __m42 = (() => {
 const { tool, frame, noun, shape, postmod, qmod, fmt } = __m0;
-const { ELEMENTS } = __m37;
+const { ELEMENTS } = __m39;
 const { numberAsk, firstNeed } = __m26;
 // Sampling theory and mine economics as declared formulas. Every term is a slot; a term the person did
 // not give is asked for, with the conventional value offered first and never applied on its own. Prices
@@ -15602,7 +15791,7 @@ frame({
 })();
 
 /* ==== src/engine/log.js ==== */
-const __m41 = (() => {
+const __m43 = (() => {
 const { S, tool, frame, amend, noun, fmt, iso } = __m0;
 const { parseUnit, dimName } = __m2;
 const { findDate, today, fmtDate, dateWords } = __m4;
@@ -15751,7 +15940,7 @@ amend({ tools: ['logAdd'], name: 'logfix', label: 'Correct', words: ['that was',
 })();
 
 /* ==== src/engine/places.js ==== */
-const __m42 = (() => {
+const __m44 = (() => {
 const { S, tool, frame, amend, noun, shape, postmod, fmt, rad, deg } = __m0;
 // Places, distance and UTM. A place is coordinates in the request or a name saved on this device
 // ("home is -19.92, -43.94"); there is no gazetteer and device location is off, so an unknown name is
@@ -15917,11 +16106,11 @@ amend({ tools: ['utm'], name: 'utmband', label: 'Band', words: [], elidable: tru
 })();
 
 /* ==== src/engine/sky.js ==== */
-const __m43 = (() => {
+const __m45 = (() => {
 const { tool, frame, amend, noun, compound, fmt, rad, deg, iso } = __m0;
 const { findDate, today, fmtDate, dateWords } = __m4;
-const { zonesOf, offsetOf } = __m35;
-const { placeOf } = __m42;
+const { zonesOf, offsetOf } = __m37;
+const { placeOf } = __m44;
 // The sun by NOAA's solar position equations (after Meeus), and the moon's phase from the mean
 // synodic cycle, labelled with its accuracy. Times are given in the place's zone when the place name
 // has one, else in UTC and the card says so.
@@ -16003,7 +16192,7 @@ amend({ tools: ['sun'], name: 'sunzone', label: 'Zone', words: [], elidable: tru
 })();
 
 /* ==== src/engine/apply.js ==== */
-const __m44 = (() => {
+const __m46 = (() => {
 const { S, tool, fmt, rad, deg, p3, p2 } = __m0;
 const { whereOf } = __m16;
 const { evaluatePredicate, predicateToString } = __m15;
@@ -16070,7 +16259,7 @@ tool({
 })();
 
 /* ==== src/vendor/ipynb.js ==== */
-const __m45 = (() => {
+const __m47 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/ipynb, copied from ../auditable/ext/ipynb/index.js (MIT). golem uses importNotebook
 // for its import-substitution table only (numpy → natra, pandas → sadpan, …). Re-vendor by copying that file here.
 
@@ -16619,9 +16808,9 @@ function exportNotebook(cells, opts = {}) {
 })();
 
 /* ==== src/engine/python.js ==== */
-const __m46 = (() => {
+const __m48 = (() => {
 const { tool, frame, amend, result, fmt } = __m0;
-const { importNotebook } = __m45;
+const { importNotebook } = __m47;
 // Run and trace Python with adder, on the device. The tool itself stays synchronous: a first run returns a
 // "running" card carrying a job, the runner (a Web Worker in the page, adder in-process in the tests)
 // answers later, and the card is recomputed from the kept result. Replay reruns the code, which is
@@ -16691,7 +16880,7 @@ amend({ tools: ['python'], name: 'pytraceoff', label: 'Run', words: ['no trace',
 })();
 
 /* ==== src/vendor/librarian.js ==== */
-const __m47 = (() => {
+const __m49 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/librarian, the in-process text search (BM25F, fuzzy expansion, snippets, did-you-mean), copied from ../auditable/ext/librarian/index.js at auditable 5fa5f72e (MIT).
 // Re-vendor by copying that file here.
 
@@ -17967,9 +18156,9 @@ const Librarian = {
 })();
 
 /* ==== src/engine/docs.js ==== */
-const __m48 = (() => {
+const __m50 = (() => {
 const { S, tool, frame, amend, noun, postmod } = __m0;
-const { Librarian } = __m47;
+const { Librarian } = __m49;
 // Search my documents (A7). Markdown, plain text and HTML opened with the paperclip are kept on the device,
 // cut into passages (by heading, then by paragraph) and indexed by @gcu/librarian. A search returns
 // passages verbatim with the matched words marked; golem never rewrites them. The index is derived
@@ -18122,7 +18311,7 @@ amend({ tools: ['docPassage'], name: 'docstep', label: 'Passage', words: [], eli
 })();
 
 /* ==== src/engine/recipes.js ==== */
-const __m49 = (() => {
+const __m51 = (() => {
 const { S, tool, frame, noun, session, runTool } = __m0;
 const { listOf } = __m26;
 // Recipes (A9): a session's plan saved under a name, with the subjects that may change between runs.
@@ -18318,7 +18507,7 @@ session({
 })();
 
 /* ==== src/vendor/sheet.js ==== */
-const __m50 = (() => {
+const __m52 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sheet, copied from ../auditable/ext/sheet/index.js (built from its src/ by @gcu/build, MIT).
 // Re-vendor by copying that file here. Reading is asynchronous (DecompressionStream), so golem converts at open time, not in a tool.
 
@@ -19550,7 +19739,7 @@ const sheet = {
 })();
 
 /* ==== src/vendor/dm.js ==== */
-const __m51 = (() => {
+const __m53 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/dm, the read-only Datamine .dm reader, copied from ../auditable/ext/dm/index.js (MIT).
 // Re-vendor by copying that file here.
 
@@ -19826,10 +20015,10 @@ function readDM(buffer) {
 })();
 
 /* ==== src/engine/formats.js ==== */
-const __m52 = (() => {
-const { sheet } = __m50;
-const { readDM } = __m51;
-const { readParquet, parquetInfo } = __m32;
+const __m54 = (() => {
+const { sheet } = __m52;
+const { readDM } = __m53;
+const { readParquet, parquetInfo } = __m34;
 // Binary table formats, converted to text when a file is opened: xlsx through @gcu/sheet (one text per
 // sheet), Datamine .dm through @gcu/dm, Parquet through @gcu/parquet. Tools stay synchronous and the device keeps the converted text,
 // so a session replays from it. What did not carry over is said on the card.
@@ -19880,7 +20069,7 @@ async function convertBinary(name, buffer) {
 })();
 
 /* ==== src/engine/notes.js ==== */
-const __m53 = (() => {
+const __m55 = (() => {
 const { S, tool, frame } = __m0;
 // Notes and taught words. Both belong to the device and are shared by every session.
 const textOf = c => c.theme[0] && c.theme[0].type === 'text' ? c.theme[0].value : null;
@@ -19931,7 +20120,7 @@ frame({
 })();
 
 /* ==== src/engine/skills.js ==== */
-const __m54 = (() => {
+const __m56 = (() => {
 const { TOOLS, tool, frame } = __m0;
 // The catalog: skills derived from the declarations, planned skills named here, and the packs golem
 // knows about. Examples feed the Skills tab, the "nearest skills" suggestions and the teach vocabulary.
@@ -20003,9 +20192,9 @@ const SUGGESTIONS = ['pop means population', 'histogram of cu', 'log scale', 'po
 })();
 
 /* ==== src/engine/learn.js ==== */
-const __m55 = (() => {
+const __m57 = (() => {
 const { S, tool, frame, noun } = __m0;
-const { vocab } = __m54;
+const { vocab } = __m56;
 // Learning from the person, on the device (SPEC 13: the language that grows). Nothing is learned silently, and nothing
 // is sent: what did not read is kept in a list the person can see and teach from ("what couldn't you read"); a request
 // that did not read, followed by one that did and differs in a short stretch, offers to remember that stretch as a word
@@ -20105,11 +20294,11 @@ frame({
 })();
 
 /* ==== src/engine/ontology.js ==== */
-const __m56 = (() => {
+const __m58 = (() => {
 const { FRAMES, LEXICON, S } = __m0;
 const { UNIT_TABLE, COMPOUNDS, DIM, parseUnit, dimName } = __m2;
 const { ELEMENT } = __m16;
-const { TIMESCALE } = __m28;
+const { TIMESCALE } = __m30;
 // The clause ontology, assembled from what golem knows: units from the conversion table, nouns from the
 // sample packs, verb frames from the declarations. Inert data; the build writes it to dist/golem.json.
 // Portuguese synonyms are listed here by hand until packs carry them in their golem facet.
@@ -20186,7 +20375,7 @@ function ontology(only) {
 })();
 
 /* ==== src/vendor/dispatch.js ==== */
-const __m57 = (() => {
+const __m59 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/dispatch, built from ../auditable/ext/dispatch/src/ by its own build.
 // Source of truth: gentropic/auditable ext/dispatch (local clone: ../auditable). Re-vendor by copying
 // ext/dispatch/index.js here after 'node ext/dispatch/build.js'. golem uses the grammar rung only:
@@ -22339,14 +22528,14 @@ const PORTUGUESE = {
 })();
 
 /* ==== src/engine/reading.js ==== */
-const __m58 = (() => {
+const __m60 = (() => {
 const { S, T, TOOLS, FRAMES, tool, frame, amend, session, noun, toolByName, runTool, iso } = __m0;
-const { examples, vocab } = __m54;
-const { rankByPicks } = __m55;
-const { ontology } = __m56;
+const { examples, vocab } = __m56;
+const { rankByPicks } = __m57;
+const { ontology } = __m58;
 const { calcOf } = __m3;
-const { estimateOf } = __m36;
-const { createEngine, makeSession, ENGLISH, PORTUGUESE } = __m57;
+const { estimateOf } = __m38;
+const { createEngine, makeSession, ENGLISH, PORTUGUESE } = __m59;
 // The reading ladder: context (amendments, meta-intents), grammar (the clause parser, then the regex
 // rules the declarations carry), taught words (device lexicon rewrites, then grammar again). Plus the
 // tools that talk about the session itself: none, why, export.
@@ -22626,7 +22815,7 @@ frame({
   name: 'export', label: 'Export', words: ['export', 'save', 'write', 'give me'], elidable: true, theme: ['table'], required: ['as'], roles: { as: { preps: ['as', 'to', 'in'], types: ['format'] } },
   words_pt: ['exportar', 'exporta', 'salvar', 'salva'], label_pt: 'Exportar',
   // csv, tsv, json and parquet are the open table as a file; script and notebook are the session as code
-  bind: c => { const as = c.roles.as && c.roles.as[0] && c.roles.as[0].value; return ['csv', 'tsv', 'json', 'parquet'].includes(as) ? { tool: 'tableExport', args: { fmt: as } } : ['script', 'notebook'].includes(as) ? { tool: 'export', args: {} } : null; }
+  bind: c => { const as = c.roles.as && c.roles.as[0] && c.roles.as[0].value; return ['csv', 'tsv', 'json', 'parquet'].includes(as) ? { tool: 'tableExport', args: { fmt: as } } : as === 'notebook' ? { tool: 'exportNotebook', args: {} } : as === 'script' ? { tool: 'export', args: {} } : null; }
 });
 // "why", "show the plan": the steps behind the last card, whatever its tool
 amend({ tools: ['*'], name: 'why', label: 'Why', words: ['why', 'how', 'how so', 'show the plan', 'show me the plan', 'show the trace', 'show the work', 'show me the work', 'what did you do', 'explain that'], theme: [], required: [], roles: {},
@@ -22654,127 +22843,8 @@ function sessionRead(raw) {
   return { setLanguage, language, norm, clauseEngine, clauseRead, grammar, commandOf, context, readingOf, completions, taught, guessesOf, guessRead, sessionRead };
 })();
 
-/* ==== src/engine/sessions.js ==== */
-const __m59 = (() => {
-const { S, toolByName, runTool, startJobs, clearResults } = __m0;
-// Sessions: stored as plans (card specs), replayed on open, named from the tools that ran.
-// The shell persists whatever `serialize()` returns and feeds it back through `hydrate()`.
-
-let SS = [], cur = null;
-let sid = 0;
-const listeners = [];
-// the shell registers here to persist and redraw after any change to the session store
-const onChange = fn => { listeners.push(fn); };
-const changed = () => listeners.forEach(f => f());
-
-// what a session keeps of a card: enough to recompute it, and nothing else
-const spec = c => ({ id: c.id, raw: c.raw, tool: c.tool, args: c.args, rung: c.rung, amends: c.amends, ms: c.ms, ...(c.pinned ? { pinned: true } : {}) });
-
-// what a card contributes to its session's name: [label, weight], from the tool's declaration
-function tagOf(c) { const d = toolByName(c.tool); return d && d.topic ? d.topic(c.args) : null; }
-function autoName(cards) {
-  const opened = cards.find(c => c.tool === 'open'), table = opened || cards.some(c => ['hist', 'query'].includes(c.tool)), w = new Map();
-  const tname = opened && opened.args.file ? opened.args.file.name : 'assays.csv';
-  cards.forEach((c, i) => {
-    if (table && !['hist', 'query'].includes(c.tool)) return;
-    const t = tagOf(c); if (t) w.set(t[0], (w.get(t[0]) || 0) + t[1] + i * 1e-3);
-  });
-  const top = [...w.entries()].sort((x, y) => y[1] - x[1]).map(x => x[0]);
-  if (table) return tname + (top.length ? ': ' + top.slice(0, 2).join(', ') : '');
-  if (!top.length) return 'New session';
-  const two = top.slice(0, 2).join(', ');
-  return two.length > 40 ? top[0] : two;
-}
-// the current session changed: refresh its automatic name and tell the shell
-function touch() { cur.updated = Date.now(); if (cur.auto) cur.name = autoName(S.cards); changed(); }
-
-// open a session: clear the working state and recompute every card from its spec
-function load(s) {
-  cur = s; const specs = s.cards;
-  S.cards = []; s.cards = S.cards; S.table = null; S.n = 0; S.clause = null;
-  specs.forEach(c => {
-    let res = null; try { res = runTool(c.tool, c.args); } catch (e) { res = null; }
-    if (!res) return;
-    const card = { ...spec(c), res }; S.cards.push(card); S.n = Math.max(S.n, card.id);
-  });
-  const loaded = S.cards;
-  startJobs(loaded, card => { card.res = runTool(card.tool, card.args); });
-  return S.cards;
-}
-function openSession(id) { const s = SS.find(x => x.id === id); if (!s) return null; load(s); changed(); return s; }
-function newSession(example) {
-  const s = { id: ++sid, name: 'New session', auto: true, example: !!example, created: Date.now(), updated: Date.now(), cards: [] };
-  SS.push(s); load(s); changed(); return s;
-}
-// an empty name hands the session back to automatic naming
-function renameSession(id, name) {
-  const s = SS.find(x => x.id === id); if (!s) return null;
-  const v = name.trim();
-  if (v) { s.name = v; s.auto = false; } else { s.auto = true; s.name = autoName(s.cards); }
-  changed(); return s;
-}
-function deleteSession(id) {
-  SS = SS.filter(x => x.id !== id);
-  if (cur && cur.id === id) { if (SS.length) load([...SS].sort((x, y) => y.updated - x.updated)[0]); else newSession(); }
-  changed();
-}
-// a pinned card stays at hand at the top of its session; the pin is part of the session's plan, so it travels with it
-function pinCard(c) { if (c.pinned) delete c.pinned; else c.pinned = true; cur.updated = Date.now(); changed(); return !!c.pinned; }
-// a new session with this session's cards up to and including one: the same plan, recomputed, to go another way from there
-function branchSession(cardId) {
-  const from = cur, keep = from.cards.filter(c => c.id <= cardId).map(spec);
-  const s = { id: ++sid, name: 'New session', auto: true, example: false, created: Date.now(), updated: Date.now(), cards: keep };
-  SS.push(s); load(s); s.name = autoName(S.cards) + (autoName(S.cards) === from.name ? ' (branch)' : ''); changed(); return s;
-}
-// substring match over what was typed, across every session
-function searchHistory(q) {
-  q = q.trim().toLowerCase(); const hits = [];
-  if (q) SS.forEach(s => s.cards.forEach(c => { if (c.raw.toLowerCase().includes(q)) hits.push({ session: s, card: c }); }));
-  return hits;
-}
-const sessions = () => SS;
-const current = () => cur;
-
-function serialize() {
-  // files under a megabyte travel with the device state; larger ones stay in memory and say so on replay
-  const files = Object.fromEntries(Object.entries(S.files).filter(([, f]) => f.text.length <= 1e6));
-  return { cur: cur && cur.id, sid, aliases: S.aliases, facts: S.facts, files, tables: S.tables, recipes: S.recipes, misses: S.misses, picks: S.picks, ss: SS.map(s => ({ ...s, cards: s.cards.map(spec) })) };
-}
-// the same state in parts, for a store that keeps each session and each file on its own (the shell's @gcu/vfs), with no
-// size cap on files; hydrate() takes the parts put back together ({ cur, sid, ...device, files, ss })
-function parts() {
-  return { meta: { v: 1, cur: cur && cur.id, sid }, device: { aliases: S.aliases, facts: S.facts, tables: S.tables, recipes: S.recipes, misses: S.misses, picks: S.picks },
-    sessions: SS.map(s => ({ ...s, cards: s.cards.map(spec) })), files: S.files };
-}
-// A session as a file of its own ("<name>.golem.json"): its card specs and the files they read, so it replays on another
-// device. Importing gives it a new id and keeps the files it brings that this device does not have.
-function exportSession(id) {
-  const s = SS.find(x => x.id === id); if (!s) return null;
-  const hashes = new Set(), walk = v => { if (v && typeof v === 'object') { if (typeof v.hash === 'string' && S.files[v.hash]) hashes.add(v.hash); Object.values(v).forEach(walk); } };
-  s.cards.forEach(c => walk(c.args));
-  const { id: _, ...rest } = s;
-  return { golem: 'session', v: 1, session: { ...rest, cards: s.cards.map(spec) }, files: Object.fromEntries([...hashes].map(h => [h, S.files[h]])) };
-}
-function importSession(d) {
-  if (!d || d.golem !== 'session' || !d.session || !Array.isArray(d.session.cards)) return null;
-  for (const [h, f] of Object.entries(d.files || {})) if (!S.files[h] && f && f.hash === h) S.files[h] = f;
-  const s = { ...d.session, id: ++sid, example: false, updated: Date.now() };
-  SS.push(s); load(s); changed(); return s;
-}
-function hydrate(d) {
-  if (!d || !Array.isArray(d.ss) || !d.ss.length) return false;
-  SS = d.ss; sid = d.sid || Math.max(...SS.map(s => s.id)); S.aliases = d.aliases || {}; S.facts = d.facts || []; S.files = d.files || {}; S.tables = d.tables || {}; S.recipes = d.recipes || {}; S.misses = d.misses || []; S.picks = d.picks || {};
-  load(SS.find(s => s.id === d.cur) || SS[0]); return true;
-}
-// forget everything: sessions, device state, working state (tests start here)
-function reset() {
-  SS = []; cur = null; sid = 0; S.cards = []; S.n = 0; S.aliases = {}; S.facts = []; S.files = {}; S.tables = {}; S.recipes = {}; S.misses = []; S.picks = {}; S.table = null; S.clause = null; clearResults();
-}
-  return { onChange, spec, tagOf, autoName, touch, load, openSession, newSession, renameSession, deleteSession, pinCard, branchSession, searchHistory, sessions, current, serialize, parts, exportSession, importSession, hydrate, reset };
-})();
-
 /* ==== src/vendor/sluice/accumulator.js ==== */
-const __m60 = (() => {
+const __m61 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sluice src/accumulator.js, copied from ../auditable/ext/sluice/src/accumulator.js at auditable 3a7b253c.
 // golem vendors sluice's accumulator modules only (src/engine/stream.js): its runner builds expressions with new Function,
 // which golem does not ship outside the Python worker.
@@ -22942,7 +23012,7 @@ function weightedStats() {
 })();
 
 /* ==== src/vendor/sluice/tdigest.js ==== */
-const __m61 = (() => {
+const __m62 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sluice src/tdigest.js, copied from ../auditable/ext/sluice/src/tdigest.js at auditable 3a7b253c.
 // golem vendors sluice's accumulator modules only (src/engine/stream.js): its runner builds expressions with new Function,
 // which golem does not ship outside the Python worker.
@@ -23057,7 +23127,7 @@ function quantile(state, q) {
 })();
 
 /* ==== src/vendor/sluice/histogram.js ==== */
-const __m62 = (() => {
+const __m63 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sluice src/histogram.js, copied from ../auditable/ext/sluice/src/histogram.js at auditable 3a7b253c.
 // golem vendors sluice's accumulator modules only (src/engine/stream.js): its runner builds expressions with new Function,
 // which golem does not ship outside the Python worker.
@@ -23109,14 +23179,14 @@ function cumulativeFromTop(counts) {
 })();
 
 /* ==== src/engine/stream.js ==== */
-const __m63 = (() => {
+const __m64 = (() => {
 const { S, T, fmt, result } = __m0;
 const { colOf, whereSrc, tableFromText, openTable } = __m16;
 const { parsePredicate, evaluatePredicate, predicateToString } = __m15;
 const { NULL_SENTINELS } = __m14;
-const { weightedStats } = __m60;
-const { tdigest, quantile } = __m61;
-const { histogram } = __m62;
+const { weightedStats } = __m61;
+const { tdigest, quantile } = __m62;
+const { histogram } = __m63;
 // Tables too large to hold (SPEC 13.7): a CSV or TSV over 20 MB is typed from its first megabyte by recon, like any
 // table, and its questions are answered by scanning the whole file as a job, through @gcu/sluice's accumulators
 // (mergeable, never holding the rows): Welford and weighted moments, t-digest quantiles, histograms. The shell runs the
@@ -23277,18 +23347,18 @@ for (const k of ['apply', 'tableExport']) T[k] = a => S.table && S.table.streame
 })();
 
 /* ==== src/engine/engine.js ==== */
-const __m64 = (() => {
+const __m65 = (() => {
 const { S, T, runTool, toolByName, startJobs, tool, CONDITIONS, EFFECTS, clock, iso } = __m0;
 const { DOCUMENT } = __m12;
-const { DOCTEXT } = __m48;
-const { bindingsOf, runSteps } = __m49;
+const { DOCTEXT } = __m50;
+const { bindingsOf, runSteps } = __m51;
 const { tableFromText } = __m16;
-const { convertBinary } = __m52;
-const { noteMiss, clearMiss, correctionOf, teachOfPick, notePick, setReader } = __m55;
-const { norm, grammar, context, taught, sessionRead, readingOf, guessRead, clauseEngine } = __m58;
-const { makeSession } = __m57;
-const { current, newSession, renameSession, touch } = __m59;
-const { streamedTable } = __m63;
+const { convertBinary } = __m54;
+const { noteMiss, clearMiss, correctionOf, teachOfPick, notePick, setReader } = __m57;
+const { norm, grammar, context, taught, sessionRead, readingOf, guessRead, clauseEngine } = __m60;
+const { makeSession } = __m59;
+const { current, newSession, renameSession, touch } = __m28;
+const { streamedTable } = __m64;
 // The entry point: submit(raw) reads a request and returns what happened. Cards are recomputed in
 // place by rerun(); answers and slot flips go through it, so args stay the only state that matters.
 
@@ -23554,7 +23624,7 @@ function seedExamples() {
 })();
 
 /* ==== src/engine/packs.js ==== */
-const __m65 = (() => {
+const __m66 = (() => {
 const { profilesOf } = __m18;
 // Packs as gcu-library ships them: a .gcudat is a gzipped tar holding gcudat.json (the manifest) and the data files
 // (gcu-library tools/build-gcudat.mjs). Read here with the platform's own gunzip (DecompressionStream, in browsers and
@@ -23669,7 +23739,7 @@ async function compileStrunk(bytes) {
 })();
 
 /* ==== src/vendor/vfs.js ==== */
-const __m66 = (() => {
+const __m67 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/vfs, copied from ../auditable/ext/vfs/index.js (built from its src/ by node ext/vfs/build.js), at
 // auditable 8837da6e. golem's shell keeps sessions, device state, files and packs in it over IndexedDB (src/shell/store.js).
 // golem constructs only IDBBackend and MemoryBackend; the network backends in this bundle (fetch, REST, Dropbox) are
@@ -27480,8 +27550,8 @@ function fromPicker(vfs, destPath, opts) {
 })();
 
 /* ==== src/shell/store.js ==== */
-const __m67 = (() => {
-const { VFS } = __m66;
+const __m68 = (() => {
+const { VFS } = __m67;
 // Where the device keeps golem (SPEC 13.9): @gcu/vfs over IndexedDB, one file per session, one per opened file, the
 // device state and a small meta file, so a session can be exported as itself and nothing has a size cap but the
 // browser's. Only what changed is written. When IndexedDB is not there, the whole state goes to localStorage as before;
@@ -27595,7 +27665,7 @@ function noStore() {
 })();
 
 /* ==== src/vendor/leadacid.js ==== */
-const __m68 = (() => {
+const __m69 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. The lead-acid shell shim, copied from ../auditable/ext/leadacid/index.js
 // (itself vendored from gentropic/lead-acid, lead-acid.js). Re-vendor by copying that file here.
 
@@ -28299,7 +28369,7 @@ function orientationFromRotationVector(v) {
 })();
 
 /* ==== src/vendor/plot.js ==== */
-const __m69 = (() => {
+const __m70 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/plot (matplotlib-shaped plotting; figures leave the worker as draw lists), copied from ../auditable/ext/plot/index.js at auditable 774234c3 (9 Oct 2026, MIT).
 // Loaded only inside the Python worker. Re-vendor by copying that file here.
 
@@ -30333,7 +30403,7 @@ if (typeof window !== 'undefined') {
 })();
 
 /* ==== src/shell/i18n.js ==== */
-const __m70 = (() => {
+const __m71 = (() => {
 // The interface in English or Brazilian Portuguese. golem's own words (the page, the sidebar, the composer, the cards'
 // frame, the messages) go through t(); the English is the key, so a sentence not translated yet shows in English and a
 // placeholder ({name}) is filled in after the lookup. What a tool answers is the tool's, in English for now.
@@ -30399,7 +30469,8 @@ const PT = {
   'Tap Take reading to turn the compass on.': 'Toque em Medir para ligar a bússola.', 'Compass on: hold the phone still, then take the reading.': 'Bússola ligada: segure o celular parado e meça.',
   'The compass needs the motion permission: allow it for this site in the browser.': 'A bússola precisa da permissão de movimento: permita para este site no navegador.', 'Position needs the location permission: allow it for this site in the browser.': 'A posição precisa da permissão de localização: permita para este site no navegador.',
   'In a browser the fix comes through the browser, which may ask its own location service for it.': 'No navegador a posição vem do navegador, que pode consultar o próprio serviço de localização.',
-  'Add to station {name}': 'Adicionar à estação {name}', 'A sample of 42 common minerals ships, copied from the pack.': 'Uma amostra de 42 minerais comuns vem junto, copiada do pacote.', 'Installed: {n} minerals.': 'Instalado: {n} minerais.', 'Removed. The sample of 42 minerals answers again.': 'Removido. A amostra de 42 minerais responde de novo.', 'Remember: “{word}” means “{means}”': 'Lembrar: “{word}” quer dizer “{means}”',
+  'Add to station {name}': 'Adicionar à estação {name}',
+  "Imported \"{name}\". It is not signed.": "\"{name}\" importada. Não está assinada.", "Imported \"{name}\". Signed by key {fp} ({security}), unchanged since it was signed.": "\"{name}\" importada. Assinada pela chave {fp} ({security}), sem alteração desde a assinatura.", "Imported \"{name}\", but its signature does not match: the file was changed after key {fp} signed it.": "\"{name}\" importada, mas a assinatura não confere: o arquivo foi alterado depois que a chave {fp} o assinou.", "Saved unsigned: {e}": "Salvo sem assinatura: {e}", "Signing key": "Chave de assinatura", "Exported sessions and notebooks are signed with this device's key, {fp} ({security}). A signature shows that a file is unchanged since this key signed it; golem checks it when the file is opened.": "Sessões e notebooks exportados são assinados com a chave deste aparelho, {fp} ({security}). A assinatura mostra que o arquivo não mudou desde que esta chave o assinou; o golem confere ao abrir o arquivo.", "Reading this device's key…": "Lendo a chave deste aparelho…", 'A sample of 42 common minerals ships, copied from the pack.': 'Uma amostra de 42 minerais comuns vem junto, copiada do pacote.', 'Installed: {n} minerals.': 'Instalado: {n} minerais.', 'Removed. The sample of 42 minerals answers again.': 'Removido. A amostra de 42 minerais responde de novo.', 'Remember: “{word}” means “{means}”': 'Lembrar: “{word}” quer dizer “{means}”',
   'Measured.': 'Medido.', 'Measured. The phone moved while measuring; hold it still for a steadier reading.': 'Medido. O celular se mexeu durante a medida; segure parado para uma leitura mais firme.',
   'Waiting for a fix…': 'Esperando uma posição…', 'Position needs the location permission: allow it in the dialog, or in the app\'s settings.': 'A posição precisa da permissão de localização: permita na caixa de diálogo, ou nas configurações do app.',
   'No position: {e}': 'Sem posição: {e}', 'No fix. Go where the sky is open and try again.': 'Sem posição. Vá para onde o céu está aberto e tente de novo.', 'Position taken, ±{m} m.': 'Posição registrada, ±{m} m.',
@@ -30445,11 +30516,11 @@ const PT = {
 })();
 
 /* ==== src/shell/render.js ==== */
-const __m71 = (() => {
+const __m72 = (() => {
 const { fmt } = __m0;
 const { conversions, equalArea } = __m5;
-const { Figure } = __m69;
-const { t } = __m70;
+const { Figure } = __m70;
+const { t } = __m71;
 const { stationNow } = __m25;
 // Rendering. The engine hands over plain blocks; this is the only file that turns them into markup.
 
@@ -30595,7 +30666,7 @@ function figImage(ctx, x, y, w, h, cols, rows, b64) {
 })();
 
 /* ==== src/vendor/sw-register.js ==== */
-const __m72 = (() => {
+const __m73 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sw's page-side companion, copied from ../auditable/ext/sw/register.js (at auditable 8837da6e).
 
 // @gcu/sw — the page-side companion (ES module). Registration + persistent
@@ -30672,28 +30743,82 @@ function registerGcuSw(opts = {}) {
   return { registerGcuSw };
 })();
 
+/* ==== src/shell/sign.js ==== */
+const __m74 = (() => {
+const { shell } = __m69;
+// Signing what golem exports, and checking what it opens (SPEC 13: things you can trust). One signature format for both
+// homes, ECDSA P-256 over SHA-256, the signature raw (r‖s) and the public key as SPKI, both base64: inside the lead-acid
+// app the phone's hardware key signs (lead-acid's attest plugin: StrongBox, else the TEE); in a browser, a WebCrypto key
+// pair made once and kept in IndexedDB, its private half not extractable. A signature says the file has not changed
+// since a key signed it; who holds the key is for the person to know (the fingerprint is shown under Packs).
+
+const ALG = 'ECDSA-P256-SHA256', P256 = { name: 'ECDSA', namedCurve: 'P-256' }, SIGN = { name: 'ECDSA', hash: 'SHA-256' };
+const b64 = buf => { const u = new Uint8Array(buf); let s = ''; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode(...u.subarray(i, i + 0x8000)); return btoa(s); };
+const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+const canSign = () => !!(shell.present || (globalThis.crypto && crypto.subtle && globalThis.indexedDB));
+
+// the browser's key: made on first use, kept in its own IndexedDB store (a CryptoKey is stored as itself)
+function idb() {
+  return new Promise((ok, no) => { const r = indexedDB.open('golem-sign', 1); r.onupgradeneeded = () => r.result.createObjectStore('keys'); r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); });
+}
+async function browserKey() {
+  const db = await idb(), get = () => new Promise((ok, no) => { const q = db.transaction('keys').objectStore('keys').get('device'); q.onsuccess = () => ok(q.result); q.onerror = () => no(q.error); });
+  let k = await get();
+  if (!k) {
+    k = await crypto.subtle.generateKey(P256, false, ['sign', 'verify']);
+    await new Promise((ok, no) => { const tx = db.transaction('keys', 'readwrite'); tx.objectStore('keys').put(k, 'device'); tx.oncomplete = ok; tx.onerror = () => no(tx.error); });
+  }
+  return k;
+}
+// this device's key: { pub, security, fingerprint }
+async function deviceKey() {
+  if (shell.present) { const i = await shell.attest.keyinfo(); return { pub: i.pub, security: i.security, fingerprint: await fingerprint(i.pub) }; }
+  const k = await browserKey(), pub = b64(await crypto.subtle.exportKey('spki', k.publicKey));
+  return { pub, security: 'browser (WebCrypto, kept in IndexedDB)', fingerprint: await fingerprint(pub) };
+}
+async function sign(bytes) {
+  if (shell.present) { const a = await shell.attest.sign(bytes); return { alg: a.alg || ALG, sig: a.sig, pub: a.pub, security: a.security, signedAt: new Date().toISOString() }; }
+  const k = await browserKey(), sig = await crypto.subtle.sign(SIGN, k.privateKey, bytes);
+  return { alg: ALG, sig: b64(sig), pub: b64(await crypto.subtle.exportKey('spki', k.publicKey)), security: 'browser (WebCrypto, kept in IndexedDB)', signedAt: new Date().toISOString() };
+}
+// true when the bytes are what the key signed
+async function verify(s, bytes) {
+  if (!s || s.alg !== ALG || !s.sig || !s.pub) return false;
+  try { const key = await crypto.subtle.importKey('spki', unb64(s.pub), P256, false, ['verify']); return await crypto.subtle.verify(SIGN, key, unb64(s.sig), bytes); }
+  catch (e) { return false; }
+}
+// the key, short enough to compare by eye: the first 8 bytes of the SHA-256 of its SPKI, in groups of four hex digits
+async function fingerprint(pubB64) {
+  const h = new Uint8Array(await crypto.subtle.digest('SHA-256', unb64(pubB64)));
+  return [...h.slice(0, 8)].map(x => x.toString(16).padStart(2, '0')).join('').match(/.{4}/g).join(' ');
+}
+  return { canSign, deviceKey, sign, verify, fingerprint };
+})();
+
 /* ==== src/shell/main.js ==== */
-const __m73 = (() => {
+const __m75 = (() => {
 const { S } = __m0;
-const { submit, flipSlot, answer, capture, seedExamples, openFile, openBinary, openStreamed, preview } = __m64;
-const { scanTable, STREAM_OVER } = __m63;
-const { completions } = __m58;
+const { submit, flipSlot, answer, capture, seedExamples, openFile, openBinary, openStreamed, preview } = __m65;
+const { scanTable, STREAM_OVER } = __m64;
+const { completions } = __m60;
 const { fromDevice } = __m24;
 const { conversions } = __m5;
 const { useFactbook, factbookInfo } = __m18;
-const { factbookFromGcudat, factbookProfiles, readGcudat, compileOds, compileStrunk, mineralsFromGcudat } = __m65;
+const { factbookFromGcudat, factbookProfiles, readGcudat, compileOds, compileStrunk, mineralsFromGcudat } = __m66;
 const { useMinerals, mineralsInfo } = __m8;
 const { useBook, bookInfo } = __m19;
-const { BINARY } = __m52;
+const { BINARY } = __m54;
 const { setRunner, onJobDone } = __m0;
-const { sessions, current, newSession, openSession, renameSession, deleteSession, searchHistory, parts, hydrate, onChange, exportSession, importSession, pinCard, branchSession } = __m59;
-const { openStore, putBlob, getBlob } = __m67;
-const { skills, PACKS, STARTERS, STARTERS_PT } = __m54;
-const { shell } = __m68;
-const { escHtml, pad, cardEl, drawCharts } = __m71;
-const { registerGcuSw } = __m72;
-const { t, plural, setUiLang, uiLang, applyStatic } = __m70;
-const { setLanguage } = __m58;
+const { sessions, current, newSession, openSession, renameSession, deleteSession, searchHistory, parts, hydrate, onChange, exportSession, importSession, pinCard, branchSession } = __m28;
+const { openStore, putBlob, getBlob } = __m68;
+const { skills, PACKS, STARTERS, STARTERS_PT } = __m56;
+const { shell } = __m69;
+const { escHtml, pad, cardEl, drawCharts } = __m72;
+const { registerGcuSw } = __m73;
+const { sign, verify, fingerprint, deviceKey, canSign } = __m74;
+const { canonical, unsigned } = __m29;
+const { t, plural, setUiLang, uiLang, applyStatic } = __m71;
+const { setLanguage } = __m60;
 // The shell: wiring, tabs, the session drawer, storage, and the sleep switch. Everything that touches
 // the DOM or the browser lives here or in render.js; the engine never does.
 
@@ -31101,7 +31226,7 @@ function renderPacks() {
   });
   const al = Object.entries(S.aliases);
   h += `<div class="lbl">${t('On this device')}</div><div class="item"><h3>${t('Taught words')}</h3><p>${al.length ? al.map(([k, v]) => `${escHtml(k)} → ${escHtml(v)}`).join('<br>') : t('None yet. Try “pop means population”.')}</p></div><div class="item"><h3>${t('Notes')}</h3><p>${S.facts.length ? S.facts.map(escHtml).join('<br>') : t('None yet. Try “remember that …”.')}</p></div><div class="item"><h3>${t('Open table')}</h3><p>${S.table ? escHtml(t('{name} · {n} rows · {source}', { name: S.table.name, n: S.table.rows.length, source: t(S.table.source === 'sample' ? 'sample data' : 'from your files') })) : t('None.')}</p></div><div class="item"><h3>${t('Files on this device')}</h3><p>${Object.values(S.files).length ? Object.values(S.files).map(f => `${escHtml(f.name)} · ${(f.size / 1024).toFixed(0)} kB`).join('<br>') : t('None yet. Tap the paperclip to open a CSV.')}</p></div>`;
-  h += voiceItem() + appItem();
+  h += voiceItem() + keyItem() + appItem();
   $('v-packs').innerHTML = h;
   for (const [id, fn] of [['fb-install', () => installFactbook(false)], ['fb-install-full', () => installFactbook(true)], ['fb-remove', removeFactbook]]) { const b = $(id); if (b) b.addEventListener('click', fn); }
   const ck = $('sw-check'), ap = $('sw-apply');
@@ -31248,6 +31373,32 @@ document.addEventListener('keydown', e => {
 $('attach').addEventListener('click', () => { if (awake) $('file').click(); });
 $('file').addEventListener('change', e => { const f = e.target.files && e.target.files[0]; if (f) openPicked(f); e.target.value = ''; });
 // a file from the paperclip, dropped on the window, or shared to the app ("Open with golem"): one way in
+// a session file, from a .golem.json or a notebook's metadata: its signature checked over the bytes it covers, then it
+// comes back as a session of its own, the status saying whether it is signed and unchanged
+async function openSessionFile(d) {
+  let s = null; try { s = importSession(d); } catch (err) { s = null; }
+  if (!s) { status('That is not a golem session file.'); return; }
+  renderStream(); renderDrawer();
+  if (!d.signature) { status(t('Imported "{name}". It is not signed.', { name: s.name })); return; }
+  const ok = await verify(d.signature, new TextEncoder().encode(canonical(unsigned(d)))).catch(() => false);
+  const fp = await fingerprint(d.signature.pub).catch(() => '?');
+  status(ok ? t('Imported "{name}". Signed by key {fp} ({security}), unchanged since it was signed.', { name: s.name, fp, security: d.signature.security || '' })
+    : t('Imported "{name}", but its signature does not match: the file was changed after key {fp} signed it.', { name: s.name, fp }));
+}
+// this device's signing key, under Packs: fetched (or made, in a browser) the first time the view is drawn
+let keyInfo = null, keyAsked = false;
+function keyItem() {
+  if (!canSign()) return '';
+  if (!keyAsked) { keyAsked = true; deviceKey().then(k => { keyInfo = k; renderPacks(); }, () => {}); }
+  return `<div class="item"><h3>${t('Signing key')}</h3><p>${keyInfo ? t('Exported sessions and notebooks are signed with this device\'s key, {fp} ({security}). A signature shows that a file is unchanged since this key signed it; golem checks it when the file is opened.', { fp: `<code>${escHtml(keyInfo.fingerprint)}</code>`, security: escHtml(keyInfo.security) }) : t('Reading this device\'s key…')}</p></div>`;
+}
+// the session file as saved: signed with this device's key when it can be (unsigned, and said so, when it cannot)
+async function signedSession(id) {
+  const d = exportSession(id); if (!d) return null;
+  if (!canSign()) return d;
+  try { return { ...d, signature: await sign(new TextEncoder().encode(canonical(d))) }; }
+  catch (e) { status(t('Saved unsigned: {e}', { e: e.message })); return d; }
+}
 function openPicked(f) {
   if (!awake) return status('Asleep. Tap wake at the top right.');
   if (!ready) return status('Opening your sessions…');
@@ -31265,7 +31416,11 @@ function openPicked(f) {
     return;
   }
   if (/\.golem\.json$/i.test(f.name)) {   // a session exported from golem: it comes back as a session of its own
-    f.text().then(txt => { let s = null; try { s = importSession(JSON.parse(txt)); } catch (err) { s = null; } if (!s) { status('That is not a golem session file.'); return; } renderStream(); renderDrawer(); status(t('Imported "{name}".', { name: s.name })); }, () => status('Could not read that file.'));
+    f.text().then(txt => { let d = null; try { d = JSON.parse(txt); } catch (err) { d = null; } openSessionFile(d); }, () => status('Could not read that file.'));
+    return;
+  }
+  if (/\.ipynb$/i.test(f.name)) {   // a notebook golem exported carries its session in metadata.golem; any other opens as before
+    f.text().then(txt => { let j = null; try { j = JSON.parse(txt); } catch (err) { j = null; } if (j && j.metadata && j.metadata.golem) openSessionFile(j.metadata.golem); else { show(openFile(f.name, txt)); status(t('Opened {name}.', { name: f.name })); } }, () => status('Could not read that file.'));
     return;
   }
   if (BINARY.test(f.name)) f.arrayBuffer().then(buf => openBinary(f.name, buf)).then(o => { show(o); if (o.kind === 'card') status(t('Opened {name}.', { name: f.name })); }, () => status('Could not read that file.'));
@@ -31308,7 +31463,10 @@ $('stream').addEventListener('click', e => {
       e => say(e && e.status === 503 ? `No app on this phone takes ${send.name}.` : e && e.status === 400 ? `The shell refused the ${e.field || 'request'}: ${e.message || ''}` : `The hand-off failed: ${(e && e.message) || e}`, 'err'));
   }
   else if (act === 'save' && c.res.file) {
-    const f = c.res.file; saveFile(f.name, f.bytes || f.text, f.mime);
+    const f = c.res.file;
+    // a notebook carries the session itself in its metadata, signed like a session file
+    if (f.notebook) { signedSession(f.session).then(d => saveFile(f.name, JSON.stringify({ ...f.notebook, metadata: { ...f.notebook.metadata, golem: d } }, null, 1), f.mime)); return; }
+    saveFile(f.name, f.bytes || f.text, f.mime);
   }
   else if (act === 'copy') {
     const fail = () => { const p = document.createElement('pre'); p.textContent = c.res.copy; b.closest('.ans').appendChild(p); status('Copy was blocked here. The text is shown so you can select it.'); };
@@ -31337,8 +31495,8 @@ $('dlist').addEventListener('click', e => {
   if (b.dataset.s) { openSession(+b.dataset.s); renderStream(b.dataset.c); renderDrawer(); closeDrawer(); }
   else if (b.dataset.ren) { ren = +b.dataset.ren; del = null; renderDrawer(); }
   else if (b.dataset.exp) {   // the session as a file of its own; the paperclip opens it again
-    const d = exportSession(+b.dataset.exp), slug = (d.session.name || 'session').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'session';
-    saveFile(`${slug}.golem.json`, JSON.stringify(d, null, 1), 'application/json');
+    const id = +b.dataset.exp, d0 = exportSession(id), slug = (d0.session.name || 'session').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'session';
+    signedSession(id).then(d => saveFile(`${slug}.golem.json`, JSON.stringify(d, null, 1), 'application/json'));
   }
   else if (b.dataset.del) {
     const id = +b.dataset.del;

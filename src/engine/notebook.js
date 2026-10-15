@@ -128,7 +128,7 @@ tool({
     else { text = JSON.stringify({ type: 'FeatureCollection', features: all.map(r => ({ type: 'Feature', geometry: r.lat != null ? { type: 'Point', coordinates: [r.lon, r.lat] } : null, properties: props(r) })) }, null, 1) + '\n'; name = 'field-notebook.geojson'; mime = 'application/geo+json'; }
     const placed = all.filter(r => r.lat != null).length;
     return { read, value: text, copy: text, file: { name, mime, text },
-      body: [{ t: 'pre', text: text.split('\n').slice(0, 12).join('\n') + '\n…' }, { t: 'kv', rows: [['rows', String(all.length)], ['with a position', `${placed} of ${all.length}${a.fmt === 'csv' ? '' : '; the others have no geometry'}`], ['coordinates', 'WGS84 longitude, latitude, as the phone or the typing gave them']] }, SRC],
+      body: [{ t: 'pre', text: text.split('\n').slice(0, 12).join('\n') + '\n…' }, { t: 'actions', items: [{ act: 'save', label: `Save ${name}` }] }, { t: 'kv', rows: [['rows', String(all.length)], ['with a position', `${placed} of ${all.length}${a.fmt === 'csv' ? '' : '; the others have no geometry'}`], ['coordinates', 'WGS84 longitude, latitude, as the phone or the typing gave them']] }, SRC],
       trace: [`${all.length} rows → ${fmtName}`], py: `field.export("${a.fmt}")` };
   }
 });

@@ -18,6 +18,8 @@ import { skills, PACKS, STARTERS, STARTERS_PT } from '../engine/skills.js';
 import { shell } from '../vendor/leadacid.js';
 import { escHtml, pad, cardEl, drawCharts } from './render.js';
 import { registerGcuSw } from '../vendor/sw-register.js';
+import { sign, verify, fingerprint, deviceKey, canSign } from './sign.js';
+import { canonical, unsigned } from '../engine/share.js';
 import { t, plural, setUiLang, uiLang, applyStatic } from './i18n.js';
 import { setLanguage } from '../engine/reading.js';
 
@@ -425,7 +427,7 @@ function renderPacks() {
   });
   const al = Object.entries(S.aliases);
   h += `<div class="lbl">${t('On this device')}</div><div class="item"><h3>${t('Taught words')}</h3><p>${al.length ? al.map(([k, v]) => `${escHtml(k)} → ${escHtml(v)}`).join('<br>') : t('None yet. Try “pop means population”.')}</p></div><div class="item"><h3>${t('Notes')}</h3><p>${S.facts.length ? S.facts.map(escHtml).join('<br>') : t('None yet. Try “remember that …”.')}</p></div><div class="item"><h3>${t('Open table')}</h3><p>${S.table ? escHtml(t('{name} · {n} rows · {source}', { name: S.table.name, n: S.table.rows.length, source: t(S.table.source === 'sample' ? 'sample data' : 'from your files') })) : t('None.')}</p></div><div class="item"><h3>${t('Files on this device')}</h3><p>${Object.values(S.files).length ? Object.values(S.files).map(f => `${escHtml(f.name)} · ${(f.size / 1024).toFixed(0)} kB`).join('<br>') : t('None yet. Tap the paperclip to open a CSV.')}</p></div>`;
-  h += voiceItem() + appItem();
+  h += voiceItem() + keyItem() + appItem();
   $('v-packs').innerHTML = h;
   for (const [id, fn] of [['fb-install', () => installFactbook(false)], ['fb-install-full', () => installFactbook(true)], ['fb-remove', removeFactbook]]) { const b = $(id); if (b) b.addEventListener('click', fn); }
   const ck = $('sw-check'), ap = $('sw-apply');
@@ -572,6 +574,32 @@ document.addEventListener('keydown', e => {
 $('attach').addEventListener('click', () => { if (awake) $('file').click(); });
 $('file').addEventListener('change', e => { const f = e.target.files && e.target.files[0]; if (f) openPicked(f); e.target.value = ''; });
 // a file from the paperclip, dropped on the window, or shared to the app ("Open with golem"): one way in
+// a session file, from a .golem.json or a notebook's metadata: its signature checked over the bytes it covers, then it
+// comes back as a session of its own, the status saying whether it is signed and unchanged
+async function openSessionFile(d) {
+  let s = null; try { s = importSession(d); } catch (err) { s = null; }
+  if (!s) { status('That is not a golem session file.'); return; }
+  renderStream(); renderDrawer();
+  if (!d.signature) { status(t('Imported "{name}". It is not signed.', { name: s.name })); return; }
+  const ok = await verify(d.signature, new TextEncoder().encode(canonical(unsigned(d)))).catch(() => false);
+  const fp = await fingerprint(d.signature.pub).catch(() => '?');
+  status(ok ? t('Imported "{name}". Signed by key {fp} ({security}), unchanged since it was signed.', { name: s.name, fp, security: d.signature.security || '' })
+    : t('Imported "{name}", but its signature does not match: the file was changed after key {fp} signed it.', { name: s.name, fp }));
+}
+// this device's signing key, under Packs: fetched (or made, in a browser) the first time the view is drawn
+let keyInfo = null, keyAsked = false;
+function keyItem() {
+  if (!canSign()) return '';
+  if (!keyAsked) { keyAsked = true; deviceKey().then(k => { keyInfo = k; renderPacks(); }, () => {}); }
+  return `<div class="item"><h3>${t('Signing key')}</h3><p>${keyInfo ? t('Exported sessions and notebooks are signed with this device\'s key, {fp} ({security}). A signature shows that a file is unchanged since this key signed it; golem checks it when the file is opened.', { fp: `<code>${escHtml(keyInfo.fingerprint)}</code>`, security: escHtml(keyInfo.security) }) : t('Reading this device\'s key…')}</p></div>`;
+}
+// the session file as saved: signed with this device's key when it can be (unsigned, and said so, when it cannot)
+async function signedSession(id) {
+  const d = exportSession(id); if (!d) return null;
+  if (!canSign()) return d;
+  try { return { ...d, signature: await sign(new TextEncoder().encode(canonical(d))) }; }
+  catch (e) { status(t('Saved unsigned: {e}', { e: e.message })); return d; }
+}
 function openPicked(f) {
   if (!awake) return status('Asleep. Tap wake at the top right.');
   if (!ready) return status('Opening your sessions…');
@@ -589,7 +617,11 @@ function openPicked(f) {
     return;
   }
   if (/\.golem\.json$/i.test(f.name)) {   // a session exported from golem: it comes back as a session of its own
-    f.text().then(txt => { let s = null; try { s = importSession(JSON.parse(txt)); } catch (err) { s = null; } if (!s) { status('That is not a golem session file.'); return; } renderStream(); renderDrawer(); status(t('Imported "{name}".', { name: s.name })); }, () => status('Could not read that file.'));
+    f.text().then(txt => { let d = null; try { d = JSON.parse(txt); } catch (err) { d = null; } openSessionFile(d); }, () => status('Could not read that file.'));
+    return;
+  }
+  if (/\.ipynb$/i.test(f.name)) {   // a notebook golem exported carries its session in metadata.golem; any other opens as before
+    f.text().then(txt => { let j = null; try { j = JSON.parse(txt); } catch (err) { j = null; } if (j && j.metadata && j.metadata.golem) openSessionFile(j.metadata.golem); else { show(openFile(f.name, txt)); status(t('Opened {name}.', { name: f.name })); } }, () => status('Could not read that file.'));
     return;
   }
   if (BINARY.test(f.name)) f.arrayBuffer().then(buf => openBinary(f.name, buf)).then(o => { show(o); if (o.kind === 'card') status(t('Opened {name}.', { name: f.name })); }, () => status('Could not read that file.'));
@@ -632,7 +664,10 @@ $('stream').addEventListener('click', e => {
       e => say(e && e.status === 503 ? `No app on this phone takes ${send.name}.` : e && e.status === 400 ? `The shell refused the ${e.field || 'request'}: ${e.message || ''}` : `The hand-off failed: ${(e && e.message) || e}`, 'err'));
   }
   else if (act === 'save' && c.res.file) {
-    const f = c.res.file; saveFile(f.name, f.bytes || f.text, f.mime);
+    const f = c.res.file;
+    // a notebook carries the session itself in its metadata, signed like a session file
+    if (f.notebook) { signedSession(f.session).then(d => saveFile(f.name, JSON.stringify({ ...f.notebook, metadata: { ...f.notebook.metadata, golem: d } }, null, 1), f.mime)); return; }
+    saveFile(f.name, f.bytes || f.text, f.mime);
   }
   else if (act === 'copy') {
     const fail = () => { const p = document.createElement('pre'); p.textContent = c.res.copy; b.closest('.ans').appendChild(p); status('Copy was blocked here. The text is shown so you can select it.'); };
@@ -661,8 +696,8 @@ $('dlist').addEventListener('click', e => {
   if (b.dataset.s) { openSession(+b.dataset.s); renderStream(b.dataset.c); renderDrawer(); closeDrawer(); }
   else if (b.dataset.ren) { ren = +b.dataset.ren; del = null; renderDrawer(); }
   else if (b.dataset.exp) {   // the session as a file of its own; the paperclip opens it again
-    const d = exportSession(+b.dataset.exp), slug = (d.session.name || 'session').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'session';
-    saveFile(`${slug}.golem.json`, JSON.stringify(d, null, 1), 'application/json');
+    const id = +b.dataset.exp, d0 = exportSession(id), slug = (d0.session.name || 'session').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'session';
+    signedSession(id).then(d => saveFile(`${slug}.golem.json`, JSON.stringify(d, null, 1), 'application/json'));
   }
   else if (b.dataset.del) {
     const id = +b.dataset.del;

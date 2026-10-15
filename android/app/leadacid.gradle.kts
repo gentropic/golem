@@ -8,6 +8,7 @@ dependencies {
     "implementation"(project(":plugin-intake"))
     "implementation"(project(":plugin-sensor"))
     "implementation"(project(":plugin-gnss"))
+    "implementation"(project(":plugin-attest"))
 }
 
 // The artifact, copied from the web build at every build (never committed under src/): dist/golem.html
