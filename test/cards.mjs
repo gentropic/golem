@@ -81,6 +81,17 @@ await page.locator('#stream .card').last().locator('[data-act="take"]').click();
 const here = await page.locator('#stream .card').last().textContent();
 check(/declination at -23.52, -46.19/.test(here) && /° west/.test(here), `declination here takes the browser's position (${here.replace(/[ ]+/g, ' ').slice(0, 70)})`);
 
+// Chrome on Android (155) has DeviceOrientationEvent.requestPermission too, and allows motion already: the compass must
+// not wait for a tap there (it did, until tried on a phone). A page that only has the function still reads at once.
+const p2 = await ctx.newPage(); p2.on('pageerror', e => errors.push(e.message));
+await p2.addInitScript(() => { DeviceOrientationEvent.requestPermission = async () => 'granted'; });
+await p2.goto(url); await p2.waitForSelector('html[data-ready]'); await p2.waitForTimeout(200);
+await p2.fill('#q', 'measure bedding'); await p2.press('#q', 'Enter'); await p2.waitForTimeout(250);
+await p2.evaluate(() => window.dispatchEvent(new DeviceOrientationEvent('deviceorientationabsolute', { alpha: 100, beta: 30, gamma: 0, absolute: true })));
+await p2.waitForTimeout(100);
+const live2 = (await p2.locator('#stream .card').last().locator('.capture .live').textContent()).trim();
+check(/^080[/]30/.test(live2), `where requestPermission exists but motion is allowed, the compass reads without a tap (${live2})`);
+
 errors.forEach(e => console.log('FAIL page error: ' + e));
 await browser.close();
 if (failed || errors.length) { console.log('\ncards test failed'); process.exit(1); }

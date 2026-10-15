@@ -29970,8 +29970,7 @@ const { registerGcuSw } = __m67;
 const { t, plural, setUiLang, uiLang, applyStatic } = __m65;
 const { setLanguage } = __m53;
 // The shell: wiring, tabs, the session drawer, storage, and the sleep switch. Everything that touches
-// the DOM or the browser lives here or in render.js; the engine never does.
-
+// the DOM or the browser lives here or in render.js; the engine never does.
 const $ = id => document.getElementById(id);
 const THEME = 'golem.theme', FOLD = 'golem.side', LANG = 'golem.lang';
 const narrow = () => window.matchMedia('(max-width: 860px)').matches;
@@ -30183,10 +30182,13 @@ const vecOf = (what, al, be, ga) => { const [x, y] = fromDevice(what, al, be, ga
 // The compass: in the app, lead-acid's fused rotation vector, with Android's accuracy; in a phone's browser, the events
 // that say where north is (deviceorientationabsolute in Chrome, an absolute deviceorientation in Firefox, Safari's
 // webkitCompassHeading once a tap allows motion), which carry no accuracy. Events relative to wherever the phone
-// started are not a compass, and are not used. A desktop has the events and never fires them: after a while it says so.
+// started are not a compass, and are not used. golem listens at once: Chrome has requestPermission too but already
+// allows motion, and sends an event only when the reading changes. Only when nothing has come does it ask for the tap
+// (Safari); a desktop has the events and never fires them, and after a while it says so.
 const webCompass = !inApp && typeof DeviceOrientationEvent !== 'undefined';
 const webFix = !inApp && !!navigator.geolocation;
-let compassAllowed = !(webCompass && typeof DeviceOrientationEvent.requestPermission === 'function');
+const askable = webCompass && typeof DeviceOrientationEvent.requestPermission === 'function';
+let compassAllowed = !askable;
 if (inApp || webCompass) document.documentElement.dataset.compass = '1';
 if (inApp || webFix) document.documentElement.dataset.fix = '1';
 function browserOrientation(cb) {
@@ -30210,9 +30212,8 @@ async function armCaptures() {
   if (!want && orient) { orient.close(); orient = null; samples = []; return; }
   if (!want || orient) { paintCaptures(); return; }
   if (!inApp) {
-    if (!compassAllowed) { liveAll(t('Tap Take reading to turn the compass on.')); return; }
-    const mine = orient = browserOrientation(sample);
-    setTimeout(() => { if (orient === mine && !samples.length) liveAll(t('The compass is not available here.')); }, 2500);
+    const mine = orient = browserOrientation(o => { compassAllowed = true; sample(o); });
+    if (!compassAllowed) liveAll(t('Tap Take reading to turn the compass on.')); else quiet(mine);
     return;
   }
   try {
@@ -30228,16 +30229,17 @@ function paintCaptures() {
     live.innerHTML = `${String(Math.round(((x % 360) + 360) % 360)).padStart(3, '0')}/${String(Math.round(y)).padStart(2, '0')}<small>${escHtml(t('magnetic · compass {acc}', { acc: t(ACCW[s.acc] || 'not reported') }))}</small>`;
   }
 }
+const quiet = mine => setTimeout(() => { if (orient === mine && !samples.length) liveAll(t('The compass is not available here.')); }, 2500);
 // Safari asks before it hands a page the motion sensors, and only from a tap: the first tap asks, the next one measures
 async function allowCompass() {
   try { compassAllowed = (await DeviceOrientationEvent.requestPermission()) === 'granted'; } catch (e) { compassAllowed = false; }
   if (!compassAllowed) { status(t('The compass needs the motion permission: allow it for this site in the browser.')); return; }
-  armCaptures(); status(t('Compass on: hold the phone still, then take the reading.'));
+  armCaptures(); quiet(orient); status(t('Compass on: hold the phone still, then take the reading.'));
 }
 // the steadiest reading of the last second: the sample nearest the others, and how far the farthest was
 function takeReading(c) {
   const kind = c.res.capture.kind;
-  if (!inApp && !compassAllowed) { allowCompass(); return; }
+  if (!inApp && !compassAllowed && !samples.length) { allowCompass(); return; }
   if (!samples.length) { status('No reading from the compass yet: hold the phone still a moment.'); return; }
   const vs = samples.map(s => vecOf(kind, s.alpha, s.beta, s.gamma));
   let best = 0, bestSum = Infinity;
