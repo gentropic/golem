@@ -22,7 +22,7 @@ test('measure waits for a reading, keeps it in args, and replays it unmeasured',
   g.reset(); pin(); g.newSession();
   for (const [q, what, name] of [['measure bedding', 'plane', 'bedding'], ['measure a lineation', 'line', 'lineation'], ['compass', 'plane', undefined], ['take a reading of the fold axis', 'line', 'fold axis']]) {
     const c = g.submit(q).card; assert.equal(c.tool, 'measure', q); assert.equal(c.args.what, what, q); assert.equal(c.args.name, name, q);
-    assert.ok(c.res.capture, `${q}: the card asks for a reading`); assert.match(g.textOf(c), /needs the golem app/);
+    assert.ok(c.res.capture, `${q}: the card asks for a reading`); assert.match(g.textOf(c), /needs a phone's compass/);
   }
   g.reset(); pin(); g.newSession();
   const c = g.submit('measure bedding').card;
@@ -49,4 +49,13 @@ test('declination here waits for a position, then is the declination there', () 
   g.capture(c, { lat: -23.52, lon: -46.19, acc: 5, at: Date.UTC(2026, 9, 14, 13) });
   assert.equal(c.args.here, undefined); assert.equal(c.args.lat, -23.52);
   assert.match(g.textOf(c), /declination at -23\.52, -46\.19 here, ±5 m/); assert.match(g.textOf(c), /° west/);
+});
+
+test('a reading from a phone\'s browser is the same arithmetic, says where it came from, and has no accuracy', () => {
+  g.reset(); pin(); g.newSession();
+  const c = g.submit('measure bedding').card;
+  g.capture(c, { alpha: 100, beta: 30, gamma: 0, acc: null, spread: 0.6, at: Date.UTC(2026, 9, 14, 13), via: 'browser' });
+  assert.equal(c.args.reading.via, 'browser');
+  assert.match(g.textOf(c), /080\/30 dip direction\/dip \(magnetic\)/); assert.match(g.textOf(c), /compass accuracy not reported: the browser does not say/);
+  assert.match(g.textOf(c), /deviceorientation, north-referenced/);
 });

@@ -9,8 +9,8 @@ const url = pathToFileURL(join(dirname(fileURLToPath(import.meta.url)), '..', 'd
 let failed = 0;
 const check = (ok, what) => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${what}`); if (!ok) failed++; };
 const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
-const ctx = await browser.newContext({ viewport: { width: 1200, height: 900 } });
-await ctx.grantPermissions(['clipboard-read', 'clipboard-write']);
+const ctx = await browser.newContext({ viewport: { width: 1200, height: 900 }, geolocation: { latitude: -23.52, longitude: -46.19, accuracy: 8 } });
+await ctx.grantPermissions(['clipboard-read', 'clipboard-write', 'geolocation']);
 const page = await ctx.newPage(); const errors = []; page.on('pageerror', e => errors.push(e.message));
 await page.goto(url); await page.waitForSelector('html[data-ready]'); await page.waitForTimeout(200);
 const ask = async q => { await page.fill('#q', q); await page.press('#q', 'Enter'); await page.waitForTimeout(250); };
@@ -59,6 +59,27 @@ check(await page.evaluate(() => { const c = document.querySelector('#stream .car
 const wide = [];
 for (const w of [390, 700, 870, 900, 1200, 1700]) { await page.setViewportSize({ width: w, height: 900 }); await page.waitForTimeout(250); const sw = await page.evaluate(() => document.documentElement.scrollWidth); if (sw > w) wide.push(`${w}: ${sw}`); }
 check(!wide.length, `nothing scrolls sideways from 390 to 1700 px${wide.length ? ' (' + wide.join(', ') + ')' : ''}`);
+
+// field capture in a phone's browser, not only in the app: north-referenced orientation events (faked here as a phone's
+// browser sends them: deviceorientationabsolute in Chrome, an absolute deviceorientation elsewhere) and the geolocation
+await page.setViewportSize({ width: 1200, height: 900 });
+await ask('measure bedding');
+await page.evaluate(() => { const o = { alpha: 100, beta: 30, gamma: 0, absolute: true }; for (let i = 0; i < 5; i++) { window.dispatchEvent(new DeviceOrientationEvent('deviceorientationabsolute', o)); window.dispatchEvent(new DeviceOrientationEvent('deviceorientation', o)); } });
+await page.waitForTimeout(100);
+const liveTxt = await page.locator('#stream .card').last().locator('.capture .live').textContent();
+check(/^080[/]30/.test(liveTxt.trim()), `the browser's compass shows live (${liveTxt.trim()})`);
+await page.locator('#stream .card').last().locator('[data-act="take"]').click(); await page.waitForTimeout(200);
+const measured = await page.locator('#stream .card').last().textContent();
+check(/080[/]30/.test(measured) && /not reported: the browser does not say/.test(measured), 'a reading taken in the browser is the card, marked as from the browser');
+await page.evaluate(() => window.dispatchEvent(new DeviceOrientationEvent('deviceorientation', { alpha: 10, beta: 30, gamma: 0, absolute: false })));
+await ask('measure a joint'); await page.evaluate(() => window.dispatchEvent(new DeviceOrientationEvent('deviceorientation', { alpha: 10, beta: 30, gamma: 0, absolute: false })));
+await page.waitForTimeout(100);
+const rel = (await page.locator('#stream .card').last().locator('.capture .live').textContent()).trim();
+check(!/^[0-9]{3}[/]/.test(rel), `an orientation not tied to north is not a compass (${rel})`);
+await ask('declination here');
+await page.locator('#stream .card').last().locator('[data-act="take"]').click(); await page.waitForTimeout(800);
+const here = await page.locator('#stream .card').last().textContent();
+check(/declination at -23.52, -46.19/.test(here) && /° west/.test(here), `declination here takes the browser's position (${here.replace(/[ ]+/g, ' ').slice(0, 70)})`);
 
 errors.forEach(e => console.log('FAIL page error: ' + e));
 await browser.close();

@@ -220,7 +220,7 @@ function voiceItem() {
   const out = voice.say ? `${t('Answers can be read aloud with the phone\'s offline voices.')}</p><div class="opts"><button class="btn${voice.all ? ' go' : ''}" type="button" id="say-all" aria-pressed="${voice.all}">${t(voice.all ? 'Reading every answer aloud' : 'Read every answer aloud')}</button></div>` : t('No offline voice for {lang}, so nothing is read aloud.', { lang: langName() }) + '</p>';
   return `<div class="item"><h3>${t('Voice')}</h3><p>${hear} ${out}</div>`;
 }
-/* ── field capture, in the app: the phone's fused orientation for a plane or a line, one position fix. A card that waits
+/* ── field capture, in the app or a phone's browser: the phone's orientation for a plane or a line, one position fix. A card that waits
    for a reading (res.capture) shows it live; the reading taken goes into the card's args (capture() in the engine). ── */
 if (inApp) document.documentElement.dataset.app = '1';
 const ACCW = { 3: 'high', 2: 'medium', 1: 'low', 0: 'unreliable', '-1': 'no sensor' };
@@ -228,17 +228,45 @@ let orient = null, samples = [];
 const pendingCaptures = () => S.cards.filter(c => c.res && c.res.capture && ['plane', 'line'].includes(c.res.capture.kind));
 const angle = (u, v) => Math.acos(Math.max(-1, Math.min(1, Math.abs(u[0] * v[0] + u[1] * v[1] + u[2] * v[2])))) * 180 / Math.PI;
 const vecOf = (what, al, be, ga) => { const [x, y] = fromDevice(what, al, be, ga); return what === 'line' ? conversions.lineToDcos(x, y) : conversions.planeToDcos(x, y); };
+// The compass: in the app, lead-acid's fused rotation vector, with Android's accuracy; in a phone's browser, the events
+// that say where north is (deviceorientationabsolute in Chrome, an absolute deviceorientation in Firefox, Safari's
+// webkitCompassHeading once a tap allows motion), which carry no accuracy. Events relative to wherever the phone
+// started are not a compass, and are not used. A desktop has the events and never fires them: after a while it says so.
+const webCompass = !inApp && typeof DeviceOrientationEvent !== 'undefined';
+const webFix = !inApp && !!navigator.geolocation;
+let compassAllowed = !(webCompass && typeof DeviceOrientationEvent.requestPermission === 'function');
+if (inApp || webCompass) document.documentElement.dataset.compass = '1';
+if (inApp || webFix) document.documentElement.dataset.fix = '1';
+function browserOrientation(cb) {
+  const ev = 'ondeviceorientationabsolute' in window ? 'deviceorientationabsolute' : 'deviceorientation';
+  const h = e => {
+    if (e.beta == null || e.gamma == null) return;
+    let alpha = e.alpha;
+    if (typeof e.webkitCompassHeading === 'number' && e.webkitCompassHeading >= 0) alpha = (360 - e.webkitCompassHeading) % 360;
+    else if (alpha == null || (ev === 'deviceorientation' && !e.absolute)) return;
+    cb({ alpha, beta: e.beta, gamma: e.gamma, accuracy: null });
+  };
+  window.addEventListener(ev, h);
+  return { close() { window.removeEventListener(ev, h); } };
+}
+const liveAll = text => $('stream').querySelectorAll('.capture:not([data-kind="position"]) .live').forEach(l => { l.textContent = text; });
+const sample = o => { samples.push({ alpha: o.alpha, beta: o.beta, gamma: o.gamma, acc: o.accuracy, t: Date.now() }); samples = samples.filter(s => s.t > Date.now() - 1000); paintCaptures(); };
 // keep the compass running while a card on screen waits for a plane or a line, and only then
 async function armCaptures() {
-  if (!inApp) return;
+  if (!inApp && !webCompass) return;
   const want = pendingCaptures().length > 0;
   if (!want && orient) { orient.close(); orient = null; samples = []; return; }
   if (!want || orient) { paintCaptures(); return; }
+  if (!inApp) {
+    if (!compassAllowed) { liveAll(t('Tap Take reading to turn the compass on.')); return; }
+    const mine = orient = browserOrientation(sample);
+    setTimeout(() => { if (orient === mine && !samples.length) liveAll(t('The compass is not available here.')); }, 2500);
+    return;
+  }
   try {
     orient = await shell.orientation({ rateHz: 20 });
-    orient.on(o => { samples.push({ alpha: o.alpha, beta: o.beta, gamma: o.gamma, acc: o.accuracy, t: Date.now() }); samples = samples.filter(s => s.t > Date.now() - 1000); paintCaptures(); })
-      .onClose(() => { orient = null; });
-  } catch (e) { orient = null; $('stream').querySelectorAll('.capture .live').forEach(l => { l.textContent = t('The compass is not available here.'); }); }
+    orient.on(sample).onClose(() => { orient = null; });
+  } catch (e) { orient = null; liveAll(t('The compass is not available here.')); }
 }
 function paintCaptures() {
   const s = samples[samples.length - 1];
@@ -248,28 +276,44 @@ function paintCaptures() {
     live.innerHTML = `${String(Math.round(((x % 360) + 360) % 360)).padStart(3, '0')}/${String(Math.round(y)).padStart(2, '0')}<small>${escHtml(t('magnetic · compass {acc}', { acc: t(ACCW[s.acc] || 'not reported') }))}</small>`;
   }
 }
+// Safari asks before it hands a page the motion sensors, and only from a tap: the first tap asks, the next one measures
+async function allowCompass() {
+  try { compassAllowed = (await DeviceOrientationEvent.requestPermission()) === 'granted'; } catch (e) { compassAllowed = false; }
+  if (!compassAllowed) { status(t('The compass needs the motion permission: allow it for this site in the browser.')); return; }
+  armCaptures(); status(t('Compass on: hold the phone still, then take the reading.'));
+}
 // the steadiest reading of the last second: the sample nearest the others, and how far the farthest was
 function takeReading(c) {
   const kind = c.res.capture.kind;
+  if (!inApp && !compassAllowed) { allowCompass(); return; }
   if (!samples.length) { status('No reading from the compass yet: hold the phone still a moment.'); return; }
   const vs = samples.map(s => vecOf(kind, s.alpha, s.beta, s.gamma));
   let best = 0, bestSum = Infinity;
   vs.forEach((v, i) => { const sum = vs.reduce((a, w) => a + angle(v, w), 0); if (sum < bestSum) { bestSum = sum; best = i; } });
   const s = samples[best], spread = Math.max(...vs.map(w => angle(vs[best], w)));
-  capture(c, { alpha: s.alpha, beta: s.beta, gamma: s.gamma, acc: s.acc, spread: Math.round(spread * 10) / 10, at: s.t });
+  capture(c, { alpha: s.alpha, beta: s.beta, gamma: s.gamma, acc: s.acc, spread: Math.round(spread * 10) / 10, at: s.t, ...(inApp ? {} : { via: 'browser' }) });
   replaceCard(c); armCaptures(); status(spread > 2 ? 'Measured. The phone moved while measuring; hold it still for a steadier reading.' : 'Measured.');
 }
-// one position fix: the first good one in 15 seconds, or the best of them
+// One position fix: the first good one in 15 seconds, or the best of them. In the app, lead-acid's gnss; in a browser, its
+// geolocation with high accuracy (the browser may ask its own location service for it; golem sends nothing).
+function browserFix(got, fail) {
+  const id = navigator.geolocation.watchPosition(p => got({ lat: p.coords.latitude, lon: p.coords.longitude, acc: p.coords.accuracy, t: p.timestamp }),
+    e => fail(e.code === 1 ? Object.assign(new Error(e.message), { status: 403 }) : new Error(e.message || 'no fix')), { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 });
+  return { close() { navigator.geolocation.clearWatch(id); } };
+}
 async function takePosition(c) {
   const live = cardOf(c.id) && cardOf(c.id).querySelector('.capture .live'), show = t => { if (live) live.textContent = t; };
   let best = null, st = null;
   try {
-    st = await shell.gnss.location({ minMs: 1000 }); show(t('Waiting for a fix…'));
-    await new Promise(done => {
+    if (inApp) st = await shell.gnss.location({ minMs: 1000 });
+    show(t('Waiting for a fix…'));
+    await new Promise((done, fail) => {
       const stop = setTimeout(done, 15000);
-      st.on('fix', d => { const f = data(d); if (f.lat == null) return; if (!best || (f.acc != null && f.acc < best.acc)) best = f; show(`±${Math.round(f.acc)} m…`); if (f.acc != null && f.acc <= 20) { clearTimeout(stop); done(); } });
+      const got = f => { if (f.lat == null) return; if (!best || (f.acc != null && f.acc < best.acc)) best = f; show(`±${Math.round(f.acc)} m…`); if (f.acc != null && f.acc <= 20) { clearTimeout(stop); done(); } };
+      if (inApp) st.on('fix', d => got(data(d)));
+      else st = browserFix(got, e => { clearTimeout(stop); if (best) done(); else fail(e); });
     });
-  } catch (e) { show(''); status(e.status === 403 || (e.info && e.info.error === 'permission') ? t('Position needs the location permission: allow it in the dialog, or in the app\'s settings.') : t('No position: {e}', { e: e.message })); return; }
+  } catch (e) { show(''); status(e.status === 403 || (e.info && e.info.error === 'permission') ? (inApp ? t('Position needs the location permission: allow it in the dialog, or in the app\'s settings.') : t('Position needs the location permission: allow it for this site in the browser.')) : t('No position: {e}', { e: e.message })); return; }
   finally { if (st) st.close(); }
   if (!best) { show(t('No fix. Go where the sky is open and try again.')); return; }
   capture(c, { lat: best.lat, lon: best.lon, acc: best.acc, at: best.t || Date.now() }); replaceCard(c); status(t('Position taken, ±{m} m.', { m: Math.round(best.acc) }));

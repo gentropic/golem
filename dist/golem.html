@@ -222,7 +222,8 @@ svg text{font:10px var(--mono);fill:var(--au-fg-muted)}
 .chart{margin:4px 0;min-width:0}.chart canvas{display:block;width:100%;max-width:560px;height:auto}
 .capture{display:grid;gap:8px;border:1px dashed var(--au-rule);border-radius:var(--r);padding:12px 14px}.capture .how{margin:0;color:var(--au-fg-muted)}
 .capture .live{font:600 28px/1.1 var(--mono);letter-spacing:.01em}.capture .live small{font:12px var(--mono);color:var(--au-fg-soft);margin-left:8px}
-html:not([data-app]) .capture .live,html:not([data-app]) .capture .opts{display:none}
+html[data-app] .web-only,html:not([data-fix]) .web-only{display:none}.capture .web-only{margin:0}
+html:not([data-compass]) .capture:not([data-kind="position"]) :is(.live,.opts),html:not([data-fix]) .capture[data-kind="position"] :is(.live,.opts){display:none}
 .fig{margin:4px 0}.fig canvas{display:block;width:100%;max-width:560px;height:auto;border-radius:var(--r);border:1px solid var(--au-rule)}.fig figcaption{font:12px var(--mono);color:var(--au-fg-muted);margin-top:4px}
 .hbars{display:grid;grid-template-columns:auto 1fr auto;gap:4px 8px;align-items:center;margin:2px 0;font:12px var(--mono);max-width:560px} .hbars .hb{display:contents} .hbars .hk{color:var(--au-fg-muted);white-space:nowrap;max-width:9em;overflow:hidden;text-overflow:ellipsis} .hbars .hbar{height:10px;background:var(--au-surface-raised);border-radius:2px;overflow:hidden} .hbars .hbar i{display:block;height:100%;background:var(--au-info)} .hbars .hv{text-align:right}
 
@@ -360,7 +361,7 @@ html:not([lang="pt-BR"]) .notes[data-lang="pt"],html[lang="pt-BR"] .notes[data-l
         </section>
         <section>
           <h2>On Android</h2>
-          <p>In the lead-acid app, golem fills in an event, a timer or an alarm and hands it to the app you already use; that app asks you to confirm. It measures a plane or a line with the phone's compass (<code>measure bedding</code>), takes a position when you ask (<code>declination here</code>), listens with the phone's own offline recognizer and reads answers aloud with its offline voices. Nothing goes through a Google API or the network.</p>
+          <p>In the lead-acid app, golem fills in an event, a timer or an alarm and hands it to the app you already use; that app asks you to confirm. It measures a plane or a line with the phone's compass (<code>measure bedding</code>), takes a position when you ask (<code>declination here</code>), listens with the phone's own offline recognizer and reads answers aloud with its offline voices. Nothing goes through a Google API or the network. In a phone's browser golem measures and takes a position too: the browser does not say how well the compass is calibrated, and it may ask its own location service for the fix.</p>
         </section>
         <section>
           <h2>What is real here</h2>
@@ -404,7 +405,7 @@ html:not([lang="pt-BR"]) .notes[data-lang="pt"],html[lang="pt-BR"] .notes[data-l
         </section>
         <section>
           <h2>No Android</h2>
-          <p>No app lead-acid, o golem preenche um evento, um cronômetro ou um alarme e entrega ao app que você já usa; esse app pede a sua confirmação. Ele mede um plano ou uma linha com a bússola do celular (<code>mede o acamamento</code>), pega uma posição quando você pede (<code>declinação aqui</code>), ouve com o reconhecedor offline do próprio celular e lê as respostas com as vozes offline dele. Nada passa por uma API do Google nem pela rede.</p>
+          <p>No app lead-acid, o golem preenche um evento, um cronômetro ou um alarme e entrega ao app que você já usa; esse app pede a sua confirmação. Ele mede um plano ou uma linha com a bússola do celular (<code>mede o acamamento</code>), pega uma posição quando você pede (<code>declinação aqui</code>), ouve com o reconhecedor offline do próprio celular e lê as respostas com as vozes offline dele. Nada passa por uma API do Google nem pela rede. No navegador do celular o golem também mede e pega a posição: o navegador não diz se a bússola está calibrada, e pode consultar o próprio serviço de localização para a posição.</p>
         </section>
         <section>
           <h2>O que é real aqui</h2>
@@ -12600,9 +12601,10 @@ tool({
   skill: { group: 'Field', title: 'Magnetic declination', on: '@gcu/wmm', about: 'The World Magnetic Model at a place and date, and magnetic to true bearings.', examples: ['declination at -19.92, -43.94', '045 magnetic to true at -19.92, -43.94'] },
   topic: () => ['Declination', 2],
   run: a => {
-    // "here": in the app the card asks for one position fix (lead-acid's gnss, asked for on the tap), kept in args
+    // "here": the card asks for one position fix (lead-acid's gnss in the app, the browser's geolocation elsewhere; asked
+    // for on the tap), kept in args
     if (a.here) return { read: ['declination', { v: 'here' }], capture: { kind: 'position', set: (args, v) => { delete args.here; args.lat = +(+v.lat).toFixed(5); args.lon = +(+v.lon).toFixed(5); args.fix = { acc: v.acc == null ? null : Math.round(+v.acc), at: +v.at || 0 }; } },
-      body: [{ t: 'capture', kind: 'position', how: 'One position fix from the phone, kept with this card. Nothing is sent anywhere.' }, { t: 'sub', text: 'Outside the app there is no position: give coordinates, as in "declination at -19.92, -43.94".' }], trace: ['wait: a position from the phone (lead-acid gnss), or coordinates'] };
+      body: [{ t: 'capture', kind: 'position', how: 'One position fix, kept with this card. golem sends it nowhere.' }, { t: 'sub', text: 'Without a position (no location here, or the permission refused), give coordinates, as in "declination at -19.92, -43.94".' }], trace: ['wait: a position fix (the app\'s GNSS or the browser\'s geolocation), or coordinates'] };
     if (Math.abs(a.lat) > 90 || Math.abs(a.lon) > 180) return null;
     const { d, f } = decl(a);
     return {
@@ -12657,8 +12659,8 @@ const { compass, conversions } = __m5;
 const { field } = __m20;
 const { fmtDate } = __m4;
 // Field capture (SPEC 13, the field skills): a plane or a line measured with the phone, as a compass-clinometer is
-// used. The card asks for a reading (res.capture); inside the lead-acid app the shell streams the phone's fused
-// orientation and, when the person takes the reading, hands the device angles back through capture() in engine.js,
+// used. The card asks for a reading (res.capture); the shell streams the phone's orientation (in the lead-acid app the
+// fused rotation vector, in a phone's browser the north-referenced deviceorientation events) and, when the person takes the reading, hands the device angles back through capture() in engine.js,
 // which writes them into args. From then on the card is plain arithmetic over args, like any other: bearing's compass
 // functions turn the angles into dip direction/dip or trend/plunge. North is magnetic as measured; with a saved home,
 // golem corrects it to true with the World Magnetic Model and keeps the correction in args, so a replay agrees.
@@ -12669,7 +12671,7 @@ const ori = (a, b) => `${p3(a)}/${p2(b)}`;
 // The device's angles (W3C deviceorientation) to a plane or a line, from bearing's own rotation matrix and conversions.
 // Not bearing's compass.planeFromDeviceOrientation / lineFromDeviceOrientation: they flip the vertical axis although
 // bearing's frame is east, north, up, so their answers point the opposite way (a phone facing north with its top edge
-// raised 30° reads 000/30; the plane dips 180/30). Checked by hand in test/field.test.mjs; reported for bearing.js.
+// raised 30° reads 000/30; the plane dips 180/30). Checked by hand in test/field.test.mjs; still to be reported to bearing.js.
 // plane: the screen's normal (the device z axis); line: the phone's long edge (the device y axis). Lower hemisphere.
 const fromDevice = (what, alpha, beta, gamma) => { const R = compass.deviceOrientationMatrix(alpha, beta, gamma); return what === 'line' ? conversions.dcosToLine([R[1], R[4], R[7]]) : conversions.dcosToPlane([R[2], R[5], R[8]]); };
 
@@ -12682,30 +12684,30 @@ function declAt(ms) {
 
 tool({
   name: 'measure',
-  skill: { group: 'Field', title: 'Compass capture', on: 'lead-acid sensor · @gcu/bearing', about: 'Measure a plane or a line with the phone, as with a compass-clinometer: lay its back on the plane, or its long edge along the line, and take the reading. In the app only; magnetic north, or true with a saved home.', examples: ['measure bedding', 'measure a lineation'] },
+  skill: { group: 'Field', title: 'Compass capture', on: 'the phone\'s compass · @gcu/bearing', about: 'Measure a plane or a line with the phone, as with a compass-clinometer: lay its back on the plane, or its long edge along the line, and take the reading. On a phone, in the app or the browser; magnetic north, or true with a saved home.', examples: ['measure bedding', 'measure a lineation'] },
   topic: a => [a.what === 'line' ? 'Line measured' : 'Plane measured', 2],
   run: a => {
     const k = KIND[a.what] || KIND.plane, name = a.name || k.label;
     const read = ['measure', { v: name }, 'with the phone'];
-    const capture = { kind: a.what === 'line' ? 'line' : 'plane', set: (args, v) => { args.reading = { alpha: +v.alpha, beta: +v.beta, gamma: +v.gamma, acc: v.acc == null ? null : +v.acc, spread: v.spread == null ? null : +v.spread, at: +v.at || 0 }; const d = declAt(args.reading.at); if (d) args.north = d; else delete args.north; } };
+    const capture = { kind: a.what === 'line' ? 'line' : 'plane', set: (args, v) => { args.reading = { alpha: +v.alpha, beta: +v.beta, gamma: +v.gamma, acc: v.acc == null ? null : +v.acc, spread: v.spread == null ? null : +v.spread, at: +v.at || 0, ...(v.via === 'browser' ? { via: 'browser' } : {}) }; const d = declAt(args.reading.at); if (d) args.north = d; else delete args.north; } };
     if (!a.reading) return {
       read, capture,
       body: [{ t: 'capture', kind: capture.kind, how: a.what === 'line' ? 'Lay the phone\'s long edge along the line and hold it still.' : 'Lay the phone\'s back flat on the plane, screen up, and hold it still.' },
-        { t: 'sub', text: 'Measuring needs the golem app on a phone: the browser does not give golem the fused compass. Elsewhere, type the plane, as in "plane 045/30".' }],
-      trace: ['wait: a reading from the phone (lead-acid sensor, rotation vector)']
+        { t: 'sub', text: 'Measuring needs a phone\'s compass: the golem app, or a phone\'s browser that tells golem where north is. Elsewhere, type the plane, as in "plane 045/30".' }],
+      trace: ['wait: a reading from the phone\'s compass (the app\'s rotation vector, or the browser\'s deviceorientation)']
     };
     const r = a.reading, [n1, m2] = fromDevice(a.what, r.alpha, r.beta, r.gamma), m1 = ((n1 % 360) + 360) % 360, corr = a.north ? a.north.decl : 0, t1 = ((m1 + corr) % 360 + 360) % 360;
     const when = r.at ? new Date(r.at) : null;
     const rows = [['north', a.north ? `true: corrected by ${fmt(Math.abs(corr), 3)}° ${corr < 0 ? 'west' : 'east'} (WMM at home, ${fmt(a.north.lat, 5)}, ${fmt(a.north.lon, 5)})` : 'magnetic, as the phone measured it. Save a home ("home is -19.92, -43.94") and golem corrects to true'],
       ...(a.north ? [['as measured', `${ori(m1, m2)} magnetic`]] : []),
-      ['compass accuracy', ACC[r.acc] || 'not reported'], ...(r.spread != null ? [['steadiness', `±${fmt(r.spread, 2)}° over the last second`]] : []),
+      ['compass accuracy', ACC[r.acc] || (r.via === 'browser' ? 'not reported: the browser does not say' : 'not reported')], ...(r.spread != null ? [['steadiness', `±${fmt(r.spread, 2)}° over the last second`]] : []),
       ...(when ? [['taken', `${fmtDate(when)}, ${String(when.getHours()).padStart(2, '0')}:${String(when.getMinutes()).padStart(2, '0')}`]] : [])];
     const net = a.what === 'line' ? { t: 'net', planes: [], lines: [{ tr: t1, pl: m2, label: name }] } : { t: 'net', planes: [{ dd: t1, dip: m2 }], lines: [] };
     return {
       read: ['measured', { v: name }, 'with the phone'], value: [t1, m2],
       body: [{ t: 'big', v: ori(t1, m2), unit: `${k.unit}${a.north ? ' (true)' : ' (magnetic)'}` }, net, { t: 'kv', rows },
         ...(r.acc != null && r.acc < 2 ? [{ t: 'note', kind: 'err', text: 'The phone reported its compass as low or unreliable when this was taken: move it in a figure of eight, away from steel, and measure again.' }] : []),
-        { t: 'src', text: `@gcu/bearing · vendored · the device orientation matrix, ${a.what === 'line' ? 'its long edge' : 'its screen normal'} to the lower hemisphere · the phone's fused rotation vector` }],
+        { t: 'src', text: `@gcu/bearing · vendored · the device orientation matrix, ${a.what === 'line' ? 'its long edge' : 'its screen normal'} to the lower hemisphere · ${r.via === 'browser' ? 'the browser\'s deviceorientation, north-referenced' : 'the phone\'s fused rotation vector'}` }],
       trace: [`device orientation α ${fmt(r.alpha, 5)}°, β ${fmt(r.beta, 5)}°, γ ${fmt(r.gamma, 5)}° (accuracy ${r.acc})`, `bearing: device ${a.what === 'line' ? 'y axis' : 'z axis'} in east, north, up → ${ori(m1, m2)} magnetic`, a.north ? `+ declination ${fmt(corr, 5)}° (WMM at home) → ${ori(t1, m2)} true` : 'north: magnetic (no home saved)'],
       py: `bearing.from_device("${a.what === 'line' ? 'line' : 'plane'}", ${fmt(r.alpha, 6)}, ${fmt(r.beta, 6)}, ${fmt(r.gamma, 6)})${a.north ? ` + ${fmt(corr, 6)}  # declination` : ''}`
     };
@@ -29679,6 +29681,9 @@ const PT = {
   'This phone has no offline recognizer for {lang}. Its language pack for offline speech is in the system settings.': 'Este celular não tem reconhecedor offline para {lang}. O pacote de idioma para fala offline fica nas configurações do sistema.',
   'Voice failed: {e}': 'A voz falhou: {e}', 'No offline voice for {lang} on this phone.': 'Não há voz offline para {lang} neste celular.', 'Could not speak: {e}': 'Não consegui falar: {e}',
   'The compass is not available here.': 'A bússola não está disponível aqui.', 'No reading from the compass yet: hold the phone still a moment.': 'Nenhuma leitura da bússola ainda: segure o celular parado um instante.',
+  'Tap Take reading to turn the compass on.': 'Toque em Medir para ligar a bússola.', 'Compass on: hold the phone still, then take the reading.': 'Bússola ligada: segure o celular parado e meça.',
+  'The compass needs the motion permission: allow it for this site in the browser.': 'A bússola precisa da permissão de movimento: permita para este site no navegador.', 'Position needs the location permission: allow it for this site in the browser.': 'A posição precisa da permissão de localização: permita para este site no navegador.',
+  'In a browser the fix comes through the browser, which may ask its own location service for it.': 'No navegador a posição vem do navegador, que pode consultar o próprio serviço de localização.',
   'Measured.': 'Medido.', 'Measured. The phone moved while measuring; hold it still for a steadier reading.': 'Medido. O celular se mexeu durante a medida; segure parado para uma leitura mais firme.',
   'Waiting for a fix…': 'Esperando uma posição…', 'Position needs the location permission: allow it in the dialog, or in the app\'s settings.': 'A posição precisa da permissão de localização: permita na caixa de diálogo, ou nas configurações do app.',
   'No position: {e}': 'Sem posição: {e}', 'No fix. Go where the sky is open and try again.': 'Sem posição. Vá para onde o céu está aberto e tente de novo.', 'Position taken, ±{m} m.': 'Posição registrada, ±{m} m.',
@@ -29812,7 +29817,7 @@ function blockHtml(b) {
       : `<button class="btn${i.go ? ' go' : ''}" type="button" data-act="${escHtml(i.act)}"${i.msg ? ` data-msg="${escHtml(i.msg)}"` : ''}${i.send ? ` data-send="${escHtml(JSON.stringify(i.send))}"` : ''}>${escHtml(i.label)}</button>`).join('')}</div>`;
     case 'net': return svgNet(b);
     // a reading the card waits for: in the app, a live value and the button that takes it; in a browser, only the words
-    case 'capture': return `<div class="capture" data-kind="${escHtml(b.kind)}"><p class="how">${escHtml(b.how || '')}</p><div class="live" aria-live="off">${t(b.kind === 'position' ? 'no fix yet' : 'waiting for the compass…')}</div><div class="opts"><button class="btn go" type="button" data-act="take">${t(b.kind === 'position' ? 'Use my position' : 'Take reading')}</button></div></div>`;
+    case 'capture': return `<div class="capture" data-kind="${escHtml(b.kind)}"><p class="how">${escHtml(b.how || '')}</p><div class="live" aria-live="off">${t(b.kind === 'position' ? 'no fix yet' : 'waiting for the compass…')}</div>${b.kind === 'position' ? `<p class="sub web-only">${t('In a browser the fix comes through the browser, which may ask its own location service for it.')}</p>` : ''}<div class="opts"><button class="btn go" type="button" data-act="take">${t(b.kind === 'position' ? 'Use my position' : 'Take reading')}</button></div></div>`;
     case 'bars': return b.lo != null ? `<figure class="chart"><canvas data-chart="${escHtml(JSON.stringify(b))}" role="img" aria-label="${escHtml(chartLabel(b))}"></canvas></figure>` : svgBars(b);
     case 'figure': return `<figure class="fig"><canvas data-fig width="${+b.w || 400}" height="${+b.h || 300}" role="img" aria-label="${escHtml(b.label || 'Figure')}"></canvas><figcaption>${escHtml(b.label || 'Figure')}</figcaption></figure>`;
     case 'curve': return svgCurve(b);
@@ -30167,7 +30172,7 @@ function voiceItem() {
   const out = voice.say ? `${t('Answers can be read aloud with the phone\'s offline voices.')}</p><div class="opts"><button class="btn${voice.all ? ' go' : ''}" type="button" id="say-all" aria-pressed="${voice.all}">${t(voice.all ? 'Reading every answer aloud' : 'Read every answer aloud')}</button></div>` : t('No offline voice for {lang}, so nothing is read aloud.', { lang: langName() }) + '</p>';
   return `<div class="item"><h3>${t('Voice')}</h3><p>${hear} ${out}</div>`;
 }
-/* ── field capture, in the app: the phone's fused orientation for a plane or a line, one position fix. A card that waits
+/* ── field capture, in the app or a phone's browser: the phone's orientation for a plane or a line, one position fix. A card that waits
    for a reading (res.capture) shows it live; the reading taken goes into the card's args (capture() in the engine). ── */
 if (inApp) document.documentElement.dataset.app = '1';
 const ACCW = { 3: 'high', 2: 'medium', 1: 'low', 0: 'unreliable', '-1': 'no sensor' };
@@ -30175,17 +30180,45 @@ let orient = null, samples = [];
 const pendingCaptures = () => S.cards.filter(c => c.res && c.res.capture && ['plane', 'line'].includes(c.res.capture.kind));
 const angle = (u, v) => Math.acos(Math.max(-1, Math.min(1, Math.abs(u[0] * v[0] + u[1] * v[1] + u[2] * v[2])))) * 180 / Math.PI;
 const vecOf = (what, al, be, ga) => { const [x, y] = fromDevice(what, al, be, ga); return what === 'line' ? conversions.lineToDcos(x, y) : conversions.planeToDcos(x, y); };
+// The compass: in the app, lead-acid's fused rotation vector, with Android's accuracy; in a phone's browser, the events
+// that say where north is (deviceorientationabsolute in Chrome, an absolute deviceorientation in Firefox, Safari's
+// webkitCompassHeading once a tap allows motion), which carry no accuracy. Events relative to wherever the phone
+// started are not a compass, and are not used. A desktop has the events and never fires them: after a while it says so.
+const webCompass = !inApp && typeof DeviceOrientationEvent !== 'undefined';
+const webFix = !inApp && !!navigator.geolocation;
+let compassAllowed = !(webCompass && typeof DeviceOrientationEvent.requestPermission === 'function');
+if (inApp || webCompass) document.documentElement.dataset.compass = '1';
+if (inApp || webFix) document.documentElement.dataset.fix = '1';
+function browserOrientation(cb) {
+  const ev = 'ondeviceorientationabsolute' in window ? 'deviceorientationabsolute' : 'deviceorientation';
+  const h = e => {
+    if (e.beta == null || e.gamma == null) return;
+    let alpha = e.alpha;
+    if (typeof e.webkitCompassHeading === 'number' && e.webkitCompassHeading >= 0) alpha = (360 - e.webkitCompassHeading) % 360;
+    else if (alpha == null || (ev === 'deviceorientation' && !e.absolute)) return;
+    cb({ alpha, beta: e.beta, gamma: e.gamma, accuracy: null });
+  };
+  window.addEventListener(ev, h);
+  return { close() { window.removeEventListener(ev, h); } };
+}
+const liveAll = text => $('stream').querySelectorAll('.capture:not([data-kind="position"]) .live').forEach(l => { l.textContent = text; });
+const sample = o => { samples.push({ alpha: o.alpha, beta: o.beta, gamma: o.gamma, acc: o.accuracy, t: Date.now() }); samples = samples.filter(s => s.t > Date.now() - 1000); paintCaptures(); };
 // keep the compass running while a card on screen waits for a plane or a line, and only then
 async function armCaptures() {
-  if (!inApp) return;
+  if (!inApp && !webCompass) return;
   const want = pendingCaptures().length > 0;
   if (!want && orient) { orient.close(); orient = null; samples = []; return; }
   if (!want || orient) { paintCaptures(); return; }
+  if (!inApp) {
+    if (!compassAllowed) { liveAll(t('Tap Take reading to turn the compass on.')); return; }
+    const mine = orient = browserOrientation(sample);
+    setTimeout(() => { if (orient === mine && !samples.length) liveAll(t('The compass is not available here.')); }, 2500);
+    return;
+  }
   try {
     orient = await shell.orientation({ rateHz: 20 });
-    orient.on(o => { samples.push({ alpha: o.alpha, beta: o.beta, gamma: o.gamma, acc: o.accuracy, t: Date.now() }); samples = samples.filter(s => s.t > Date.now() - 1000); paintCaptures(); })
-      .onClose(() => { orient = null; });
-  } catch (e) { orient = null; $('stream').querySelectorAll('.capture .live').forEach(l => { l.textContent = t('The compass is not available here.'); }); }
+    orient.on(sample).onClose(() => { orient = null; });
+  } catch (e) { orient = null; liveAll(t('The compass is not available here.')); }
 }
 function paintCaptures() {
   const s = samples[samples.length - 1];
@@ -30195,28 +30228,44 @@ function paintCaptures() {
     live.innerHTML = `${String(Math.round(((x % 360) + 360) % 360)).padStart(3, '0')}/${String(Math.round(y)).padStart(2, '0')}<small>${escHtml(t('magnetic · compass {acc}', { acc: t(ACCW[s.acc] || 'not reported') }))}</small>`;
   }
 }
+// Safari asks before it hands a page the motion sensors, and only from a tap: the first tap asks, the next one measures
+async function allowCompass() {
+  try { compassAllowed = (await DeviceOrientationEvent.requestPermission()) === 'granted'; } catch (e) { compassAllowed = false; }
+  if (!compassAllowed) { status(t('The compass needs the motion permission: allow it for this site in the browser.')); return; }
+  armCaptures(); status(t('Compass on: hold the phone still, then take the reading.'));
+}
 // the steadiest reading of the last second: the sample nearest the others, and how far the farthest was
 function takeReading(c) {
   const kind = c.res.capture.kind;
+  if (!inApp && !compassAllowed) { allowCompass(); return; }
   if (!samples.length) { status('No reading from the compass yet: hold the phone still a moment.'); return; }
   const vs = samples.map(s => vecOf(kind, s.alpha, s.beta, s.gamma));
   let best = 0, bestSum = Infinity;
   vs.forEach((v, i) => { const sum = vs.reduce((a, w) => a + angle(v, w), 0); if (sum < bestSum) { bestSum = sum; best = i; } });
   const s = samples[best], spread = Math.max(...vs.map(w => angle(vs[best], w)));
-  capture(c, { alpha: s.alpha, beta: s.beta, gamma: s.gamma, acc: s.acc, spread: Math.round(spread * 10) / 10, at: s.t });
+  capture(c, { alpha: s.alpha, beta: s.beta, gamma: s.gamma, acc: s.acc, spread: Math.round(spread * 10) / 10, at: s.t, ...(inApp ? {} : { via: 'browser' }) });
   replaceCard(c); armCaptures(); status(spread > 2 ? 'Measured. The phone moved while measuring; hold it still for a steadier reading.' : 'Measured.');
 }
-// one position fix: the first good one in 15 seconds, or the best of them
+// One position fix: the first good one in 15 seconds, or the best of them. In the app, lead-acid's gnss; in a browser, its
+// geolocation with high accuracy (the browser may ask its own location service for it; golem sends nothing).
+function browserFix(got, fail) {
+  const id = navigator.geolocation.watchPosition(p => got({ lat: p.coords.latitude, lon: p.coords.longitude, acc: p.coords.accuracy, t: p.timestamp }),
+    e => fail(e.code === 1 ? Object.assign(new Error(e.message), { status: 403 }) : new Error(e.message || 'no fix')), { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 });
+  return { close() { navigator.geolocation.clearWatch(id); } };
+}
 async function takePosition(c) {
   const live = cardOf(c.id) && cardOf(c.id).querySelector('.capture .live'), show = t => { if (live) live.textContent = t; };
   let best = null, st = null;
   try {
-    st = await shell.gnss.location({ minMs: 1000 }); show(t('Waiting for a fix…'));
-    await new Promise(done => {
+    if (inApp) st = await shell.gnss.location({ minMs: 1000 });
+    show(t('Waiting for a fix…'));
+    await new Promise((done, fail) => {
       const stop = setTimeout(done, 15000);
-      st.on('fix', d => { const f = data(d); if (f.lat == null) return; if (!best || (f.acc != null && f.acc < best.acc)) best = f; show(`±${Math.round(f.acc)} m…`); if (f.acc != null && f.acc <= 20) { clearTimeout(stop); done(); } });
+      const got = f => { if (f.lat == null) return; if (!best || (f.acc != null && f.acc < best.acc)) best = f; show(`±${Math.round(f.acc)} m…`); if (f.acc != null && f.acc <= 20) { clearTimeout(stop); done(); } };
+      if (inApp) st.on('fix', d => got(data(d)));
+      else st = browserFix(got, e => { clearTimeout(stop); if (best) done(); else fail(e); });
     });
-  } catch (e) { show(''); status(e.status === 403 || (e.info && e.info.error === 'permission') ? t('Position needs the location permission: allow it in the dialog, or in the app\'s settings.') : t('No position: {e}', { e: e.message })); return; }
+  } catch (e) { show(''); status(e.status === 403 || (e.info && e.info.error === 'permission') ? (inApp ? t('Position needs the location permission: allow it in the dialog, or in the app\'s settings.') : t('Position needs the location permission: allow it for this site in the browser.')) : t('No position: {e}', { e: e.message })); return; }
   finally { if (st) st.close(); }
   if (!best) { show(t('No fix. Go where the sky is open and try again.')); return; }
   capture(c, { lat: best.lat, lon: best.lon, acc: best.acc, at: best.t || Date.now() }); replaceCard(c); status(t('Position taken, ±{m} m.', { m: Math.round(best.acc) }));

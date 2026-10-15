@@ -208,7 +208,8 @@ svg text{font:10px var(--mono);fill:var(--au-fg-muted)}
 .chart{margin:4px 0;min-width:0}.chart canvas{display:block;width:100%;max-width:560px;height:auto}
 .capture{display:grid;gap:8px;border:1px dashed var(--au-rule);border-radius:var(--r);padding:12px 14px}.capture .how{margin:0;color:var(--au-fg-muted)}
 .capture .live{font:600 28px/1.1 var(--mono);letter-spacing:.01em}.capture .live small{font:12px var(--mono);color:var(--au-fg-soft);margin-left:8px}
-html:not([data-app]) .capture .live,html:not([data-app]) .capture .opts{display:none}
+html[data-app] .web-only,html:not([data-fix]) .web-only{display:none}.capture .web-only{margin:0}
+html:not([data-compass]) .capture:not([data-kind="position"]) :is(.live,.opts),html:not([data-fix]) .capture[data-kind="position"] :is(.live,.opts){display:none}
 .fig{margin:4px 0}.fig canvas{display:block;width:100%;max-width:560px;height:auto;border-radius:var(--r);border:1px solid var(--au-rule)}.fig figcaption{font:12px var(--mono);color:var(--au-fg-muted);margin-top:4px}
 .hbars{display:grid;grid-template-columns:auto 1fr auto;gap:4px 8px;align-items:center;margin:2px 0;font:12px var(--mono);max-width:560px} .hbars .hb{display:contents} .hbars .hk{color:var(--au-fg-muted);white-space:nowrap;max-width:9em;overflow:hidden;text-overflow:ellipsis} .hbars .hbar{height:10px;background:var(--au-surface-raised);border-radius:2px;overflow:hidden} .hbars .hbar i{display:block;height:100%;background:var(--au-info)} .hbars .hv{text-align:right}
 
@@ -344,7 +345,7 @@ html:not([lang="pt-BR"]) .notes[data-lang="pt"],html[lang="pt-BR"] .notes[data-l
         </section>
         <section>
           <h2>On Android</h2>
-          <p>In the lead-acid app, golem fills in an event, a timer or an alarm and hands it to the app you already use; that app asks you to confirm. It measures a plane or a line with the phone's compass (<code>measure bedding</code>), takes a position when you ask (<code>declination here</code>), listens with the phone's own offline recognizer and reads answers aloud with its offline voices. Nothing goes through a Google API or the network.</p>
+          <p>In the lead-acid app, golem fills in an event, a timer or an alarm and hands it to the app you already use; that app asks you to confirm. It measures a plane or a line with the phone's compass (<code>measure bedding</code>), takes a position when you ask (<code>declination here</code>), listens with the phone's own offline recognizer and reads answers aloud with its offline voices. Nothing goes through a Google API or the network. In a phone's browser golem measures and takes a position too: the browser does not say how well the compass is calibrated, and it may ask its own location service for the fix.</p>
         </section>
         <section>
           <h2>What is real here</h2>
@@ -388,7 +389,7 @@ html:not([lang="pt-BR"]) .notes[data-lang="pt"],html[lang="pt-BR"] .notes[data-l
         </section>
         <section>
           <h2>No Android</h2>
-          <p>No app lead-acid, o golem preenche um evento, um cronômetro ou um alarme e entrega ao app que você já usa; esse app pede a sua confirmação. Ele mede um plano ou uma linha com a bússola do celular (<code>mede o acamamento</code>), pega uma posição quando você pede (<code>declinação aqui</code>), ouve com o reconhecedor offline do próprio celular e lê as respostas com as vozes offline dele. Nada passa por uma API do Google nem pela rede.</p>
+          <p>No app lead-acid, o golem preenche um evento, um cronômetro ou um alarme e entrega ao app que você já usa; esse app pede a sua confirmação. Ele mede um plano ou uma linha com a bússola do celular (<code>mede o acamamento</code>), pega uma posição quando você pede (<code>declinação aqui</code>), ouve com o reconhecedor offline do próprio celular e lê as respostas com as vozes offline dele. Nada passa por uma API do Google nem pela rede. No navegador do celular o golem também mede e pega a posição: o navegador não diz se a bússola está calibrada, e pode consultar o próprio serviço de localização para a posição.</p>
         </section>
         <section>
           <h2>O que é real aqui</h2>
