@@ -261,6 +261,13 @@ html[data-drop] .composer::after{content:"Drop to open";font:12px var(--mono);co
 .item p{margin:0;font-size:14px;color:var(--au-fg-muted)}
 .item .from{font:11px var(--mono);color:var(--au-fg-soft)}
 .view > .lbl{margin-top:10px}
+.pref select,.pref input{background:var(--au-surface);color:var(--au-fg);border:1px solid var(--au-border);border-radius:6px;padding:6px 8px;font:13px var(--sans);min-height:34px;max-width:100%}
+.pref{grid-template-columns:minmax(0,1fr)}
+.pref select{min-width:0;flex:0 1 auto;text-overflow:ellipsis}
+.pref input{width:8em;font-family:var(--mono)}
+.kept-list{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+.kept-list li{display:flex;gap:8px;align-items:baseline;justify-content:space-between;font:13px var(--mono);color:var(--au-fg-muted);overflow-wrap:anywhere}
+.btn.warn{border-color:var(--au-error);color:var(--au-error)}
 .notes{display:grid;gap:26px;min-width:0}
 .notes section{display:grid;gap:8px;min-width:0}
 html:not([lang="pt-BR"]) .notes[data-lang="pt"],html[lang="pt-BR"] .notes[data-lang="en"]{display:none}
@@ -281,10 +288,10 @@ html:not([lang="pt-BR"]) .notes[data-lang="pt"],html[lang="pt-BR"] .notes[data-l
     <div class="dlist" id="dlist"></div>
     <nav class="sfoot" aria-label="golem">
       <button class="navbtn only-wide" type="button" data-tab="skills"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12M2 8h12M2 13h7"/></svg><span data-t>Skills</span></button>
-      <button class="navbtn only-wide" type="button" data-tab="packs"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 5l6-3 6 3-6 3-6-3zM2 5v6l6 3 6-3V5M8 8v6"/></svg><span data-t>Packs and this device</span></button>
+      <button class="navbtn only-wide" type="button" data-tab="packs"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 5l6-3 6 3-6 3-6-3zM2 5v6l6 3 6-3V5M8 8v6"/></svg><span data-t>Packs</span></button>
       <button class="navbtn" type="button" data-tab="about"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M8 7v4M8 4.6v.1"/></svg><span data-t>How golem reads</span></button>
-      <button class="navbtn" id="theme" type="button"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M8 2a6 6 0 0 0 0 12z" fill="currentColor"/></svg><span data-t>Theme</span><span class="k" id="theme-k">auto</span></button>
-      <button class="navbtn" id="lang" type="button" title="English / Português"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M2 8h12M8 2c-2 2-2 10 0 12M8 2c2 2 2 10 0 12"/></svg><span data-t>Language</span><span class="k" id="lang-k">English</span></button>
+      <button class="navbtn" type="button" data-tab="kept"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="3" width="11" height="10" rx="1.5"/><path d="M2.5 6.5h11M6.5 9h3"/></svg><span data-t>What golem keeps</span></button>
+      <button class="navbtn" type="button" data-tab="settings"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4h7M12 4h2M2 8h2M7 8h7M2 12h9M14 12h0"/><circle cx="10.5" cy="4" r="1.5"/><circle cx="5.5" cy="8" r="1.5"/><circle cx="12.5" cy="12" r="1.5"/></svg><span data-t>Settings</span></button>
     </nav>
   </aside>
 
@@ -310,6 +317,9 @@ html:not([lang="pt-BR"]) .notes[data-lang="pt"],html[lang="pt-BR"] .notes[data-l
     </div>
     <div class="view" id="v-skills" hidden></div>
     <div class="view" id="v-packs" hidden></div>
+    <div class="view" id="v-settings" hidden></div>
+    <div class="view" id="v-kept" hidden></div>
+    <input type="file" id="restore-f" accept=".json,application/json" hidden>
     <div class="view" id="v-about" hidden>
       <h1 class="vhead" data-t>How golem reads</h1>
       <div class="notes" data-lang="en">

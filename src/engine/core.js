@@ -6,7 +6,8 @@
 // belong to the device, not a session). `clause` is the parser's session, rebuilt when a session is opened.
 // `misses` (what did not read) and `picks` (guesses picked, by tool) are the device's too: learn.js. So are `formulas`
 // (taught: lore.js), `orders` (standing orders: orders.js) and `strata` (what was said of the units' ages: strata.js).
-export const S = { cards: [], n: 0, aliases: {}, facts: [], files: {}, tables: {}, recipes: {}, misses: [], picks: {}, formulas: {}, orders: [], strata: [], table: null, clause: null };
+// `prefs` is the person's settings (prefs.js), the device's too.
+export const S = { cards: [], n: 0, aliases: {}, facts: [], files: {}, tables: {}, recipes: {}, misses: [], picks: {}, formulas: {}, orders: [], strata: [], prefs: {}, table: null, clause: null };
 
 // The tool table: T.name = args => Result | null. A tool returns null when its arguments do not apply.
 //   Result = { read: (string | Slot)[], body: Block[], trace: string[], py?, value?, ask?, copy? }
@@ -114,16 +115,24 @@ export function runTool(name, args) {
     return { read: [name], body: [], trace: [...traces, `blocked: ${c} (precondition)`],
       ask: { prompt: options.length === 1 ? C.prompt.replace('{one}', options[0].name || options[0].label) : C.many || C.prompt.replace('{one}', 'which?'), options: options.map(o => ({ label: o.label, value: o })), set: (a, v) => { a.plan = [...(a.plan || []), { label: v.label, tool: v.tool, args: v.args }]; } } };
   }
-  const res = T[name](args); bump();
+  // how numbers, bearings and coordinates are written: the card's own style (args.style, copied from the settings when
+  // it was read: prefs.js), in force while the tool runs, so a replay writes them as the card first did
+  const was = { ...STYLE }; Object.assign(STYLE, args && args.style);
+  let res; try { res = T[name](args); } finally { Object.assign(STYLE, was); }
+  bump();
   if (res && traces.length) res.trace.unshift(...traces);
   return res;
 }
+// the style a tool writes in while it runs: sig caps the significant figures (golem's own choice where a number carries
+// fewer), bearing 'azimuth' | 'quadrant', coords 'dd' | 'dms'
+export const STYLE = { sig: null, bearing: 'azimuth', coords: 'dd' };
 
 // The clock, so tests can pin "today".
 export const clock = { now: () => new Date(), zone: () => Intl.DateTimeFormat().resolvedOptions().timeZone };
 
 export const fmt = (x, sig = 6) => {
   if (!isFinite(x)) return String(x);
+  if (STYLE.sig) sig = Math.min(sig, STYLE.sig);
   const a = Math.abs(x);
   if (a !== 0 && (a < 1e-4 || a >= 1e12)) return x.toExponential(4);
   return Number(x.toPrecision(sig)).toLocaleString('en-US', { maximumFractionDigits: 8 });
@@ -133,6 +142,23 @@ export const rad = d => d * Math.PI / 180;
 export const deg = r => r * 180 / Math.PI;
 export const p3 = x => String(Math.round(x) % 360).padStart(3, '0');
 export const p2 = x => String(Math.round(x)).padStart(2, '0');
+// a single bearing as the card's style writes it: 045, or N45°E as a quadrant bearing
+export const azi = x => {
+  x = ((Math.round(x) % 360) + 360) % 360; if (STYLE.bearing !== 'quadrant') return p3(x);
+  const [a, n, b] = x <= 90 ? ['N', x, 'E'] : x < 180 ? ['S', 180 - x, 'E'] : x <= 270 ? ['S', x - 180, 'W'] : ['N', 360 - x, 'W'];
+  return `${a}${p2(n)}°${b}`;
+};
+// latitude and longitude as the card's style writes them: 19.92° S, 43.94° W, or 19°55′12.0″ S, 43°56′24.0″ W
+export const latlon = (lat, lon, sig = 6) => {
+  const one = (v, pos, neg) => {
+    const h = v < 0 ? neg : pos; v = Math.abs(v);
+    if (STYLE.coords !== 'dms') return `${fmt(v, sig)}° ${h}`;
+    let d = Math.floor(v), m = Math.floor((v - d) * 60), sec = Math.round(((v - d) * 60 - m) * 600) / 10;
+    if (sec >= 60) { sec = 0; m++; } if (m >= 60) { m = 0; d++; }
+    return `${d}°${String(m).padStart(2, '0')}′${sec.toFixed(1).padStart(4, '0')}″ ${h}`;
+  };
+  return `${one(lat, 'N', 'S')}, ${one(lon, 'E', 'W')}`;
+};
 // a quantity node from the parser as a number in a base unit, given the unit's factor
 export const qty = (node, f) => node && node.type === 'quantity' ? node.n * f(node.unit) : null;
 

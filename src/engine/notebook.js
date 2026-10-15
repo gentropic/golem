@@ -4,7 +4,7 @@
 // the open station. A compass reading at a station with a position is corrected to true north with the World Magnetic
 // Model there, on the day it was taken, and the correction is kept with the row. Rows belong to the device, like the
 // log; a card writes its row once (by id) and undo removes it. Typed attitudes are kept as typed, north as you read it.
-import { S, tool, frame, noun, shape, postmod, condition, fmt, iso, p3, p2, clock, checksOf, said } from './core.js';
+import { S, tool, frame, noun, shape, postmod, condition, fmt, iso, p3, p2, clock, checksOf, said, latlon, STYLE } from './core.js';
 import { conversions, statistics } from '../vendor/bearing.js';
 import { field as wmm } from '../vendor/wmm.js';
 import { fromDevice } from './field.js';
@@ -23,7 +23,7 @@ const newId = () => Date.now().toString(36) + Math.floor(Math.random() * 1e6).to
 const hhmm = d => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 const put = row => { const t = fieldTable(), at = t.rows.findIndex(r => r.id === row.id); if (at >= 0) t.rows[at] = row; else t.rows.push(row); return t; };
 const SRC = { t: 'src', text: 'the field notebook · a table on this device · nothing leaves it' };
-const fmtLL = (lat, lon) => `${fmt(lat, 7)}, ${fmt(lon, 7)}`;
+const fmtLL = (lat, lon) => STYLE.coords === 'dms' ? latlon(lat, lon) : `${fmt(lat, 7)}, ${fmt(lon, 7)}`;
 
 /* ── the precondition: a station is open ───────────────────── */
 condition('station', {
@@ -59,11 +59,11 @@ function attitude(a, st) {
   if (a.typed) return { az: a.typed[0], dip: a.typed[1], north: 'as typed', via: 'typed', trace: ['as typed'] };
   if (!a.reading) return null;
   const r = a.reading, [m, dip] = fromDevice(a.what, r.alpha, r.beta, r.gamma), mag = ((m % 360) + 360) % 360;
-  if (st && st.lat != null) {
-    const d = wmm(st.lat, st.lon, { date: new Date(r.at || clock.now()) }).decl, az = ((mag + d) % 360 + 360) % 360;
-    return { az, dip, north: `true (WMM at the station, ${fmt(d, 3)}°)`, via: r.via === 'browser' ? 'browser compass' : 'phone compass', trace: [`device α ${fmt(r.alpha, 5)}° β ${fmt(r.beta, 5)}° γ ${fmt(r.gamma, 5)}° → ${p3(mag)}/${p2(dip)} magnetic`, `+ declination ${fmt(d, 5)}° (WMM at ${fmtLL(st.lat, st.lon)}) → ${p3(az)}/${p2(dip)} true`] };
+  if (typeof a.decl === 'number' || (a.decl !== 'none' && st && st.lat != null)) {
+    const fixed = typeof a.decl === 'number', d = fixed ? a.decl : wmm(st.lat, st.lon, { date: new Date(r.at || clock.now()) }).decl, az = ((mag + d) % 360 + 360) % 360;
+    return { az, dip, north: fixed ? `true (a fixed declination from the settings, ${fmt(d, 3)}°)` : `true (WMM at the station, ${fmt(d, 3)}°)`, via: r.via === 'browser' ? 'browser compass' : 'phone compass', trace: [`device α ${fmt(r.alpha, 5)}° β ${fmt(r.beta, 5)}° γ ${fmt(r.gamma, 5)}° → ${p3(mag)}/${p2(dip)} magnetic`, `+ declination ${fmt(d, 5)}° (WMM at ${fmtLL(st.lat, st.lon)}) → ${p3(az)}/${p2(dip)} true`] };
   }
-  return { az: mag, dip, north: 'magnetic (the station has no position)', via: r.via === 'browser' ? 'browser compass' : 'phone compass', trace: [`device α ${fmt(r.alpha, 5)}° β ${fmt(r.beta, 5)}° γ ${fmt(r.gamma, 5)}° → ${p3(mag)}/${p2(dip)} magnetic`, 'north: magnetic (the station has no position)'] };
+  return { az: mag, dip, north: a.decl === 'none' ? 'magnetic (the settings say not to correct)' : 'magnetic (the station has no position)', via: r.via === 'browser' ? 'browser compass' : 'phone compass', trace: [`device α ${fmt(r.alpha, 5)}° β ${fmt(r.beta, 5)}° γ ${fmt(r.gamma, 5)}° → ${p3(mag)}/${p2(dip)} magnetic`, 'north: magnetic (the station has no position)'] };
 }
 tool({
   name: 'fieldAdd', effects: ['device'], pre: ['station'],

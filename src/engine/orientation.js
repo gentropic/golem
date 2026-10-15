@@ -1,6 +1,6 @@
 // Orientation: true thickness from an intercept, and planes on a stereonet. @gcu/bearing (vendored) does the
 // vectors; the shell draws the `net` block (lower hemisphere, equal area) from the planes and lines it carries.
-import { tool, frame, noun, shape, postmod, qmod, fmt, deg, p3, p2 } from './core.js';
+import { tool, frame, noun, shape, postmod, qmod, fmt, deg, p3, p2, azi } from './core.js';
 import { parseUnit } from './units.js';
 import { conversions, vec3 } from '../vendor/bearing.js';
 const planeDD = a => a.conv === 'sd' ? (a.a1 + 90) % 360 : a.a1;
@@ -17,9 +17,9 @@ tool({
       read: ['true thickness of', { v: fmt(a.len) + ' m' }, 'in hole', { v: `${p3(a.htr)}/${p2(a.hpl)} trend/plunge` }, 'through', convSlot(a)],
       value: tt,
       body: [
-        { t: 'big', v: fmt(tt, 4), unit: 'm true thickness' },
+        a.units === 'imperial' ? { t: 'big', v: fmt(tt / 0.3048, 4), unit: 'ft true thickness' } : { t: 'big', v: fmt(tt, 4), unit: 'm true thickness' },
         { t: 'net', planes: [{ dd, dip: a.a2 }], lines: [{ tr: a.htr, pl: a.hpl, label: 'hole' }] },
-        { t: 'kv', rows: [['hole to pole', `${fmt(ang, 3)}°`], ['hole to plane', `${fmt(90 - ang, 3)}°`], ['factor', `${fmt(c, 4)} of downhole length`]] },
+        { t: 'kv', rows: [['hole to pole', `${fmt(ang, 3)}°`], ['hole to plane', `${fmt(90 - ang, 3)}°`], ['factor', `${fmt(c, 4)} of downhole length`], ...(a.units === 'imperial' ? [['in metres', `${fmt(tt, 4)} m`]] : [])] },
         { t: 'src', text: '@gcu/bearing · vendored · lower hemisphere, equal area' }
       ],
       trace: [`bearing.planeToDcos(${p3(dd)}, ${p2(a.a2)}) → pole ${p3(dd + 180)}/${p2(90 - a.a2)}`, `bearing.lineToDcos(${p3(a.htr)}, ${p2(a.hpl)}) → hole axis`, `|hole · pole| = ${fmt(c, 5)}`, `${fmt(a.len)} m × ${fmt(c, 5)} = ${fmt(tt, 5)} m`],
@@ -37,7 +37,7 @@ tool({
       read: ['plot plane', convSlot(a)],
       body: [
         { t: 'net', planes: [{ dd, dip: a.a2 }], lines: [] },
-        { t: 'kv', rows: [['strike', p3(dd + 270)], ['dip', `${p2(a.a2)}° toward ${p3(dd)}`], ['pole', `${p3(dd + 180)}/${p2(90 - a.a2)}`]] },
+        { t: 'kv', rows: [['strike', azi(dd + 270)], ['dip', `${p2(a.a2)}° toward ${azi(dd)}`], ['pole', `${p3(dd + 180)}/${p2(90 - a.a2)}`]] },
         { t: 'src', text: '@gcu/bearing · vendored' }
       ],
       trace: ['plane → great circle and pole', 'equal-area projection, lower hemisphere'], py: `stereonet.plane(${dd}, ${a.a2})`

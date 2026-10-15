@@ -1,6 +1,6 @@
 // Magnetic declination from @gcu/wmm (vendored WMM2025), and bearings between magnetic and true north.
 // A place is coordinates in the request; device location stays off (SPEC-skills 0.7).
-import { tool, frame, noun, qmod, clock, fmt, iso, p3 } from './core.js';
+import { tool, frame, noun, qmod, clock, fmt, iso, p3, azi, STYLE } from './core.js';
 import { field, MODEL, VALID_FROM, VALID_TO } from '../vendor/wmm.js';
 import { findDate, fmtDate, dateWords } from './dates.js';
 
@@ -42,7 +42,7 @@ tool({
     const { d, f } = decl(a), out = ((a.from === 'magnetic' ? a.v + f.decl : a.v - f.decl) % 360 + 360) % 360;
     return {
       read: [{ v: p3(a.v) }, a.from, 'to', a.to, 'at', { v: `${a.lat}, ${a.lon}` }], value: out,
-      body: [{ t: 'big', v: fmt(out, 4), unit: `° ${a.to}` }, { t: 'kv', rows: [['declination', `${fmt(Math.abs(f.decl), 3)}° ${dirWord(f.decl)} on ${fmtDate(d)}`], ['applied', `${a.from} ${a.from === 'magnetic' ? '+' : '−'} declination`]] }, SRC(f)],
+      body: [STYLE.bearing === 'quadrant' ? { t: 'big', v: azi(out), unit: a.to } : { t: 'big', v: fmt(out, 4), unit: `° ${a.to}` }, { t: 'kv', rows: [['declination', `${fmt(Math.abs(f.decl), 3)}° ${dirWord(f.decl)} on ${fmtDate(d)}`], ['applied', `${a.from} ${a.from === 'magnetic' ? '+' : '−'} declination`]] }, SRC(f)],
       trace: [`wmm.field(${a.lat}, ${a.lon}, ${fmt(f.year, 6)}) → declination ${fmt(f.decl, 5)}°`, `${a.v} ${a.from === 'magnetic' ? '+' : '−'} ${fmt(f.decl, 5)} = ${fmt(out, 5)}`], py: `wmm.to_${a.to}(${a.v}, ${a.lat}, ${a.lon}, "${iso(d)}")`
     };
   }

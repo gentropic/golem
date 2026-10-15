@@ -275,6 +275,13 @@ html[data-drop] .composer::after{content:"Drop to open";font:12px var(--mono);co
 .item p{margin:0;font-size:14px;color:var(--au-fg-muted)}
 .item .from{font:11px var(--mono);color:var(--au-fg-soft)}
 .view > .lbl{margin-top:10px}
+.pref select,.pref input{background:var(--au-surface);color:var(--au-fg);border:1px solid var(--au-border);border-radius:6px;padding:6px 8px;font:13px var(--sans);min-height:34px;max-width:100%}
+.pref{grid-template-columns:minmax(0,1fr)}
+.pref select{min-width:0;flex:0 1 auto;text-overflow:ellipsis}
+.pref input{width:8em;font-family:var(--mono)}
+.kept-list{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+.kept-list li{display:flex;gap:8px;align-items:baseline;justify-content:space-between;font:13px var(--mono);color:var(--au-fg-muted);overflow-wrap:anywhere}
+.btn.warn{border-color:var(--au-error);color:var(--au-error)}
 .notes{display:grid;gap:26px;min-width:0}
 .notes section{display:grid;gap:8px;min-width:0}
 html:not([lang="pt-BR"]) .notes[data-lang="pt"],html[lang="pt-BR"] .notes[data-lang="en"]{display:none}
@@ -297,10 +304,10 @@ html:not([lang="pt-BR"]) .notes[data-lang="pt"],html[lang="pt-BR"] .notes[data-l
     <div class="dlist" id="dlist"></div>
     <nav class="sfoot" aria-label="golem">
       <button class="navbtn only-wide" type="button" data-tab="skills"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12M2 8h12M2 13h7"/></svg><span data-t>Skills</span></button>
-      <button class="navbtn only-wide" type="button" data-tab="packs"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 5l6-3 6 3-6 3-6-3zM2 5v6l6 3 6-3V5M8 8v6"/></svg><span data-t>Packs and this device</span></button>
+      <button class="navbtn only-wide" type="button" data-tab="packs"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 5l6-3 6 3-6 3-6-3zM2 5v6l6 3 6-3V5M8 8v6"/></svg><span data-t>Packs</span></button>
       <button class="navbtn" type="button" data-tab="about"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M8 7v4M8 4.6v.1"/></svg><span data-t>How golem reads</span></button>
-      <button class="navbtn" id="theme" type="button"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M8 2a6 6 0 0 0 0 12z" fill="currentColor"/></svg><span data-t>Theme</span><span class="k" id="theme-k">auto</span></button>
-      <button class="navbtn" id="lang" type="button" title="English / Português"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M2 8h12M8 2c-2 2-2 10 0 12M8 2c2 2 2 10 0 12"/></svg><span data-t>Language</span><span class="k" id="lang-k">English</span></button>
+      <button class="navbtn" type="button" data-tab="kept"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="3" width="11" height="10" rx="1.5"/><path d="M2.5 6.5h11M6.5 9h3"/></svg><span data-t>What golem keeps</span></button>
+      <button class="navbtn" type="button" data-tab="settings"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4h7M12 4h2M2 8h2M7 8h7M2 12h9M14 12h0"/><circle cx="10.5" cy="4" r="1.5"/><circle cx="5.5" cy="8" r="1.5"/><circle cx="12.5" cy="12" r="1.5"/></svg><span data-t>Settings</span></button>
     </nav>
   </aside>
 
@@ -326,6 +333,9 @@ html:not([lang="pt-BR"]) .notes[data-lang="pt"],html[lang="pt-BR"] .notes[data-l
     </div>
     <div class="view" id="v-skills" hidden></div>
     <div class="view" id="v-packs" hidden></div>
+    <div class="view" id="v-settings" hidden></div>
+    <div class="view" id="v-kept" hidden></div>
+    <input type="file" id="restore-f" accept=".json,application/json" hidden>
     <div class="view" id="v-about" hidden>
       <h1 class="vhead" data-t>How golem reads</h1>
       <div class="notes" data-lang="en">
@@ -453,7 +463,8 @@ const __m0 = (() => {
 // belong to the device, not a session). `clause` is the parser's session, rebuilt when a session is opened.
 // `misses` (what did not read) and `picks` (guesses picked, by tool) are the device's too: learn.js. So are `formulas`
 // (taught: lore.js), `orders` (standing orders: orders.js) and `strata` (what was said of the units' ages: strata.js).
-const S = { cards: [], n: 0, aliases: {}, facts: [], files: {}, tables: {}, recipes: {}, misses: [], picks: {}, formulas: {}, orders: [], strata: [], table: null, clause: null };
+// `prefs` is the person's settings (prefs.js), the device's too.
+const S = { cards: [], n: 0, aliases: {}, facts: [], files: {}, tables: {}, recipes: {}, misses: [], picks: {}, formulas: {}, orders: [], strata: [], prefs: {}, table: null, clause: null };
 
 // The tool table: T.name = args => Result | null. A tool returns null when its arguments do not apply.
 //   Result = { read: (string | Slot)[], body: Block[], trace: string[], py?, value?, ask?, copy? }
@@ -561,16 +572,24 @@ function runTool(name, args) {
     return { read: [name], body: [], trace: [...traces, `blocked: ${c} (precondition)`],
       ask: { prompt: options.length === 1 ? C.prompt.replace('{one}', options[0].name || options[0].label) : C.many || C.prompt.replace('{one}', 'which?'), options: options.map(o => ({ label: o.label, value: o })), set: (a, v) => { a.plan = [...(a.plan || []), { label: v.label, tool: v.tool, args: v.args }]; } } };
   }
-  const res = T[name](args); bump();
+  // how numbers, bearings and coordinates are written: the card's own style (args.style, copied from the settings when
+  // it was read: prefs.js), in force while the tool runs, so a replay writes them as the card first did
+  const was = { ...STYLE }; Object.assign(STYLE, args && args.style);
+  let res; try { res = T[name](args); } finally { Object.assign(STYLE, was); }
+  bump();
   if (res && traces.length) res.trace.unshift(...traces);
   return res;
 }
+// the style a tool writes in while it runs: sig caps the significant figures (golem's own choice where a number carries
+// fewer), bearing 'azimuth' | 'quadrant', coords 'dd' | 'dms'
+const STYLE = { sig: null, bearing: 'azimuth', coords: 'dd' };
 
 // The clock, so tests can pin "today".
 const clock = { now: () => new Date(), zone: () => Intl.DateTimeFormat().resolvedOptions().timeZone };
 
 const fmt = (x, sig = 6) => {
   if (!isFinite(x)) return String(x);
+  if (STYLE.sig) sig = Math.min(sig, STYLE.sig);
   const a = Math.abs(x);
   if (a !== 0 && (a < 1e-4 || a >= 1e12)) return x.toExponential(4);
   return Number(x.toPrecision(sig)).toLocaleString('en-US', { maximumFractionDigits: 8 });
@@ -580,6 +599,23 @@ const rad = d => d * Math.PI / 180;
 const deg = r => r * 180 / Math.PI;
 const p3 = x => String(Math.round(x) % 360).padStart(3, '0');
 const p2 = x => String(Math.round(x)).padStart(2, '0');
+// a single bearing as the card's style writes it: 045, or N45°E as a quadrant bearing
+const azi = x => {
+  x = ((Math.round(x) % 360) + 360) % 360; if (STYLE.bearing !== 'quadrant') return p3(x);
+  const [a, n, b] = x <= 90 ? ['N', x, 'E'] : x < 180 ? ['S', 180 - x, 'E'] : x <= 270 ? ['S', x - 180, 'W'] : ['N', 360 - x, 'W'];
+  return `${a}${p2(n)}°${b}`;
+};
+// latitude and longitude as the card's style writes them: 19.92° S, 43.94° W, or 19°55′12.0″ S, 43°56′24.0″ W
+const latlon = (lat, lon, sig = 6) => {
+  const one = (v, pos, neg) => {
+    const h = v < 0 ? neg : pos; v = Math.abs(v);
+    if (STYLE.coords !== 'dms') return `${fmt(v, sig)}° ${h}`;
+    let d = Math.floor(v), m = Math.floor((v - d) * 60), sec = Math.round(((v - d) * 60 - m) * 600) / 10;
+    if (sec >= 60) { sec = 0; m++; } if (m >= 60) { m = 0; d++; }
+    return `${d}°${String(m).padStart(2, '0')}′${sec.toFixed(1).padStart(4, '0')}″ ${h}`;
+  };
+  return `${one(lat, 'N', 'S')}, ${one(lon, 'E', 'W')}`;
+};
 // a quantity node from the parser as a number in a base unit, given the unit's factor
 const qty = (node, f) => node && node.type === 'quantity' ? node.n * f(node.unit) : null;
 
@@ -591,7 +627,7 @@ const CHECKS = [];
 // (shell/i18n-answers.js): { t: 'note', ...said('Added to station {station}: {n} there.', { station, n }) }
 const said = (tpl, params = {}) => ({ text: tpl.replace(/\{(\w+)\}/g, (m, k) => params[k] != null ? String(params[k]) : m), tpl, params });
 const checksOf = (table, rows) => { try { return CHECKS.flatMap(f => f(table, rows)); } catch (e) { return []; } };
-  return { S, T, EFFECTS, TOOLS, tool, toolByName, FRAMES, frame, amend, session, LEXICON, noun, shape, postmod, unit, qmod, compound, CONDITIONS, condition, setRunner, onJobDone, result, clearResults, startJobs, settle, STATE, bump, runTool, clock, fmt, iso, rad, deg, p3, p2, qty, CHECKS, said, checksOf };
+  return { S, T, EFFECTS, TOOLS, tool, toolByName, FRAMES, frame, amend, session, LEXICON, noun, shape, postmod, unit, qmod, compound, CONDITIONS, condition, setRunner, onJobDone, result, clearResults, startJobs, settle, STATE, bump, runTool, STYLE, clock, fmt, iso, rad, deg, p3, p2, azi, latlon, qty, CHECKS, said, checksOf };
 })();
 
 /* ==== src/vendor/units.js ==== */
@@ -5191,12 +5227,11 @@ function mapValue(name, value, min, max, options) {
 
 /* ==== src/engine/orientation.js ==== */
 const __m6 = (() => {
-const { tool, frame, noun, shape, postmod, qmod, fmt, deg, p3, p2 } = __m0;
+const { tool, frame, noun, shape, postmod, qmod, fmt, deg, p3, p2, azi } = __m0;
 const { parseUnit } = __m2;
 const { conversions, vec3 } = __m5;
 // Orientation: true thickness from an intercept, and planes on a stereonet. @gcu/bearing (vendored) does the
-// vectors; the shell draws the `net` block (lower hemisphere, equal area) from the planes and lines it carries.
-const planeDD = a => a.conv === 'sd' ? (a.a1 + 90) % 360 : a.a1;
+// vectors; the shell draws the `net` block (lower hemisphere, equal area) from the planes and lines it carries.const planeDD = a => a.conv === 'sd' ? (a.a1 + 90) % 360 : a.a1;
 const convSlot = a => ({ v: `${p3(a.a1)}/${p2(a.a2)} as ${a.conv === 'sd' ? 'strike/dip (right-hand)' : 'dip direction/dip'}`, key: 'conv', alts: ['dd', 'sd'], cur: a.conv || 'dd' });
 
 tool({
@@ -5210,9 +5245,9 @@ tool({
       read: ['true thickness of', { v: fmt(a.len) + ' m' }, 'in hole', { v: `${p3(a.htr)}/${p2(a.hpl)} trend/plunge` }, 'through', convSlot(a)],
       value: tt,
       body: [
-        { t: 'big', v: fmt(tt, 4), unit: 'm true thickness' },
+        a.units === 'imperial' ? { t: 'big', v: fmt(tt / 0.3048, 4), unit: 'ft true thickness' } : { t: 'big', v: fmt(tt, 4), unit: 'm true thickness' },
         { t: 'net', planes: [{ dd, dip: a.a2 }], lines: [{ tr: a.htr, pl: a.hpl, label: 'hole' }] },
-        { t: 'kv', rows: [['hole to pole', `${fmt(ang, 3)}°`], ['hole to plane', `${fmt(90 - ang, 3)}°`], ['factor', `${fmt(c, 4)} of downhole length`]] },
+        { t: 'kv', rows: [['hole to pole', `${fmt(ang, 3)}°`], ['hole to plane', `${fmt(90 - ang, 3)}°`], ['factor', `${fmt(c, 4)} of downhole length`], ...(a.units === 'imperial' ? [['in metres', `${fmt(tt, 4)} m`]] : [])] },
         { t: 'src', text: '@gcu/bearing · vendored · lower hemisphere, equal area' }
       ],
       trace: [`bearing.planeToDcos(${p3(dd)}, ${p2(a.a2)}) → pole ${p3(dd + 180)}/${p2(90 - a.a2)}`, `bearing.lineToDcos(${p3(a.htr)}, ${p2(a.hpl)}) → hole axis`, `|hole · pole| = ${fmt(c, 5)}`, `${fmt(a.len)} m × ${fmt(c, 5)} = ${fmt(tt, 5)} m`],
@@ -5230,7 +5265,7 @@ tool({
       read: ['plot plane', convSlot(a)],
       body: [
         { t: 'net', planes: [{ dd, dip: a.a2 }], lines: [] },
-        { t: 'kv', rows: [['strike', p3(dd + 270)], ['dip', `${p2(a.a2)}° toward ${p3(dd)}`], ['pole', `${p3(dd + 180)}/${p2(90 - a.a2)}`]] },
+        { t: 'kv', rows: [['strike', azi(dd + 270)], ['dip', `${p2(a.a2)}° toward ${azi(dd)}`], ['pole', `${p3(dd + 180)}/${p2(90 - a.a2)}`]] },
         { t: 'src', text: '@gcu/bearing · vendored' }
       ],
       trace: ['plane → great circle and pole', 'equal-area projection, lower hemisphere'], py: `stereonet.plane(${dd}, ${a.a2})`
@@ -12975,12 +13010,11 @@ function declination(lat, lon, date = new Date(), height = 0) {
 
 /* ==== src/engine/geo.js ==== */
 const __m26 = (() => {
-const { tool, frame, noun, qmod, clock, fmt, iso, p3 } = __m0;
+const { tool, frame, noun, qmod, clock, fmt, iso, p3, azi, STYLE } = __m0;
 const { field, MODEL, VALID_FROM, VALID_TO } = __m25;
 const { findDate, fmtDate, dateWords } = __m4;
 // Magnetic declination from @gcu/wmm (vendored WMM2025), and bearings between magnetic and true north.
-// A place is coordinates in the request; device location stays off (SPEC-skills 0.7).
-
+// A place is coordinates in the request; device location stays off (SPEC-skills 0.7).
 const LL = '(-?\\d{1,2}(?:\\.\\d+)?)\\s*,\\s*(-?\\d{1,3}(?:\\.\\d+)?)';
 const whereNote = { t: 'note', kind: 'err', text: 'Where? Give coordinates, as in "declination at -19.92, -43.94". Device location stays off.' };
 const dateOf = a => a.date ? new Date(a.date) : clock.now();
@@ -13019,7 +13053,7 @@ tool({
     const { d, f } = decl(a), out = ((a.from === 'magnetic' ? a.v + f.decl : a.v - f.decl) % 360 + 360) % 360;
     return {
       read: [{ v: p3(a.v) }, a.from, 'to', a.to, 'at', { v: `${a.lat}, ${a.lon}` }], value: out,
-      body: [{ t: 'big', v: fmt(out, 4), unit: `° ${a.to}` }, { t: 'kv', rows: [['declination', `${fmt(Math.abs(f.decl), 3)}° ${dirWord(f.decl)} on ${fmtDate(d)}`], ['applied', `${a.from} ${a.from === 'magnetic' ? '+' : '−'} declination`]] }, SRC(f)],
+      body: [STYLE.bearing === 'quadrant' ? { t: 'big', v: azi(out), unit: a.to } : { t: 'big', v: fmt(out, 4), unit: `° ${a.to}` }, { t: 'kv', rows: [['declination', `${fmt(Math.abs(f.decl), 3)}° ${dirWord(f.decl)} on ${fmtDate(d)}`], ['applied', `${a.from} ${a.from === 'magnetic' ? '+' : '−'} declination`]] }, SRC(f)],
       trace: [`wmm.field(${a.lat}, ${a.lon}, ${fmt(f.year, 6)}) → declination ${fmt(f.decl, 5)}°`, `${a.v} ${a.from === 'magnetic' ? '+' : '−'} ${fmt(f.decl, 5)} = ${fmt(out, 5)}`], py: `wmm.to_${a.to}(${a.v}, ${a.lat}, ${a.lon}, "${iso(d)}")`
     };
   }
@@ -13055,8 +13089,7 @@ const { fmtDate } = __m4;
 // fused rotation vector, in a phone's browser the north-referenced deviceorientation events) and, when the person takes the reading, hands the device angles back through capture() in engine.js,
 // which writes them into args. From then on the card is plain arithmetic over args, like any other: bearing's compass
 // functions turn the angles into dip direction/dip or trend/plunge. North is magnetic as measured; with a saved home,
-// golem corrects it to true with the World Magnetic Model and keeps the correction in args, so a replay agrees.
-
+// golem corrects it to true with the World Magnetic Model and keeps the correction in args, so a replay agrees.
 const ACC = { 3: 'high', 2: 'medium', 1: 'low', 0: 'unreliable: move the phone in a figure of eight to calibrate', '-1': 'no contact with the sensor' };
 const KIND = { plane: { label: 'plane', unit: 'dip direction/dip' }, line: { label: 'line', unit: 'trend/plunge' } };
 const ori = (a, b) => `${p3(a)}/${p2(b)}`;
@@ -13080,7 +13113,7 @@ tool({
   run: a => {
     const k = KIND[a.what] || KIND.plane, name = a.name || k.label;
     const read = ['measure', { v: name }, 'with the phone'];
-    const capture = { kind: a.what === 'line' ? 'line' : 'plane', set: (args, v) => { args.reading = { alpha: +v.alpha, beta: +v.beta, gamma: +v.gamma, acc: v.acc == null ? null : +v.acc, spread: v.spread == null ? null : +v.spread, at: +v.at || 0, ...(v.via === 'browser' ? { via: 'browser' } : {}) }; const d = declAt(args.reading.at); if (d) args.north = d; else delete args.north; } };
+    const capture = { kind: a.what === 'line' ? 'line' : 'plane', set: (args, v) => { args.reading = { alpha: +v.alpha, beta: +v.beta, gamma: +v.gamma, acc: v.acc == null ? null : +v.acc, spread: v.spread == null ? null : +v.spread, at: +v.at || 0, ...(v.via === 'browser' ? { via: 'browser' } : {}) }; const d = args.decl === 'none' ? null : typeof args.decl === 'number' ? { decl: args.decl, fixed: true } : declAt(args.reading.at); if (d) args.north = d; else delete args.north; } };
     if (!a.reading) return {
       read, capture,
       body: [{ t: 'capture', kind: capture.kind, how: a.what === 'line' ? 'Lay the phone\'s long edge along the line and hold it still.' : 'Lay the phone\'s back flat on the plane, screen up, and hold it still.' },
@@ -13089,18 +13122,18 @@ tool({
     };
     const r = a.reading, [n1, m2] = fromDevice(a.what, r.alpha, r.beta, r.gamma), m1 = ((n1 % 360) + 360) % 360, corr = a.north ? a.north.decl : 0, t1 = ((m1 + corr) % 360 + 360) % 360;
     const when = r.at ? new Date(r.at) : null;
-    const rows = [['north', a.north ? `true: corrected by ${fmt(Math.abs(corr), 3)}° ${corr < 0 ? 'west' : 'east'} (WMM at home, ${fmt(a.north.lat, 5)}, ${fmt(a.north.lon, 5)})` : 'magnetic, as the phone measured it. Save a home ("home is -19.92, -43.94") and golem corrects to true'],
+    const rows = [['north', a.north ? `true: corrected by ${fmt(Math.abs(corr), 3)}° ${corr < 0 ? 'west' : 'east'} (${a.north.fixed ? 'a fixed declination, from the settings' : `WMM at home, ${fmt(a.north.lat, 5)}, ${fmt(a.north.lon, 5)}`})` : a.decl === 'none' ? 'magnetic, as the phone measured it (the settings say not to correct)' : 'magnetic, as the phone measured it. Save a home ("home is -19.92, -43.94") and golem corrects to true'],
       ...(a.north ? [['as measured', `${ori(m1, m2)} magnetic`]] : []),
       ['compass accuracy', ACC[r.acc] || (r.via === 'browser' ? 'not reported: the browser does not say' : 'not reported')], ...(r.spread != null ? [['steadiness', `±${fmt(r.spread, 2)}° over the last second`]] : []),
       ...(when ? [['taken', `${fmtDate(when)}, ${String(when.getHours()).padStart(2, '0')}:${String(when.getMinutes()).padStart(2, '0')}`]] : [])];
     const net = a.what === 'line' ? { t: 'net', planes: [], lines: [{ tr: t1, pl: m2, label: name }] } : { t: 'net', planes: [{ dd: t1, dip: m2 }], lines: [] };
     return {
       read: ['measured', { v: name }, 'with the phone'], value: [t1, m2],
-      body: [{ t: 'big', v: ori(t1, m2), unit: `${k.unit}${a.north ? ' (true)' : ' (magnetic)'}` }, net, { t: 'kv', rows },
+      body: [{ t: 'big', v: a.what !== 'line' && a.conv === 'sd' ? ori(t1 - 90 + 360, m2) : ori(t1, m2), unit: `${a.what !== 'line' && a.conv === 'sd' ? 'strike/dip (right-hand)' : k.unit}${a.north ? ' (true)' : ' (magnetic)'}` }, net, { t: 'kv', rows },
         ...(r.acc != null && r.acc < 2 ? [{ t: 'note', kind: 'err', text: 'The phone reported its compass as low or unreliable when this was taken: move it in a figure of eight, away from steel, and measure again.' }] : []),
         { t: 'src', text: `@gcu/bearing · vendored · the device orientation matrix, ${a.what === 'line' ? 'its long edge' : 'its screen normal'} to the lower hemisphere · ${r.via === 'browser' ? 'the browser\'s deviceorientation, north-referenced' : 'the phone\'s fused rotation vector'}` }],
-      trace: [`device orientation α ${fmt(r.alpha, 5)}°, β ${fmt(r.beta, 5)}°, γ ${fmt(r.gamma, 5)}° (accuracy ${r.acc})`, `bearing: device ${a.what === 'line' ? 'y axis' : 'z axis'} in east, north, up → ${ori(m1, m2)} magnetic`, a.north ? `+ declination ${fmt(corr, 5)}° (WMM at home) → ${ori(t1, m2)} true` : 'north: magnetic (no home saved)'],
-      py: `bearing.from_device("${a.what === 'line' ? 'line' : 'plane'}", ${fmt(r.alpha, 6)}, ${fmt(r.beta, 6)}, ${fmt(r.gamma, 6)})${a.north ? ` + ${fmt(corr, 6)}  # declination` : ''}`
+      trace: [`device orientation α ${fmt(r.alpha, 5)}°, β ${fmt(r.beta, 5)}°, γ ${fmt(r.gamma, 5)}° (accuracy ${r.acc})`, `bearing: device ${a.what === 'line' ? 'y axis' : 'z axis'} in east, north, up → ${ori(m1, m2)} magnetic`, a.north ? `+ declination ${fmt(corr, 5)}° (${a.north.fixed ? 'fixed, from the settings' : 'WMM at home'}) → ${ori(t1, m2)} true` : 'north: magnetic (no home saved)'],
+      py: `bearing.from_device("${a.what === 'line' ? 'line' : 'plane'}", ${+r.alpha.toPrecision(6)}, ${+r.beta.toPrecision(6)}, ${+r.gamma.toPrecision(6)})${a.north ? ` + ${+corr.toPrecision(6)}  # declination` : ''}`
     };
   }
 });
@@ -13125,7 +13158,7 @@ frame({
 
 /* ==== src/engine/notebook.js ==== */
 const __m28 = (() => {
-const { S, tool, frame, noun, shape, postmod, condition, fmt, iso, p3, p2, clock, checksOf, said } = __m0;
+const { S, tool, frame, noun, shape, postmod, condition, fmt, iso, p3, p2, clock, checksOf, said, latlon, STYLE } = __m0;
 const { conversions, statistics } = __m5;
 const { field: wmm } = __m25;
 const { fromDevice } = __m27;
@@ -13149,7 +13182,7 @@ const newId = () => Date.now().toString(36) + Math.floor(Math.random() * 1e6).to
 const hhmm = d => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 const put = row => { const t = fieldTable(), at = t.rows.findIndex(r => r.id === row.id); if (at >= 0) t.rows[at] = row; else t.rows.push(row); return t; };
 const SRC = { t: 'src', text: 'the field notebook · a table on this device · nothing leaves it' };
-const fmtLL = (lat, lon) => `${fmt(lat, 7)}, ${fmt(lon, 7)}`;
+const fmtLL = (lat, lon) => STYLE.coords === 'dms' ? latlon(lat, lon) : `${fmt(lat, 7)}, ${fmt(lon, 7)}`;
 
 /* ── the precondition: a station is open ───────────────────── */
 condition('station', {
@@ -13185,11 +13218,11 @@ function attitude(a, st) {
   if (a.typed) return { az: a.typed[0], dip: a.typed[1], north: 'as typed', via: 'typed', trace: ['as typed'] };
   if (!a.reading) return null;
   const r = a.reading, [m, dip] = fromDevice(a.what, r.alpha, r.beta, r.gamma), mag = ((m % 360) + 360) % 360;
-  if (st && st.lat != null) {
-    const d = wmm(st.lat, st.lon, { date: new Date(r.at || clock.now()) }).decl, az = ((mag + d) % 360 + 360) % 360;
-    return { az, dip, north: `true (WMM at the station, ${fmt(d, 3)}°)`, via: r.via === 'browser' ? 'browser compass' : 'phone compass', trace: [`device α ${fmt(r.alpha, 5)}° β ${fmt(r.beta, 5)}° γ ${fmt(r.gamma, 5)}° → ${p3(mag)}/${p2(dip)} magnetic`, `+ declination ${fmt(d, 5)}° (WMM at ${fmtLL(st.lat, st.lon)}) → ${p3(az)}/${p2(dip)} true`] };
+  if (typeof a.decl === 'number' || (a.decl !== 'none' && st && st.lat != null)) {
+    const fixed = typeof a.decl === 'number', d = fixed ? a.decl : wmm(st.lat, st.lon, { date: new Date(r.at || clock.now()) }).decl, az = ((mag + d) % 360 + 360) % 360;
+    return { az, dip, north: fixed ? `true (a fixed declination from the settings, ${fmt(d, 3)}°)` : `true (WMM at the station, ${fmt(d, 3)}°)`, via: r.via === 'browser' ? 'browser compass' : 'phone compass', trace: [`device α ${fmt(r.alpha, 5)}° β ${fmt(r.beta, 5)}° γ ${fmt(r.gamma, 5)}° → ${p3(mag)}/${p2(dip)} magnetic`, `+ declination ${fmt(d, 5)}° (WMM at ${fmtLL(st.lat, st.lon)}) → ${p3(az)}/${p2(dip)} true`] };
   }
-  return { az: mag, dip, north: 'magnetic (the station has no position)', via: r.via === 'browser' ? 'browser compass' : 'phone compass', trace: [`device α ${fmt(r.alpha, 5)}° β ${fmt(r.beta, 5)}° γ ${fmt(r.gamma, 5)}° → ${p3(mag)}/${p2(dip)} magnetic`, 'north: magnetic (the station has no position)'] };
+  return { az: mag, dip, north: a.decl === 'none' ? 'magnetic (the settings say not to correct)' : 'magnetic (the station has no position)', via: r.via === 'browser' ? 'browser compass' : 'phone compass', trace: [`device α ${fmt(r.alpha, 5)}° β ${fmt(r.beta, 5)}° γ ${fmt(r.gamma, 5)}° → ${p3(mag)}/${p2(dip)} magnetic`, 'north: magnetic (the station has no position)'] };
 }
 tool({
   name: 'fieldAdd', effects: ['device'], pre: ['station'],
@@ -13546,6 +13579,8 @@ const listeners = [];
 // the shell registers here to persist and redraw after any change to the session store
 const onChange = fn => { listeners.push(fn); };
 const changed = () => { bump(); listeners.forEach(f => f()); };
+// device state changed outside a card (forgotten from the Settings view, a setting set there): persist it
+const deviceChanged = () => changed();
 
 // what a session keeps of a card: enough to recompute it, and nothing else
 // uses: what device state the card read through (a taught word's meaning, a taught formula), for tms.js
@@ -13569,12 +13604,17 @@ function autoName(cards) {
 // the current session changed: refresh its automatic name and tell the shell
 function touch() { cur.updated = Date.now(); if (cur.auto) cur.name = autoName(S.cards); changed(); }
 
-// open a session: clear the working state and recompute every card from its spec
-function load(s) {
+// open a session: clear the working state and recompute every card from its spec. The device state is kept as it is:
+// a card that wrote to it (taught a word, saved a place) is recomputed but writes nothing again, so what was forgotten
+// since stays forgotten. A session brought from another device (importSession) does write: that device learns it.
+const DEVICE = ['aliases', 'facts', 'tables', 'recipes', 'misses', 'picks', 'formulas', 'orders', 'strata', 'prefs'];
+function load(s, write = false) {
   cur = s; const specs = s.cards;
   S.cards = []; s.cards = S.cards; S.table = null; S.n = 0; S.clause = null;
   specs.forEach(c => {
+    const d = !write && toolByName(c.tool), keep = d && (d.effects || []).includes('device') ? JSON.stringify(DEVICE.map(k => S[k])) : null;
     let res = null; try { res = runTool(c.tool, c.args); } catch (e) { res = null; }
+    if (keep) JSON.parse(keep).forEach((v, i) => { S[DEVICE[i]] = v; });
     if (!res) return;
     const card = { ...spec(c), res }; S.cards.push(card); S.n = Math.max(S.n, card.id);
   });
@@ -13585,7 +13625,7 @@ function load(s) {
 function openSession(id) { const s = SS.find(x => x.id === id); if (!s) return null; load(s); changed(); return s; }
 function newSession(example) {
   const s = { id: ++sid, name: 'New session', auto: true, example: !!example, created: Date.now(), updated: Date.now(), cards: [] };
-  SS.push(s); load(s); changed(); return s;
+  SS.push(s); load(s, true); changed(); return s;
 }
 // an empty name hands the session back to automatic naming
 function renameSession(id, name) {
@@ -13619,12 +13659,12 @@ const current = () => cur;
 function serialize() {
   // files under a megabyte travel with the device state; larger ones stay in memory and say so on replay
   const files = Object.fromEntries(Object.entries(S.files).filter(([, f]) => f.text.length <= 1e6));
-  return { cur: cur && cur.id, sid, aliases: S.aliases, facts: S.facts, files, tables: S.tables, recipes: S.recipes, misses: S.misses, picks: S.picks, formulas: S.formulas, orders: S.orders, strata: S.strata, ss: SS.map(s => ({ ...s, cards: s.cards.map(spec) })) };
+  return { cur: cur && cur.id, sid, aliases: S.aliases, facts: S.facts, files, tables: S.tables, recipes: S.recipes, misses: S.misses, picks: S.picks, formulas: S.formulas, orders: S.orders, strata: S.strata, prefs: S.prefs, ss: SS.map(s => ({ ...s, cards: s.cards.map(spec) })) };
 }
 // the same state in parts, for a store that keeps each session and each file on its own (the shell's @gcu/vfs), with no
 // size cap on files; hydrate() takes the parts put back together ({ cur, sid, ...device, files, ss })
 function parts() {
-  return { meta: { v: 1, cur: cur && cur.id, sid }, device: { aliases: S.aliases, facts: S.facts, tables: S.tables, recipes: S.recipes, misses: S.misses, picks: S.picks, formulas: S.formulas, orders: S.orders, strata: S.strata },
+  return { meta: { v: 1, cur: cur && cur.id, sid }, device: { aliases: S.aliases, facts: S.facts, tables: S.tables, recipes: S.recipes, misses: S.misses, picks: S.picks, formulas: S.formulas, orders: S.orders, strata: S.strata, prefs: S.prefs },
     sessions: SS.map(s => ({ ...s, cards: s.cards.map(spec) })), files: S.files };
 }
 // A session as a file of its own ("<name>.golem.json"): its card specs and the files they read, so it replays on another
@@ -13640,18 +13680,25 @@ function importSession(d) {
   if (!d || d.golem !== 'session' || !d.session || !Array.isArray(d.session.cards)) return null;
   for (const [h, f] of Object.entries(d.files || {})) if (!S.files[h] && f && f.hash === h) S.files[h] = f;
   const s = { ...d.session, id: ++sid, example: false, updated: Date.now() };
-  SS.push(s); load(s); changed(); return s;
+  SS.push(s); load(s, true); changed(); return s;
+}
+// Everything on this device as one file: every session, the device state (with the settings) and every file opened.
+// The packs are not in it: they come from the library or a .gcudat again. Restoring replaces all of it.
+function exportDevice() { const p = parts(); return { golem: 'device', v: 1, meta: p.meta, device: p.device, sessions: p.sessions, files: p.files }; }
+function importDevice(d) {
+  if (!d || d.golem !== 'device' || !Array.isArray(d.sessions) || !d.sessions.length || !d.device) return false;
+  reset(); hydrate({ cur: d.meta && d.meta.cur, sid: d.meta && d.meta.sid, ...d.device, files: d.files || {}, ss: d.sessions }); changed(); return true;
 }
 function hydrate(d) {
   if (!d || !Array.isArray(d.ss) || !d.ss.length) return false;
-  SS = d.ss; sid = d.sid || Math.max(...SS.map(s => s.id)); S.aliases = d.aliases || {}; S.facts = d.facts || []; S.files = d.files || {}; S.tables = d.tables || {}; S.recipes = d.recipes || {}; S.misses = d.misses || []; S.picks = d.picks || {}; S.formulas = d.formulas || {}; S.orders = d.orders || []; S.strata = d.strata || [];
+  SS = d.ss; sid = d.sid || Math.max(...SS.map(s => s.id)); S.aliases = d.aliases || {}; S.facts = d.facts || []; S.files = d.files || {}; S.tables = d.tables || {}; S.recipes = d.recipes || {}; S.misses = d.misses || []; S.picks = d.picks || {}; S.formulas = d.formulas || {}; S.orders = d.orders || []; S.strata = d.strata || []; S.prefs = d.prefs || {};
   load(SS.find(s => s.id === d.cur) || SS[0]); return true;
 }
 // forget everything: sessions, device state, working state (tests start here)
 function reset() {
-  bump(); SS = []; cur = null; sid = 0; S.cards = []; S.n = 0; S.aliases = {}; S.facts = []; S.files = {}; S.tables = {}; S.recipes = {}; S.misses = []; S.picks = {}; S.formulas = {}; S.orders = []; S.strata = []; S.table = null; S.clause = null; clearResults();
+  bump(); SS = []; cur = null; sid = 0; S.cards = []; S.n = 0; S.aliases = {}; S.facts = []; S.files = {}; S.tables = {}; S.recipes = {}; S.misses = []; S.picks = {}; S.formulas = {}; S.orders = []; S.strata = []; S.prefs = {}; S.table = null; S.clause = null; clearResults();
 }
-  return { onChange, spec, tagOf, autoName, touch, load, openSession, newSession, renameSession, deleteSession, pinCard, branchSession, searchHistory, sessions, current, serialize, parts, exportSession, importSession, hydrate, reset };
+  return { onChange, deviceChanged, spec, tagOf, autoName, touch, load, openSession, newSession, renameSession, deleteSession, pinCard, branchSession, searchHistory, sessions, current, serialize, parts, exportSession, importSession, exportDevice, importDevice, hydrate, reset };
 })();
 
 /* ==== src/engine/share.js ==== */
@@ -14354,16 +14401,17 @@ frame({
 
 /* ==== src/engine/places.js ==== */
 const __m39 = (() => {
-const { S, tool, frame, amend, noun, shape, postmod, fmt, rad, deg } = __m0;
+const { S, tool, frame, amend, noun, shape, postmod, fmt, rad, deg, latlon, azi, STYLE } = __m0;
 // Places, distance and UTM. A place is coordinates in the request or a name saved on this device
 // ("home is -19.92, -43.94"); there is no gazetteer and device location is off, so an unknown name is
-// a question, not a guess. Distance is Vincenty's inverse on WGS84; UTM is the Krüger series.
-
+// a question, not a guess. Distance is Vincenty's inverse on WGS84; UTM is the Krüger series.
 const WGS84 = { a: 6378137, f: 1 / 298.257223563 };
 WGS84.b = WGS84.a * (1 - WGS84.f); WGS84.e2 = WGS84.f * (2 - WGS84.f); WGS84.e = Math.sqrt(WGS84.e2);
 const placesTable = () => S.tables.places || (S.tables.places = { name: 'places', cols: [{ name: 'name', type: 'category' }, { name: 'lat', type: 'numeric' }, { name: 'lon', type: 'numeric' }], rows: [] });
 const COORD = '(-?\\d{1,2}(?:\\.\\d+)?)\\s*,\\s*(-?\\d{1,3}(?:\\.\\d+)?)';
-const fmtLL = (lat, lon) => `${fmt(Math.abs(lat), 6)}° ${lat < 0 ? 'S' : 'N'}, ${fmt(Math.abs(lon), 6)}° ${lon < 0 ? 'W' : 'E'}`;
+const fmtLL = (lat, lon) => latlon(lat, lon);
+// a bearing between places: to a tenth of a degree, or as a quadrant bearing when the card's style says so
+const brg = x => STYLE.bearing === 'quadrant' ? azi(x) : `${fmt(x, 4)}°`;
 // a place from text: coordinates, or a saved name → { lat, lon, name } | { unknown } | null
 function placeOf(s) {
   if (!s) return null; s = s.trim().replace(/^(?:at|in|from|to)\s+/, '');
@@ -14421,8 +14469,8 @@ tool({
     for (const [p, key, name] of [[A, 'fromLL', a.from], [B, 'toLL', a.to]]) if (!p || p.unknown) return { read, body: [], ask: whereAsk(name, key), trace: [`place "${name}": unknown`] };
     const r = vincenty(A.lat, A.lon, B.lat, B.lon);
     if (!r) return { read, body: [{ t: 'note', kind: 'err', text: 'The two points are nearly antipodal and Vincenty\'s formula does not converge there. Karney\'s method would; it is not in golem yet.' }], trace: ['vincenty: no convergence'] };
-    const km = r.s / 1000;
-    return { read, value: r.s, body: [{ t: 'big', v: km >= 100 ? fmt(km, 5) : fmt(km, 4), unit: 'km over the ellipsoid, not by road' }, { t: 'kv', rows: [['from', `${a.from === (A.name || '') ? A.name + ', ' : ''}${fmtLL(A.lat, A.lon)}`], ['to', `${B.name ? B.name + ', ' : ''}${fmtLL(B.lat, B.lon)}`], ['metres', fmt(r.s, 9), { mono: true }], ['initial bearing', `${fmt(r.a1, 4)}° true`], ['final bearing', `${fmt(r.a2, 4)}° true`]] }, { t: 'src', text: 'Vincenty (1975) inverse on WGS84 · converges to a millimetre except near antipodes' }], trace: [`vincenty(${A.lat}, ${A.lon}, ${B.lat}, ${B.lon}) → ${fmt(r.s, 9)} m in ${r.it} iterations`], py: `geodesic.inverse((${A.lat}, ${A.lon}), (${B.lat}, ${B.lon}))` };
+    const km = r.s / 1000, mi = km / 1.609344, imp = a.units === 'imperial';
+    return { read, value: r.s, body: [{ t: 'big', v: imp ? (mi >= 100 ? fmt(mi, 5) : fmt(mi, 4)) : km >= 100 ? fmt(km, 5) : fmt(km, 4), unit: `${imp ? 'miles' : 'km'} over the ellipsoid, not by road` }, { t: 'kv', rows: [...(imp ? [['kilometres', fmt(km, 6)]] : []),['from', `${a.from === (A.name || '') ? A.name + ', ' : ''}${fmtLL(A.lat, A.lon)}`], ['to', `${B.name ? B.name + ', ' : ''}${fmtLL(B.lat, B.lon)}`], ['metres', fmt(r.s, 9), { mono: true }], ['initial bearing', `${brg(r.a1)} true`], ['final bearing', `${brg(r.a2)} true`]] }, { t: 'src', text: 'Vincenty (1975) inverse on WGS84 · converges to a millimetre except near antipodes' }], trace: [`vincenty(${A.lat}, ${A.lon}, ${B.lat}, ${B.lon}) → ${fmt(r.s, 9)} m in ${r.it} iterations`], py: `geodesic.inverse((${A.lat}, ${A.lon}), (${B.lat}, ${B.lon}))` };
   }
 });
 
@@ -14590,8 +14638,187 @@ const SUGGESTIONS = ['pop means population', 'histogram of cu', 'log scale', 'po
   return { PACKS, skills, examples, vocab, STARTERS, STARTERS_PT, SUGGESTIONS };
 })();
 
-/* ==== src/engine/learn.js ==== */
+/* ==== src/engine/prefs.js ==== */
 const __m41 = (() => {
+const { S, T, tool, frame, noun, said } = __m0;
+// Settings: what the person sets, kept on the device (S.prefs). Two kinds:
+//   conventions change what an answer says (how planes are read and written, declination, precision). When golem reads
+//     a request, the ones that differ from golem's default are copied into the card's args (stamp()), so the card says
+//     which it used, a later change leaves it as it was, and a replay on another device agrees;
+//   behaviour changes nothing an answer says: the decimal mark the page writes (the shell does that, as it does the
+//     language), learning from what did not read, how old a position fix may be, how golem opens.
+// Every setting can be said ("use strike and dip", "set declination to -22") and leaves a card; the Settings view sets
+// the same ones without a card.
+
+const num = (lo, hi) => s => { const m = /^[+-]?\d+(?:[.,]\d+)?$/.exec(String(s).trim()); const v = m ? +String(s).trim().replace(',', '.') : NaN; return v >= lo && v <= hi ? v : null; };
+const DECL = num(-90, 90), ZONE = s => { const v = num(1, 60)(s); return v != null && Number.isInteger(v) ? v : null; };
+// key, group ('answers': a convention; 'device': behaviour), def, options [{ v, label, words }], tools (the tools a
+// convention is copied into; style: true for every tool, as args.style), put(args, v) (how a tool takes it), free (a
+// value outside the options: a number)
+const PREFS = [
+  { key: 'plane', group: 'answers', label: 'Plane notation', def: 'dd',
+    options: [{ v: 'dd', label: 'dip direction/dip', words: ['dip direction', 'dd', 'dip direction/dip'] }, { v: 'sd', label: 'strike/dip (right-hand rule)', words: ['strike/dip', 'sd', 'strike', 'strike and dip', 'right-hand rule'] }],
+    tools: ['thickness', 'plane', 'apparent', 'intersect', 'rake', 'measure'], put: (a, v) => { if (a.conv == null || a.conv === 'dd') a.conv = v; } },
+  { key: 'decl', group: 'answers', label: 'Declination', def: 'wmm',
+    options: [{ v: 'wmm', label: 'the World Magnetic Model where the place is known, to true north', words: ['wmm', 'true', 'true north', 'auto'] }, { v: 'none', label: 'none: magnetic north, as measured', words: ['none', 'magnetic', 'magnetic north', 'off'] }],
+    free: { parse: DECL, label: v => `fixed, ${Math.abs(v)}° ${v < 0 ? 'west' : 'east'}`, hint: 'a fixed declination in degrees, east positive' },
+    tools: ['measure', 'fieldAdd'], put: (a, v) => { a.decl = v; } },
+  { key: 'sig', group: 'answers', label: 'Significant figures (at most)', def: 6, style: true,
+    options: [3, 4, 5, 6].map(v => ({ v, label: String(v) })), free: { parse: s => { const v = num(2, 6)(s); return Number.isInteger(v) ? v : null; }, label: String } },
+  { key: 'bearing', group: 'answers', label: 'Bearings', def: 'azimuth', style: true,
+    options: [{ v: 'azimuth', label: 'azimuths (045)', words: ['azimuth','azimuths'] }, { v: 'quadrant', label: 'quadrant bearings (N45°E)', words: ['quadrant','quadrants'] }] },
+  { key: 'coords', group: 'answers', label: 'Latitude and longitude', def: 'dd', style: true,
+    options: [{ v: 'dd', label: 'decimal degrees', words: ['decimal','decimal degrees','dd'] }, { v: 'dms', label: 'degrees, minutes and seconds', words: ['dms','degrees minutes seconds','degrees minutes and seconds'] }] },
+  { key: 'datum', group: 'answers', label: 'UTM datum', def: 'WGS84',
+    options: [{ v: 'WGS84', label: 'WGS84', words: ['wgs84','wgs 84'] }, { v: 'SIRGAS 2000', label: 'SIRGAS 2000', words: ['sirgas','sirgas 2000'] }], tools: ['utm'], put: (a, v) => { if (a.place && !a.datum) a.datum = v; } },
+  { key: 'zone', group: 'answers', label: 'UTM zone', def: 'auto',
+    options: [{ v: 'auto', label: 'the zone the place is in', words: ['auto','automatic'] }], free: { parse: ZONE, label: v => `always zone ${v}`, hint: 'a zone, 1 to 60' },
+    tools: ['utm'], put: (a, v) => { if (a.place && !a.zoneForced) a.zoneForced = v; } },
+  { key: 'units', group: 'answers', label: 'Distances and thicknesses', def: 'metric',
+    options: [{ v: 'metric', label: 'metres and kilometres', words: ['metric','metres','si'] }, { v: 'imperial', label: 'feet and miles', words: ['imperial','feet'] }], tools: ['distance', 'thickness'], put: (a, v) => { a.units = v; } },
+  { key: 'numbers', group: 'device', label: 'Decimal mark', def: 'auto',
+    options: [{ v: 'auto', label: 'the language\'s', words: ['auto','language'] }, { v: 'point', label: 'a point (1,234.5)', words: ['point','dot','decimal point'] }, { v: 'comma', label: 'a comma (1.234,5)', words: ['comma','decimal comma'] }] },
+  { key: 'learn', group: 'device', label: 'Learning from what did not read', def: 'on',
+    options: [{ v: 'on', label: 'on: kept on this device, offered to teach', words: ['on','yes'] }, { v: 'off', label: 'off: nothing is kept', words: ['off','no'] }] },
+  { key: 'fixAge', group: 'device', label: 'Oldest position fix taken', def: 120,
+    options: [{ v: 30, label: '30 seconds', words: ['30 s','30 seconds'] }, { v: 120, label: '2 minutes', words: ['2 min','2 minutes'] }, { v: 600, label: '10 minutes', words: ['10 min','10 minutes'] }] },
+  { key: 'opens', group: 'device', label: 'When golem opens', def: 'left',
+    options: [{ v: 'left', label: 'awake or asleep, as it was left', words: ['as left','left','last'] }, { v: 'awake', label: 'always awake', words: ['awake'] }, { v: 'asleep', label: 'always asleep', words: ['asleep'] }] },
+];
+const prefByKey = k => PREFS.find(p => p.key === k);
+const prefOf = k => { const p = prefByKey(k), v = S.prefs[k]; return v === undefined ? p && p.def : v; };
+// a value as said: the option's label, or the free value's
+const prefLabel = (p, v) => { const o = p.options.find(x => x.v === v); return o ? o.label : p.free ? p.free.label(v) : String(v); };
+// a value from words: an option by its value or label, or a free value
+function prefParse(p, s) {
+  const w = String(s).trim().toLowerCase().replace(/^(?:the|a|an)\s+/, '');
+  const o = p.options.find(x => String(x.v).toLowerCase() === w || x.label.toLowerCase() === w || (x.words || []).includes(w));
+  if (o) return o.v;
+  return p.free ? p.free.parse(w) : null;
+}
+// set without a card (the Settings view); the default is kept as no entry
+function setPref(k, v) { const p = prefByKey(k); if (!p) return false; if (v === p.def) delete S.prefs[k]; else S.prefs[k] = v; return true; }
+
+// The conventions a card is read with: copied into a fresh reading's args before its tool runs (reading.js), only where
+// they differ from golem's default, so a card read with the defaults has nothing added. → what was copied, as words.
+function stamp(name, args) {
+  if (!args || typeof args !== 'object' || /^prefs?(?:Reset)?$/.test(name)) return [];
+  const out = [];
+  for (const p of PREFS) {
+    if (p.group !== 'answers') continue;
+    const v = S.prefs[p.key]; if (v === undefined || v === p.def) continue;
+    if (p.style) { args.style = { ...(args.style || {}), [p.key]: v }; out.push(`${p.label.toLowerCase()}: ${prefLabel(p, v)}`); }
+    else if (p.tools.includes(name)) { const before = JSON.stringify(args); p.put(args, v); if (JSON.stringify(args) !== before) out.push(`${p.label.toLowerCase()}: ${prefLabel(p, v)}`); }
+  }
+  return out;
+}
+
+/* ── the settings as cards ───────────────────────────────────── */
+const NOTE = { answers: 'Cards read from now on use it; cards already made keep what they were read with.', device: 'Answers are unchanged; this is how golem behaves on this device.' };
+tool({
+  name: 'pref', effects: ['device'],
+  skill: { group: 'Session', title: 'Settings', on: 'this device', about: 'How golem reads and writes planes, bearings, coordinates and numbers, the declination it applies, and how it behaves. Say it or set it under Settings. A setting that changes answers is copied into each card read with it.', examples: ['use strike and dip', 'set declination to -22', 'use decimal commas', 'show my settings'] },
+  topic: a => ['Settings', .3],
+  undo: a => { if (!a.done) return; if (a.was === null) delete S.prefs[a.key]; else S.prefs[a.key] = a.was; },
+  run: a => {
+    const p = prefByKey(a.key); if (!p) return null;
+    if (!a.done) { a.was = S.prefs[a.key] === undefined ? null : S.prefs[a.key]; setPref(a.key, a.value); a.done = true; }
+    const was = a.was === null ? p.def : a.was;
+    return { read: ['set', { v: p.label.toLowerCase() }, 'to', { v: prefLabel(p, a.value) }], value: a.value,
+      body: [{ t: 'note', kind: 'ok', ...said('Set. {setting}: {value}.', { setting: p.label, value: prefLabel(p, a.value) }) }, { t: 'sub', text: NOTE[p.group] },
+        { t: 'kv', rows: [['before', prefLabel(p, was)], ['golem\'s default', prefLabel(p, p.def)]] }, { t: 'chips', items: ['show my settings'] }],
+      trace: [`prefs.${a.key} = ${JSON.stringify(a.value)}${was !== a.value ? ` (was ${JSON.stringify(was)})` : ' (unchanged)'}`] };
+  }
+});
+tool({
+  name: 'prefs',
+  topic: () => ['Settings', .3],
+  run: a => {
+    const rows = PREFS.map(p => [p.label, prefLabel(p, prefOf(p.key)), prefOf(p.key) === p.def ? 'default' : 'set here']);
+    const n = Object.keys(S.prefs).length;
+    return { read: a.reset ? ['reset the settings to golem\'s defaults'] : ['the settings on this device'], value: n,
+      body: [...(a.reset ? [{ t: 'note', kind: 'ok', ...said('Reset: {n} settings back to golem\'s defaults.', { n: Object.keys(a.was).length }) }] : []),
+        { t: 'lbl', text: 'Answers' }, { t: 'table', head: ['setting', 'value', ''], rows: rows.filter((_, i) => PREFS[i].group === 'answers'), tr: [0, 1, 2] },
+        { t: 'lbl', text: 'This device' }, { t: 'table', head: ['setting', 'value', ''], rows: rows.filter((_, i) => PREFS[i].group === 'device'), tr: [0, 1, 2] },
+        { t: 'sub', text: 'Change one by saying it ("use strike and dip", "set significant figures to 4"), or under Settings.' }],
+      trace: [a.reset ? 'prefs cleared' : `prefs: ${n} set on this device`] };
+  }
+});
+tool({
+  name: 'prefsReset', effects: ['device'],
+  topic: () => ['Settings', .3],
+  undo: a => { if (a.done) S.prefs = { ...a.was }; },
+  run: a => { if (!a.done) { a.was = { ...S.prefs }; S.prefs = {}; a.done = true; } return T.prefs({ reset: true, was: a.was }); }
+});
+
+/* ── what reads them ─────────────────────────────────────────── */
+// the settings by name: "set declination to -22", "set significant figures to 4", "change the utm zone to 23"
+const SETTING = {
+  plane: [['planes', 'plane notation', 'plane convention', 'plane format'], ['planos', 'notação dos planos']],
+  decl: [['declination', 'magnetic declination', 'declination correction'], ['declinação', 'declinação magnética']],
+  sig: [['significant figures', 'sig figs', 'precision'], ['algarismos significativos', 'precisão']],
+  bearing: [['bearings', 'bearing notation', 'bearing format'], ['rumos', 'notação dos rumos']],
+  coords: [['coordinates', 'coordinate format', 'latitude and longitude'], ['coordenadas', 'formato das coordenadas']],
+  datum: [['datum', 'utm datum'], ['datum']],
+  zone: [['utm zone', 'zone'], ['zona utm', 'fuso', 'fuso utm']],
+  units: [['units', 'unit system', 'distance units'], ['unidades', 'sistema de unidades']],
+  numbers: [['numbers', 'decimal mark', 'decimal separator', 'number format'], ['números', 'separador decimal', 'marca decimal']],
+  learn: [['learning', 'learning from misses'], ['aprendizado', 'aprendizagem']],
+  fixAge: [['oldest position fix', 'position fix age', 'fix age'], ['idade da posição']],
+  opens: [['opening', 'how golem opens', 'start up'], ['abertura']],
+};
+noun({ type: 'setting', words: Object.fromEntries(Object.entries(SETTING).map(([k, [en]]) => [k, en])), words_pt: Object.fromEntries(Object.entries(SETTING).map(([k, [, pt]]) => [k, pt])) });
+frame({
+  name: 'prefSet', label: 'Set', words: ['set', 'change', 'make'], theme: ['setting'], required: ['theme', 'to'], roles: { to: { preps: ['to', 'as'], types: ['text'] } },
+  words_pt: ['muda', 'mude', 'ajusta', 'ajuste', 'põe', 'coloca'], label_pt: 'Ajustar',
+  bind: c => {
+    const p = prefByKey(c.theme[0].value), to = c.roles.to && String(c.roles.to[0].value); if (!p || !to) return null;
+    const v = prefParse(p, to);
+    return v == null ? { clarify: `${p.label}: ${p.options.map(o => `"${(o.words || [o.label])[0]}"`).join(', ')}${p.free ? `, or ${p.free.hint || 'a number'}` : ''}` } : { tool: 'pref', args: { key: p.key, value: v } };
+  }
+});
+// a setting by its value: "use strike and dip", "use decimal commas", "switch to quadrant bearings"
+const VALUE = {
+  'plane:sd': [['strike and dip', 'strike/dip', 'strike dip', 'the right hand rule', 'right hand rule', 'the right-hand rule'], ['direção e mergulho', 'strike e dip', 'regra da mão direita']],
+  'plane:dd': [['dip direction and dip', 'dip direction/dip', 'dip direction', 'dip directions'], ['sentido de mergulho', 'direção de mergulho', 'direção do mergulho']],
+  'bearing:quadrant': [['quadrant bearings', 'quadrants', 'quadrant notation'], ['quadrantes', 'rumos em quadrante']],
+  'bearing:azimuth': [['azimuths', 'azimuth bearings', 'whole circle bearings'], ['azimutes']],
+  'coords:dms': [['degrees minutes and seconds', 'degrees minutes seconds', 'dms'], ['graus minutos e segundos', 'gms']],
+  'coords:dd': [['decimal degrees'], ['graus decimais']],
+  'datum:SIRGAS 2000': [['sirgas 2000', 'sirgas'], ['sirgas 2000', 'sirgas']],
+  'datum:WGS84': [['wgs84', 'wgs 84'], ['wgs84', 'wgs 84']],
+  'units:metric': [['metric units', 'metric', 'metres', 'meters'], ['unidades métricas', 'sistema métrico', 'metros']],
+  'units:imperial': [['imperial units', 'imperial', 'feet and miles', 'feet'], ['unidades imperiais', 'pés e milhas', 'pés']],
+  'numbers:comma': [['decimal commas', 'a decimal comma', 'decimal comma'], ['vírgula decimal', 'vírgulas decimais']],
+  'numbers:point': [['decimal points', 'a decimal point', 'decimal point'], ['ponto decimal', 'pontos decimais']],
+  'decl:none': [['magnetic north', 'no declination'], ['norte magnético', 'sem declinação']],
+  'decl:wmm': [['true north', 'the world magnetic model'], ['norte verdadeiro', 'o modelo magnético mundial']],
+};
+noun({ type: 'prefvalue', words: Object.fromEntries(Object.entries(VALUE).map(([k, [en]]) => [k, en])), words_pt: Object.fromEntries(Object.entries(VALUE).map(([k, [, pt]]) => [k, pt])) });
+frame({
+  name: 'prefUse', label: 'Use', words: ['use', 'switch to', 'write', 'write in', 'prefer'], theme: ['prefvalue'], required: ['theme'], roles: {},
+  words_pt: ['usa', 'use', 'muda para', 'escreve em', 'prefiro'], label_pt: 'Usar',
+  bind: c => {
+    const [k, ...rest] = String(c.theme[0].value).split(':'), p = prefByKey(k), raw = rest.join(':');
+    const v = p && p.options.find(o => String(o.v) === raw); return v ? { tool: 'pref', args: { key: k, value: v.v } } : null;
+  }
+});
+noun({ type: 'settingsnoun', words: { all: ['settings', 'my settings', 'the settings', 'preferences', 'my preferences'] }, words_pt: { all: ['configurações', 'minhas configurações', 'as configurações', 'preferências'] } });
+frame({
+  name: 'prefs', label: 'Settings', words: ['show', 'list', 'what are'], elidable: true, theme: ['settingsnoun'], required: ['theme'], roles: {},
+  words_pt: ['mostra', 'lista', 'quais são'], label_pt: 'Configurações',
+  bind: () => ({ tool: 'prefs', args: {} })
+});
+frame({
+  name: 'prefsReset', label: 'Reset settings', words: ['reset', 'restore', 'clear'], theme: ['settingsnoun'], required: ['theme'], roles: {},
+  words_pt: ['restaura', 'redefine', 'zera'], label_pt: 'Restaurar configurações',
+  bind: () => ({ tool: 'prefsReset', args: {} })
+});
+  return { PREFS, prefByKey, prefOf, prefLabel, prefParse, setPref, stamp };
+})();
+
+/* ==== src/engine/learn.js ==== */
+const __m42 = (() => {
 const { S, tool, frame, noun } = __m0;
 const { vocab } = __m40;
 // Learning from the person, on the device (SPEC 13: the language that grows). Nothing is learned silently, and nothing
@@ -14693,7 +14920,7 @@ frame({
 })();
 
 /* ==== src/engine/data/timescale.js ==== */
-const __m42 = (() => {
+const __m43 = (() => {
 // The International Chronostratigraphic Chart as a records pack: one row per unit, five ranks.
 // Source: ICS (Cohen, Finney, Gibbard & Fan 2013; updated chart) as served by Macrostrat
 // (macrostrat.org/api/v2/defs/intervals?timescale_id=11, CC BY 4.0), fetched 8 Oct 2026. The Hadean is
@@ -14878,11 +15105,11 @@ const TIMESCALE = [
 })();
 
 /* ==== src/engine/ontology.js ==== */
-const __m43 = (() => {
+const __m44 = (() => {
 const { FRAMES, LEXICON, S } = __m0;
 const { UNIT_TABLE, COMPOUNDS, DIM, parseUnit, dimName } = __m2;
 const { ELEMENT } = __m19;
-const { TIMESCALE } = __m42;
+const { TIMESCALE } = __m43;
 // The clause ontology, assembled from what golem knows: units from the conversion table, nouns from the
 // sample packs, verb frames from the declarations. Inert data; the build writes it to dist/golem.json.
 // Portuguese synonyms are listed here by hand until packs carry them in their golem facet.
@@ -14959,7 +15186,7 @@ function ontology(only) {
 })();
 
 /* ==== src/engine/estimate.js ==== */
-const __m44 = (() => {
+const __m45 = (() => {
 const { amend, noun, tool, fmt } = __m0;
 const { U } = __m2;
 // Estimates with ranges: arithmetic over intervals by simulation, units carried through, the seed kept
@@ -15134,7 +15361,7 @@ amend({ tools: ['estimate'], name: 'estdist', label: 'Distribution', words: ['as
 })();
 
 /* ==== src/vendor/dispatch.js ==== */
-const __m45 = (() => {
+const __m46 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/dispatch, built from ../auditable/ext/dispatch/src/ by its own build.
 // Source of truth: gentropic/auditable ext/dispatch (local clone: ../auditable). Re-vendor by copying
 // ext/dispatch/index.js here after 'node ext/dispatch/build.js'. golem uses the grammar rung only:
@@ -17287,14 +17514,15 @@ const PORTUGUESE = {
 })();
 
 /* ==== src/engine/reading.js ==== */
-const __m46 = (() => {
+const __m47 = (() => {
 const { S, T, TOOLS, FRAMES, tool, frame, amend, session, noun, toolByName, runTool, iso, STATE } = __m0;
+const { stamp } = __m41;
 const { examples, vocab } = __m40;
-const { rankByPicks } = __m41;
-const { ontology } = __m43;
+const { rankByPicks } = __m42;
+const { ontology } = __m44;
 const { calcOf } = __m3;
-const { estimateOf } = __m44;
-const { createEngine, makeSession, ENGLISH, PORTUGUESE } = __m45;
+const { estimateOf } = __m45;
+const { createEngine, makeSession, ENGLISH, PORTUGUESE } = __m46;
 // The reading ladder: context (amendments, meta-intents), grammar (the clause parser, then the regex
 // rules the declarations carry), taught words (device lexicon rewrites, then grammar again). Plus the
 // tools that talk about the session itself: none, why, export.
@@ -17352,8 +17580,8 @@ function verdictIn(E, text, session, opts) {
 function clauseRead(text, rung) {
   const { r, b } = verdictOf(text, clauseSession());
   if (!b) return { verdict: r };
-  const res = runTool(b.tool, b.args); if (!res) return { verdict: r };
-  res.trace.unshift(`clause: ${r.echo}`, ...r.diag.notes.map(n => `clause: ${n}`));
+  const set = stamp(b.tool, b.args), res = runTool(b.tool, b.args); if (!res) return { verdict: r };
+  res.trace.unshift(`clause: ${r.echo}`, ...r.diag.notes.map(n => `clause: ${n}`), ...(set.length ? [`settings: ${set.join('; ')}`] : []));
   return { tool: b.tool, args: b.args, rung, res, cmd: r.commands[0] };
 }
 const describeVerdict = r => `clause: ${r.status}${r.reasons ? ' — ' + r.reasons.join('; ') : r.readings ? ' — ' + r.readings.join(' | ') : ''}`;
@@ -17370,7 +17598,7 @@ function expressionRead(raw, rung) {
   const x = expressionOf(raw); if (!x) return null;
   for (const [tool, args] of [['calc', calcOf(x)], ['estimate', estimateOf(x)]]) {
     if (!args) continue;
-    const res = runTool(tool, args); if (res) { res.trace.unshift(`expression: "${x}"`); return { tool, args, rung, res }; }
+    const set = stamp(tool, args), res = runTool(tool, args); if (res) { res.trace.unshift(`expression: "${x}"`, ...(set.length ? [`settings: ${set.join('; ')}`] : [])); return { tool, args, rung, res }; }
   }
   return null;
 }
@@ -17606,7 +17834,7 @@ function sessionRead(raw) {
 })();
 
 /* ==== src/engine/selftest.js ==== */
-const __m47 = (() => {
+const __m48 = (() => {
 const { tool, frame, fmt } = __m0;
 const { parseUnit } = __m2;
 const { sha256 } = __m36;
@@ -17617,7 +17845,7 @@ const { quantitiesOf, combos, roots, FORMULAS } = __m29;
 const { conversions, statistics } = __m5;
 const { field: wmm, MODEL } = __m25;
 const { STARTERS, STARTERS_PT } = __m40;
-const { readingOf, setLanguage, language } = __m46;
+const { readingOf, setLanguage, language } = __m47;
 const { factbookInfo } = __m21;
 const { mineralsInfo } = __m8;
 const { bookInfo } = __m22;
@@ -17691,9 +17919,9 @@ frame({
 })();
 
 /* ==== src/engine/vocab.js ==== */
-const __m48 = (() => {
+const __m49 = (() => {
 const { S, tool, frame, FRAMES } = __m0;
-const { ontology } = __m43;
+const { ontology } = __m44;
 const { examples } = __m40;
 // The words golem obeys, shown (SPEC 13: nothing hidden). "what words do you know for density": every command whose
 // words carry it, every thing (noun) and unit it names, and what was taught on this device, from the live ontology —
@@ -17753,7 +17981,7 @@ const frameCount = () => FRAMES.length;
 })();
 
 /* ==== src/engine/strata.js ==== */
-const __m49 = (() => {
+const __m50 = (() => {
 const { S, tool, frame, noun, said } = __m0;
 const { infer, proofOf, keyOf } = __m9;
 // Relative ages by Steno's principles (SPEC 13: inference). What you say of the units — "the sandstone overlies the
@@ -17885,9 +18113,9 @@ frame({ name: 'strataWhy', label: 'Relative ages', words: ['why is', 'how do you
 })();
 
 /* ==== src/engine/timescale.js ==== */
-const __m50 = (() => {
+const __m51 = (() => {
 const { tool, frame, noun, unit, fmt } = __m0;
-const { TIMESCALE, TIMESCALE_SOURCE } = __m42;
+const { TIMESCALE, TIMESCALE_SOURCE } = __m43;
 // The geologic timescale: the ICS chart as a records pack (data/timescale.js). Ages, bounds, ranks,
 // what a unit sits in, what came before and after, what it is subdivided into, and which unit an age
 // in Ma falls in. Lookups only; the chart is the answer.
@@ -17987,7 +18215,7 @@ noun({ type: 'chron', words: Object.fromEntries(Object.keys(RETIRED).map(k => [k
 })();
 
 /* ==== src/engine/sample.js ==== */
-const __m51 = (() => {
+const __m52 = (() => {
 const { tool, frame, noun, compound, qmod, postmod, unit, fmt } = __m0;
 const { parseUnit } = __m2;
 const { core, sieve } = __m1;
@@ -18127,7 +18355,7 @@ frame({
 })();
 
 /* ==== src/engine/explain.js ==== */
-const __m52 = (() => {
+const __m53 = (() => {
 const { tool, frame, amend, noun, shape, clock, fmt } = __m0;
 // Explainers: formal notation parsed and described, one row per piece. Cron schedules, epoch times,
 // chmod modes, URLs and ECMAScript regular expressions. Each member has a recogniser so a bare
@@ -18502,7 +18730,7 @@ amend({ tools: ['explain'], name: 'explainas', label: 'Explain as', words: [], e
 })();
 
 /* ==== src/vendor/plan-calendar.js ==== */
-const __m53 = (() => {
+const __m54 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/plan's calendar engine and Brazilian holidays, copied from
 // ../auditable/ext/plan/src/calendar.js and src/holidays-br.js (MIT). The scheduling half of the package is not here.
 // Re-vendor by copying those two files here again and keeping the single export block at the end.
@@ -18859,10 +19087,10 @@ function brazilMunicipalities() {
 })();
 
 /* ==== src/engine/calendar.js ==== */
-const __m54 = (() => {
+const __m55 = (() => {
 const { S, tool, frame, amend, noun, shape, postmod, unit, clock, iso } = __m0;
 const { findDate, findTime, today, day0, fmtDate, dateWords } = __m4;
-const { isWorkingDay, addWorkingDays, brazilCalendar, federalHolidays } = __m53;
+const { isWorkingDay, addWorkingDays, brazilCalendar, federalHolidays } = __m54;
 // Working days and rosters over @gcu/plan's calendar engine (vendored), and time zones through Intl.
 // The calendar is a slot and is always shown: Brazil's federal holidays, or weekdays only.
 
@@ -19095,7 +19323,7 @@ amend({ tools: ['workdays'], name: 'workcal', label: 'Calendar', words: [], elid
 })();
 
 /* ==== src/engine/text.js ==== */
-const __m55 = (() => {
+const __m56 = (() => {
 const { tool, frame, amend, noun, qmod, fmt } = __m0;
 // Text tools over a pasted payload: counts and readability, extracted key sentences, and a diff.
 // The payload is what follows the first colon, or every line after the first of a multi-line input;
@@ -19241,7 +19469,7 @@ amend({ tools: ['diff'], name: 'diffunit', label: 'Diff by', words: [], elidable
 })();
 
 /* ==== src/engine/econ.js ==== */
-const __m56 = (() => {
+const __m57 = (() => {
 const { tool, frame, noun, shape, postmod, qmod, fmt } = __m0;
 const { ELEMENTS } = __m37;
 const { numberAsk, firstNeed } = __m10;
@@ -19408,7 +19636,7 @@ frame({
 })();
 
 /* ==== src/engine/log.js ==== */
-const __m57 = (() => {
+const __m58 = (() => {
 const { S, tool, frame, amend, noun, fmt, iso, checksOf } = __m0;
 const { parseUnit, dimName } = __m2;
 const { findDate, today, fmtDate, dateWords } = __m4;
@@ -19556,10 +19784,10 @@ amend({ tools: ['logAdd'], name: 'logfix', label: 'Correct', words: ['that was',
 })();
 
 /* ==== src/engine/sky.js ==== */
-const __m58 = (() => {
+const __m59 = (() => {
 const { tool, frame, amend, noun, compound, fmt, rad, deg, iso } = __m0;
 const { findDate, today, fmtDate, dateWords } = __m4;
-const { zonesOf, offsetOf } = __m54;
+const { zonesOf, offsetOf } = __m55;
 const { placeOf } = __m39;
 // The sun by NOAA's solar position equations (after Meeus), and the moon's phase from the mean
 // synodic cycle, labelled with its accuracy. Times are given in the place's zone when the place name
@@ -19642,7 +19870,7 @@ amend({ tools: ['sun'], name: 'sunzone', label: 'Zone', words: [], elidable: tru
 })();
 
 /* ==== src/engine/apply.js ==== */
-const __m59 = (() => {
+const __m60 = (() => {
 const { S, tool, fmt, rad, deg, p3, p2 } = __m0;
 const { whereOf } = __m19;
 const { evaluatePredicate, predicateToString } = __m18;
@@ -19709,7 +19937,7 @@ tool({
 })();
 
 /* ==== src/vendor/ipynb.js ==== */
-const __m60 = (() => {
+const __m61 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/ipynb, copied from ../auditable/ext/ipynb/index.js (MIT). golem uses importNotebook
 // for its import-substitution table only (numpy → natra, pandas → sadpan, …). Re-vendor by copying that file here.
 
@@ -20258,9 +20486,9 @@ function exportNotebook(cells, opts = {}) {
 })();
 
 /* ==== src/engine/python.js ==== */
-const __m61 = (() => {
+const __m62 = (() => {
 const { tool, frame, amend, result, fmt } = __m0;
-const { importNotebook } = __m60;
+const { importNotebook } = __m61;
 // Run and trace Python with adder, on the device. The tool itself stays synchronous: a first run returns a
 // "running" card carrying a job, the runner (a Web Worker in the page, adder in-process in the tests)
 // answers later, and the card is recomputed from the kept result. Replay reruns the code, which is
@@ -20330,7 +20558,7 @@ amend({ tools: ['python'], name: 'pytraceoff', label: 'Run', words: ['no trace',
 })();
 
 /* ==== src/vendor/librarian.js ==== */
-const __m62 = (() => {
+const __m63 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/librarian, the in-process text search (BM25F, fuzzy expansion, snippets, did-you-mean), copied from ../auditable/ext/librarian/index.js at auditable 5fa5f72e (MIT).
 // Re-vendor by copying that file here.
 
@@ -21606,9 +21834,9 @@ const Librarian = {
 })();
 
 /* ==== src/engine/docs.js ==== */
-const __m63 = (() => {
+const __m64 = (() => {
 const { S, tool, frame, amend, noun, postmod } = __m0;
-const { Librarian } = __m62;
+const { Librarian } = __m63;
 // Search my documents (A7). Markdown, plain text and HTML opened with the paperclip are kept on the device,
 // cut into passages (by heading, then by paragraph) and indexed by @gcu/librarian. A search returns
 // passages verbatim with the matched words marked; golem never rewrites them. The index is derived
@@ -21761,7 +21989,7 @@ amend({ tools: ['docPassage'], name: 'docstep', label: 'Passage', words: [], eli
 })();
 
 /* ==== src/engine/recipes.js ==== */
-const __m64 = (() => {
+const __m65 = (() => {
 const { S, tool, frame, noun, session, runTool } = __m0;
 const { listOf } = __m10;
 // Recipes (A9): a session's plan saved under a name, with the subjects that may change between runs.
@@ -21957,7 +22185,7 @@ session({
 })();
 
 /* ==== src/vendor/sheet.js ==== */
-const __m65 = (() => {
+const __m66 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sheet, copied from ../auditable/ext/sheet/index.js (built from its src/ by @gcu/build, MIT).
 // Re-vendor by copying that file here. Reading is asynchronous (DecompressionStream), so golem converts at open time, not in a tool.
 
@@ -23189,7 +23417,7 @@ const sheet = {
 })();
 
 /* ==== src/vendor/dm.js ==== */
-const __m66 = (() => {
+const __m67 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/dm, the read-only Datamine .dm reader, copied from ../auditable/ext/dm/index.js (MIT).
 // Re-vendor by copying that file here.
 
@@ -23465,9 +23693,9 @@ function readDM(buffer) {
 })();
 
 /* ==== src/engine/formats.js ==== */
-const __m67 = (() => {
-const { sheet } = __m65;
-const { readDM } = __m66;
+const __m68 = (() => {
+const { sheet } = __m66;
+const { readDM } = __m67;
 const { readParquet, parquetInfo } = __m35;
 // Binary table formats, converted to text when a file is opened: xlsx through @gcu/sheet (one text per
 // sheet), Datamine .dm through @gcu/dm, Parquet through @gcu/parquet. Tools stay synchronous and the device keeps the converted text,
@@ -23519,7 +23747,7 @@ async function convertBinary(name, buffer) {
 })();
 
 /* ==== src/engine/notes.js ==== */
-const __m68 = (() => {
+const __m69 = (() => {
 const { S, tool, frame } = __m0;
 // Notes and taught words. Both belong to the device and are shared by every session.
 const textOf = c => c.theme[0] && c.theme[0].type === 'text' ? c.theme[0].value : null;
@@ -23570,7 +23798,7 @@ frame({
 })();
 
 /* ==== src/vendor/sluice/accumulator.js ==== */
-const __m69 = (() => {
+const __m70 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sluice src/accumulator.js, copied from ../auditable/ext/sluice/src/accumulator.js at auditable 3a7b253c.
 // golem vendors sluice's accumulator modules only (src/engine/stream.js): its runner builds expressions with new Function,
 // which golem does not ship outside the Python worker.
@@ -23738,7 +23966,7 @@ function weightedStats() {
 })();
 
 /* ==== src/vendor/sluice/tdigest.js ==== */
-const __m70 = (() => {
+const __m71 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sluice src/tdigest.js, copied from ../auditable/ext/sluice/src/tdigest.js at auditable 3a7b253c.
 // golem vendors sluice's accumulator modules only (src/engine/stream.js): its runner builds expressions with new Function,
 // which golem does not ship outside the Python worker.
@@ -23853,7 +24081,7 @@ function quantile(state, q) {
 })();
 
 /* ==== src/vendor/sluice/histogram.js ==== */
-const __m71 = (() => {
+const __m72 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sluice src/histogram.js, copied from ../auditable/ext/sluice/src/histogram.js at auditable 3a7b253c.
 // golem vendors sluice's accumulator modules only (src/engine/stream.js): its runner builds expressions with new Function,
 // which golem does not ship outside the Python worker.
@@ -23905,14 +24133,14 @@ function cumulativeFromTop(counts) {
 })();
 
 /* ==== src/engine/stream.js ==== */
-const __m72 = (() => {
+const __m73 = (() => {
 const { S, T, fmt, result } = __m0;
 const { colOf, whereSrc, tableFromText, openTable } = __m19;
 const { parsePredicate, evaluatePredicate, predicateToString } = __m18;
 const { NULL_SENTINELS } = __m17;
-const { weightedStats } = __m69;
-const { tdigest, quantile } = __m70;
-const { histogram } = __m71;
+const { weightedStats } = __m70;
+const { tdigest, quantile } = __m71;
+const { histogram } = __m72;
 // Tables too large to hold (SPEC 13.7): a CSV or TSV over 20 MB is typed from its first megabyte by recon, like any
 // table, and its questions are answered by scanning the whole file as a job, through @gcu/sluice's accumulators
 // (mergeable, never holding the rows): Welford and weighted moments, t-digest quantiles, histograms. The shell runs the
@@ -24073,18 +24301,19 @@ for (const k of ['apply', 'tableExport']) T[k] = a => S.table && S.table.streame
 })();
 
 /* ==== src/engine/engine.js ==== */
-const __m73 = (() => {
+const __m74 = (() => {
 const { S, T, runTool, toolByName, startJobs, tool, CONDITIONS, EFFECTS, clock, iso } = __m0;
+const { stamp, prefOf } = __m41;
 const { DOCUMENT } = __m15;
-const { DOCTEXT } = __m63;
-const { bindingsOf, runSteps } = __m64;
+const { DOCTEXT } = __m64;
+const { bindingsOf, runSteps } = __m65;
 const { tableFromText } = __m19;
-const { convertBinary } = __m67;
-const { noteMiss, clearMiss, correctionOf, teachOfPick, notePick, setReader } = __m41;
-const { norm, grammar, context, taught, sessionRead, readingOf, guessRead, clauseEngine } = __m46;
-const { makeSession } = __m45;
+const { convertBinary } = __m68;
+const { noteMiss, clearMiss, correctionOf, teachOfPick, notePick, setReader } = __m42;
+const { norm, grammar, context, taught, sessionRead, readingOf, guessRead, clauseEngine } = __m47;
+const { makeSession } = __m46;
 const { current, newSession, renameSession, touch } = __m30;
-const { streamedTable } = __m72;
+const { streamedTable } = __m73;
 // The entry point: submit(raw) reads a request and returns what happened. Cards are recomputed in
 // place by rerun(); answers and slot flips go through it, so args stay the only state that matters.
 function addCard(raw, r, ms) {
@@ -24110,9 +24339,10 @@ function answer(c, i) {
   // a guess picked: the card becomes that tool's card, still marked as a guess (the rung is kept with the session)
   if (c.tool === 'guess') {
     const k = c.args.cands[o.value], from = c.args.cands.length;
-    c.tool = k.tool; c.args = JSON.parse(JSON.stringify(k.args)); rerun(c);
+    c.tool = k.tool; c.args = JSON.parse(JSON.stringify(k.args)); stamp(c.tool, c.args); rerun(c);
     if (c.res) c.res.trace.unshift(`guess: read as ${k.echo}${k.changes.length ? ' (' + k.changes.join('; ') + ')' : ''}, picked from ${from}`);
     // the pick is learned from: the tool counts for the next guesses, and the repaired word is offered to teach
+    if (prefOf('learn') === 'off') { touch(); return o; }
     notePick(k.tool); clearMiss(c.raw); touch();
     const teach = teachOfPick(k); return teach ? { ...o, teach } : o;
   }
@@ -24163,8 +24393,10 @@ function submit(raw) {
   const r = grammar(text, q, 'grammar', raw) || context(q, last, raw) || taught(text, q, raw) || guessRead(raw) || { tool: 'none', args: { q }, rung: 'none', res: T.none({ q }) };
   // learned from (learn.js): what did not read goes on the device's list; what read comes off it, and when it follows
   // something that did not read, the stretch that changed is offered as a word to teach
-  if (r.rung === 'none' || r.rung === 'guess') noteMiss(raw, iso(clock.now())); else clearMiss(raw);
-  const teach = r.rung === 'none' || r.rung === 'guess' ? null : correctionOf(last, raw);
+  // (unless learning is off in the settings: then nothing is kept)
+  const learning = prefOf('learn') !== 'off';
+  if (learning) { if (r.rung === 'none' || r.rung === 'guess') noteMiss(raw, iso(clock.now())); else clearMiss(raw); }
+  const teach = !learning || r.rung === 'none' || r.rung === 'guess' ? null : correctionOf(last, raw);
   return { kind: 'card', card: addCard(raw, r, performance.now() - t0), ...(teach ? { teach } : {}) };
 }
 
@@ -24342,16 +24574,19 @@ async function openBinary(name, buffer) {
   return { kind: 'card', card: addCard(`open ${name}`, { tool: 'open', args, rung: 'grammar', res }, performance.now() - t0) };
 }
 
-// two example sessions for a first visit
+// two example sessions for a first visit (what their cards would teach golem about misses is not kept: the person did
+// not type them)
 function seedExamples() {
+  const misses = S.misses, picks = S.picks; S.misses = []; S.picks = {};
   newSession(true); ['open assays.csv', 'histogram of cu', 'log scale', 'histogram of au'].forEach(x => submit(x));
   newSession(true); ['0.35 oz per short ton in g/t', 'true thickness of a 14 m intercept, hole 270/60, bedding 045/30', 'remind me to send the samples to the lab on friday at 9', 'pop of mongolia'].forEach(x => submit(x));
+  S.misses = misses; S.picks = picks;
 }
   return { addCard, rerun, flipSlot, answer, capture, undo, submit, planOf, preview, hashOf, openStreamed, openFile, openBinary, seedExamples };
 })();
 
 /* ==== src/engine/packs.js ==== */
-const __m74 = (() => {
+const __m75 = (() => {
 const { profilesOf } = __m21;
 // Packs as gcu-library ships them: a .gcudat is a gzipped tar holding gcudat.json (the manifest) and the data files
 // (gcu-library tools/build-gcudat.mjs). Read here with the platform's own gunzip (DecompressionStream, in browsers and
@@ -24465,8 +24700,74 @@ async function compileStrunk(bytes) {
   return { gunzip, untar, readGcudat, mineralsFromGcudat, factbookProfiles, factbookFromGcudat, plain, compileOds, compileStrunk };
 })();
 
+/* ==== src/engine/keep.js ==== */
+const __m76 = (() => {
+const { S } = __m0;
+const { deviceChanged } = __m30;
+const { PREFS, prefLabel } = __m41;
+// What golem keeps on this device, as one inventory (the shell's "What golem keeps" view), and forgetting from it.
+// Forgetting here leaves no card: it is the person tidying the device, as deleting a session is. A session that read
+// what is forgotten says so when it replays (a word that no longer reads, a file not kept), and its cards keep what
+// they were read with (tms.js marks those that used a taught value or formula).
+
+const REL = { overlies: 'overlies', cuts: 'cuts', encloses: 'contains clasts of', said_younger: 'is younger than' };
+const bytes = v => new TextEncoder().encode(JSON.stringify(v === undefined ? null : v)).length;
+const rowsOf = t => (S.tables[t] ? S.tables[t].rows : []);
+const isValue = v => /^-?\d/.test(String(v));   // a taught value reads as a quantity ("2.7 t/m3"); a word, as words
+const kb = n => n >= 1e6 ? `${(n / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} kB`;
+
+// → [{ kind, label, items: [{ key, text }], bytes }], in the order the view shows them
+function kept() {
+  const al = Object.entries(S.aliases), field = rowsOf('field');
+  const kinds = [
+    { kind: 'words', label: 'Taught words', items: al.filter(([, v]) => !isValue(v)).map(([k, v]) => ({ key: k, text: `${k} → ${v}` })), data: al.filter(([, v]) => !isValue(v)) },
+    { kind: 'values', label: 'Taught values', items: al.filter(([, v]) => isValue(v)).map(([k, v]) => ({ key: k, text: `${k} = ${v}` })), data: al.filter(([, v]) => isValue(v)) },
+    { kind: 'formulas', label: 'Taught formulas', items: Object.entries(S.formulas).map(([k, f]) => ({ key: k, text: `${f.result} = ${f.expr}` })), data: S.formulas },
+    { kind: 'notes', label: 'Notes', items: S.facts.map((f, i) => ({ key: i, text: f })), data: S.facts },
+    { kind: 'places', label: 'Places', items: rowsOf('places').map(r => ({ key: r.name, text: `${r.name}: ${r.lat}, ${r.lon}` })), data: rowsOf('places') },
+    { kind: 'stations', label: 'Field notebook', items: field.filter(r => r.feature === 'station').map(s => { const n = field.filter(r => r.station === s.station && r.feature !== 'station').length; return { key: s.station, text: `station ${s.station}, ${s.date}: ${n} ${n === 1 ? 'entry' : 'entries'}` }; }), data: field },
+    { kind: 'log', label: 'Log', items: rowsOf('log').map(r => ({ key: r.id, text: `${r.date} ${r.activity}${r.value != null ? ` ${r.value}${r.unit ? ' ' + r.unit : ''}` : ''}` })), data: rowsOf('log') },
+    { kind: 'orders', label: 'Standing orders', items: S.orders.map(o => ({ key: o.id, text: `${o.kind === 'must' ? 'every row needs' : 'warn when'} ${o.text}` })), data: S.orders },
+    { kind: 'strata', label: 'Relative ages', items: S.strata.map(f => ({ key: f.id, text: `${f.na} ${REL[f.rel] || f.rel} ${f.nb}` })), data: S.strata },
+    { kind: 'recipes', label: 'Recipes', items: Object.values(S.recipes).map(r => ({ key: r.name, text: `${r.name}: ${r.steps.length} ${r.steps.length === 1 ? 'step' : 'steps'}` })), data: S.recipes },
+    { kind: 'files', label: 'Files', items: Object.values(S.files).map(f => ({ key: f.hash, text: `${f.name}, ${kb(f.size || 0)}` })), size: Object.values(S.files).reduce((s, f) => s + (f.size || 0), 0) },
+    { kind: 'misses', label: 'What did not read', items: S.misses.map(m => ({ key: m.q, text: `${m.q} (${m.n}×)` })), data: S.misses },
+    { kind: 'picks', label: 'Guesses picked, by skill', items: Object.entries(S.picks).map(([k, n]) => ({ key: k, text: `${k}: ${n}` })), data: S.picks },
+    { kind: 'prefs', label: 'Settings changed', items: PREFS.filter(p => S.prefs[p.key] !== undefined).map(p => ({ key: p.key, text: `${p.label}: ${prefLabel(p, S.prefs[p.key])}` })), data: S.prefs },
+  ];
+  return kinds.map(({ data, size, ...k }) => ({ ...k, bytes: size != null ? size : bytes(data) }));
+}
+
+// forget one item of a kind, or the whole kind when key is undefined → how many went
+function forgetKept(kind, key) {
+  const all = key === undefined, before = JSON.stringify(kept().find(k => k.kind === kind) || null);
+  const drop = (t, keep) => { if (S.tables[t]) S.tables[t].rows = all ? [] : S.tables[t].rows.filter(keep); };
+  const n0 = (kept().find(k => k.kind === kind) || { items: [] }).items.length;
+  switch (kind) {
+    case 'words': case 'values': for (const k of Object.keys(S.aliases)) if ((all ? (kind === 'values') === isValue(S.aliases[k]) : k === key)) delete S.aliases[k]; break;
+    case 'formulas': if (all) S.formulas = {}; else delete S.formulas[key]; break;
+    case 'notes': if (all) S.facts = []; else S.facts.splice(+key, 1); break;
+    case 'places': drop('places', r => r.name !== key); break;
+    case 'stations': drop('field', r => r.station !== key); break;
+    case 'log': drop('log', r => r.id !== key); break;
+    case 'orders': S.orders = all ? [] : S.orders.filter(o => o.id !== key); break;
+    case 'strata': S.strata = all ? [] : S.strata.filter(f => f.id !== key); break;
+    case 'recipes': if (all) S.recipes = {}; else delete S.recipes[key]; break;
+    case 'files': if (all) S.files = {}; else delete S.files[key]; break;
+    case 'misses': S.misses = all ? [] : S.misses.filter(m => m.q !== key); break;
+    case 'picks': if (all) S.picks = {}; else delete S.picks[key]; break;
+    case 'prefs': if (all) S.prefs = {}; else delete S.prefs[key]; break;
+    default: return 0;
+  }
+  const after = kept().find(k => k.kind === kind) || { items: [] };
+  if (JSON.stringify(after) !== before) deviceChanged();
+  return n0 - after.items.length;
+}
+  return { kept, forgetKept };
+})();
+
 /* ==== src/vendor/vfs.js ==== */
-const __m75 = (() => {
+const __m77 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/vfs, copied from ../auditable/ext/vfs/index.js (built from its src/ by node ext/vfs/build.js), at
 // auditable 8837da6e. golem's shell keeps sessions, device state, files and packs in it over IndexedDB (src/shell/store.js).
 // golem constructs only IDBBackend and MemoryBackend; the network backends in this bundle (fetch, REST, Dropbox) are
@@ -28277,8 +28578,8 @@ function fromPicker(vfs, destPath, opts) {
 })();
 
 /* ==== src/shell/store.js ==== */
-const __m76 = (() => {
-const { VFS } = __m75;
+const __m78 = (() => {
+const { VFS } = __m77;
 // Where the device keeps golem (SPEC 13.9): @gcu/vfs over IndexedDB, one file per session, one per opened file, the
 // device state and a small meta file, so a session can be exported as itself and nothing has a size cap but the
 // browser's. Only what changed is written. When IndexedDB is not there, the whole state goes to localStorage as before;
@@ -28291,8 +28592,7 @@ const { VFS } = __m75;
 //   /device.json          { aliases, facts, tables, recipes }
 //   /sessions/<id>.json   a session with its card specs
 //   /files/<hash>.json    a file opened on this device
-//   /packs/<name>.json    an installed pack (step 8)
-
+//   /packs/<name>.json    an installed pack (step 8)
 const LS_KEY = 'golem.state.v2', LS_OLD = 'golem.mock.v2', JOURNAL = 'golem.journal';
 function journalOf(parts, at) { const s = parts.sessions.find(x => x.id === parts.meta.cur); return { at, meta: parts.meta, device: parts.device, session: s || null }; }
 function readJournal() { try { return JSON.parse(localStorage.getItem(JOURNAL)); } catch (e) { return null; } }
@@ -28312,6 +28612,14 @@ const tx = async (mode, fn) => { const db = await blobDb(); return new Promise((
 const putBlob = (key, blob) => typeof indexedDB === 'undefined' ? Promise.resolve() : tx('readwrite', s => s.put(blob, key));
 const getBlob = key => typeof indexedDB === 'undefined' ? Promise.resolve(null) : tx('readonly', s => s.get(key)).catch(() => null);
 const dropBlob = key => typeof indexedDB === 'undefined' ? Promise.resolve() : tx('readwrite', s => s.delete(key)).catch(() => {});
+
+// Everything golem keeps in this browser, gone: its databases (the sessions and device state, the large files, the signing
+// key) and its keys in localStorage. A database still open is deleted as the page reloads, before anything opens it again.
+function eraseAll() {
+  try { for (let i = localStorage.length - 1; i >= 0; i--) { const k = localStorage.key(i); if (k && k.startsWith('golem.')) localStorage.removeItem(k); } } catch (e) { /* storage off */ }
+  if (typeof indexedDB === 'undefined') return Promise.resolve();
+  return Promise.all(['golem', BLOBS, 'golem-sign'].map(n => new Promise(done => { const r = indexedDB.deleteDatabase(n); r.onsuccess = r.onerror = r.onblocked = () => done(); })));
+}
 
 async function openStore() {
   let vfs = null;
@@ -28388,11 +28696,11 @@ function localStore() {
 function noStore() {
   return { kind: 'none', journal() {}, async load() { return null; }, save() { return Promise.resolve(); }, async readPack() { return null; }, async writePack() { throw new Error('this browser keeps nothing for golem'); }, async removePack() {}, async usage() { return null; } };
 }
-  return { putBlob, getBlob, dropBlob, openStore };
+  return { putBlob, getBlob, dropBlob, eraseAll, openStore };
 })();
 
 /* ==== src/vendor/leadacid.js ==== */
-const __m77 = (() => {
+const __m79 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. The lead-acid shell shim, copied from ../auditable/ext/leadacid/index.js
 // (itself vendored from gentropic/lead-acid, lead-acid.js). Re-vendor by copying that file here.
 
@@ -29096,7 +29404,7 @@ function orientationFromRotationVector(v) {
 })();
 
 /* ==== src/vendor/plot.js ==== */
-const __m78 = (() => {
+const __m80 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/plot (matplotlib-shaped plotting; figures leave the worker as draw lists), copied from ../auditable/ext/plot/index.js at auditable 774234c3 (9 Oct 2026, MIT).
 // Loaded only inside the Python worker. Re-vendor by copying that file here.
 
@@ -31130,7 +31438,7 @@ if (typeof window !== 'undefined') {
 })();
 
 /* ==== src/shell/i18n-answers.js ==== */
-const __m79 = (() => {
+const __m81 = (() => {
 // What golem's answers say, in Portuguese (pt-BR): the fixed words of the "read as" line, the labels of key-value rows,
 // units and labels, and the templates of sentences that carry values (a block's tpl, filled with its params). The engine
 // answers in English, its canonical form; the shell shows these when the interface is in Portuguese. A string with no
@@ -31212,10 +31520,58 @@ const ANSWERS_PT = {
   'Standing order {n}: {label}. I check it every time a table opens and every time a row is written to the log or the field notebook, on any table with those columns.': 'Ordem permanente {n}: {label}. Eu a confiro sempre que uma tabela abre e sempre que uma linha é escrita no log ou na caderneta de campo, em qualquer tabela com essas colunas.',
   'This is the synthetic QC sample: its batches, values and certified standard are generated, with failures planted to show the rules.': 'Esta é a amostra sintética de QC: lotes, valores e padrão certificado são gerados, com falhas plantadas para mostrar as regras.',
   '{n} earlier cards read with the old {what}: their answers stay as they were, true of what they were given.': '{n} cartões anteriores foram lidos com {what} antigo: as respostas ficam como estavam, verdadeiras para o que receberam.',
-  'Read with {what}.': 'Lido com {what}.'
+  'Read with {what}.': 'Lido com {what}.',
+  // the settings (prefs.js)
+  "Plane notation": "Notação dos planos",
+  "Declination": "Declinação",
+  "Significant figures (at most)": "Algarismos significativos (no máximo)",
+  "Bearings": "Rumos",
+  "Latitude and longitude": "Latitude e longitude",
+  "UTM datum": "Datum UTM",
+  "UTM zone": "Zona UTM",
+  "Distances and thicknesses": "Distâncias e espessuras",
+  "Decimal mark": "Separador decimal",
+  "Learning from what did not read": "Aprender com o que não foi lido",
+  "Oldest position fix taken": "Posição mais antiga aceita",
+  "When golem opens": "Quando o golem abre",
+  "dip direction/dip": "sentido de mergulho/mergulho",
+  "strike/dip (right-hand rule)": "direção/mergulho (regra da mão direita)",
+  "the World Magnetic Model where the place is known, to true north": "o Modelo Magnético Mundial onde o lugar é conhecido, para o norte verdadeiro",
+  "none: magnetic north, as measured": "nenhuma: norte magnético, como medido",
+  "azimuths (045)": "azimutes (045)",
+  "quadrant bearings (N45°E)": "rumos em quadrante (N45°E)",
+  "decimal degrees": "graus decimais",
+  "degrees, minutes and seconds": "graus, minutos e segundos",
+  "the zone the place is in": "a zona onde o lugar está",
+  "metres and kilometres": "metros e quilômetros",
+  "feet and miles": "pés e milhas",
+  "the language's": "o do idioma",
+  "a point (1,234.5)": "um ponto (1,234.5)",
+  "a comma (1.234,5)": "uma vírgula (1.234,5)",
+  "on: kept on this device, offered to teach": "ligado: guardado neste aparelho, oferecido para ensinar",
+  "off: nothing is kept": "desligado: nada é guardado",
+  "30 seconds": "30 segundos",
+  "2 minutes": "2 minutos",
+  "10 minutes": "10 minutos",
+  "awake or asleep, as it was left": "acordado ou dormindo, como foi deixado",
+  "always awake": "sempre acordado",
+  "always asleep": "sempre dormindo",
+  "a fixed declination in degrees, east positive": "uma declinação fixa em graus, leste positivo",
+  "a zone, 1 to 60": "uma zona, de 1 a 60",
+  "Cards read from now on use it; cards already made keep what they were read with.": "Os cartões lidos daqui em diante a usam; os já feitos mantêm o que foi usado na leitura.",
+  "Answers are unchanged; this is how golem behaves on this device.": "As respostas não mudam; é como o golem se comporta neste aparelho.",
+  "before": "antes",
+  "golem's default": "padrão do golem",
+  "the settings on this device": "as configurações deste aparelho",
+  "reset the settings to golem's defaults": "restaurar as configurações para os padrões do golem",
+  "Reset: {n} settings back to golem's defaults.": "Restaurado: {n} configurações de volta aos padrões do golem.",
+  "Change one by saying it (\"use strike and dip\", \"set significant figures to 4\"), or under Settings.": "Mude uma dizendo-a (\"usa direção e mergulho\", \"muda os algarismos significativos para 4\"), ou em Configurações.",
+  "default": "padrão",
+  "show my settings": "mostra as configurações",
 };
 // table headings: golem's own words only, never a table's column names
 const HEADS_PT = {
+  "setting": "configuração",
   'Element': 'Elemento', 'Count': 'Quantidade', 'Atomic weight': 'Peso atômico', 'Contribution': 'Contribuição', 'Mass %': '% em massa', 'Field': 'Campo', 'Value': 'Valor', 'Means': 'Significa',
   'Who': 'Quem', 'Piece': 'Parte', 'feature': 'feição', 'attitude': 'atitude', 'youngest first': 'da mais jovem', 'true thickness': 'espessura verdadeira', 'Country': 'País', 'Population': 'População',
   'Area km²': 'Área km²', 'Found': 'Encontrado', 'Rule': 'Regra', 'Try': 'Tente', 'from (Ma)': 'de (Ma)', 'to (Ma)': 'até (Ma)', 'entries': 'registros', 'request': 'pedido', 'times': 'vezes', 'last': 'última',
@@ -31227,8 +31583,8 @@ const HEADS_PT = {
 })();
 
 /* ==== src/shell/i18n.js ==== */
-const __m80 = (() => {
-const { ANSWERS_PT, HEADS_PT } = __m79;
+const __m82 = (() => {
+const { ANSWERS_PT, HEADS_PT } = __m81;
 // The interface in English or Brazilian Portuguese. golem's own words (the page, the sidebar, the composer, the cards'
 // frame, the messages) go through t(); the English is the key, so a sentence not translated yet shows in English and a
 // placeholder ({name}) is filled in after the lookup. What a tool answers is shown through the same table where i18n-answers.js
@@ -31336,7 +31692,93 @@ const PT = {
   'Installing…': 'Instalando…', 'Installed: {n} countries{full}.': 'Instalado: {n} países{full}.', 'Removed. The 14-country sample answers again.': 'Removido. A amostra de 14 países responde de novo.',
   'A sample term index ships: where a term is defined, without the passage.': 'Vem um índice de termos de amostra: onde um termo é definido, sem o trecho.', 'Installed: {n} terms with their defining passages.': 'Instalado: {n} termos com os trechos que os definem.',
   'Removed. The sample term index answers again.': 'Removido. O índice de amostra responde de novo.', 'A sample of rules 10, 11 and 13 ships.': 'Vem uma amostra das regras 10, 11 e 13.',
-  'Installed: {n} checks from its rules and chapter V.': 'Instalado: {n} verificações das regras e do capítulo V.', 'Removed. The sample checks answer again.': 'Removido. As verificações de amostra respondem de novo.'
+  'Installed: {n} checks from its rules and chapter V.': 'Instalado: {n} verificações das regras e do capítulo V.', 'Removed. The sample checks answer again.': 'Removido. As verificações de amostra respondem de novo.',
+  // Settings and What golem keeps (15 Oct 2026)
+  "What golem keeps": "O que o golem guarda",
+  "Settings": "Configurações",
+  "What golem keeps on this device, and its settings, have views of their own in the sidebar.": "O que o golem guarda neste aparelho, e as configurações, têm telas próprias na barra lateral.",
+  "Settings that change answers are copied into each card read with them: the card says which it used, keeps it when the setting changes, and replays the same on any device. The others change only how golem behaves here.": "As configurações que mudam respostas são copiadas para cada cartão lido com elas: o cartão diz qual usou, a mantém quando a configuração muda e se refaz igual em qualquer aparelho. As outras mudam só como o golem se comporta aqui.",
+  "Answers": "Respostas",
+  "This device": "Este aparelho",
+  "This app": "Este app",
+  "Said": "Dito",
+  "Every setting can be said, and saying it leaves a card in the session.": "Toda configuração pode ser dita, e dizê-la deixa um cartão na sessão.",
+  "Back to golem's defaults": "Voltar aos padrões do golem",
+  "Tap again to reset every setting": "Toque de novo para restaurar todas as configurações",
+  "set here": "definido aqui",
+  "always one zone…": "sempre uma zona…",
+  "a fixed value…": "um valor fixo…",
+  "Set. {setting}: {value}.": "Definido. {setting}: {value}.",
+  "{setting}: {hint}.": "{setting}: {hint}.",
+  "Every setting is back to golem's default.": "Todas as configurações voltaram ao padrão do golem.",
+  "How a typed plane such as 120/55 is read, and how a measured one is written.": "Como um plano digitado, como 120/55, é lido, e como um medido é escrito.",
+  "Applied to a compass reading when it is taken. A fixed value is applied as given.": "Aplicada a uma leitura da bússola quando ela é feita. Um valor fixo é aplicado como dado.",
+  "A cap: golem shows fewer where a number carries fewer.": "Um limite: o golem mostra menos onde um número carrega menos.",
+  "Strikes, dip directions, and bearings between places.": "Direções, sentidos de mergulho e rumos entre lugares.",
+  "Places, stations, and UTM back to latitude and longitude.": "Lugares, estações e UTM de volta para latitude e longitude.",
+  "Said with each UTM answer. WGS84 and SIRGAS 2000 differ by centimetres.": "Dito em cada resposta em UTM. WGS84 e SIRGAS 2000 diferem por centímetros.",
+  "A project zone: a place outside it is still given in it, and the card says so.": "Uma zona de projeto: um lugar fora dela ainda é dado nela, e o cartão diz isso.",
+  "Distances between places, and true thicknesses.": "Distâncias entre lugares e espessuras verdadeiras.",
+  "How the page writes numbers, and so what is copied from it. The answers are unchanged, and the files golem saves keep the point.": "Como a página escreve os números, e portanto o que se copia dela. As respostas não mudam, e os arquivos que o golem salva mantêm o ponto.",
+  "What did not read is kept, to offer words to teach. Off, nothing is kept.": "O que não foi lido é guardado, para oferecer palavras a ensinar. Desligado, nada é guardado.",
+  "A position fix older than this is not taken as here.": "Uma posição mais antiga que isso não é tomada como aqui.",
+  "Asleep, golem reads and runs nothing, and the compass and the position are off.": "Dormindo, o golem não lê nem roda nada, e a bússola e a posição ficam desligadas.",
+  "All of it is on this device, and nowhere else. Forgetting something here leaves no card; a session that read it says so when it is opened, and its cards keep what they were read with.": "Tudo isso está neste aparelho e em nenhum outro lugar. Esquecer algo aqui não deixa cartão; uma sessão que o leu diz isso quando é aberta, e seus cartões mantêm o que foi usado na leitura.",
+  "Restore from a file": "Restaurar de um arquivo",
+  "{file}: {n} sessions, saved {date}. {signed} Restoring replaces every session, everything below and the settings on this device with what the file holds.": "{file}: {n} sessões, salvas em {date}. {signed} Restaurar substitui todas as sessões, tudo abaixo e as configurações deste aparelho pelo que o arquivo contém.",
+  "Replace everything with this file": "Substituir tudo por este arquivo",
+  "Tap again to replace everything": "Toque de novo para substituir tudo",
+  "Cancel": "Cancelar",
+  "Open table": "Tabela aberta",
+  "forget": "esquecer",
+  "and {n} more": "e mais {n}",
+  "Forget all of them": "Esquecer todos",
+  "Tap again to forget all {n}": "Toque de novo para esquecer os {n}",
+  "Nothing yet": "Nada ainda",
+  "Taught values": "Valores ensinados",
+  "Taught formulas": "Fórmulas ensinadas",
+  "Places": "Lugares",
+  "Field notebook": "Caderneta de campo",
+  "Log": "Registro",
+  "Standing orders": "Ordens permanentes",
+  "Relative ages": "Idades relativas",
+  "Recipes": "Receitas",
+  "Files": "Arquivos",
+  "What did not read": "O que não foi lido",
+  "Guesses picked, by skill": "Palpites escolhidos, por habilidade",
+  "Settings changed": "Configurações alteradas",
+  "Storage": "Armazenamento",
+  "This browser gives golem {used} of {quota}; installed packs and large files count.": "Este navegador dá ao golem {used} de {quota}; pacotes instalados e arquivos grandes contam.",
+  "This browser does not say how much it keeps.": "Este navegador não diz quanto guarda.",
+  "It keeps it even when space runs short.": "Ele mantém tudo mesmo quando falta espaço.",
+  "It may clear it when space runs short, as browsers do with sites.": "Ele pode apagar tudo quando falta espaço, como os navegadores fazem com sites.",
+  "Ask the browser to keep it": "Pedir ao navegador para manter",
+  "The browser keeps golem's data now, even when space runs short.": "O navegador agora mantém os dados do golem, mesmo quando falta espaço.",
+  "The browser said no. Installing golem as an app usually makes it keep it.": "O navegador disse não. Instalar o golem como app costuma fazê-lo manter.",
+  "Save the public key": "Salvar a chave pública",
+  "Replace the key": "Trocar a chave",
+  "Tap again: files signed before still check, new ones use a new key": "Toque de novo: arquivos assinados antes continuam conferindo, os novos usam uma chave nova",
+  "In the app the key lives in the phone's hardware, so it is not replaced here.": "No app a chave fica no hardware do celular, então não é trocada aqui.",
+  "A new key: {fp}.": "Uma chave nova: {fp}.",
+  "The key was not replaced: {e}": "A chave não foi trocada: {e}",
+  "A copy of everything": "Uma cópia de tudo",
+  "Every session, everything above, the settings and the files opened, in one signed file. Packs are not in it: install them again. The paperclip or the button below opens it again, here or on another device.": "Todas as sessões, tudo acima, as configurações e os arquivos abertos, num só arquivo assinado. Os pacotes não vão nele: instale-os de novo. O clipe ou o botão abaixo o abrem de novo, aqui ou em outro aparelho.",
+  "Save everything to a file": "Salvar tudo num arquivo",
+  "Restore from a file…": "Restaurar de um arquivo…",
+  "Erase": "Apagar",
+  "Every session, everything above, the files, the packs, the settings and the signing key, gone from this device. golem starts again as on a first visit.": "Todas as sessões, tudo acima, os arquivos, os pacotes, as configurações e a chave de assinatura, apagados deste aparelho. O golem recomeça como numa primeira visita.",
+  "Erase everything on this device": "Apagar tudo neste aparelho",
+  "Tap again: this cannot be undone": "Toque de novo: isso não pode ser desfeito",
+  "Erasing…": "Apagando…",
+  "It is not signed.": "Não está assinado.",
+  "Signed by key {fp}, unchanged since.": "Assinado pela chave {fp}, sem mudança desde então.",
+  "Its signature does not match: it was changed after key {fp} signed it.": "A assinatura não confere: foi alterado depois que a chave {fp} o assinou.",
+  "That is not a golem backup.": "Isso não é uma cópia do golem.",
+  "That backup holds no sessions, so nothing was replaced.": "Essa cópia não tem sessões, então nada foi substituído.",
+  "Restored. Everything on this device is now what the file held.": "Restaurado. Tudo neste aparelho agora é o que o arquivo continha.",
+  "Forgotten.": "Esquecido.",
+  "Nothing to forget.": "Nada a esquecer.",
+  "Forgotten: {n}.": "Esquecidos: {n}.",
 };
 // what the answers say (i18n-answers.js), merged under golem's own words, which win where both have a key
 for (const [k, v] of Object.entries(ANSWERS_PT)) if (!(k in PT)) PT[k] = v;
@@ -31348,11 +31790,12 @@ const tx = b => b.tpl ? t(b.tpl, Object.fromEntries(Object.entries(b.params || {
 })();
 
 /* ==== src/shell/render.js ==== */
-const __m81 = (() => {
+const __m83 = (() => {
 const { fmt } = __m0;
 const { conversions, equalArea } = __m5;
-const { Figure } = __m78;
-const { t, th, tx } = __m80;
+const { Figure } = __m80;
+const { t, th, tx, uiLang } = __m82;
+const { prefOf } = __m41;
 const { stationNow } = __m28;
 const { staleOf, staleText } = __m32;
 // Rendering. The engine hands over plain blocks; this is the only file that turns them into markup.
@@ -31431,16 +31874,27 @@ function svgCurve(b) {
   return s + '</svg>';
 }
 
+/* ── numbers, with the decimal mark of the settings (the language's by default: a comma in Portuguese) ── */
+// Only how the page writes them (and so what is copied from it): the answer is unchanged, and the files golem saves keep the point. A number is one
+// with a decimal point or grouping commas, standing alone (not a version such as 0.2.4, not inside a word); two of them
+// separated by a comma (a latitude and longitude) are separated by a semicolon instead.
+const NUM = /(?<![\w.,])-?(?:\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+\.\d+)(?:e[+-]?\d+)?(?![\w]|[.,]\d)/g;
+const commaMark = () => { const m = prefOf('numbers'); return m === 'comma' || (m === 'auto' && uiLang() === 'pt'); };
+function marks(s) {
+  if (s == null || !commaMark()) return s;
+  return String(s).replace(/(\d\.\d+), (?=-?\d+\.\d)/g, '$1; ').replace(NUM, n => n.replace(/[.,]/g, c => (c === '.' ? ',' : '.')));
+}
+
 /* ── blocks ── */
 function blockHtml(b) {
   switch (b.t) {
-    case 'big': return `<div class="big"${b.size ? ` style="font-size:${b.size}px"` : ''}${b.end ? ` data-end="${b.end}"` : ''}>${escHtml(b.v)}${b.unit ? ` <small>${escHtml(t(b.unit))}</small>` : ''}</div>`;
-    case 'sub': return `<div class="sub">${escHtml(tx(b))}</div>`;
-    case 'note': return `<div class="note${b.kind ? ' ' + b.kind : ''}">${escHtml(tx(b))}</div>`;
+    case 'big': return `<div class="big"${b.size ? ` style="font-size:${b.size}px"` : ''}${b.end ? ` data-end="${b.end}"` : ''}>${escHtml(marks(b.v))}${b.unit ? ` <small>${escHtml(t(b.unit))}</small>` : ''}</div>`;
+    case 'sub': return `<div class="sub">${escHtml(marks(tx(b)))}</div>`;
+    case 'note': return `<div class="note${b.kind ? ' ' + b.kind : ''}">${escHtml(marks(tx(b)))}</div>`;
     case 'src': return `<div class="src">${escHtml(b.text)}</div>`;
     case 'lbl': return `<div class="lbl">${escHtml(tx(b))}</div>`;
-    case 'kv': return `<dl class="kv">${b.rows.map(([k, v, o]) => `<dt>${escHtml(t(k))}</dt><dd>${o && o.mono ? `<code>${escHtml(v)}</code>` : escHtml(t(String(v)))}</dd>`).join('')}</dl>`;
-    case 'table': return `<div class="tbl"><table><tr>${b.head.map((h, i) => `<th${b.num && b.num[i] ? ' class="n"' : ''}>${escHtml(th(h))}</th>`).join('')}</tr>${b.rows.map(r => `<tr>${r.map((v, i) => `<td${b.num && b.num[i] ? ' class="n"' : ''}>${escHtml(b.tr && b.tr.includes(i) && typeof v === 'string' ? t(v) : v)}</td>`).join('')}</tr>`).join('')}</table></div>`;
+    case 'kv': return `<dl class="kv">${b.rows.map(([k, v, o]) => `<dt>${escHtml(t(k))}</dt><dd>${o && o.mono ? `<code>${escHtml(marks(v))}</code>` : escHtml(marks(t(String(v))))}</dd>`).join('')}</dl>`;
+    case 'table': return `<div class="tbl"><table><tr>${b.head.map((h, i) => `<th${b.num && b.num[i] ? ' class="n"' : ''}>${escHtml(th(h))}</th>`).join('')}</tr>${b.rows.map(r => `<tr>${r.map((v, i) => `<td${b.num && b.num[i] ? ' class="n"' : ''}>${escHtml(b.tr && b.tr.includes(i) && typeof v === 'string' ? t(v) : b.num && b.num[i] ? marks(v) : v)}</td>`).join('')}</tr>`).join('')}</table></div>`;
     case 'list': return `<ul class="plain">${b.items.map(i => `<li>${escHtml(i)}</li>`).join('')}</ul>`;
     case 'steps': return `<ol class="steps">${b.items.map(i => `<li>${escHtml(i)}</li>`).join('')}</ol>`;
     case 'pre': return `<pre>${escHtml(b.text)}</pre>`;
@@ -31501,11 +31955,11 @@ function figImage(ctx, x, y, w, h, cols, rows, b64) {
   scratch.getContext('2d').putImageData(new ImageData(bytes, cols, rows), 0, 0);
   const smooth = ctx.imageSmoothingEnabled; ctx.imageSmoothingEnabled = false; ctx.drawImage(scratch, x, y, w, h); ctx.imageSmoothingEnabled = smooth;
 }
-  return { escHtml, pad, drawChart, drawCharts, cardEl };
+  return { escHtml, pad, drawChart, drawCharts, commaMark, marks, cardEl };
 })();
 
 /* ==== src/vendor/sw-register.js ==== */
-const __m82 = (() => {
+const __m84 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sw's page-side companion, copied from ../auditable/ext/sw/register.js (at auditable 8837da6e).
 
 // @gcu/sw — the page-side companion (ES module). Registration + persistent
@@ -31583,14 +32037,13 @@ function registerGcuSw(opts = {}) {
 })();
 
 /* ==== src/shell/sign.js ==== */
-const __m83 = (() => {
-const { shell } = __m77;
+const __m85 = (() => {
+const { shell } = __m79;
 // Signing what golem exports, and checking what it opens (SPEC 13: things you can trust). One signature format for both
 // homes, ECDSA P-256 over SHA-256, the signature raw (r‖s) and the public key as SPKI, both base64: inside the lead-acid
 // app the phone's hardware key signs (lead-acid's attest plugin: StrongBox, else the TEE); in a browser, a WebCrypto key
 // pair made once and kept in IndexedDB, its private half not extractable. A signature says the file has not changed
-// since a key signed it; who holds the key is for the person to know (the fingerprint is shown under Packs).
-
+// since a key signed it; who holds the key is for the person to know (the fingerprint is shown under Packs).
 const ALG = 'ECDSA-P256-SHA256', P256 = { name: 'ECDSA', namedCurve: 'P-256' }, SIGN = { name: 'ECDSA', hash: 'SHA-256' };
 const b64 = buf => { const u = new Uint8Array(buf); let s = ''; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode(...u.subarray(i, i + 0x8000)); return btoa(s); };
 const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
@@ -31609,6 +32062,16 @@ async function browserKey() {
   }
   return k;
 }
+// a new key in place of the browser's (Settings, What golem keeps): files signed before still check, by the key each
+// carries; only new signatures change. In the app the key lives in the phone's hardware and is not replaced here.
+const canReplaceKey = () => !shell.present && !!(globalThis.crypto && crypto.subtle && globalThis.indexedDB);
+async function replaceKey() {
+  const db = await idb(), k = await crypto.subtle.generateKey(P256, false, ['sign', 'verify']);
+  await new Promise((ok, no) => { const tx = db.transaction('keys', 'readwrite'); tx.objectStore('keys').put(k, 'device'); tx.oncomplete = ok; tx.onerror = () => no(tx.error); });
+  return deviceKey();
+}
+// the public half as a PEM file, to give to whoever checks the signatures
+const pemOf = pub => `-----BEGIN PUBLIC KEY-----\n${pub.match(/.{1,64}/g).join('\n')}\n-----END PUBLIC KEY-----\n`;
 // this device's key: { pub, security, fingerprint }
 async function deviceKey() {
   if (shell.present) { const i = await shell.attest.keyinfo(); return { pub: i.pub, security: i.security, fingerprint: await fingerprint(i.pub) }; }
@@ -31631,34 +32094,36 @@ async function fingerprint(pubB64) {
   const h = new Uint8Array(await crypto.subtle.digest('SHA-256', unb64(pubB64)));
   return [...h.slice(0, 8)].map(x => x.toString(16).padStart(2, '0')).join('').match(/.{4}/g).join(' ');
 }
-  return { canSign, deviceKey, sign, verify, fingerprint };
+  return { canSign, canReplaceKey, replaceKey, pemOf, deviceKey, sign, verify, fingerprint };
 })();
 
 /* ==== src/shell/main.js ==== */
-const __m84 = (() => {
+const __m86 = (() => {
 const { S } = __m0;
-const { submit, flipSlot, answer, capture, seedExamples, openFile, openBinary, openStreamed, preview } = __m73;
-const { scanTable, STREAM_OVER } = __m72;
-const { completions } = __m46;
+const { submit, flipSlot, answer, capture, seedExamples, openFile, openBinary, openStreamed, preview } = __m74;
+const { scanTable, STREAM_OVER } = __m73;
+const { completions } = __m47;
 const { fromDevice } = __m27;
 const { conversions } = __m5;
 const { useFactbook, factbookInfo } = __m21;
-const { factbookFromGcudat, factbookProfiles, readGcudat, compileOds, compileStrunk, mineralsFromGcudat } = __m74;
+const { factbookFromGcudat, factbookProfiles, readGcudat, compileOds, compileStrunk, mineralsFromGcudat } = __m75;
 const { useMinerals, mineralsInfo } = __m8;
 const { useBook, bookInfo } = __m22;
-const { BINARY } = __m67;
+const { BINARY } = __m68;
 const { setRunner, onJobDone } = __m0;
-const { sessions, current, newSession, openSession, renameSession, deleteSession, searchHistory, parts, hydrate, onChange, exportSession, importSession, pinCard, branchSession } = __m30;
-const { openStore, putBlob, getBlob } = __m76;
+const { sessions, current, newSession, openSession, renameSession, deleteSession, searchHistory, parts, hydrate, onChange, exportSession, importSession, pinCard, branchSession, exportDevice, importDevice, deviceChanged } = __m30;
+const { PREFS, prefOf, prefByKey, prefLabel, setPref } = __m41;
+const { kept, forgetKept } = __m76;
+const { openStore, putBlob, getBlob, eraseAll } = __m78;
 const { skills, PACKS, STARTERS, STARTERS_PT } = __m40;
-const { shell } = __m77;
-const { escHtml, pad, cardEl, drawCharts } = __m81;
-const { registerGcuSw } = __m82;
-const { sign, verify, fingerprint, deviceKey, canSign } = __m83;
+const { shell } = __m79;
+const { escHtml, pad, cardEl, drawCharts } = __m83;
+const { registerGcuSw } = __m84;
+const { sign, verify, fingerprint, deviceKey, canSign, canReplaceKey, replaceKey, pemOf } = __m85;
 const { canonical, unsigned } = __m31;
 const { staleOf } = __m32;
-const { t, plural, setUiLang, uiLang, applyStatic } = __m80;
-const { setLanguage } = __m46;
+const { t, plural, setUiLang, uiLang, applyStatic } = __m82;
+const { setLanguage } = __m47;
 // The shell: wiring, tabs, the session drawer, storage, and the sleep switch. Everything that touches
 // the DOM or the browser lives here or in render.js; the engine never does.
 const $ = id => document.getElementById(id);
@@ -31669,7 +32134,8 @@ let awake = true, statusT;
 // a message in the person's language: t() on a sentence that is already translated leaves it as it is
 function status(msg) { $('status').textContent = t(msg); clearTimeout(statusT); statusT = setTimeout(() => { $('status').textContent = ''; }, 5000); }
 function showTab(t) {
-  ['ask', 'skills', 'packs', 'about'].forEach(k => { $('v-' + k).hidden = k !== t; });
+  ['ask', 'skills', 'packs', 'about', 'settings', 'kept'].forEach(k => { $('v-' + k).hidden = k !== t; });
+  if (t === 'settings') renderSettings(); if (t === 'kept') renderKept();
   document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === t));
   document.querySelectorAll('.navbtn[data-tab]').forEach(b => b.setAttribute('aria-current', b.dataset.tab === t));
 }
@@ -31967,7 +32433,7 @@ async function takePosition(c) {
     show(t('Waiting for a fix…'));
     await new Promise((done, fail) => {
       const stop = setTimeout(done, 15000);
-      const got = f => { if (f.lat == null || (f.t && Date.now() - f.t > 120000)) return; if (!best || (f.acc != null && f.acc < best.acc)) best = f; show(`±${Math.round(f.acc)} m…`); if (f.acc != null && f.acc <= 20) { clearTimeout(stop); done(); } };
+      const got = f => { if (f.lat == null || (f.t && Date.now() - f.t > prefOf('fixAge') * 1000)) return; if (!best || (f.acc != null && f.acc < best.acc)) best = f; show(`±${Math.round(f.acc)} m…`); if (f.acc != null && f.acc <= 20) { clearTimeout(stop); done(); } };
       if (inApp) st.on('fix', d => got(data(d)));
       else st = browserFix(got, e => { clearTimeout(stop); if (best) done(); else fail(e); });
       fixStream = { close() { clearTimeout(stop); done(); } };   // sleep ends the wait; the stream closes below
@@ -32062,7 +32528,7 @@ function factbookItem() {
 }
 function renderPacks() {
   const lab = { live: t('installed'), samp: t('sample'), plan: t('not wired') };
-  let h = `<h1 class="vhead">${t('Packs and this device')}</h1><div class="sub">${t('golem knows what its installed packs hold. These are the gcu-library entries plus packs worth adding.')}</div><div class="lbl">${t('Library')}</div>`;
+  let h = `<h1 class="vhead">${t('Packs')}</h1><div class="sub">${t('golem knows what its installed packs hold. These are the gcu-library entries plus packs worth adding.')}</div><div class="lbl">${t('Library')}</div>`;
   const fbi = factbookInfo();
   PACKS.forEach(([id, name, meta, st, d]) => {
     if (id === 'factbook') st = fbi.kind === 'sample' ? 'samp' : 'live';
@@ -32070,15 +32536,10 @@ function renderPacks() {
     if (BOOKS[id]) st = infoOf(id).kind === 'pack' ? 'live' : 'samp';
     h += `<div class="item"><h3>${escHtml(name)} <span class="tag ${st}">${lab[st]}</span></h3><p>${escHtml(d)}</p>${id === 'factbook' ? factbookItem() : BOOKS[id] ? bookItem(id) : ''}<div class="from">${escHtml(id)} · ${escHtml(meta)}</div></div>`;
   });
-  const al = Object.entries(S.aliases);
-  h += `<div class="lbl">${t('On this device')}</div><div class="item"><h3>${t('Taught words')}</h3><p>${al.length ? al.map(([k, v]) => `${escHtml(k)} → ${escHtml(v)}`).join('<br>') : t('None yet. Try “pop means population”.')}</p></div><div class="item"><h3>${t('Notes')}</h3><p>${S.facts.length ? S.facts.map(escHtml).join('<br>') : t('None yet. Try “remember that …”.')}</p></div><div class="item"><h3>${t('Open table')}</h3><p>${S.table ? escHtml(t('{name} · {n} rows · {source}', { name: S.table.name, n: S.table.rows.length, source: t(S.table.source === 'sample' ? 'sample data' : 'from your files') })) : t('None.')}</p></div><div class="item"><h3>${t('Files on this device')}</h3><p>${Object.values(S.files).length ? Object.values(S.files).map(f => `${escHtml(f.name)} · ${(f.size / 1024).toFixed(0)} kB`).join('<br>') : t('None yet. Tap the paperclip to open a CSV.')}</p></div>`;
-  h += voiceItem() + keyItem() + appItem();
+  h += `<p class="sub">${t('What golem keeps on this device, and its settings, have views of their own in the sidebar.')}</p>`;
   $('v-packs').innerHTML = h;
   for (const [id, fn] of [['fb-install', () => installFactbook(false)], ['fb-install-full', () => installFactbook(true)], ['fb-remove', removeFactbook]]) { const b = $(id); if (b) b.addEventListener('click', fn); }
-  const ck = $('sw-check'), ap = $('sw-apply');
-  if (ck) ck.addEventListener('click', checkUpdates);
-  if (ap) ap.addEventListener('click', () => sw.applyUpdate());
-  const sa = $('say-all'); if (sa) sa.addEventListener('click', () => { voice.all = !voice.all; try { localStorage.setItem(VOICE, voice.all ? 'all' : ''); } catch (e) { /* storage is optional */ } renderPacks(); });
+  if (!$('v-settings').hidden) renderSettings(); if (!$('v-kept').hidden) renderKept();
 }
 
 /* ── the drawer: sessions and history ── */
@@ -32116,37 +32577,36 @@ function commitName(inp) { ren = null; renameSession(+inp.dataset.id, inp.value)
 // saved on the device through store.js (@gcu/vfs over IndexedDB): a moment after each change, and at once when the page
 // is hidden, so a closed tab keeps its last card
 // (a moment after the last change, but never more than a second behind while changes keep coming)
-let store = null, saveT = 0, firstUnsaved = 0;
+let store = null, saveT = 0, firstUnsaved = 0, erasing = false;   // erasing: nothing is written again before the reload
 function persist() {
-  if (!store) return;
+  if (!store || erasing) return;
   store.journal(parts());
   const now = Date.now(); if (!firstUnsaved) firstUnsaved = now;
   clearTimeout(saveT); saveT = setTimeout(() => { firstUnsaved = 0; store.save(parts()); }, now - firstUnsaved > 1000 ? 0 : 80);
 }
-document.addEventListener('visibilitychange', () => { if (document.hidden && store) { clearTimeout(saveT); firstUnsaved = 0; store.save(parts()); } });
-onChange(() => { renderBar(); persist(); if (!$('hq').value.trim() && ren == null) renderDrawer(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden && store && !erasing) { clearTimeout(saveT); firstUnsaved = 0; store.save(parts()); } });
+onChange(() => { renderBar(); persist(); if (!$('hq').value.trim() && ren == null) renderDrawer(); if (!$('v-kept').hidden) renderKept(); });
 
 /* ── language: the device's, or the choice kept on this device. golem reads both; the interface is the chosen one ── */
 function applyLanguage(l) {
   setUiLang(l); setLanguage(l); applyStatic(document);
-  $('lang-k').textContent = l === 'pt' ? 'Português' : 'English';
   $('st-req').textContent = requestText(); applyTheme(theme); renderPower(); renderStarters(); renderSkills(); voiceSupport();
   if (ready) { renderStream(); renderDrawer(); renderPacks(); }
 }
+function setLang(l) { lang = l; try { localStorage.setItem(LANG, lang); } catch (e) { /* storage is optional */ } applyLanguage(lang); }
 let lang = (navigator.language || 'en').toLowerCase().startsWith('pt') ? 'pt' : 'en';
 try { const l = localStorage.getItem(LANG); if (l === 'en' || l === 'pt') lang = l; } catch (e) { /* storage is optional */ }
-$('lang').addEventListener('click', () => { lang = lang === 'pt' ? 'en' : 'pt'; try { localStorage.setItem(LANG, lang); } catch (e) { /* storage is optional */ } applyLanguage(lang); });
 /* ── theme: auto follows the system; a choice is kept on this device ── */
 const THEMES = ['auto', 'light', 'dark'];
 let theme = 'auto';
-function applyTheme(th) { if (th === 'auto') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = th; $('theme-k').textContent = t(th); drawCharts(); }
+function applyTheme(th) { if (th === 'auto') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = th; drawCharts(); }
+function setTheme(th) { theme = th; applyTheme(theme); try { localStorage.setItem(THEME, theme); } catch (e) { /* storage is optional */ } }
 // charts read the theme's colours and the column's width when drawn: draw them again when either changes
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => drawCharts());
 let redrawT; window.addEventListener('resize', () => { clearTimeout(redrawT); redrawT = setTimeout(() => drawCharts(), 150); });
 try { const t = localStorage.getItem(THEME); if (THEMES.includes(t)) theme = t; } catch (e) { /* storage is optional */ }
 applyTheme(theme);
 applyLanguage(lang);
-$('theme').addEventListener('click', () => { theme = THEMES[(THEMES.indexOf(theme) + 1) % 3]; applyTheme(theme); try { localStorage.setItem(THEME, theme); } catch (e) { /* storage is optional */ } });
 
 /* ── wiring ── */
 /* ── Python: adder in a fresh Web Worker per run, built from the page itself; no network ── */
@@ -32218,10 +32678,13 @@ document.addEventListener('keydown', e => {
 // a file from the picker (the lead-acid shell routes <input type=file> to the system picker): text in, a card out
 $('attach').addEventListener('click', () => { if (awake) $('file').click(); });
 $('file').addEventListener('change', e => { const f = e.target.files && e.target.files[0]; if (f) openPicked(f); e.target.value = ''; });
+// a backup picked under What golem keeps: read, checked, offered
+$('restore-f').addEventListener('change', e => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (!f) return; f.text().then(txt => { let d = null; try { d = JSON.parse(txt); } catch (err) { d = null; } offerRestore(d, f.name); }, () => status('Could not read that file.')); });
 // a file from the paperclip, dropped on the window, or shared to the app ("Open with golem"): one way in
 // a session file, from a .golem.json or a notebook's metadata: its signature checked over the bytes it covers, then it
 // comes back as a session of its own, the status saying whether it is signed and unchanged
 async function openSessionFile(d) {
+  if (d && d.golem === 'device') { offerRestore(d); return; }
   let s = null; try { s = importSession(d); } catch (err) { s = null; }
   if (!s) { status('That is not a golem session file.'); return; }
   renderStream(); renderDrawer();
@@ -32235,9 +32698,150 @@ async function openSessionFile(d) {
 let keyInfo = null, keyAsked = false;
 function keyItem() {
   if (!canSign()) return '';
-  if (!keyAsked) { keyAsked = true; deviceKey().then(k => { keyInfo = k; renderPacks(); }, () => {}); }
-  return `<div class="item"><h3>${t('Signing key')}</h3><p>${keyInfo ? t('Exported sessions and notebooks are signed with this device\'s key, {fp} ({security}). A signature shows that a file is unchanged since this key signed it; golem checks it when the file is opened.', { fp: `<code>${escHtml(keyInfo.fingerprint)}</code>`, security: escHtml(keyInfo.security) }) : t('Reading this device\'s key…')}</p></div>`;
+  if (!keyAsked) { keyAsked = true; deviceKey().then(k => { keyInfo = k; renderKept(); }, () => {}); }
+  const acts = keyInfo ? `<div class="opts"><button class="btn" type="button" data-kp="pem">${t('Save the public key')}</button>${canReplaceKey() ? confirmBtn('key', t('Replace the key'), t('Tap again: files signed before still check, new ones use a new key')) : ''}</div>` : '';
+  return `<div class="item"><h3>${t('Signing key')}</h3><p>${keyInfo ? t('Exported sessions and notebooks are signed with this device\'s key, {fp} ({security}). A signature shows that a file is unchanged since this key signed it; golem checks it when the file is opened.', { fp: `<code>${escHtml(keyInfo.fingerprint)}</code>`, security: escHtml(keyInfo.security) }) : t('Reading this device\'s key…')}${keyInfo && inApp ? ' ' + t('In the app the key lives in the phone\'s hardware, so it is not replaced here.') : ''}</p>${acts}</div>`;
 }
+
+/* ── Settings: what changes answers (copied into each card read with it: prefs.js) and how golem behaves here ── */
+const PREF_ABOUT = {
+  plane: 'How a typed plane such as 120/55 is read, and how a measured one is written.',
+  decl: 'Applied to a compass reading when it is taken. A fixed value is applied as given.',
+  sig: 'A cap: golem shows fewer where a number carries fewer.',
+  bearing: 'Strikes, dip directions, and bearings between places.',
+  coords: 'Places, stations, and UTM back to latitude and longitude.',
+  datum: 'Said with each UTM answer. WGS84 and SIRGAS 2000 differ by centimetres.',
+  zone: 'A project zone: a place outside it is still given in it, and the card says so.',
+  units: 'Distances between places, and true thicknesses.',
+  numbers: 'How the page writes numbers, and so what is copied from it. The answers are unchanged, and the files golem saves keep the point.',
+  learn: 'What did not read is kept, to offer words to teach. Off, nothing is kept.',
+  fixAge: 'A position fix older than this is not taken as here.',
+  opens: 'Asleep, golem reads and runs nothing, and the compass and the position are off.',
+};
+const FREE = {}, prefVal = v => escHtml(JSON.stringify(v));
+function prefItem(p) {
+  const v = prefOf(p.key), isOpt = p.options.some(o => o.v === v), free = p.free && p.free.hint && (!isOpt || FREE[p.key]);
+  const opts = p.options.map(o => `<option value="${prefVal(o.v)}"${o.v === v && !FREE[p.key] ? ' selected' : ''}>${escHtml(t(o.label))}</option>`).join('')
+    + (p.free && p.free.hint ? `<option value="free"${free ? ' selected' : ''}>${escHtml(t(p.key === 'zone' ? 'always one zone…' : 'a fixed value…'))}</option>` : '');
+  return `<div class="item pref"><h3><label for="pf-${p.key}">${escHtml(t(p.label))}</label>${v !== p.def ? `<span class="tag">${t('set here')}</span>` : ''}</h3><p>${escHtml(t(PREF_ABOUT[p.key] || ''))}</p>`
+    + `<div class="opts"><select id="pf-${p.key}" data-pref="${p.key}">${opts}</select>${free ? `<input type="text" inputmode="decimal" data-pref-free="${p.key}" value="${isOpt ? '' : escHtml(String(v))}" placeholder="${escHtml(t(p.free.hint))}" aria-label="${escHtml(t(p.free.hint))}">` : ''}</div></div>`;
+}
+const pick = (id, label, cur, opts) => `<div class="item pref"><h3><label for="${id}">${t(label)}</label></h3><div class="opts"><select id="${id}">${opts.map(([v, l]) => `<option value="${v}"${v === cur ? ' selected' : ''}>${escHtml(l)}</option>`).join('')}</select></div></div>`;
+function renderSettings() {
+  const group = g => PREFS.filter(p => p.group === g).map(prefItem).join('');
+  let h = `<h1 class="vhead">${t('Settings')}</h1><div class="sub">${t('Settings that change answers are copied into each card read with them: the card says which it used, keeps it when the setting changes, and replays the same on any device. The others change only how golem behaves here.')}</div>`;
+  h += `<div class="lbl">${t('Answers')}</div>${group('answers')}`;
+  h += `<div class="lbl">${t('This device')}</div>${pick('st-theme', 'Theme', theme, [['auto', t('auto')], ['light', t('light')], ['dark', t('dark')]])}${pick('st-lang', 'Language', lang, [['en', 'English'], ['pt', 'Português']])}${group('device')}${voiceItem()}`;
+  h += `<div class="lbl">${t('This app')}</div>${appItem()}`;
+  h += `<div class="lbl">${t('Said')}</div><div class="item"><p>${t('Every setting can be said, and saying it leaves a card in the session.')}</p><div class="opts">${['use strike and dip', 'set declination to -22', 'use decimal commas', 'show my settings'].map(q => `<button class="chip" type="button" data-q="${escHtml(q)}">${escHtml(q)}</button>`).join('')}</div></div>`;
+  h += `<div class="opts">${confirmBtn('prefs', t('Back to golem\'s defaults'), t('Tap again to reset every setting'))}</div>`;
+  $('v-settings').innerHTML = h;
+}
+function afterPref(k) {
+  deviceChanged(); const p = prefByKey(k);
+  status(t('Set. {setting}: {value}.', { setting: t(p.label), value: t(prefLabel(p, prefOf(k))) }));
+  if (k === 'numbers') { renderStream(); showTab('settings'); } else renderSettings();
+}
+$('v-settings').addEventListener('change', e => {
+  const el = e.target;
+  if (el.id === 'st-theme') { setTheme(el.value); return; }
+  if (el.id === 'st-lang') { setLang(el.value); renderSettings(); return; }
+  if (el.dataset.pref) {
+    const k = el.dataset.pref; if (el.value === 'free') { FREE[k] = true; renderSettings(); const i = document.querySelector(`[data-pref-free="${k}"]`); if (i) i.focus(); return; }
+    delete FREE[k]; setPref(k, JSON.parse(el.value)); afterPref(k); return;
+  }
+  if (el.dataset.prefFree) {
+    const k = el.dataset.prefFree, p = prefByKey(k), v = p.free.parse(el.value);
+    if (v == null) { status(t('{setting}: {hint}.', { setting: t(p.label), hint: t(p.free.hint) })); return; }
+    delete FREE[k]; setPref(k, v); afterPref(k);
+  }
+});
+$('v-settings').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.q) { showTab('ask'); run(b.dataset.q); return; }
+  if (b.id === 'sw-check') { checkUpdates(); return; }
+  if (b.id === 'sw-apply') { sw.applyUpdate(); return; }
+  if (b.id === 'say-all') { voice.all = !voice.all; try { localStorage.setItem(VOICE, voice.all ? 'all' : ''); } catch (err) { /* storage is optional */ } renderSettings(); return; }
+  if (b.dataset.confirm === 'prefs' && confirmed(b)) { forgetKept('prefs'); status('Every setting is back to golem\'s default.'); renderStream(); showTab('settings'); }
+});
+
+/* ── What golem keeps: everything on this device, each with a way to forget it, a copy of it all, and erasing it all ── */
+// A button that does something hard to undo asks for a second tap within four seconds.
+let armed = null, armedT = 0;
+const confirmBtn = (id, label, again) => `<button class="btn${armed === id ? ' warn' : ''}" type="button" data-confirm="${escHtml(id)}">${escHtml(armed === id ? again : label)}</button>`;
+function confirmed(b) {
+  const id = b.dataset.confirm; if (armed === id) { armed = null; clearTimeout(armedT); return true; }
+  armed = id; clearTimeout(armedT); armedT = setTimeout(() => { armed = null; renderSettings(); renderKept(); }, 4000);
+  renderSettings(); renderKept(); return false;
+}
+let usage = null, persisted = null, restoring = null;
+async function storageInfo() {
+  try { usage = navigator.storage && navigator.storage.estimate ? await navigator.storage.estimate() : null; persisted = navigator.storage && navigator.storage.persisted ? await navigator.storage.persisted() : null; } catch (e) { usage = null; }
+  renderKept();
+}
+const size = n => n >= 1e6 ? `${(n / 1e6).toFixed(1)} MB` : n >= 1024 ? `${Math.round(n / 1024)} kB` : `${n} B`;
+const SHOW = 40;
+function renderKept() {
+  if (!$('v-kept') || $('v-kept').hidden) return;
+  if (usage === null && persisted === null) { usage = undefined; storageInfo(); }
+  const ks = kept();
+  let h = `<h1 class="vhead">${t('What golem keeps')}</h1><div class="sub">${t('All of it is on this device, and nowhere else. Forgetting something here leaves no card; a session that read it says so when it is opened, and its cards keep what they were read with.')}</div>`;
+  if (restoring) {
+    const d = restoring;
+    h += `<div class="item"><h3>${t('Restore from a file')}</h3><p>${escHtml(t('{file}: {n} sessions, saved {date}. {signed} Restoring replaces every session, everything below and the settings on this device with what the file holds.', { file: d.name, n: d.data.sessions.length, date: d.data.at ? new Date(d.data.at).toLocaleString(uiLang() === 'pt' ? 'pt-BR' : 'en-GB') : '?', signed: d.signed }))}</p><div class="opts">${confirmBtn('restore', t('Replace everything with this file'), t('Tap again to replace everything'))}<button class="btn" type="button" data-kp="cancel">${t('Cancel')}</button></div></div>`;
+  }
+  h += `<div class="lbl">${t('On this device')}</div>`;
+  h += `<div class="item"><h3>${t('Open table')}</h3><p>${S.table ? escHtml(t('{name} · {n} rows · {source}', { name: S.table.name, n: S.table.rows.length, source: t(S.table.source === 'sample' ? 'sample data' : 'from your files') })) : t('None.')}</p></div>`;
+  for (const k of ks.filter(x => x.items.length)) {
+    const list = k.items.slice(0, SHOW).map(i => `<li><span>${escHtml(i.text)}</span><button class="cact" type="button" data-forget="${k.kind}" data-key="${escHtml(JSON.stringify(i.key))}">${t('forget')}</button></li>`).join('');
+    h += `<div class="item"><h3>${escHtml(t(k.label))}${k.items.length ? `<span class="tag">${k.items.length} · ${size(k.bytes)}</span>` : ''}</h3>`
+      + (k.items.length ? `<ul class="kept-list">${list}</ul>${k.items.length > SHOW ? `<p>${t('and {n} more', { n: k.items.length - SHOW })}</p>` : ''}${k.items.length > 1 ? `<div class="opts">${confirmBtn('all:' + k.kind, t('Forget all of them'), t('Tap again to forget all {n}', { n: k.items.length }))}</div>` : ''}`
+        : '') + '</div>';
+  }
+  const none = ks.filter(x => !x.items.length);
+  if (none.length) h += `<div class="item"><h3>${t('Nothing yet')}</h3><p>${escHtml(none.map(k => t(k.label)).join(', '))}.</p></div>`;
+  h += `<div class="lbl">${t('Storage')}</div><div class="item"><p>${usage ? escHtml(t('This browser gives golem {used} of {quota}; installed packs and large files count.', { used: size(usage.usage || 0), quota: size(usage.quota || 0) })) : t('This browser does not say how much it keeps.')} ${persisted === true ? t('It keeps it even when space runs short.') : persisted === false ? t('It may clear it when space runs short, as browsers do with sites.') : ''}</p>${persisted === false ? `<div class="opts"><button class="btn" type="button" data-kp="persist">${t('Ask the browser to keep it')}</button></div>` : ''}</div>`;
+  h += keyItem();
+  h += `<div class="item"><h3>${t('A copy of everything')}</h3><p>${t('Every session, everything above, the settings and the files opened, in one signed file. Packs are not in it: install them again. The paperclip or the button below opens it again, here or on another device.')}</p><div class="opts"><button class="btn" type="button" data-kp="backup">${t('Save everything to a file')}</button><button class="btn" type="button" data-kp="restore">${t('Restore from a file…')}</button></div></div>`;
+  h += `<div class="item"><h3>${t('Erase')}</h3><p>${t('Every session, everything above, the files, the packs, the settings and the signing key, gone from this device. golem starts again as on a first visit.')}</p><div class="opts">${confirmBtn('erase', t('Erase everything on this device'), t('Tap again: this cannot be undone'))}</div></div>`;
+  $('v-kept').innerHTML = h;
+}
+// a backup file: checked, then offered; nothing is replaced until the second tap
+async function offerRestore(d, name = 'golem-device.golem.json') {
+  if (!d || d.golem !== 'device' || !Array.isArray(d.sessions)) { status('That is not a golem backup.'); return; }
+  let signed = t('It is not signed.');
+  if (d.signature) {
+    const ok = await verify(d.signature, new TextEncoder().encode(canonical(unsigned(d)))).catch(() => false), fp = await fingerprint(d.signature.pub).catch(() => '?');
+    signed = ok ? t('Signed by key {fp}, unchanged since.', { fp }) : t('Its signature does not match: it was changed after key {fp} signed it.', { fp });
+  }
+  restoring = { data: d, name, signed }; showTab('kept'); closeDrawer();
+}
+$('v-kept').addEventListener('click', async e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.forget) {
+    const n = forgetKept(b.dataset.forget, JSON.parse(b.dataset.key)); status(n ? t('Forgotten.') : t('Nothing to forget.')); renderKept(); return;
+  }
+  const c = b.dataset.confirm;
+  if (c && !confirmed(b)) return;
+  if (c && c.startsWith('all:')) { const n = forgetKept(c.slice(4)); status(t('Forgotten: {n}.', { n })); renderKept(); return; }
+  if (c === 'key') { try { keyInfo = await replaceKey(); status(t('A new key: {fp}.', { fp: keyInfo.fingerprint })); } catch (err) { status(t('The key was not replaced: {e}', { e: err.message })); } renderKept(); return; }
+  if (c === 'erase') { erasing = true; clearTimeout(saveT); status('Erasing…'); await eraseAll(); location.reload(); return; }
+  if (c === 'restore' && restoring) {
+    const ok = importDevice(unsigned(restoring.data)); restoring = null;
+    if (!ok) { status('That backup holds no sessions, so nothing was replaced.'); renderKept(); return; }
+    renderStream(); renderDrawer(); renderSettings(); renderKept(); status('Restored. Everything on this device is now what the file held.'); return;
+  }
+  const k = b.dataset.kp;
+  if (k === 'cancel') { restoring = null; renderKept(); }
+  else if (k === 'persist') { try { persisted = await navigator.storage.persist(); } catch (err) { persisted = false; } status(persisted ? 'The browser keeps golem\'s data now, even when space runs short.' : 'The browser said no. Installing golem as an app usually makes it keep it.'); renderKept(); }
+  else if (k === 'pem' && keyInfo) saveFile(`golem-key-${keyInfo.fingerprint.replace(/ /g, '')}.pem`, pemOf(keyInfo.pub), 'application/x-pem-file');
+  else if (k === 'backup') {
+    const d = { ...exportDevice(), at: new Date().toISOString() }, name = `golem-device-${new Date().toISOString().slice(0, 10)}.golem.json`;
+    let out = d; if (canSign()) { try { out = { ...d, signature: await sign(new TextEncoder().encode(canonical(d))) }; } catch (err) { status(t('Saved unsigned: {e}', { e: err.message })); } }
+    saveFile(name, JSON.stringify(out), 'application/json');
+  }
+  else if (k === 'restore') $('restore-f').click();
+});
 // the session file as saved: signed with this device's key when it can be (unsigned, and said so, when it cannot)
 async function signedSession(id) {
   const d = exportSession(id); if (!d) return null;
@@ -32375,6 +32979,7 @@ if (shell.present) { $('st-where').dataset.tEn = 'in the lead-acid shell'; $('st
   if (got && got.migrated) store.save(parts());
   // the "New session" shortcut of the installed app
   if (new URLSearchParams(location.search).has('new')) { newSession(); try { history.replaceState(null, '', location.pathname); } catch (e) { /* file:// */ } }
+  if (prefOf('opens') === 'awake' && !awake) setAwake(true, true); else if (prefOf('opens') === 'asleep' && awake) setAwake(false, true);
   renderStream(); renderDrawer(); renderPacks();
   $('status').textContent = store.kind === 'none' ? t('This browser keeps nothing for golem: sessions last until the page closes.') : '';
   ready = true; document.documentElement.dataset.ready = '1';   // tests wait for this

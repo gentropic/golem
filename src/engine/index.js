@@ -21,6 +21,9 @@ export { numberAsk, listAsk, listOf, firstNeed } from './forms.js';
 export { readLog, logTable } from './log.js';
 export { placeOf, vincenty, toUTM, fromUTM, utmZone } from './places.js';
 export { solar } from './sky.js';
+export { PREFS, prefOf, prefByKey, prefLabel, setPref, stamp } from './prefs.js';
+export { kept, forgetKept } from './keep.js';
+export { exportDevice, importDevice, deviceChanged } from './sessions.js';
 
 // the words of a result, in reading order: what a person would see on the card
 export function textOf(c) {

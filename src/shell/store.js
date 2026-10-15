@@ -33,6 +33,14 @@ export const putBlob = (key, blob) => typeof indexedDB === 'undefined' ? Promise
 export const getBlob = key => typeof indexedDB === 'undefined' ? Promise.resolve(null) : tx('readonly', s => s.get(key)).catch(() => null);
 export const dropBlob = key => typeof indexedDB === 'undefined' ? Promise.resolve() : tx('readwrite', s => s.delete(key)).catch(() => {});
 
+// Everything golem keeps in this browser, gone: its databases (the sessions and device state, the large files, the signing
+// key) and its keys in localStorage. A database still open is deleted as the page reloads, before anything opens it again.
+export function eraseAll() {
+  try { for (let i = localStorage.length - 1; i >= 0; i--) { const k = localStorage.key(i); if (k && k.startsWith('golem.')) localStorage.removeItem(k); } } catch (e) { /* storage off */ }
+  if (typeof indexedDB === 'undefined') return Promise.resolve();
+  return Promise.all(['golem', BLOBS, 'golem-sign'].map(n => new Promise(done => { const r = indexedDB.deleteDatabase(n); r.onsuccess = r.onerror = r.onblocked = () => done(); })));
+}
+
 export async function openStore() {
   let vfs = null;
   try { if (typeof indexedDB !== 'undefined') vfs = await VFS.create({ type: 'idb', name: 'golem' }); } catch (e) { vfs = null; }

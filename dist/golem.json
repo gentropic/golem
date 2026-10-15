@@ -1433,6 +1433,274 @@
       ]
     },
     {
+      "type": "setting",
+      "words": {
+        "plane": [
+          "planes",
+          "plane notation",
+          "plane convention",
+          "plane format"
+        ],
+        "decl": [
+          "declination",
+          "magnetic declination",
+          "declination correction"
+        ],
+        "sig": [
+          "significant figures",
+          "sig figs",
+          "precision"
+        ],
+        "bearing": [
+          "bearings",
+          "bearing notation",
+          "bearing format"
+        ],
+        "coords": [
+          "coordinates",
+          "coordinate format",
+          "latitude and longitude"
+        ],
+        "datum": [
+          "datum",
+          "utm datum"
+        ],
+        "zone": [
+          "utm zone",
+          "zone"
+        ],
+        "units": [
+          "units",
+          "unit system",
+          "distance units"
+        ],
+        "numbers": [
+          "numbers",
+          "decimal mark",
+          "decimal separator",
+          "number format"
+        ],
+        "learn": [
+          "learning",
+          "learning from misses"
+        ],
+        "fixAge": [
+          "oldest position fix",
+          "position fix age",
+          "fix age"
+        ],
+        "opens": [
+          "opening",
+          "how golem opens",
+          "start up"
+        ]
+      },
+      "words_pt": {
+        "plane": [
+          "planos",
+          "notação dos planos"
+        ],
+        "decl": [
+          "declinação",
+          "declinação magnética"
+        ],
+        "sig": [
+          "algarismos significativos",
+          "precisão"
+        ],
+        "bearing": [
+          "rumos",
+          "notação dos rumos"
+        ],
+        "coords": [
+          "coordenadas",
+          "formato das coordenadas"
+        ],
+        "datum": [
+          "datum"
+        ],
+        "zone": [
+          "zona utm",
+          "fuso",
+          "fuso utm"
+        ],
+        "units": [
+          "unidades",
+          "sistema de unidades"
+        ],
+        "numbers": [
+          "números",
+          "separador decimal",
+          "marca decimal"
+        ],
+        "learn": [
+          "aprendizado",
+          "aprendizagem"
+        ],
+        "fixAge": [
+          "idade da posição"
+        ],
+        "opens": [
+          "abertura"
+        ]
+      }
+    },
+    {
+      "type": "prefvalue",
+      "words": {
+        "plane:sd": [
+          "strike and dip",
+          "strike/dip",
+          "strike dip",
+          "the right hand rule",
+          "right hand rule",
+          "the right-hand rule"
+        ],
+        "plane:dd": [
+          "dip direction and dip",
+          "dip direction/dip",
+          "dip direction",
+          "dip directions"
+        ],
+        "bearing:quadrant": [
+          "quadrant bearings",
+          "quadrants",
+          "quadrant notation"
+        ],
+        "bearing:azimuth": [
+          "azimuths",
+          "azimuth bearings",
+          "whole circle bearings"
+        ],
+        "coords:dms": [
+          "degrees minutes and seconds",
+          "degrees minutes seconds",
+          "dms"
+        ],
+        "coords:dd": [
+          "decimal degrees"
+        ],
+        "datum:SIRGAS 2000": [
+          "sirgas 2000",
+          "sirgas"
+        ],
+        "datum:WGS84": [
+          "wgs84",
+          "wgs 84"
+        ],
+        "units:metric": [
+          "metric units",
+          "metric",
+          "metres",
+          "meters"
+        ],
+        "units:imperial": [
+          "imperial units",
+          "imperial",
+          "feet and miles",
+          "feet"
+        ],
+        "numbers:comma": [
+          "decimal commas",
+          "a decimal comma",
+          "decimal comma"
+        ],
+        "numbers:point": [
+          "decimal points",
+          "a decimal point",
+          "decimal point"
+        ],
+        "decl:none": [
+          "magnetic north",
+          "no declination"
+        ],
+        "decl:wmm": [
+          "true north",
+          "the world magnetic model"
+        ]
+      },
+      "words_pt": {
+        "plane:sd": [
+          "direção e mergulho",
+          "strike e dip",
+          "regra da mão direita"
+        ],
+        "plane:dd": [
+          "sentido de mergulho",
+          "direção de mergulho",
+          "direção do mergulho"
+        ],
+        "bearing:quadrant": [
+          "quadrantes",
+          "rumos em quadrante"
+        ],
+        "bearing:azimuth": [
+          "azimutes"
+        ],
+        "coords:dms": [
+          "graus minutos e segundos",
+          "gms"
+        ],
+        "coords:dd": [
+          "graus decimais"
+        ],
+        "datum:SIRGAS 2000": [
+          "sirgas 2000",
+          "sirgas"
+        ],
+        "datum:WGS84": [
+          "wgs84",
+          "wgs 84"
+        ],
+        "units:metric": [
+          "unidades métricas",
+          "sistema métrico",
+          "metros"
+        ],
+        "units:imperial": [
+          "unidades imperiais",
+          "pés e milhas",
+          "pés"
+        ],
+        "numbers:comma": [
+          "vírgula decimal",
+          "vírgulas decimais"
+        ],
+        "numbers:point": [
+          "ponto decimal",
+          "pontos decimais"
+        ],
+        "decl:none": [
+          "norte magnético",
+          "sem declinação"
+        ],
+        "decl:wmm": [
+          "norte verdadeiro",
+          "o modelo magnético mundial"
+        ]
+      }
+    },
+    {
+      "type": "settingsnoun",
+      "words": {
+        "all": [
+          "settings",
+          "my settings",
+          "the settings",
+          "preferences",
+          "my preferences"
+        ]
+      },
+      "words_pt": {
+        "all": [
+          "configurações",
+          "minhas configurações",
+          "as configurações",
+          "preferências"
+        ]
+      }
+    },
+    {
       "type": "missnoun",
       "words": {
         "misses": [
@@ -9727,6 +9995,113 @@
         "passo a passo"
       ],
       "label_pt": "Rastrear"
+    },
+    {
+      "name": "prefSet",
+      "label": "Set",
+      "words": [
+        "set",
+        "change",
+        "make"
+      ],
+      "theme": [
+        "setting"
+      ],
+      "required": [
+        "theme",
+        "to"
+      ],
+      "roles": {
+        "to": {
+          "preps": [
+            "to",
+            "as"
+          ],
+          "types": [
+            "text"
+          ]
+        }
+      },
+      "words_pt": [
+        "muda",
+        "mude",
+        "ajusta",
+        "ajuste",
+        "põe",
+        "coloca"
+      ],
+      "label_pt": "Ajustar"
+    },
+    {
+      "name": "prefUse",
+      "label": "Use",
+      "words": [
+        "use",
+        "switch to",
+        "write",
+        "write in",
+        "prefer"
+      ],
+      "theme": [
+        "prefvalue"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {},
+      "words_pt": [
+        "usa",
+        "use",
+        "muda para",
+        "escreve em",
+        "prefiro"
+      ],
+      "label_pt": "Usar"
+    },
+    {
+      "name": "prefs",
+      "label": "Settings",
+      "words": [
+        "show",
+        "list",
+        "what are"
+      ],
+      "elidable": true,
+      "theme": [
+        "settingsnoun"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {},
+      "words_pt": [
+        "mostra",
+        "lista",
+        "quais são"
+      ],
+      "label_pt": "Configurações"
+    },
+    {
+      "name": "prefsReset",
+      "label": "Reset settings",
+      "words": [
+        "reset",
+        "restore",
+        "clear"
+      ],
+      "theme": [
+        "settingsnoun"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {},
+      "words_pt": [
+        "restaura",
+        "redefine",
+        "zera"
+      ],
+      "label_pt": "Restaurar configurações"
     },
     {
       "name": "abilities",

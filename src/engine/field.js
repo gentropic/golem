@@ -32,7 +32,7 @@ tool({
   run: a => {
     const k = KIND[a.what] || KIND.plane, name = a.name || k.label;
     const read = ['measure', { v: name }, 'with the phone'];
-    const capture = { kind: a.what === 'line' ? 'line' : 'plane', set: (args, v) => { args.reading = { alpha: +v.alpha, beta: +v.beta, gamma: +v.gamma, acc: v.acc == null ? null : +v.acc, spread: v.spread == null ? null : +v.spread, at: +v.at || 0, ...(v.via === 'browser' ? { via: 'browser' } : {}) }; const d = declAt(args.reading.at); if (d) args.north = d; else delete args.north; } };
+    const capture = { kind: a.what === 'line' ? 'line' : 'plane', set: (args, v) => { args.reading = { alpha: +v.alpha, beta: +v.beta, gamma: +v.gamma, acc: v.acc == null ? null : +v.acc, spread: v.spread == null ? null : +v.spread, at: +v.at || 0, ...(v.via === 'browser' ? { via: 'browser' } : {}) }; const d = args.decl === 'none' ? null : typeof args.decl === 'number' ? { decl: args.decl, fixed: true } : declAt(args.reading.at); if (d) args.north = d; else delete args.north; } };
     if (!a.reading) return {
       read, capture,
       body: [{ t: 'capture', kind: capture.kind, how: a.what === 'line' ? 'Lay the phone\'s long edge along the line and hold it still.' : 'Lay the phone\'s back flat on the plane, screen up, and hold it still.' },
@@ -41,18 +41,18 @@ tool({
     };
     const r = a.reading, [n1, m2] = fromDevice(a.what, r.alpha, r.beta, r.gamma), m1 = ((n1 % 360) + 360) % 360, corr = a.north ? a.north.decl : 0, t1 = ((m1 + corr) % 360 + 360) % 360;
     const when = r.at ? new Date(r.at) : null;
-    const rows = [['north', a.north ? `true: corrected by ${fmt(Math.abs(corr), 3)}° ${corr < 0 ? 'west' : 'east'} (WMM at home, ${fmt(a.north.lat, 5)}, ${fmt(a.north.lon, 5)})` : 'magnetic, as the phone measured it. Save a home ("home is -19.92, -43.94") and golem corrects to true'],
+    const rows = [['north', a.north ? `true: corrected by ${fmt(Math.abs(corr), 3)}° ${corr < 0 ? 'west' : 'east'} (${a.north.fixed ? 'a fixed declination, from the settings' : `WMM at home, ${fmt(a.north.lat, 5)}, ${fmt(a.north.lon, 5)}`})` : a.decl === 'none' ? 'magnetic, as the phone measured it (the settings say not to correct)' : 'magnetic, as the phone measured it. Save a home ("home is -19.92, -43.94") and golem corrects to true'],
       ...(a.north ? [['as measured', `${ori(m1, m2)} magnetic`]] : []),
       ['compass accuracy', ACC[r.acc] || (r.via === 'browser' ? 'not reported: the browser does not say' : 'not reported')], ...(r.spread != null ? [['steadiness', `±${fmt(r.spread, 2)}° over the last second`]] : []),
       ...(when ? [['taken', `${fmtDate(when)}, ${String(when.getHours()).padStart(2, '0')}:${String(when.getMinutes()).padStart(2, '0')}`]] : [])];
     const net = a.what === 'line' ? { t: 'net', planes: [], lines: [{ tr: t1, pl: m2, label: name }] } : { t: 'net', planes: [{ dd: t1, dip: m2 }], lines: [] };
     return {
       read: ['measured', { v: name }, 'with the phone'], value: [t1, m2],
-      body: [{ t: 'big', v: ori(t1, m2), unit: `${k.unit}${a.north ? ' (true)' : ' (magnetic)'}` }, net, { t: 'kv', rows },
+      body: [{ t: 'big', v: a.what !== 'line' && a.conv === 'sd' ? ori(t1 - 90 + 360, m2) : ori(t1, m2), unit: `${a.what !== 'line' && a.conv === 'sd' ? 'strike/dip (right-hand)' : k.unit}${a.north ? ' (true)' : ' (magnetic)'}` }, net, { t: 'kv', rows },
         ...(r.acc != null && r.acc < 2 ? [{ t: 'note', kind: 'err', text: 'The phone reported its compass as low or unreliable when this was taken: move it in a figure of eight, away from steel, and measure again.' }] : []),
         { t: 'src', text: `@gcu/bearing · vendored · the device orientation matrix, ${a.what === 'line' ? 'its long edge' : 'its screen normal'} to the lower hemisphere · ${r.via === 'browser' ? 'the browser\'s deviceorientation, north-referenced' : 'the phone\'s fused rotation vector'}` }],
-      trace: [`device orientation α ${fmt(r.alpha, 5)}°, β ${fmt(r.beta, 5)}°, γ ${fmt(r.gamma, 5)}° (accuracy ${r.acc})`, `bearing: device ${a.what === 'line' ? 'y axis' : 'z axis'} in east, north, up → ${ori(m1, m2)} magnetic`, a.north ? `+ declination ${fmt(corr, 5)}° (WMM at home) → ${ori(t1, m2)} true` : 'north: magnetic (no home saved)'],
-      py: `bearing.from_device("${a.what === 'line' ? 'line' : 'plane'}", ${fmt(r.alpha, 6)}, ${fmt(r.beta, 6)}, ${fmt(r.gamma, 6)})${a.north ? ` + ${fmt(corr, 6)}  # declination` : ''}`
+      trace: [`device orientation α ${fmt(r.alpha, 5)}°, β ${fmt(r.beta, 5)}°, γ ${fmt(r.gamma, 5)}° (accuracy ${r.acc})`, `bearing: device ${a.what === 'line' ? 'y axis' : 'z axis'} in east, north, up → ${ori(m1, m2)} magnetic`, a.north ? `+ declination ${fmt(corr, 5)}° (${a.north.fixed ? 'fixed, from the settings' : 'WMM at home'}) → ${ori(t1, m2)} true` : 'north: magnetic (no home saved)'],
+      py: `bearing.from_device("${a.what === 'line' ? 'line' : 'plane'}", ${+r.alpha.toPrecision(6)}, ${+r.beta.toPrecision(6)}, ${+r.gamma.toPrecision(6)})${a.north ? ` + ${+corr.toPrecision(6)}  # declination` : ''}`
     };
   }
 });

@@ -1,13 +1,15 @@
 // Places, distance and UTM. A place is coordinates in the request or a name saved on this device
 // ("home is -19.92, -43.94"); there is no gazetteer and device location is off, so an unknown name is
 // a question, not a guess. Distance is Vincenty's inverse on WGS84; UTM is the Krüger series.
-import { S, tool, frame, amend, noun, shape, postmod, fmt, rad, deg } from './core.js';
+import { S, tool, frame, amend, noun, shape, postmod, fmt, rad, deg, latlon, azi, STYLE } from './core.js';
 
 const WGS84 = { a: 6378137, f: 1 / 298.257223563 };
 WGS84.b = WGS84.a * (1 - WGS84.f); WGS84.e2 = WGS84.f * (2 - WGS84.f); WGS84.e = Math.sqrt(WGS84.e2);
 export const placesTable = () => S.tables.places || (S.tables.places = { name: 'places', cols: [{ name: 'name', type: 'category' }, { name: 'lat', type: 'numeric' }, { name: 'lon', type: 'numeric' }], rows: [] });
 const COORD = '(-?\\d{1,2}(?:\\.\\d+)?)\\s*,\\s*(-?\\d{1,3}(?:\\.\\d+)?)';
-const fmtLL = (lat, lon) => `${fmt(Math.abs(lat), 6)}° ${lat < 0 ? 'S' : 'N'}, ${fmt(Math.abs(lon), 6)}° ${lon < 0 ? 'W' : 'E'}`;
+const fmtLL = (lat, lon) => latlon(lat, lon);
+// a bearing between places: to a tenth of a degree, or as a quadrant bearing when the card's style says so
+const brg = x => STYLE.bearing === 'quadrant' ? azi(x) : `${fmt(x, 4)}°`;
 // a place from text: coordinates, or a saved name → { lat, lon, name } | { unknown } | null
 export function placeOf(s) {
   if (!s) return null; s = s.trim().replace(/^(?:at|in|from|to)\s+/, '');
@@ -65,8 +67,8 @@ tool({
     for (const [p, key, name] of [[A, 'fromLL', a.from], [B, 'toLL', a.to]]) if (!p || p.unknown) return { read, body: [], ask: whereAsk(name, key), trace: [`place "${name}": unknown`] };
     const r = vincenty(A.lat, A.lon, B.lat, B.lon);
     if (!r) return { read, body: [{ t: 'note', kind: 'err', text: 'The two points are nearly antipodal and Vincenty\'s formula does not converge there. Karney\'s method would; it is not in golem yet.' }], trace: ['vincenty: no convergence'] };
-    const km = r.s / 1000;
-    return { read, value: r.s, body: [{ t: 'big', v: km >= 100 ? fmt(km, 5) : fmt(km, 4), unit: 'km over the ellipsoid, not by road' }, { t: 'kv', rows: [['from', `${a.from === (A.name || '') ? A.name + ', ' : ''}${fmtLL(A.lat, A.lon)}`], ['to', `${B.name ? B.name + ', ' : ''}${fmtLL(B.lat, B.lon)}`], ['metres', fmt(r.s, 9), { mono: true }], ['initial bearing', `${fmt(r.a1, 4)}° true`], ['final bearing', `${fmt(r.a2, 4)}° true`]] }, { t: 'src', text: 'Vincenty (1975) inverse on WGS84 · converges to a millimetre except near antipodes' }], trace: [`vincenty(${A.lat}, ${A.lon}, ${B.lat}, ${B.lon}) → ${fmt(r.s, 9)} m in ${r.it} iterations`], py: `geodesic.inverse((${A.lat}, ${A.lon}), (${B.lat}, ${B.lon}))` };
+    const km = r.s / 1000, mi = km / 1.609344, imp = a.units === 'imperial';
+    return { read, value: r.s, body: [{ t: 'big', v: imp ? (mi >= 100 ? fmt(mi, 5) : fmt(mi, 4)) : km >= 100 ? fmt(km, 5) : fmt(km, 4), unit: `${imp ? 'miles' : 'km'} over the ellipsoid, not by road` }, { t: 'kv', rows: [...(imp ? [['kilometres', fmt(km, 6)]] : []),['from', `${a.from === (A.name || '') ? A.name + ', ' : ''}${fmtLL(A.lat, A.lon)}`], ['to', `${B.name ? B.name + ', ' : ''}${fmtLL(B.lat, B.lon)}`], ['metres', fmt(r.s, 9), { mono: true }], ['initial bearing', `${brg(r.a1)} true`], ['final bearing', `${brg(r.a2)} true`]] }, { t: 'src', text: 'Vincenty (1975) inverse on WGS84 · converges to a millimetre except near antipodes' }], trace: [`vincenty(${A.lat}, ${A.lon}, ${B.lat}, ${B.lon}) → ${fmt(r.s, 9)} m in ${r.it} iterations`], py: `geodesic.inverse((${A.lat}, ${A.lon}), (${B.lat}, ${B.lon}))` };
   }
 });
 

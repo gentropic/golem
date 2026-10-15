@@ -8,6 +8,8 @@ const listeners = [];
 // the shell registers here to persist and redraw after any change to the session store
 export const onChange = fn => { listeners.push(fn); };
 const changed = () => { bump(); listeners.forEach(f => f()); };
+// device state changed outside a card (forgotten from the Settings view, a setting set there): persist it
+export const deviceChanged = () => changed();
 
 // what a session keeps of a card: enough to recompute it, and nothing else
 // uses: what device state the card read through (a taught word's meaning, a taught formula), for tms.js
@@ -31,12 +33,17 @@ export function autoName(cards) {
 // the current session changed: refresh its automatic name and tell the shell
 export function touch() { cur.updated = Date.now(); if (cur.auto) cur.name = autoName(S.cards); changed(); }
 
-// open a session: clear the working state and recompute every card from its spec
-export function load(s) {
+// open a session: clear the working state and recompute every card from its spec. The device state is kept as it is:
+// a card that wrote to it (taught a word, saved a place) is recomputed but writes nothing again, so what was forgotten
+// since stays forgotten. A session brought from another device (importSession) does write: that device learns it.
+const DEVICE = ['aliases', 'facts', 'tables', 'recipes', 'misses', 'picks', 'formulas', 'orders', 'strata', 'prefs'];
+export function load(s, write = false) {
   cur = s; const specs = s.cards;
   S.cards = []; s.cards = S.cards; S.table = null; S.n = 0; S.clause = null;
   specs.forEach(c => {
+    const d = !write && toolByName(c.tool), keep = d && (d.effects || []).includes('device') ? JSON.stringify(DEVICE.map(k => S[k])) : null;
     let res = null; try { res = runTool(c.tool, c.args); } catch (e) { res = null; }
+    if (keep) JSON.parse(keep).forEach((v, i) => { S[DEVICE[i]] = v; });
     if (!res) return;
     const card = { ...spec(c), res }; S.cards.push(card); S.n = Math.max(S.n, card.id);
   });
@@ -47,7 +54,7 @@ export function load(s) {
 export function openSession(id) { const s = SS.find(x => x.id === id); if (!s) return null; load(s); changed(); return s; }
 export function newSession(example) {
   const s = { id: ++sid, name: 'New session', auto: true, example: !!example, created: Date.now(), updated: Date.now(), cards: [] };
-  SS.push(s); load(s); changed(); return s;
+  SS.push(s); load(s, true); changed(); return s;
 }
 // an empty name hands the session back to automatic naming
 export function renameSession(id, name) {
@@ -81,12 +88,12 @@ export const current = () => cur;
 export function serialize() {
   // files under a megabyte travel with the device state; larger ones stay in memory and say so on replay
   const files = Object.fromEntries(Object.entries(S.files).filter(([, f]) => f.text.length <= 1e6));
-  return { cur: cur && cur.id, sid, aliases: S.aliases, facts: S.facts, files, tables: S.tables, recipes: S.recipes, misses: S.misses, picks: S.picks, formulas: S.formulas, orders: S.orders, strata: S.strata, ss: SS.map(s => ({ ...s, cards: s.cards.map(spec) })) };
+  return { cur: cur && cur.id, sid, aliases: S.aliases, facts: S.facts, files, tables: S.tables, recipes: S.recipes, misses: S.misses, picks: S.picks, formulas: S.formulas, orders: S.orders, strata: S.strata, prefs: S.prefs, ss: SS.map(s => ({ ...s, cards: s.cards.map(spec) })) };
 }
 // the same state in parts, for a store that keeps each session and each file on its own (the shell's @gcu/vfs), with no
 // size cap on files; hydrate() takes the parts put back together ({ cur, sid, ...device, files, ss })
 export function parts() {
-  return { meta: { v: 1, cur: cur && cur.id, sid }, device: { aliases: S.aliases, facts: S.facts, tables: S.tables, recipes: S.recipes, misses: S.misses, picks: S.picks, formulas: S.formulas, orders: S.orders, strata: S.strata },
+  return { meta: { v: 1, cur: cur && cur.id, sid }, device: { aliases: S.aliases, facts: S.facts, tables: S.tables, recipes: S.recipes, misses: S.misses, picks: S.picks, formulas: S.formulas, orders: S.orders, strata: S.strata, prefs: S.prefs },
     sessions: SS.map(s => ({ ...s, cards: s.cards.map(spec) })), files: S.files };
 }
 // A session as a file of its own ("<name>.golem.json"): its card specs and the files they read, so it replays on another
@@ -102,14 +109,21 @@ export function importSession(d) {
   if (!d || d.golem !== 'session' || !d.session || !Array.isArray(d.session.cards)) return null;
   for (const [h, f] of Object.entries(d.files || {})) if (!S.files[h] && f && f.hash === h) S.files[h] = f;
   const s = { ...d.session, id: ++sid, example: false, updated: Date.now() };
-  SS.push(s); load(s); changed(); return s;
+  SS.push(s); load(s, true); changed(); return s;
+}
+// Everything on this device as one file: every session, the device state (with the settings) and every file opened.
+// The packs are not in it: they come from the library or a .gcudat again. Restoring replaces all of it.
+export function exportDevice() { const p = parts(); return { golem: 'device', v: 1, meta: p.meta, device: p.device, sessions: p.sessions, files: p.files }; }
+export function importDevice(d) {
+  if (!d || d.golem !== 'device' || !Array.isArray(d.sessions) || !d.sessions.length || !d.device) return false;
+  reset(); hydrate({ cur: d.meta && d.meta.cur, sid: d.meta && d.meta.sid, ...d.device, files: d.files || {}, ss: d.sessions }); changed(); return true;
 }
 export function hydrate(d) {
   if (!d || !Array.isArray(d.ss) || !d.ss.length) return false;
-  SS = d.ss; sid = d.sid || Math.max(...SS.map(s => s.id)); S.aliases = d.aliases || {}; S.facts = d.facts || []; S.files = d.files || {}; S.tables = d.tables || {}; S.recipes = d.recipes || {}; S.misses = d.misses || []; S.picks = d.picks || {}; S.formulas = d.formulas || {}; S.orders = d.orders || []; S.strata = d.strata || [];
+  SS = d.ss; sid = d.sid || Math.max(...SS.map(s => s.id)); S.aliases = d.aliases || {}; S.facts = d.facts || []; S.files = d.files || {}; S.tables = d.tables || {}; S.recipes = d.recipes || {}; S.misses = d.misses || []; S.picks = d.picks || {}; S.formulas = d.formulas || {}; S.orders = d.orders || []; S.strata = d.strata || []; S.prefs = d.prefs || {};
   load(SS.find(s => s.id === d.cur) || SS[0]); return true;
 }
 // forget everything: sessions, device state, working state (tests start here)
 export function reset() {
-  bump(); SS = []; cur = null; sid = 0; S.cards = []; S.n = 0; S.aliases = {}; S.facts = []; S.files = {}; S.tables = {}; S.recipes = {}; S.misses = []; S.picks = {}; S.formulas = {}; S.orders = []; S.strata = []; S.table = null; S.clause = null; clearResults();
+  bump(); SS = []; cur = null; sid = 0; S.cards = []; S.n = 0; S.aliases = {}; S.facts = []; S.files = {}; S.tables = {}; S.recipes = {}; S.misses = []; S.picks = {}; S.formulas = {}; S.orders = []; S.strata = []; S.prefs = {}; S.table = null; S.clause = null; clearResults();
 }

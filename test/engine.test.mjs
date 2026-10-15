@@ -31,6 +31,7 @@ export const STEPS = [
   ['pop of mongolia', 'no reading', 'pop means population'],
   ['pop means population', 'grammar', 'Learned'],
   ['pop of mongolia', 'taught', '3,300,000'],
+  ['show my settings', 'grammar', 'Plane notation'],
   ['histogram of cu', 'grammar', 'No table is open'],
   ['yes', 'grammar', 'median'],
   ['histogram of au', 'grammar', 'median'],
@@ -59,7 +60,7 @@ test('a session replays from its specs through serialize and hydrate', () => {
   assert.ok(saved.ss[1].cards.every(c => !('res' in c)), 'results are not stored');
   g.reset();
   assert.ok(g.hydrate(saved));
-  assert.equal(g.S.cards.length, 7);
+  assert.equal(g.S.cards.length, 8);
   assert.equal(g.S.aliases.pop, 'population');
   assert.equal(g.current().name, 'assays.csv: Au histogram, Cu histogram');
   assert.ok(g.textOf(g.S.cards[4]).includes('median'));
@@ -117,9 +118,9 @@ test('the clock can be pinned, and dates follow it', () => {
 
 test('declarations drive the catalog, the names and the amendments', () => {
   const rows = g.skills();
-  assert.equal(rows.length, 62);
+  assert.equal(rows.length, 63);
   assert.deepEqual([...new Set(rows.map(r => r.group))], ['Compute', 'Field', 'Table', 'Knowledge', 'Device', 'Session']);
-  assert.equal(rows.filter(r => r.live).length, 56);
+  assert.equal(rows.filter(r => r.live).length, 57);
   for (const name of Object.keys(g.T)) assert.ok(g.toolByName(name), `a declaration for ${name}`);
   assert.deepEqual(g.tagOf({ tool: 'hist', args: { col: 'au' } }), ['Au histogram', 3]);
   assert.ok(g.FRAMES.some(f => f.amends && f.amends.includes('extract')) && g.FRAMES.some(f => f.amends && f.amends.includes('*')), 'amendments are frames, scoped to their tools');

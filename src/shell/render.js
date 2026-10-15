@@ -2,7 +2,8 @@
 import { fmt } from '../engine/core.js';
 import { conversions, equalArea } from '../vendor/bearing.js';
 import { Figure } from '../vendor/plot.js';
-import { t, th, tx } from './i18n.js';
+import { t, th, tx, uiLang } from './i18n.js';
+import { prefOf } from '../engine/prefs.js';
 import { stationNow } from '../engine/notebook.js';
 import { staleOf, staleText } from '../engine/tms.js';
 
@@ -81,16 +82,27 @@ function svgCurve(b) {
   return s + '</svg>';
 }
 
+/* ── numbers, with the decimal mark of the settings (the language's by default: a comma in Portuguese) ── */
+// Only how the page writes them (and so what is copied from it): the answer is unchanged, and the files golem saves keep the point. A number is one
+// with a decimal point or grouping commas, standing alone (not a version such as 0.2.4, not inside a word); two of them
+// separated by a comma (a latitude and longitude) are separated by a semicolon instead.
+const NUM = /(?<![\w.,])-?(?:\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+\.\d+)(?:e[+-]?\d+)?(?![\w]|[.,]\d)/g;
+export const commaMark = () => { const m = prefOf('numbers'); return m === 'comma' || (m === 'auto' && uiLang() === 'pt'); };
+export function marks(s) {
+  if (s == null || !commaMark()) return s;
+  return String(s).replace(/(\d\.\d+), (?=-?\d+\.\d)/g, '$1; ').replace(NUM, n => n.replace(/[.,]/g, c => (c === '.' ? ',' : '.')));
+}
+
 /* ── blocks ── */
 function blockHtml(b) {
   switch (b.t) {
-    case 'big': return `<div class="big"${b.size ? ` style="font-size:${b.size}px"` : ''}${b.end ? ` data-end="${b.end}"` : ''}>${escHtml(b.v)}${b.unit ? ` <small>${escHtml(t(b.unit))}</small>` : ''}</div>`;
-    case 'sub': return `<div class="sub">${escHtml(tx(b))}</div>`;
-    case 'note': return `<div class="note${b.kind ? ' ' + b.kind : ''}">${escHtml(tx(b))}</div>`;
+    case 'big': return `<div class="big"${b.size ? ` style="font-size:${b.size}px"` : ''}${b.end ? ` data-end="${b.end}"` : ''}>${escHtml(marks(b.v))}${b.unit ? ` <small>${escHtml(t(b.unit))}</small>` : ''}</div>`;
+    case 'sub': return `<div class="sub">${escHtml(marks(tx(b)))}</div>`;
+    case 'note': return `<div class="note${b.kind ? ' ' + b.kind : ''}">${escHtml(marks(tx(b)))}</div>`;
     case 'src': return `<div class="src">${escHtml(b.text)}</div>`;
     case 'lbl': return `<div class="lbl">${escHtml(tx(b))}</div>`;
-    case 'kv': return `<dl class="kv">${b.rows.map(([k, v, o]) => `<dt>${escHtml(t(k))}</dt><dd>${o && o.mono ? `<code>${escHtml(v)}</code>` : escHtml(t(String(v)))}</dd>`).join('')}</dl>`;
-    case 'table': return `<div class="tbl"><table><tr>${b.head.map((h, i) => `<th${b.num && b.num[i] ? ' class="n"' : ''}>${escHtml(th(h))}</th>`).join('')}</tr>${b.rows.map(r => `<tr>${r.map((v, i) => `<td${b.num && b.num[i] ? ' class="n"' : ''}>${escHtml(b.tr && b.tr.includes(i) && typeof v === 'string' ? t(v) : v)}</td>`).join('')}</tr>`).join('')}</table></div>`;
+    case 'kv': return `<dl class="kv">${b.rows.map(([k, v, o]) => `<dt>${escHtml(t(k))}</dt><dd>${o && o.mono ? `<code>${escHtml(marks(v))}</code>` : escHtml(marks(t(String(v))))}</dd>`).join('')}</dl>`;
+    case 'table': return `<div class="tbl"><table><tr>${b.head.map((h, i) => `<th${b.num && b.num[i] ? ' class="n"' : ''}>${escHtml(th(h))}</th>`).join('')}</tr>${b.rows.map(r => `<tr>${r.map((v, i) => `<td${b.num && b.num[i] ? ' class="n"' : ''}>${escHtml(b.tr && b.tr.includes(i) && typeof v === 'string' ? t(v) : b.num && b.num[i] ? marks(v) : v)}</td>`).join('')}</tr>`).join('')}</table></div>`;
     case 'list': return `<ul class="plain">${b.items.map(i => `<li>${escHtml(i)}</li>`).join('')}</ul>`;
     case 'steps': return `<ol class="steps">${b.items.map(i => `<li>${escHtml(i)}</li>`).join('')}</ol>`;
     case 'pre': return `<pre>${escHtml(b.text)}</pre>`;

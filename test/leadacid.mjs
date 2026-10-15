@@ -52,7 +52,7 @@ const last = page.locator('#stream .card').last();
 await last.locator('[data-act="say"]').click(); await page.waitForTimeout(200);
 const spoken = await page.evaluate(() => window.__bench.spoken.slice(-1)[0] || null);
 check(spoken && /1\.24274/.test(spoken.text) && !/@gcu/.test(spoken.text), `say reads the answer aloud, without its sources (${spoken && spoken.text})`);
-await page.evaluate(() => document.querySelector('[data-tab="packs"]').click()); await page.waitForTimeout(150);
+await page.evaluate(() => document.querySelector('[data-tab="settings"]').click()); await page.waitForTimeout(150);
 await page.click('#say-all'); await page.evaluate(() => document.querySelector('[data-tab="ask"]').click());
 const n0 = await page.evaluate(() => window.__bench.spoken.length);
 await page.fill('#q', '25 c in f'); await page.press('#q', 'Enter'); await page.waitForTimeout(300);
@@ -85,7 +85,9 @@ check(/declination at -23\.52, -46\.19 here, ±5 m/.test(await hereCard.textCont
 // the app has no network permission: no service worker, no library buttons, packs through the paperclip
 await page.evaluate(() => document.querySelector('[data-tab="packs"]').click()); await page.waitForTimeout(200);
 const drawer = await page.textContent('#v-packs');
-check(/Installed as an Android app/.test(drawer) && !/Install from the library|Check for updates/.test(drawer) && /open it with the paperclip/.test(drawer), 'in the app the drawer offers the paperclip, not the library or updates');
+await page.evaluate(() => document.querySelector('[data-tab="settings"]').click()); await page.waitForTimeout(200);
+const settings = await page.textContent('#v-settings');
+check(/Installed as an Android app/.test(settings) && !/Check for updates/.test(settings) && !/Install from the library/.test(drawer) && /open it with the paperclip/.test(drawer), 'in the app Packs offers the paperclip, not the library, and Settings no updates');
 check((await page.evaluate(() => navigator.serviceWorker.getRegistrations().then(r => r.length))) === 0, 'in the app no service worker is registered');
 errors.forEach(e => console.log('FAIL page error: ' + e));
 await browser.close(); server.close();

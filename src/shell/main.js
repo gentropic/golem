@@ -12,13 +12,15 @@ import { useMinerals, mineralsInfo } from '../engine/minerals.js';
 import { useBook, bookInfo } from '../engine/books.js';
 import { BINARY } from '../engine/formats.js';
 import { setRunner, onJobDone } from '../engine/core.js';
-import { sessions, current, newSession, openSession, renameSession, deleteSession, searchHistory, parts, hydrate, onChange, exportSession, importSession, pinCard, branchSession } from '../engine/sessions.js';
-import { openStore, putBlob, getBlob } from './store.js';
+import { sessions, current, newSession, openSession, renameSession, deleteSession, searchHistory, parts, hydrate, onChange, exportSession, importSession, pinCard, branchSession, exportDevice, importDevice, deviceChanged } from '../engine/sessions.js';
+import { PREFS, prefOf, prefByKey, prefLabel, setPref } from '../engine/prefs.js';
+import { kept, forgetKept } from '../engine/keep.js';
+import { openStore, putBlob, getBlob, eraseAll } from './store.js';
 import { skills, PACKS, STARTERS, STARTERS_PT } from '../engine/skills.js';
 import { shell } from '../vendor/leadacid.js';
 import { escHtml, pad, cardEl, drawCharts } from './render.js';
 import { registerGcuSw } from '../vendor/sw-register.js';
-import { sign, verify, fingerprint, deviceKey, canSign } from './sign.js';
+import { sign, verify, fingerprint, deviceKey, canSign, canReplaceKey, replaceKey, pemOf } from './sign.js';
 import { canonical, unsigned } from '../engine/share.js';
 import { staleOf } from '../engine/tms.js';
 import { t, plural, setUiLang, uiLang, applyStatic } from './i18n.js';
@@ -32,7 +34,8 @@ let awake = true, statusT;
 // a message in the person's language: t() on a sentence that is already translated leaves it as it is
 function status(msg) { $('status').textContent = t(msg); clearTimeout(statusT); statusT = setTimeout(() => { $('status').textContent = ''; }, 5000); }
 function showTab(t) {
-  ['ask', 'skills', 'packs', 'about'].forEach(k => { $('v-' + k).hidden = k !== t; });
+  ['ask', 'skills', 'packs', 'about', 'settings', 'kept'].forEach(k => { $('v-' + k).hidden = k !== t; });
+  if (t === 'settings') renderSettings(); if (t === 'kept') renderKept();
   document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === t));
   document.querySelectorAll('.navbtn[data-tab]').forEach(b => b.setAttribute('aria-current', b.dataset.tab === t));
 }
@@ -330,7 +333,7 @@ async function takePosition(c) {
     show(t('Waiting for a fix…'));
     await new Promise((done, fail) => {
       const stop = setTimeout(done, 15000);
-      const got = f => { if (f.lat == null || (f.t && Date.now() - f.t > 120000)) return; if (!best || (f.acc != null && f.acc < best.acc)) best = f; show(`±${Math.round(f.acc)} m…`); if (f.acc != null && f.acc <= 20) { clearTimeout(stop); done(); } };
+      const got = f => { if (f.lat == null || (f.t && Date.now() - f.t > prefOf('fixAge') * 1000)) return; if (!best || (f.acc != null && f.acc < best.acc)) best = f; show(`±${Math.round(f.acc)} m…`); if (f.acc != null && f.acc <= 20) { clearTimeout(stop); done(); } };
       if (inApp) st.on('fix', d => got(data(d)));
       else st = browserFix(got, e => { clearTimeout(stop); if (best) done(); else fail(e); });
       fixStream = { close() { clearTimeout(stop); done(); } };   // sleep ends the wait; the stream closes below
@@ -425,7 +428,7 @@ function factbookItem() {
 }
 function renderPacks() {
   const lab = { live: t('installed'), samp: t('sample'), plan: t('not wired') };
-  let h = `<h1 class="vhead">${t('Packs and this device')}</h1><div class="sub">${t('golem knows what its installed packs hold. These are the gcu-library entries plus packs worth adding.')}</div><div class="lbl">${t('Library')}</div>`;
+  let h = `<h1 class="vhead">${t('Packs')}</h1><div class="sub">${t('golem knows what its installed packs hold. These are the gcu-library entries plus packs worth adding.')}</div><div class="lbl">${t('Library')}</div>`;
   const fbi = factbookInfo();
   PACKS.forEach(([id, name, meta, st, d]) => {
     if (id === 'factbook') st = fbi.kind === 'sample' ? 'samp' : 'live';
@@ -433,15 +436,10 @@ function renderPacks() {
     if (BOOKS[id]) st = infoOf(id).kind === 'pack' ? 'live' : 'samp';
     h += `<div class="item"><h3>${escHtml(name)} <span class="tag ${st}">${lab[st]}</span></h3><p>${escHtml(d)}</p>${id === 'factbook' ? factbookItem() : BOOKS[id] ? bookItem(id) : ''}<div class="from">${escHtml(id)} · ${escHtml(meta)}</div></div>`;
   });
-  const al = Object.entries(S.aliases);
-  h += `<div class="lbl">${t('On this device')}</div><div class="item"><h3>${t('Taught words')}</h3><p>${al.length ? al.map(([k, v]) => `${escHtml(k)} → ${escHtml(v)}`).join('<br>') : t('None yet. Try “pop means population”.')}</p></div><div class="item"><h3>${t('Notes')}</h3><p>${S.facts.length ? S.facts.map(escHtml).join('<br>') : t('None yet. Try “remember that …”.')}</p></div><div class="item"><h3>${t('Open table')}</h3><p>${S.table ? escHtml(t('{name} · {n} rows · {source}', { name: S.table.name, n: S.table.rows.length, source: t(S.table.source === 'sample' ? 'sample data' : 'from your files') })) : t('None.')}</p></div><div class="item"><h3>${t('Files on this device')}</h3><p>${Object.values(S.files).length ? Object.values(S.files).map(f => `${escHtml(f.name)} · ${(f.size / 1024).toFixed(0)} kB`).join('<br>') : t('None yet. Tap the paperclip to open a CSV.')}</p></div>`;
-  h += voiceItem() + keyItem() + appItem();
+  h += `<p class="sub">${t('What golem keeps on this device, and its settings, have views of their own in the sidebar.')}</p>`;
   $('v-packs').innerHTML = h;
   for (const [id, fn] of [['fb-install', () => installFactbook(false)], ['fb-install-full', () => installFactbook(true)], ['fb-remove', removeFactbook]]) { const b = $(id); if (b) b.addEventListener('click', fn); }
-  const ck = $('sw-check'), ap = $('sw-apply');
-  if (ck) ck.addEventListener('click', checkUpdates);
-  if (ap) ap.addEventListener('click', () => sw.applyUpdate());
-  const sa = $('say-all'); if (sa) sa.addEventListener('click', () => { voice.all = !voice.all; try { localStorage.setItem(VOICE, voice.all ? 'all' : ''); } catch (e) { /* storage is optional */ } renderPacks(); });
+  if (!$('v-settings').hidden) renderSettings(); if (!$('v-kept').hidden) renderKept();
 }
 
 /* ── the drawer: sessions and history ── */
@@ -479,37 +477,36 @@ function commitName(inp) { ren = null; renameSession(+inp.dataset.id, inp.value)
 // saved on the device through store.js (@gcu/vfs over IndexedDB): a moment after each change, and at once when the page
 // is hidden, so a closed tab keeps its last card
 // (a moment after the last change, but never more than a second behind while changes keep coming)
-let store = null, saveT = 0, firstUnsaved = 0;
+let store = null, saveT = 0, firstUnsaved = 0, erasing = false;   // erasing: nothing is written again before the reload
 function persist() {
-  if (!store) return;
+  if (!store || erasing) return;
   store.journal(parts());
   const now = Date.now(); if (!firstUnsaved) firstUnsaved = now;
   clearTimeout(saveT); saveT = setTimeout(() => { firstUnsaved = 0; store.save(parts()); }, now - firstUnsaved > 1000 ? 0 : 80);
 }
-document.addEventListener('visibilitychange', () => { if (document.hidden && store) { clearTimeout(saveT); firstUnsaved = 0; store.save(parts()); } });
-onChange(() => { renderBar(); persist(); if (!$('hq').value.trim() && ren == null) renderDrawer(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden && store && !erasing) { clearTimeout(saveT); firstUnsaved = 0; store.save(parts()); } });
+onChange(() => { renderBar(); persist(); if (!$('hq').value.trim() && ren == null) renderDrawer(); if (!$('v-kept').hidden) renderKept(); });
 
 /* ── language: the device's, or the choice kept on this device. golem reads both; the interface is the chosen one ── */
 function applyLanguage(l) {
   setUiLang(l); setLanguage(l); applyStatic(document);
-  $('lang-k').textContent = l === 'pt' ? 'Português' : 'English';
   $('st-req').textContent = requestText(); applyTheme(theme); renderPower(); renderStarters(); renderSkills(); voiceSupport();
   if (ready) { renderStream(); renderDrawer(); renderPacks(); }
 }
+function setLang(l) { lang = l; try { localStorage.setItem(LANG, lang); } catch (e) { /* storage is optional */ } applyLanguage(lang); }
 let lang = (navigator.language || 'en').toLowerCase().startsWith('pt') ? 'pt' : 'en';
 try { const l = localStorage.getItem(LANG); if (l === 'en' || l === 'pt') lang = l; } catch (e) { /* storage is optional */ }
-$('lang').addEventListener('click', () => { lang = lang === 'pt' ? 'en' : 'pt'; try { localStorage.setItem(LANG, lang); } catch (e) { /* storage is optional */ } applyLanguage(lang); });
 /* ── theme: auto follows the system; a choice is kept on this device ── */
 const THEMES = ['auto', 'light', 'dark'];
 let theme = 'auto';
-function applyTheme(th) { if (th === 'auto') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = th; $('theme-k').textContent = t(th); drawCharts(); }
+function applyTheme(th) { if (th === 'auto') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = th; drawCharts(); }
+function setTheme(th) { theme = th; applyTheme(theme); try { localStorage.setItem(THEME, theme); } catch (e) { /* storage is optional */ } }
 // charts read the theme's colours and the column's width when drawn: draw them again when either changes
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => drawCharts());
 let redrawT; window.addEventListener('resize', () => { clearTimeout(redrawT); redrawT = setTimeout(() => drawCharts(), 150); });
 try { const t = localStorage.getItem(THEME); if (THEMES.includes(t)) theme = t; } catch (e) { /* storage is optional */ }
 applyTheme(theme);
 applyLanguage(lang);
-$('theme').addEventListener('click', () => { theme = THEMES[(THEMES.indexOf(theme) + 1) % 3]; applyTheme(theme); try { localStorage.setItem(THEME, theme); } catch (e) { /* storage is optional */ } });
 
 /* ── wiring ── */
 /* ── Python: adder in a fresh Web Worker per run, built from the page itself; no network ── */
@@ -581,10 +578,13 @@ document.addEventListener('keydown', e => {
 // a file from the picker (the lead-acid shell routes <input type=file> to the system picker): text in, a card out
 $('attach').addEventListener('click', () => { if (awake) $('file').click(); });
 $('file').addEventListener('change', e => { const f = e.target.files && e.target.files[0]; if (f) openPicked(f); e.target.value = ''; });
+// a backup picked under What golem keeps: read, checked, offered
+$('restore-f').addEventListener('change', e => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (!f) return; f.text().then(txt => { let d = null; try { d = JSON.parse(txt); } catch (err) { d = null; } offerRestore(d, f.name); }, () => status('Could not read that file.')); });
 // a file from the paperclip, dropped on the window, or shared to the app ("Open with golem"): one way in
 // a session file, from a .golem.json or a notebook's metadata: its signature checked over the bytes it covers, then it
 // comes back as a session of its own, the status saying whether it is signed and unchanged
 async function openSessionFile(d) {
+  if (d && d.golem === 'device') { offerRestore(d); return; }
   let s = null; try { s = importSession(d); } catch (err) { s = null; }
   if (!s) { status('That is not a golem session file.'); return; }
   renderStream(); renderDrawer();
@@ -598,9 +598,150 @@ async function openSessionFile(d) {
 let keyInfo = null, keyAsked = false;
 function keyItem() {
   if (!canSign()) return '';
-  if (!keyAsked) { keyAsked = true; deviceKey().then(k => { keyInfo = k; renderPacks(); }, () => {}); }
-  return `<div class="item"><h3>${t('Signing key')}</h3><p>${keyInfo ? t('Exported sessions and notebooks are signed with this device\'s key, {fp} ({security}). A signature shows that a file is unchanged since this key signed it; golem checks it when the file is opened.', { fp: `<code>${escHtml(keyInfo.fingerprint)}</code>`, security: escHtml(keyInfo.security) }) : t('Reading this device\'s key…')}</p></div>`;
+  if (!keyAsked) { keyAsked = true; deviceKey().then(k => { keyInfo = k; renderKept(); }, () => {}); }
+  const acts = keyInfo ? `<div class="opts"><button class="btn" type="button" data-kp="pem">${t('Save the public key')}</button>${canReplaceKey() ? confirmBtn('key', t('Replace the key'), t('Tap again: files signed before still check, new ones use a new key')) : ''}</div>` : '';
+  return `<div class="item"><h3>${t('Signing key')}</h3><p>${keyInfo ? t('Exported sessions and notebooks are signed with this device\'s key, {fp} ({security}). A signature shows that a file is unchanged since this key signed it; golem checks it when the file is opened.', { fp: `<code>${escHtml(keyInfo.fingerprint)}</code>`, security: escHtml(keyInfo.security) }) : t('Reading this device\'s key…')}${keyInfo && inApp ? ' ' + t('In the app the key lives in the phone\'s hardware, so it is not replaced here.') : ''}</p>${acts}</div>`;
 }
+
+/* ── Settings: what changes answers (copied into each card read with it: prefs.js) and how golem behaves here ── */
+const PREF_ABOUT = {
+  plane: 'How a typed plane such as 120/55 is read, and how a measured one is written.',
+  decl: 'Applied to a compass reading when it is taken. A fixed value is applied as given.',
+  sig: 'A cap: golem shows fewer where a number carries fewer.',
+  bearing: 'Strikes, dip directions, and bearings between places.',
+  coords: 'Places, stations, and UTM back to latitude and longitude.',
+  datum: 'Said with each UTM answer. WGS84 and SIRGAS 2000 differ by centimetres.',
+  zone: 'A project zone: a place outside it is still given in it, and the card says so.',
+  units: 'Distances between places, and true thicknesses.',
+  numbers: 'How the page writes numbers, and so what is copied from it. The answers are unchanged, and the files golem saves keep the point.',
+  learn: 'What did not read is kept, to offer words to teach. Off, nothing is kept.',
+  fixAge: 'A position fix older than this is not taken as here.',
+  opens: 'Asleep, golem reads and runs nothing, and the compass and the position are off.',
+};
+const FREE = {}, prefVal = v => escHtml(JSON.stringify(v));
+function prefItem(p) {
+  const v = prefOf(p.key), isOpt = p.options.some(o => o.v === v), free = p.free && p.free.hint && (!isOpt || FREE[p.key]);
+  const opts = p.options.map(o => `<option value="${prefVal(o.v)}"${o.v === v && !FREE[p.key] ? ' selected' : ''}>${escHtml(t(o.label))}</option>`).join('')
+    + (p.free && p.free.hint ? `<option value="free"${free ? ' selected' : ''}>${escHtml(t(p.key === 'zone' ? 'always one zone…' : 'a fixed value…'))}</option>` : '');
+  return `<div class="item pref"><h3><label for="pf-${p.key}">${escHtml(t(p.label))}</label>${v !== p.def ? `<span class="tag">${t('set here')}</span>` : ''}</h3><p>${escHtml(t(PREF_ABOUT[p.key] || ''))}</p>`
+    + `<div class="opts"><select id="pf-${p.key}" data-pref="${p.key}">${opts}</select>${free ? `<input type="text" inputmode="decimal" data-pref-free="${p.key}" value="${isOpt ? '' : escHtml(String(v))}" placeholder="${escHtml(t(p.free.hint))}" aria-label="${escHtml(t(p.free.hint))}">` : ''}</div></div>`;
+}
+const pick = (id, label, cur, opts) => `<div class="item pref"><h3><label for="${id}">${t(label)}</label></h3><div class="opts"><select id="${id}">${opts.map(([v, l]) => `<option value="${v}"${v === cur ? ' selected' : ''}>${escHtml(l)}</option>`).join('')}</select></div></div>`;
+function renderSettings() {
+  const group = g => PREFS.filter(p => p.group === g).map(prefItem).join('');
+  let h = `<h1 class="vhead">${t('Settings')}</h1><div class="sub">${t('Settings that change answers are copied into each card read with them: the card says which it used, keeps it when the setting changes, and replays the same on any device. The others change only how golem behaves here.')}</div>`;
+  h += `<div class="lbl">${t('Answers')}</div>${group('answers')}`;
+  h += `<div class="lbl">${t('This device')}</div>${pick('st-theme', 'Theme', theme, [['auto', t('auto')], ['light', t('light')], ['dark', t('dark')]])}${pick('st-lang', 'Language', lang, [['en', 'English'], ['pt', 'Português']])}${group('device')}${voiceItem()}`;
+  h += `<div class="lbl">${t('This app')}</div>${appItem()}`;
+  h += `<div class="lbl">${t('Said')}</div><div class="item"><p>${t('Every setting can be said, and saying it leaves a card in the session.')}</p><div class="opts">${['use strike and dip', 'set declination to -22', 'use decimal commas', 'show my settings'].map(q => `<button class="chip" type="button" data-q="${escHtml(q)}">${escHtml(q)}</button>`).join('')}</div></div>`;
+  h += `<div class="opts">${confirmBtn('prefs', t('Back to golem\'s defaults'), t('Tap again to reset every setting'))}</div>`;
+  $('v-settings').innerHTML = h;
+}
+function afterPref(k) {
+  deviceChanged(); const p = prefByKey(k);
+  status(t('Set. {setting}: {value}.', { setting: t(p.label), value: t(prefLabel(p, prefOf(k))) }));
+  if (k === 'numbers') { renderStream(); showTab('settings'); } else renderSettings();
+}
+$('v-settings').addEventListener('change', e => {
+  const el = e.target;
+  if (el.id === 'st-theme') { setTheme(el.value); return; }
+  if (el.id === 'st-lang') { setLang(el.value); renderSettings(); return; }
+  if (el.dataset.pref) {
+    const k = el.dataset.pref; if (el.value === 'free') { FREE[k] = true; renderSettings(); const i = document.querySelector(`[data-pref-free="${k}"]`); if (i) i.focus(); return; }
+    delete FREE[k]; setPref(k, JSON.parse(el.value)); afterPref(k); return;
+  }
+  if (el.dataset.prefFree) {
+    const k = el.dataset.prefFree, p = prefByKey(k), v = p.free.parse(el.value);
+    if (v == null) { status(t('{setting}: {hint}.', { setting: t(p.label), hint: t(p.free.hint) })); return; }
+    delete FREE[k]; setPref(k, v); afterPref(k);
+  }
+});
+$('v-settings').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.q) { showTab('ask'); run(b.dataset.q); return; }
+  if (b.id === 'sw-check') { checkUpdates(); return; }
+  if (b.id === 'sw-apply') { sw.applyUpdate(); return; }
+  if (b.id === 'say-all') { voice.all = !voice.all; try { localStorage.setItem(VOICE, voice.all ? 'all' : ''); } catch (err) { /* storage is optional */ } renderSettings(); return; }
+  if (b.dataset.confirm === 'prefs' && confirmed(b)) { forgetKept('prefs'); status('Every setting is back to golem\'s default.'); renderStream(); showTab('settings'); }
+});
+
+/* ── What golem keeps: everything on this device, each with a way to forget it, a copy of it all, and erasing it all ── */
+// A button that does something hard to undo asks for a second tap within four seconds.
+let armed = null, armedT = 0;
+const confirmBtn = (id, label, again) => `<button class="btn${armed === id ? ' warn' : ''}" type="button" data-confirm="${escHtml(id)}">${escHtml(armed === id ? again : label)}</button>`;
+function confirmed(b) {
+  const id = b.dataset.confirm; if (armed === id) { armed = null; clearTimeout(armedT); return true; }
+  armed = id; clearTimeout(armedT); armedT = setTimeout(() => { armed = null; renderSettings(); renderKept(); }, 4000);
+  renderSettings(); renderKept(); return false;
+}
+let usage = null, persisted = null, restoring = null;
+async function storageInfo() {
+  try { usage = navigator.storage && navigator.storage.estimate ? await navigator.storage.estimate() : null; persisted = navigator.storage && navigator.storage.persisted ? await navigator.storage.persisted() : null; } catch (e) { usage = null; }
+  renderKept();
+}
+const size = n => n >= 1e6 ? `${(n / 1e6).toFixed(1)} MB` : n >= 1024 ? `${Math.round(n / 1024)} kB` : `${n} B`;
+const SHOW = 40;
+function renderKept() {
+  if (!$('v-kept') || $('v-kept').hidden) return;
+  if (usage === null && persisted === null) { usage = undefined; storageInfo(); }
+  const ks = kept();
+  let h = `<h1 class="vhead">${t('What golem keeps')}</h1><div class="sub">${t('All of it is on this device, and nowhere else. Forgetting something here leaves no card; a session that read it says so when it is opened, and its cards keep what they were read with.')}</div>`;
+  if (restoring) {
+    const d = restoring;
+    h += `<div class="item"><h3>${t('Restore from a file')}</h3><p>${escHtml(t('{file}: {n} sessions, saved {date}. {signed} Restoring replaces every session, everything below and the settings on this device with what the file holds.', { file: d.name, n: d.data.sessions.length, date: d.data.at ? new Date(d.data.at).toLocaleString(uiLang() === 'pt' ? 'pt-BR' : 'en-GB') : '?', signed: d.signed }))}</p><div class="opts">${confirmBtn('restore', t('Replace everything with this file'), t('Tap again to replace everything'))}<button class="btn" type="button" data-kp="cancel">${t('Cancel')}</button></div></div>`;
+  }
+  h += `<div class="lbl">${t('On this device')}</div>`;
+  h += `<div class="item"><h3>${t('Open table')}</h3><p>${S.table ? escHtml(t('{name} · {n} rows · {source}', { name: S.table.name, n: S.table.rows.length, source: t(S.table.source === 'sample' ? 'sample data' : 'from your files') })) : t('None.')}</p></div>`;
+  for (const k of ks.filter(x => x.items.length)) {
+    const list = k.items.slice(0, SHOW).map(i => `<li><span>${escHtml(i.text)}</span><button class="cact" type="button" data-forget="${k.kind}" data-key="${escHtml(JSON.stringify(i.key))}">${t('forget')}</button></li>`).join('');
+    h += `<div class="item"><h3>${escHtml(t(k.label))}${k.items.length ? `<span class="tag">${k.items.length} · ${size(k.bytes)}</span>` : ''}</h3>`
+      + (k.items.length ? `<ul class="kept-list">${list}</ul>${k.items.length > SHOW ? `<p>${t('and {n} more', { n: k.items.length - SHOW })}</p>` : ''}${k.items.length > 1 ? `<div class="opts">${confirmBtn('all:' + k.kind, t('Forget all of them'), t('Tap again to forget all {n}', { n: k.items.length }))}</div>` : ''}`
+        : '') + '</div>';
+  }
+  const none = ks.filter(x => !x.items.length);
+  if (none.length) h += `<div class="item"><h3>${t('Nothing yet')}</h3><p>${escHtml(none.map(k => t(k.label)).join(', '))}.</p></div>`;
+  h += `<div class="lbl">${t('Storage')}</div><div class="item"><p>${usage ? escHtml(t('This browser gives golem {used} of {quota}; installed packs and large files count.', { used: size(usage.usage || 0), quota: size(usage.quota || 0) })) : t('This browser does not say how much it keeps.')} ${persisted === true ? t('It keeps it even when space runs short.') : persisted === false ? t('It may clear it when space runs short, as browsers do with sites.') : ''}</p>${persisted === false ? `<div class="opts"><button class="btn" type="button" data-kp="persist">${t('Ask the browser to keep it')}</button></div>` : ''}</div>`;
+  h += keyItem();
+  h += `<div class="item"><h3>${t('A copy of everything')}</h3><p>${t('Every session, everything above, the settings and the files opened, in one signed file. Packs are not in it: install them again. The paperclip or the button below opens it again, here or on another device.')}</p><div class="opts"><button class="btn" type="button" data-kp="backup">${t('Save everything to a file')}</button><button class="btn" type="button" data-kp="restore">${t('Restore from a file…')}</button></div></div>`;
+  h += `<div class="item"><h3>${t('Erase')}</h3><p>${t('Every session, everything above, the files, the packs, the settings and the signing key, gone from this device. golem starts again as on a first visit.')}</p><div class="opts">${confirmBtn('erase', t('Erase everything on this device'), t('Tap again: this cannot be undone'))}</div></div>`;
+  $('v-kept').innerHTML = h;
+}
+// a backup file: checked, then offered; nothing is replaced until the second tap
+async function offerRestore(d, name = 'golem-device.golem.json') {
+  if (!d || d.golem !== 'device' || !Array.isArray(d.sessions)) { status('That is not a golem backup.'); return; }
+  let signed = t('It is not signed.');
+  if (d.signature) {
+    const ok = await verify(d.signature, new TextEncoder().encode(canonical(unsigned(d)))).catch(() => false), fp = await fingerprint(d.signature.pub).catch(() => '?');
+    signed = ok ? t('Signed by key {fp}, unchanged since.', { fp }) : t('Its signature does not match: it was changed after key {fp} signed it.', { fp });
+  }
+  restoring = { data: d, name, signed }; showTab('kept'); closeDrawer();
+}
+$('v-kept').addEventListener('click', async e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.forget) {
+    const n = forgetKept(b.dataset.forget, JSON.parse(b.dataset.key)); status(n ? t('Forgotten.') : t('Nothing to forget.')); renderKept(); return;
+  }
+  const c = b.dataset.confirm;
+  if (c && !confirmed(b)) return;
+  if (c && c.startsWith('all:')) { const n = forgetKept(c.slice(4)); status(t('Forgotten: {n}.', { n })); renderKept(); return; }
+  if (c === 'key') { try { keyInfo = await replaceKey(); status(t('A new key: {fp}.', { fp: keyInfo.fingerprint })); } catch (err) { status(t('The key was not replaced: {e}', { e: err.message })); } renderKept(); return; }
+  if (c === 'erase') { erasing = true; clearTimeout(saveT); status('Erasing…'); await eraseAll(); location.reload(); return; }
+  if (c === 'restore' && restoring) {
+    const ok = importDevice(unsigned(restoring.data)); restoring = null;
+    if (!ok) { status('That backup holds no sessions, so nothing was replaced.'); renderKept(); return; }
+    renderStream(); renderDrawer(); renderSettings(); renderKept(); status('Restored. Everything on this device is now what the file held.'); return;
+  }
+  const k = b.dataset.kp;
+  if (k === 'cancel') { restoring = null; renderKept(); }
+  else if (k === 'persist') { try { persisted = await navigator.storage.persist(); } catch (err) { persisted = false; } status(persisted ? 'The browser keeps golem\'s data now, even when space runs short.' : 'The browser said no. Installing golem as an app usually makes it keep it.'); renderKept(); }
+  else if (k === 'pem' && keyInfo) saveFile(`golem-key-${keyInfo.fingerprint.replace(/ /g, '')}.pem`, pemOf(keyInfo.pub), 'application/x-pem-file');
+  else if (k === 'backup') {
+    const d = { ...exportDevice(), at: new Date().toISOString() }, name = `golem-device-${new Date().toISOString().slice(0, 10)}.golem.json`;
+    let out = d; if (canSign()) { try { out = { ...d, signature: await sign(new TextEncoder().encode(canonical(d))) }; } catch (err) { status(t('Saved unsigned: {e}', { e: err.message })); } }
+    saveFile(name, JSON.stringify(out), 'application/json');
+  }
+  else if (k === 'restore') $('restore-f').click();
+});
 // the session file as saved: signed with this device's key when it can be (unsigned, and said so, when it cannot)
 async function signedSession(id) {
   const d = exportSession(id); if (!d) return null;
@@ -738,6 +879,7 @@ if (shell.present) { $('st-where').dataset.tEn = 'in the lead-acid shell'; $('st
   if (got && got.migrated) store.save(parts());
   // the "New session" shortcut of the installed app
   if (new URLSearchParams(location.search).has('new')) { newSession(); try { history.replaceState(null, '', location.pathname); } catch (e) { /* file:// */ } }
+  if (prefOf('opens') === 'awake' && !awake) setAwake(true, true); else if (prefOf('opens') === 'asleep' && awake) setAwake(false, true);
   renderStream(); renderDrawer(); renderPacks();
   $('status').textContent = store.kind === 'none' ? t('This browser keeps nothing for golem: sessions last until the page closes.') : '';
   ready = true; document.documentElement.dataset.ready = '1';   // tests wait for this

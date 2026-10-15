@@ -53,7 +53,7 @@ await page.goto(base + 'golem.html'); await page.waitForTimeout(300);
 html = html.replace('<title>GCU golem</title>', '<title>GCU golem (new)</title>'); hits = [];
 await page.reload(); await page.waitForTimeout(300);
 check((await page.title()) === 'GCU golem' && !hits.includes('golem.html'), 'a reload keeps the cached golem; the new one is not fetched on its own');
-await page.click('nav [data-tab="packs"]').catch(() => {}); await page.evaluate(() => { const b = document.querySelector('[data-tab="packs"]'); if (b) b.click(); });
+await page.evaluate(() => document.querySelector('[data-tab="settings"]').click());
 await page.click('#sw-check'); await page.waitForSelector('#sw-apply', { timeout: 10000 }).catch(() => {});
 const req = await page.textContent('#st-req');
 check(await page.isVisible('#sw-apply') && req === '1 request', `"Check for updates" finds the new golem and the header counts the request (${req})`);

@@ -2,6 +2,7 @@
 // rules the declarations carry), taught words (device lexicon rewrites, then grammar again). Plus the
 // tools that talk about the session itself: none, why, export.
 import { S, T, TOOLS, FRAMES, tool, frame, amend, session, noun, toolByName, runTool, iso, STATE } from './core.js';
+import { stamp } from './prefs.js';
 import { examples, vocab } from './skills.js';
 import { rankByPicks } from './learn.js';
 import { ontology } from './ontology.js';
@@ -63,8 +64,8 @@ function verdictIn(E, text, session, opts) {
 export function clauseRead(text, rung) {
   const { r, b } = verdictOf(text, clauseSession());
   if (!b) return { verdict: r };
-  const res = runTool(b.tool, b.args); if (!res) return { verdict: r };
-  res.trace.unshift(`clause: ${r.echo}`, ...r.diag.notes.map(n => `clause: ${n}`));
+  const set = stamp(b.tool, b.args), res = runTool(b.tool, b.args); if (!res) return { verdict: r };
+  res.trace.unshift(`clause: ${r.echo}`, ...r.diag.notes.map(n => `clause: ${n}`), ...(set.length ? [`settings: ${set.join('; ')}`] : []));
   return { tool: b.tool, args: b.args, rung, res, cmd: r.commands[0] };
 }
 const describeVerdict = r => `clause: ${r.status}${r.reasons ? ' — ' + r.reasons.join('; ') : r.readings ? ' — ' + r.readings.join(' | ') : ''}`;
@@ -81,7 +82,7 @@ function expressionRead(raw, rung) {
   const x = expressionOf(raw); if (!x) return null;
   for (const [tool, args] of [['calc', calcOf(x)], ['estimate', estimateOf(x)]]) {
     if (!args) continue;
-    const res = runTool(tool, args); if (res) { res.trace.unshift(`expression: "${x}"`); return { tool, args, rung, res }; }
+    const set = stamp(tool, args), res = runTool(tool, args); if (res) { res.trace.unshift(`expression: "${x}"`, ...(set.length ? [`settings: ${set.join('; ')}`] : [])); return { tool, args, rung, res }; }
   }
   return null;
 }

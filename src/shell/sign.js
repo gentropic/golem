@@ -23,6 +23,16 @@ async function browserKey() {
   }
   return k;
 }
+// a new key in place of the browser's (Settings, What golem keeps): files signed before still check, by the key each
+// carries; only new signatures change. In the app the key lives in the phone's hardware and is not replaced here.
+export const canReplaceKey = () => !shell.present && !!(globalThis.crypto && crypto.subtle && globalThis.indexedDB);
+export async function replaceKey() {
+  const db = await idb(), k = await crypto.subtle.generateKey(P256, false, ['sign', 'verify']);
+  await new Promise((ok, no) => { const tx = db.transaction('keys', 'readwrite'); tx.objectStore('keys').put(k, 'device'); tx.oncomplete = ok; tx.onerror = () => no(tx.error); });
+  return deviceKey();
+}
+// the public half as a PEM file, to give to whoever checks the signatures
+export const pemOf = pub => `-----BEGIN PUBLIC KEY-----\n${pub.match(/.{1,64}/g).join('\n')}\n-----END PUBLIC KEY-----\n`;
 // this device's key: { pub, security, fingerprint }
 export async function deviceKey() {
   if (shell.present) { const i = await shell.attest.keyinfo(); return { pub: i.pub, security: i.security, fingerprint: await fingerprint(i.pub) }; }

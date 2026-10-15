@@ -39,15 +39,15 @@ check(/12/.test(await page.locator('#stream .card').nth(1).textContent()), 'and 
 g.session.cards[0].args.n = 3; await writeFile(join(dir, 'edited.ipynb'), JSON.stringify(j));
 await page.setInputFiles('#file', join(dir, 'edited.ipynb')); await page.waitForTimeout(800);
 check(/signature does not match: the file was changed after key/.test(await status()), 'a notebook edited after it was signed says so');
-// the session file from the drawer: signed too; the fingerprint under Packs is the one the import named
+// the session file from the drawer: signed too; the fingerprint under What golem keeps is the one the import named
 const sid = await page.evaluate(() => { const b = document.querySelector('[data-exp]'); return b && b.dataset.exp; });
 const sf = await download(() => page.evaluate(id => document.querySelector(`[data-exp="${id}"]`).click(), sid));
 check(/\.golem\.json$/.test(sf.name) && JSON.parse(sf.text).signature, `the session file is signed (${sf.name})`);
 await page.setInputFiles('#file', sf.p); await page.waitForTimeout(800);
 const fp = (/key ([0-9a-f ]{19})/.exec(await status()) || [])[1];
-await page.evaluate(() => document.querySelector('[data-tab="packs"], #tab-packs') && document.querySelector('[data-tab="packs"], #tab-packs').click());
+await page.evaluate(() => document.querySelector('[data-tab="kept"]').click());
 await page.waitForTimeout(600);
-check(fp && (await page.textContent('#v-packs')).includes(fp), `Packs shows this device's key, the one that signed (${fp})`);
+check(fp && (await page.textContent('#v-kept')).includes(fp), `What golem keeps shows this device's key, the one that signed (${fp})`);
 
 errors.forEach(e => console.log('FAIL page error: ' + e));
 await browser.close(); server.close();

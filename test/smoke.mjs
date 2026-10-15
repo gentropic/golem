@@ -31,6 +31,7 @@ const STEPS = [
   ['pop of mongolia', 'no reading', 'pop means population'],
   ['pop means population', 'grammar', 'Learned'],
   ['pop of mongolia', 'taught', '3,300,000'],
+  ['show my settings', 'grammar', 'Plane notation'],
   ['histogram of cu', 'grammar', 'No table is open'],
   ['yes', 'grammar', 'median'],
   ['histogram of au', 'grammar', 'median'],
@@ -84,7 +85,7 @@ const nameOk = name === 'assays.csv: Au histogram, Cu histogram';
 console.log(`${nameOk ? 'ok  ' : 'FAIL'} session auto-name: ${name}`);
 await page.reload(); await page.waitForSelector('html[data-ready]'); await page.waitForSelector('#stream .card');
 const kept = await page.locator('#stream .card').count();
-console.log(`${kept === 25 ? 'ok  ' : 'FAIL'} session replays after reload: ${kept} cards`);
+console.log(`${kept === 26 ? 'ok  ' : 'FAIL'} session replays after reload: ${kept} cards`);
 const overflow = await page.evaluate(() => Math.max(...[document.documentElement, document.getElementById('v-ask')].map(e => e.scrollWidth - e.clientWidth)));
 console.log(`${overflow <= 0 ? 'ok  ' : 'FAIL'} no horizontal overflow at 420 px`);
 // a real file through the picker, then a table question on it
@@ -201,5 +202,5 @@ console.log(`${offered && picked ? 'ok  ' : 'FAIL'} no exact reading offers a gu
 if (!(offered && picked)) failed++;
 errors.forEach(e => console.log('FAIL ' + e));
 await browser.close();
-if (failed || !nameOk || kept !== 25 || overflow > 0 || errors.length) { console.log('\nsmoke test failed'); process.exit(1); }
+if (failed || !nameOk || kept !== 26 || overflow > 0 || errors.length) { console.log('\nsmoke test failed'); process.exit(1); }
 console.log('\nsmoke test passed');

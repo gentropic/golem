@@ -20,6 +20,7 @@ import './share.js';
 import './lore.js';
 import './orders.js';
 import './selftest.js';
+import { stamp, prefOf } from './prefs.js';
 import './vocab.js';
 import './strata.js';
 import './tms.js';
@@ -74,9 +75,10 @@ export function answer(c, i) {
   // a guess picked: the card becomes that tool's card, still marked as a guess (the rung is kept with the session)
   if (c.tool === 'guess') {
     const k = c.args.cands[o.value], from = c.args.cands.length;
-    c.tool = k.tool; c.args = JSON.parse(JSON.stringify(k.args)); rerun(c);
+    c.tool = k.tool; c.args = JSON.parse(JSON.stringify(k.args)); stamp(c.tool, c.args); rerun(c);
     if (c.res) c.res.trace.unshift(`guess: read as ${k.echo}${k.changes.length ? ' (' + k.changes.join('; ') + ')' : ''}, picked from ${from}`);
     // the pick is learned from: the tool counts for the next guesses, and the repaired word is offered to teach
+    if (prefOf('learn') === 'off') { touch(); return o; }
     notePick(k.tool); clearMiss(c.raw); touch();
     const teach = teachOfPick(k); return teach ? { ...o, teach } : o;
   }
@@ -127,8 +129,10 @@ export function submit(raw) {
   const r = grammar(text, q, 'grammar', raw) || context(q, last, raw) || taught(text, q, raw) || guessRead(raw) || { tool: 'none', args: { q }, rung: 'none', res: T.none({ q }) };
   // learned from (learn.js): what did not read goes on the device's list; what read comes off it, and when it follows
   // something that did not read, the stretch that changed is offered as a word to teach
-  if (r.rung === 'none' || r.rung === 'guess') noteMiss(raw, iso(clock.now())); else clearMiss(raw);
-  const teach = r.rung === 'none' || r.rung === 'guess' ? null : correctionOf(last, raw);
+  // (unless learning is off in the settings: then nothing is kept)
+  const learning = prefOf('learn') !== 'off';
+  if (learning) { if (r.rung === 'none' || r.rung === 'guess') noteMiss(raw, iso(clock.now())); else clearMiss(raw); }
+  const teach = !learning || r.rung === 'none' || r.rung === 'guess' ? null : correctionOf(last, raw);
   return { kind: 'card', card: addCard(raw, r, performance.now() - t0), ...(teach ? { teach } : {}) };
 }
 
@@ -306,8 +310,11 @@ export async function openBinary(name, buffer) {
   return { kind: 'card', card: addCard(`open ${name}`, { tool: 'open', args, rung: 'grammar', res }, performance.now() - t0) };
 }
 
-// two example sessions for a first visit
+// two example sessions for a first visit (what their cards would teach golem about misses is not kept: the person did
+// not type them)
 export function seedExamples() {
+  const misses = S.misses, picks = S.picks; S.misses = []; S.picks = {};
   newSession(true); ['open assays.csv', 'histogram of cu', 'log scale', 'histogram of au'].forEach(x => submit(x));
   newSession(true); ['0.35 oz per short ton in g/t', 'true thickness of a 14 m intercept, hole 270/60, bedding 045/30', 'remind me to send the samples to the lab on friday at 9', 'pop of mongolia'].forEach(x => submit(x));
+  S.misses = misses; S.picks = picks;
 }
