@@ -16,6 +16,7 @@ export const PACKS = [
   ['factbook', 'CIA World Factbook', '2.8 MB · CC0', 'samp', 'Records: lookup, convert, filter, rank.'],
   ['factbook-full', 'Factbook, full profiles', '2.3 MB · CC0', 'samp', 'Installed with the factbook when asked: which countries are landlocked, and their coastlines. More fields later.'],
   ['ods', 'Open Data Structures', '1.9 MB · CC BY 2.5', 'samp', 'Definitions: where a term is defined, with the defining passage once installed. Listings can run in adder later.'],
+  ['minerals', 'Mineral species (Wikidata)', '254 kB · CC0', 'samp', 'Every mineral species Wikidata lists: formula, elements, class, crystal system; hardness and density where Wikidata has them. Lookups, searches by element, and a table to ask.'],
   ['elements-of-style', 'The Elements of Style (1918)', '36 kB · public domain', 'samp', 'Its rules and the expressions of chapter V, compiled into a text checker that cites them.'],
   ['rtow · rtnw · rtrol', 'Ray Tracing series', '11.5 MB · CC0', 'plan', 'Reader only until a term index is built.'],
   ['arcr', 'arcr / gewgaw manual', '26 kB · CC0', 'plan', 'Reader only.'],

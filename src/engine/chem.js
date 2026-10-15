@@ -113,8 +113,13 @@ shape({ type: 'formula', re: `(?=[a-z.]*\\d|[a-z]{2,4}(?![a-z\\d]))(?:(?:${SYMS}
 // symbols that are English words (in, as, at, no, be, he, so) and single letters stay out; the names cover them
 // and symbols that are units (cm, mg, pa, cd, pt, ga): "9 cm" is a length, not curium
 const PLAIN = new Set(['in', 'as', 'at', 'no', 'be', 'he', 'so', 'is', 'am', 'pm', 'or', 'es', 'md', 'ga', ...UNIT_TABLE.flatMap(u => u.words.map(w => w.toLowerCase()))]);
+// the Portuguese names of the elements that differ from the English ones, for "minerais com cobre" and "massa molar do ferro"
+const NAME_PT = { H: ['hidrogênio'], B: ['boro'], C: ['carbono'], N: ['nitrogênio'], O: ['oxigênio'], F: ['flúor'], Na: ['sódio'], Mg: ['magnésio'], Al: ['alumínio'], Si: ['silício'], P: ['fósforo'],
+  S: ['enxofre'], Cl: ['cloro'], K: ['potássio'], Ca: ['cálcio'], Ti: ['titânio'], V: ['vanádio'], Cr: ['cromo'], Mn: ['manganês'], Fe: ['ferro'], Co: ['cobalto'], Ni: ['níquel'], Cu: ['cobre'],
+  Zn: ['zinco'], As: ['arsênio', 'arsênico'], Sr: ['estrôncio'], Zr: ['zircônio'], Nb: ['nióbio'], Mo: ['molibdênio'], Ag: ['prata'], Sn: ['estanho'], Sb: ['antimônio'], Ba: ['bário'],
+  Ta: ['tântalo'], W: ['tungstênio'], Pt: ['platina'], Au: ['ouro'], Hg: ['mercúrio'], Pb: ['chumbo'], Bi: ['bismuto'], U: ['urânio'], Li: ['lítio'], Be: ['berílio'] };
 noun({ type: 'element', words: Object.fromEntries(ELEMENTS.map(e => [e[1], [e[2], ...(e[1].length > 1 && !PLAIN.has(e[1].toLowerCase()) ? [e[1].toLowerCase()] : [])]])),
-  words_pt: Object.fromEntries(ELEMENTS.map(e => [e[1], [e[2], ...(e[1].length > 1 && !PLAIN.has(e[1].toLowerCase()) ? [e[1].toLowerCase()] : [])]])) });
+  words_pt: Object.fromEntries(ELEMENTS.map(e => [e[1], [e[2], ...(NAME_PT[e[1]] || []), ...(e[1].length > 1 && !PLAIN.has(e[1].toLowerCase()) ? [e[1].toLowerCase()] : [])]])) });
 noun({ type: 'chemword', words: { mass: ['molar mass', 'molecular mass', 'molecular weight', 'formula weight', 'formula mass'], atomicmass: ['atomic mass', 'atomic weight'], number: ['atomic number'], element: ['element', 'element number', 'the element'], oxide: ['oxide', 'its oxide'] },
   words_pt: { mass: ['massa molar', 'peso molecular'], atomicmass: ['massa atômica', 'massa atomica'], number: ['número atômico', 'numero atomico'], element: ['elemento'], oxide: ['óxido', 'oxido'] } });
 postmod({ prep: '', heads: ['chemword'], attr: 'n', quantity: true });   // "element 26"

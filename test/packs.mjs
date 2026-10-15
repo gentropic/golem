@@ -64,6 +64,15 @@ await page.reload(); await ready();
 check((await ask('define sentinel')).includes('called the sentinel'), 'the books stay installed after a reload');
 await packs(); await page.click('[data-pk-remove="ods"]'); await page.waitForTimeout(200);
 check(!(await ask('what is a skiplist')).includes('In this chapter'), 'removed: the sample term index answers again');
+// the minerals: the sample of 42 answers first; the pack from the library has every species Wikidata lists
+check((await ask('minerals with Bi')).includes('in the sample of 42'), 'before the pack, the sample of 42 minerals answers, and says so');
+served = []; await packs(); await page.click('[data-pk-install="minerals"]');
+await page.waitForFunction(() => /Installed: \d+ minerals/.test(document.getElementById('v-packs').textContent), null, { timeout: 30000 }).catch(() => {});
+check(served.includes('dist/minerals.gcudat'), `minerals installed from the library (${served.join(', ')})`);
+const bi = await ask('minerals with Bi');
+check(!bi.includes('in the sample') && /gcu-library minerals pack/.test(bi) && parseInt(bi.match(/(\d+)\s*minerals?/)[1]) > 100, `the pack answers: ${bi.match(/(\d+)\s*minerals?/)[0]} with bismuth`);
+await page.reload(); await ready();
+check(/gcu-library minerals pack/.test(await ask('chalcopyrite')), 'the minerals pack stays installed after a reload');
 errors.forEach(e => console.log('FAIL page error: ' + e));
 await browser.close();
 if (failed || errors.length) { console.log('\npacks test failed'); process.exit(1); }

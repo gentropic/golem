@@ -1454,6 +1454,536 @@
       }
     },
     {
+      "type": "mineral",
+      "exact": true,
+      "words": {
+        "quartz": [
+          "quartz"
+        ],
+        "calcite": [
+          "calcite"
+        ],
+        "dolomite": [
+          "dolomite"
+        ],
+        "gypsum": [
+          "gypsum"
+        ],
+        "halite": [
+          "halite"
+        ],
+        "fluorite": [
+          "fluorite"
+        ],
+        "baryte": [
+          "baryte",
+          "barite"
+        ],
+        "pyrite": [
+          "pyrite"
+        ],
+        "chalcopyrite": [
+          "chalcopyrite"
+        ],
+        "bornite": [
+          "bornite"
+        ],
+        "chalcocite": [
+          "chalcocite"
+        ],
+        "covellite": [
+          "covellite"
+        ],
+        "galena": [
+          "galena"
+        ],
+        "sphalerite": [
+          "sphalerite"
+        ],
+        "arsenopyrite": [
+          "arsenopyrite"
+        ],
+        "molybdenite": [
+          "molybdenite"
+        ],
+        "cinnabar": [
+          "cinnabar"
+        ],
+        "stibnite": [
+          "stibnite"
+        ],
+        "magnetite": [
+          "magnetite"
+        ],
+        "hematite": [
+          "hematite"
+        ],
+        "ilmenite": [
+          "ilmenite"
+        ],
+        "rutile": [
+          "rutile"
+        ],
+        "cassiterite": [
+          "cassiterite"
+        ],
+        "corundum": [
+          "corundum"
+        ],
+        "scheelite": [
+          "scheelite"
+        ],
+        "malachite": [
+          "malachite"
+        ],
+        "azurite": [
+          "azurite"
+        ],
+        "native gold": [
+          "native gold",
+          "gold"
+        ],
+        "native silver": [
+          "native silver",
+          "silver"
+        ],
+        "native copper": [
+          "native copper",
+          "copper"
+        ],
+        "diamond": [
+          "diamond"
+        ],
+        "graphite": [
+          "graphite"
+        ],
+        "zircon": [
+          "zircon"
+        ],
+        "topaz": [
+          "topaz"
+        ],
+        "talc": [
+          "talc"
+        ],
+        "kaolinite": [
+          "kaolinite"
+        ],
+        "muscovite": [
+          "muscovite"
+        ],
+        "orthoclase": [
+          "orthoclase"
+        ],
+        "albite": [
+          "albite"
+        ],
+        "forsterite": [
+          "forsterite"
+        ],
+        "almandine": [
+          "almandine"
+        ],
+        "fluorapatite": [
+          "fluorapatite"
+        ]
+      },
+      "words_pt": {
+        "quartz": [
+          "quartz",
+          "quartzo"
+        ],
+        "calcite": [
+          "calcite",
+          "calcita"
+        ],
+        "dolomite": [
+          "dolomite",
+          "dolomita"
+        ],
+        "gypsum": [
+          "gypsum",
+          "gipsita"
+        ],
+        "halite": [
+          "halite"
+        ],
+        "fluorite": [
+          "fluorite",
+          "fluorita"
+        ],
+        "baryte": [
+          "baryte",
+          "barita",
+          "barite"
+        ],
+        "pyrite": [
+          "pyrite",
+          "pirite"
+        ],
+        "chalcopyrite": [
+          "chalcopyrite",
+          "calcopirita"
+        ],
+        "bornite": [
+          "bornite",
+          "bornita"
+        ],
+        "chalcocite": [
+          "chalcocite",
+          "calcocita"
+        ],
+        "covellite": [
+          "covellite"
+        ],
+        "galena": [
+          "galena"
+        ],
+        "sphalerite": [
+          "sphalerite",
+          "blenda"
+        ],
+        "arsenopyrite": [
+          "arsenopyrite",
+          "arsenopirita"
+        ],
+        "molybdenite": [
+          "molybdenite",
+          "molibdenite"
+        ],
+        "cinnabar": [
+          "cinnabar",
+          "cinábrio"
+        ],
+        "stibnite": [
+          "stibnite",
+          "estibina"
+        ],
+        "magnetite": [
+          "magnetite",
+          "magnetita"
+        ],
+        "hematite": [
+          "hematite"
+        ],
+        "ilmenite": [
+          "ilmenite",
+          "ilmenita"
+        ],
+        "rutile": [
+          "rutile",
+          "rutilo"
+        ],
+        "cassiterite": [
+          "cassiterite"
+        ],
+        "corundum": [
+          "corundum",
+          "coríndon"
+        ],
+        "scheelite": [
+          "scheelite",
+          "scheelita"
+        ],
+        "malachite": [
+          "malachite",
+          "malaquite"
+        ],
+        "azurite": [
+          "azurite"
+        ],
+        "native gold": [
+          "native gold",
+          "gold"
+        ],
+        "native silver": [
+          "native silver",
+          "silver"
+        ],
+        "native copper": [
+          "native copper",
+          "copper"
+        ],
+        "diamond": [
+          "diamond",
+          "diamante"
+        ],
+        "graphite": [
+          "graphite",
+          "grafite"
+        ],
+        "zircon": [
+          "zircon",
+          "zircão"
+        ],
+        "topaz": [
+          "topaz",
+          "topázio"
+        ],
+        "talc": [
+          "talc",
+          "talco"
+        ],
+        "kaolinite": [
+          "kaolinite",
+          "caulinite"
+        ],
+        "muscovite": [
+          "muscovite",
+          "moscovita"
+        ],
+        "orthoclase": [
+          "orthoclase",
+          "ortoclase"
+        ],
+        "albite": [
+          "albite"
+        ],
+        "forsterite": [
+          "forsterite"
+        ],
+        "almandine": [
+          "almandine"
+        ],
+        "fluorapatite": [
+          "fluorapatite"
+        ]
+      }
+    },
+    {
+      "type": "elsym",
+      "exact": true,
+      "words": {
+        "H": [
+          "h"
+        ],
+        "B": [
+          "b"
+        ],
+        "C": [
+          "c"
+        ],
+        "N": [
+          "n"
+        ],
+        "O": [
+          "o"
+        ],
+        "F": [
+          "f"
+        ],
+        "P": [
+          "p"
+        ],
+        "S": [
+          "s"
+        ],
+        "K": [
+          "k"
+        ],
+        "V": [
+          "v"
+        ],
+        "Y": [
+          "y"
+        ],
+        "U": [
+          "u"
+        ],
+        "W": [
+          "w"
+        ]
+      },
+      "words_pt": {
+        "H": [
+          "h"
+        ],
+        "B": [
+          "b"
+        ],
+        "C": [
+          "c"
+        ],
+        "N": [
+          "n"
+        ],
+        "O": [
+          "o"
+        ],
+        "F": [
+          "f"
+        ],
+        "P": [
+          "p"
+        ],
+        "S": [
+          "s"
+        ],
+        "K": [
+          "k"
+        ],
+        "V": [
+          "v"
+        ],
+        "Y": [
+          "y"
+        ],
+        "U": [
+          "u"
+        ],
+        "W": [
+          "w"
+        ]
+      }
+    },
+    {
+      "type": "mineralprop",
+      "words": {
+        "formula": [
+          "formula",
+          "chemical formula"
+        ],
+        "hardness": [
+          "hardness",
+          "mohs hardness",
+          "mohs"
+        ],
+        "density": [
+          "density",
+          "specific gravity"
+        ],
+        "system": [
+          "crystal system",
+          "system"
+        ],
+        "class": [
+          "class",
+          "strunz class",
+          "mineral class"
+        ],
+        "symbol": [
+          "ima symbol",
+          "symbol",
+          "abbreviation"
+        ],
+        "elements": [
+          "elements"
+        ]
+      },
+      "words_pt": {
+        "formula": [
+          "fórmula",
+          "formula"
+        ],
+        "hardness": [
+          "dureza"
+        ],
+        "density": [
+          "densidade"
+        ],
+        "system": [
+          "sistema cristalino"
+        ],
+        "class": [
+          "classe"
+        ],
+        "symbol": [
+          "símbolo"
+        ],
+        "elements": [
+          "elementos"
+        ]
+      }
+    },
+    {
+      "type": "mineralclass",
+      "words": {
+        "any": [
+          "minerals",
+          "mineral species"
+        ],
+        "sulfides and sulfosalts": [
+          "sulfides",
+          "sulphides",
+          "sulfosalts"
+        ],
+        "oxides": [
+          "oxides"
+        ],
+        "silicates": [
+          "silicates"
+        ],
+        "carbonates": [
+          "carbonates"
+        ],
+        "sulfates": [
+          "sulfates",
+          "sulphates"
+        ],
+        "phosphates": [
+          "phosphates"
+        ],
+        "halides": [
+          "halides"
+        ],
+        "borates": [
+          "borates"
+        ],
+        "elements": [
+          "native elements"
+        ]
+      },
+      "words_pt": {
+        "any": [
+          "minerais"
+        ],
+        "sulfides and sulfosalts": [
+          "sulfetos"
+        ],
+        "oxides": [
+          "óxidos"
+        ],
+        "silicates": [
+          "silicatos"
+        ],
+        "carbonates": [
+          "carbonatos"
+        ],
+        "sulfates": [
+          "sulfatos"
+        ],
+        "phosphates": [
+          "fosfatos"
+        ],
+        "halides": [
+          "haletos"
+        ],
+        "borates": [
+          "boratos"
+        ],
+        "elements": [
+          "elementos nativos"
+        ]
+      }
+    },
+    {
+      "type": "devtable",
+      "words": {
+        "minerals": [
+          "the minerals",
+          "minerals table",
+          "the minerals table",
+          "mineral table"
+        ]
+      },
+      "words_pt": {
+        "minerals": [
+          "os minerais",
+          "tabela de minerais"
+        ]
+      }
+    },
+    {
       "type": "column",
       "words": {
         "hole": [
@@ -6490,32 +7020,40 @@
       },
       "words_pt": {
         "H": [
-          "hydrogen"
+          "hydrogen",
+          "hidrogênio"
         ],
         "He": [
           "helium"
         ],
         "Li": [
           "lithium",
+          "lítio",
           "li"
         ],
         "Be": [
-          "beryllium"
+          "beryllium",
+          "berílio"
         ],
         "B": [
-          "boron"
+          "boron",
+          "boro"
         ],
         "C": [
-          "carbon"
+          "carbon",
+          "carbono"
         ],
         "N": [
-          "nitrogen"
+          "nitrogen",
+          "nitrogênio"
         ],
         "O": [
-          "oxygen"
+          "oxygen",
+          "oxigênio"
         ],
         "F": [
-          "fluorine"
+          "fluorine",
+          "flúor"
         ],
         "Ne": [
           "neon",
@@ -6523,28 +7061,35 @@
         ],
         "Na": [
           "sodium",
+          "sódio",
           "na"
         ],
         "Mg": [
           "magnesium",
+          "magnésio",
           "mg"
         ],
         "Al": [
           "aluminium",
+          "alumínio",
           "al"
         ],
         "Si": [
           "silicon",
+          "silício",
           "si"
         ],
         "P": [
-          "phosphorus"
+          "phosphorus",
+          "fósforo"
         ],
         "S": [
-          "sulfur"
+          "sulfur",
+          "enxofre"
         ],
         "Cl": [
           "chlorine",
+          "cloro",
           "cl"
         ],
         "Ar": [
@@ -6552,10 +7097,12 @@
           "ar"
         ],
         "K": [
-          "potassium"
+          "potassium",
+          "potássio"
         ],
         "Ca": [
           "calcium",
+          "cálcio",
           "ca"
         ],
         "Sc": [
@@ -6564,37 +7111,46 @@
         ],
         "Ti": [
           "titanium",
+          "titânio",
           "ti"
         ],
         "V": [
-          "vanadium"
+          "vanadium",
+          "vanádio"
         ],
         "Cr": [
           "chromium",
+          "cromo",
           "cr"
         ],
         "Mn": [
           "manganese",
+          "manganês",
           "mn"
         ],
         "Fe": [
           "iron",
+          "ferro",
           "fe"
         ],
         "Co": [
           "cobalt",
+          "cobalto",
           "co"
         ],
         "Ni": [
           "nickel",
+          "níquel",
           "ni"
         ],
         "Cu": [
           "copper",
+          "cobre",
           "cu"
         ],
         "Zn": [
           "zinc",
+          "zinco",
           "zn"
         ],
         "Ga": [
@@ -6605,7 +7161,9 @@
           "ge"
         ],
         "As": [
-          "arsenic"
+          "arsenic",
+          "arsênio",
+          "arsênico"
         ],
         "Se": [
           "selenium",
@@ -6625,6 +7183,7 @@
         ],
         "Sr": [
           "strontium",
+          "estrôncio",
           "sr"
         ],
         "Y": [
@@ -6632,14 +7191,17 @@
         ],
         "Zr": [
           "zirconium",
+          "zircônio",
           "zr"
         ],
         "Nb": [
           "niobium",
+          "nióbio",
           "nb"
         ],
         "Mo": [
           "molybdenum",
+          "molibdênio",
           "mo"
         ],
         "Tc": [
@@ -6660,6 +7222,7 @@
         ],
         "Ag": [
           "silver",
+          "prata",
           "ag"
         ],
         "Cd": [
@@ -6671,10 +7234,12 @@
         ],
         "Sn": [
           "tin",
+          "estanho",
           "sn"
         ],
         "Sb": [
           "antimony",
+          "antimônio",
           "sb"
         ],
         "Te": [
@@ -6694,6 +7259,7 @@
         ],
         "Ba": [
           "barium",
+          "bário",
           "ba"
         ],
         "La": [
@@ -6761,10 +7327,12 @@
         ],
         "Ta": [
           "tantalum",
+          "tântalo",
           "ta"
         ],
         "W": [
-          "tungsten"
+          "tungsten",
+          "tungstênio"
         ],
         "Re": [
           "rhenium",
@@ -6780,14 +7348,17 @@
         ],
         "Pt": [
           "platinum",
+          "platina",
           "pt"
         ],
         "Au": [
           "gold",
+          "ouro",
           "au"
         ],
         "Hg": [
           "mercury",
+          "mercúrio",
           "hg"
         ],
         "Tl": [
@@ -6796,10 +7367,12 @@
         ],
         "Pb": [
           "lead",
+          "chumbo",
           "pb"
         ],
         "Bi": [
           "bismuth",
+          "bismuto",
           "bi"
         ],
         "Po": [
@@ -6833,7 +7406,8 @@
           "protactinium"
         ],
         "U": [
-          "uranium"
+          "uranium",
+          "urânio"
         ],
         "Np": [
           "neptunium",
@@ -8959,6 +9533,94 @@
         "passa"
       ],
       "label_pt": "Converter"
+    },
+    {
+      "name": "mineral",
+      "label": "Mineral",
+      "words": [
+        "tell me about",
+        "look up",
+        "show"
+      ],
+      "elidable": true,
+      "theme": [
+        "mineral"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {},
+      "words_pt": [
+        "me fala sobre",
+        "mostra"
+      ],
+      "label_pt": "Mineral"
+    },
+    {
+      "name": "mineralProp",
+      "label": "Mineral",
+      "words": [],
+      "elidable": true,
+      "theme": [
+        "mineralprop"
+      ],
+      "required": [
+        "theme",
+        "of"
+      ],
+      "roles": {
+        "of": {
+          "preps": [
+            "of",
+            "for"
+          ],
+          "types": [
+            "mineral"
+          ]
+        }
+      },
+      "words_pt": [],
+      "label_pt": "Mineral"
+    },
+    {
+      "name": "mineralsWith",
+      "label": "Minerals with",
+      "words": [
+        "which",
+        "list",
+        "show",
+        "find"
+      ],
+      "elidable": true,
+      "theme": [
+        "mineralclass"
+      ],
+      "required": [
+        "theme",
+        "with"
+      ],
+      "roles": {
+        "with": {
+          "preps": [
+            "with",
+            "containing",
+            "that have",
+            "have",
+            "having",
+            "that contain"
+          ],
+          "types": [
+            "element",
+            "elsym"
+          ]
+        }
+      },
+      "words_pt": [
+        "quais",
+        "lista",
+        "mostra"
+      ],
+      "label_pt": "Minerais com"
     },
     {
       "name": "reformat",
@@ -11689,7 +12351,8 @@
             ""
           ],
           "types": [
-            "text"
+            "text",
+            "mineral"
           ]
         }
       },

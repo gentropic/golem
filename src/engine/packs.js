@@ -29,6 +29,14 @@ export async function readGcudat(bytes) {
   return { manifest, json: p => { const f = at(p); if (!f) throw new Error(`the pack has no ${p}`); return JSON.parse(dec.decode(f)); } };
 }
 // the factbook-full expansion, kept small: which countries are landlocked, and their coastlines
+// the minerals pack (gcu-library data/minerals: Wikidata's mineral species), kept as its records: { version, retrieved, records }
+export async function mineralsFromGcudat(bytes) {
+  const p = await readGcudat(bytes);
+  if (p.manifest.name !== 'minerals') throw new Error(`that is the ${p.manifest.name} pack, not the minerals`);
+  const index = p.json(p.manifest.index || 'dataset.json'), records = p.json(index.records || 'records.json');
+  if (!Array.isArray(records) || !records.length) throw new Error('the minerals pack holds no records');
+  return { name: 'minerals', version: p.manifest.version || index.version, retrieved: index.retrieved || null, records };
+}
 export async function factbookProfiles(fullBytes) {
   const f = await readGcudat(fullBytes); if (f.manifest.name !== 'factbook-full') throw new Error(`that is the ${f.manifest.name} pack, not the factbook's full profiles`);
   const fi = f.json(f.manifest.index || 'dataset.json'), fr = f.json(fi.records || 'records.json');

@@ -2,6 +2,7 @@
 // table questions in controlled English answered through @gcu/sadpan and @gcu/sift (all vendored).
 // Sample data stays labelled as sample data; a file is named on every card that reads it.
 import { S, T, tool, frame, amend, noun, shape, postmod, qmod, compound, condition, fmt } from './core.js';
+import { mineralsTable } from './minerals.js';
 import { DOCUMENT } from './interchange.js';
 import { series } from '../vendor/sadpan.js';
 import { sniff, detectAnalyte, NULL_SENTINELS } from '../vendor/recon.js';
@@ -109,7 +110,8 @@ tool({
   topic: () => null,
   run: a => {
     let t;
-    if (a.device) {
+    if (a.device === 'minerals') t = mineralsTable();   // a pack, not device state: the minerals as a table (minerals.js)
+    else if (a.device) {
       const d = S.tables[a.device]; if (!d || !d.rows.length) return { read: ['open table', { v: a.device }], body: [{ t: 'note', kind: 'err', text: `The ${a.device} is empty. Say "log 5 km run" first.` }], trace: ['device table: empty'] };
       t = { name: a.device, source: 'device', hash: a.device, rows: d.rows.map(r => ({ ...r })), cols: d.cols.map(c => ({ ...c })), roles: {} };
     } else if (a.file) {

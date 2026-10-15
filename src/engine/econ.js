@@ -111,7 +111,7 @@ noun({ type: 'gylot', words: {}, generic: ['lot'], generic_pt: ['lote'] }); qmod
 noun({ type: 'precision', words: { p: ['precision', 'error', 'relative error'] }, words_pt: { p: ['precisão', 'erro'] } }); qmod({ head: 'precision', attr: 'value', dims: ['mass ratio'] });
 frame({
   name: 'gy', label: 'Sampling error', words: ['calculate', 'compute'], elidable: true, theme: ['gyword'], required: ['theme', 'at'],
-  roles: { for: { preps: ['for', 'of'], types: ['gysample', 'precision'] }, at: { preps: ['at', 'with'], types: ['quantity:length'] }, from: { preps: ['from', 'of', 'in'], types: ['gylot', 'quantity:mass ratio'] }, mineral: { preps: [''], types: ['text'] } },
+  roles: { for: { preps: ['for', 'of'], types: ['gysample', 'precision'] }, at: { preps: ['at', 'with'], types: ['quantity:length'] }, from: { preps: ['from', 'of', 'in'], types: ['gylot', 'quantity:mass ratio'] }, mineral: { preps: [''], types: ['text', 'mineral'] } },
   label_pt: 'Erro de amostragem',
   bind: c => {
     const w = c.theme[0].value, d = sizeCm(c.roles.at[0]); if (d == null) return null;

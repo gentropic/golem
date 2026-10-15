@@ -7,7 +7,8 @@ import { completions } from '../engine/reading.js';
 import { fromDevice } from '../engine/field.js';
 import { conversions } from '../vendor/bearing.js';
 import { useFactbook, factbookInfo } from '../engine/factbook.js';
-import { factbookFromGcudat, factbookProfiles, readGcudat, compileOds, compileStrunk } from '../engine/packs.js';
+import { factbookFromGcudat, factbookProfiles, readGcudat, compileOds, compileStrunk, mineralsFromGcudat } from '../engine/packs.js';
+import { useMinerals, mineralsInfo } from '../engine/minerals.js';
 import { useBook, bookInfo } from '../engine/books.js';
 import { BINARY } from '../engine/formats.js';
 import { setRunner, onJobDone } from '../engine/core.js';
@@ -369,22 +370,25 @@ async function keepFactbook(pack) {
   await store.writePack('factbook', pack);
   const i = useFactbook(pack); packNote = t('Installed: {n} countries{full}.', { n: i.count, full: pack.profiles ? t(', with the full profiles') : '' }); status(packNote);
 }
-// the book packs: compiled at install into the index golem uses (packs.js), kept, handed to books.js
+// the packs compiled at install into what golem uses (packs.js), kept, and handed to the engine: books.js by default, or
+// the entry's own use/info (the minerals)
+const useOf = slug => (BOOKS[slug].use || useBook), infoOf = slug => (BOOKS[slug].info || bookInfo)(slug);
 const BOOKS = {
   ods: { compile: compileOds, size: '1.9 MB', sample: 'A sample term index ships: where a term is defined, without the passage.', installed: i => t('Installed: {n} terms with their defining passages.', { n: i.count }), removed: 'Removed. The sample term index answers again.' },
+  minerals: { compile: mineralsFromGcudat, size: '254 kB', sample: 'A sample of 42 common minerals ships, copied from the pack.', installed: i => t('Installed: {n} minerals.', { n: i.count }), removed: 'Removed. The sample of 42 minerals answers again.', use: (s, c) => useMinerals(c), info: () => mineralsInfo() },
   'elements-of-style': { compile: compileStrunk, size: '36 kB', sample: 'A sample of rules 10, 11 and 13 ships.', installed: i => t('Installed: {n} checks from its rules and chapter V.', { n: i.count }), removed: 'Removed. The sample checks answer again.' },
 };
 const bookNote = {};
-async function keepBook(slug, compiled) { await store.writePack(slug, compiled); bookNote[slug] = BOOKS[slug].installed(useBook(slug, compiled)); status(bookNote[slug]); }
+async function keepBook(slug, compiled) { await store.writePack(slug, compiled); bookNote[slug] = BOOKS[slug].installed(useOf(slug)(slug, compiled)); status(bookNote[slug]); }
 async function installBook(slug) {
   if (packBusy) return; packBusy = true; bookNote[slug] = t('Installing…'); renderPacks();
   try { const e = (await registry())(slug); if (!e) throw new Error(`the library lists no ${slug} pack`); await keepBook(slug, await BOOKS[slug].compile(await fetchPack(e))); }
   catch (err) { bookNote[slug] = t('Not installed: {e}.', { e: err.message }); }
   packBusy = false; renderPacks();
 }
-async function removeBook(slug) { await store.removePack(slug); useBook(slug, null); bookNote[slug] = t(BOOKS[slug].removed); renderPacks(); }
+async function removeBook(slug) { await store.removePack(slug); useOf(slug)(slug, null); bookNote[slug] = t(BOOKS[slug].removed); renderPacks(); }
 function bookItem(slug) {
-  const i = bookInfo(slug), B = BOOKS[slug];
+  const i = infoOf(slug), B = BOOKS[slug];
   const acts = i.kind === 'sample' ? (inApp ? `<span class="sub">${OFFLINE_APP()}</span>` : `<button class="btn go" type="button" data-pk-install="${slug}">${t('Install from the library ({size})', { size: B.size })}</button>`) : `<button class="btn" type="button" data-pk-remove="${slug}">${t('Remove')}</button>`;
   return `<p>${i.kind === 'sample' ? t(B.sample) : escHtml(t('Installed: version {v}, kept on this device.', { v: i.version || '' }))}</p><div class="opts">${store && store.kind === 'idb' ? acts : `<span class="sub">${t('This browser gives golem no IndexedDB, so a pack cannot be kept.')}</span>`}${bookNote[slug] ? `<span class="sub">${escHtml(bookNote[slug])}</span>` : ''}</div>`;
 }
@@ -416,7 +420,7 @@ function renderPacks() {
   PACKS.forEach(([id, name, meta, st, d]) => {
     if (id === 'factbook') st = fbi.kind === 'sample' ? 'samp' : 'live';
     if (id === 'factbook-full') st = fbi.kind === 'pack' && fbi.profiles ? 'live' : 'plan';
-    if (BOOKS[id]) st = bookInfo(id).kind === 'pack' ? 'live' : 'samp';
+    if (BOOKS[id]) st = infoOf(id).kind === 'pack' ? 'live' : 'samp';
     h += `<div class="item"><h3>${escHtml(name)} <span class="tag ${st}">${lab[st]}</span></h3><p>${escHtml(d)}</p>${id === 'factbook' ? factbookItem() : BOOKS[id] ? bookItem(id) : ''}<div class="from">${escHtml(id)} · ${escHtml(meta)}</div></div>`;
   });
   const al = Object.entries(S.aliases);
@@ -676,7 +680,7 @@ if (shell.present) { $('st-where').dataset.tEn = 'in the lead-acid shell'; $('st
 (async () => {
   store = await openStore();
   const fb = await store.readPack('factbook').catch(() => null); if (fb) useFactbook(fb);   // before the sessions replay, so their cards read it
-  for (const slug of Object.keys(BOOKS)) { const b = await store.readPack(slug).catch(() => null); if (b) useBook(slug, b); }
+  for (const slug of Object.keys(BOOKS)) { const b = await store.readPack(slug).catch(() => null); if (b) useOf(slug)(slug, b); }
   const got = await store.load().catch(() => null);
   // a first visit: the examples are kept in the sidebar, and golem opens on the welcome in a session of its own
   if (!(got && hydrate(got.state)) && !sessions().length) { seedExamples(); newSession(); }

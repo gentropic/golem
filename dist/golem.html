@@ -5258,8 +5258,128 @@ frame({
   return { oriOf };
 })();
 
-/* ==== src/vendor/yaml.js ==== */
+/* ==== src/engine/data/minerals-sample.js ==== */
 const __m7 = (() => {
+// ⚠ GENERATED — a sample of gcu-library's minerals pack (data/minerals/records.json, Wikidata, CC0, retrieved 2026-10-15):
+// 42 common species, copied as the pack has them, nothing rounded or filled in. The pack has 6304; install it from Packs.
+// Regenerate from a gcu-library checkout rather than editing by hand.
+const MINERALS_SAMPLE = { retrieved: '2026-10-15', of: 6304, records: [{"id":"Q43010","name":"quartz","name_pt":"quartzo","formula":"SiO2","elements":["Si","O"],"class":"oxides","strunz":"4.DA.05","system":"trigonal","hardness_min":7,"hardness_max":7,"density":2.65,"density_range":null,"symbol":"Qz","mindat":"3337"},{"id":"Q171917","name":"calcite","name_pt":"calcita","formula":"CaCO3","elements":["Ca","C","O"],"class":"carbonates and nitrates","strunz":"5.AB.05","system":"trigonal","hardness_min":3.04,"hardness_max":3.04,"density":2.72,"density_range":null,"symbol":"Cal","mindat":"859"},{"id":"Q167741","name":"dolomite","name_pt":"dolomita","formula":"CaMg(CO3)2","elements":["Ca","Mg","C","O"],"class":"carbonates and nitrates","strunz":"5.AB.10","system":"trigonal","hardness_min":null,"hardness_max":null,"density":2.87,"density_range":null,"symbol":"Dol","mindat":"1304"},{"id":"Q82658","name":"gypsum","name_pt":"gipsita","formula":"CaSO4·2H2O","elements":["Ca","S","O","H"],"class":"sulfates","strunz":"7.CD.40","system":"monoclinic","hardness_min":2,"hardness_max":2,"density":2.32,"density_range":null,"symbol":"Gp","mindat":"1784"},{"id":"Q5314","name":"halite","name_pt":"halite","formula":"NaCl","elements":["Na","Cl"],"class":"halides","strunz":"3.AA.20","system":"cubic","hardness_min":2,"hardness_max":2,"density":2.225,"density_range":null,"symbol":"Hl","mindat":"1804"},{"id":"Q102151","name":"fluorite","name_pt":"fluorita","formula":"CaF2","elements":["Ca","F"],"class":"halides","strunz":"3.AB.25","system":"cubic","hardness_min":4,"hardness_max":4,"density":3.09,"density_range":null,"symbol":"Flr","mindat":"1576"},{"id":"Q184196","name":"baryte","name_pt":"barita","formula":"BaSO4","elements":["Ba","S","O"],"class":"sulfates","strunz":"7.AD.37","system":"orthorhombic","hardness_min":null,"hardness_max":null,"density":4.424,"density_range":null,"symbol":"Brt","mindat":"549"},{"id":"Q50769","name":"pyrite","name_pt":"pirite","formula":"FeS2","elements":["Fe","S"],"class":"sulfides and sulfosalts","strunz":"2.EB.05a","system":"cubic","hardness_min":6,"hardness_max":6,"density":5.025,"density_range":null,"symbol":"Py","mindat":"3314"},{"id":"Q111044","name":"chalcopyrite","name_pt":"calcopirita","formula":"CuFeS2","elements":["Cu","Fe","S"],"class":"sulfides and sulfosalts","strunz":"2.CB.10a","system":"tetragonal","hardness_min":3.5,"hardness_max":3.5,"density":null,"density_range":null,"symbol":"Ccp","mindat":"955"},{"id":"Q108694","name":"bornite","name_pt":"bornita","formula":"Cu5FeS4","elements":["Cu","Fe","S"],"class":"sulfides and sulfosalts","strunz":"2.BA.15","system":"orthorhombic","hardness_min":3,"hardness_max":3,"density":5.1,"density_range":null,"symbol":"Bn","mindat":"727"},{"id":"Q278106","name":"chalcocite","name_pt":"calcocita","formula":"Cu2S","elements":["Cu","S"],"class":"sulfides and sulfosalts","strunz":"2.BA.05","system":"monoclinic","hardness_min":2.75,"hardness_max":2.75,"density":5.65,"density_range":null,"symbol":"Cc","mindat":"962"},{"id":"Q325345","name":"covellite","name_pt":null,"formula":"CuS","elements":["Cu","S"],"class":"sulfides and sulfosalts","strunz":"2.CA.05a","system":"hexagonal","hardness_min":null,"hardness_max":null,"density":null,"density_range":null,"symbol":"Cv","mindat":"1144"},{"id":"Q37559","name":"galena","name_pt":"Galena","formula":"PbS","elements":["Pb","S"],"class":"sulfides and sulfosalts","strunz":"2.CD.10","system":"cubic","hardness_min":2.75,"hardness_max":2.75,"density":7.5,"density_range":null,"symbol":"Gn","mindat":"1641"},{"id":"Q105006","name":"sphalerite","name_pt":"blenda","formula":"ZnS","elements":["Zn","S"],"class":"sulfides and sulfosalts","strunz":"2.CB.05a","system":"cubic","hardness_min":null,"hardness_max":null,"density":4.141,"density_range":null,"symbol":"Sp","mindat":"10356"},{"id":"Q191939","name":"arsenopyrite","name_pt":"arsenopirita","formula":"FeAsS","elements":["Fe","As","S"],"class":"sulfides and sulfosalts","strunz":"2.EB.20","system":"monoclinic","hardness_min":null,"hardness_max":null,"density":6.347,"density_range":null,"symbol":"Apy","mindat":"305"},{"id":"Q382994","name":"molybdenite","name_pt":"molibdenite","formula":"MoS2","elements":["Mo","S"],"class":"sulfides and sulfosalts","strunz":"2.EA.30","system":"hexagonal","hardness_min":null,"hardness_max":null,"density":4.67,"density_range":null,"symbol":"Mol","mindat":"31721"},{"id":"Q104614","name":"cinnabar","name_pt":"cinábrio","formula":"HgS","elements":["Hg","S"],"class":"sulfides and sulfosalts","strunz":"2.CD.15a","system":"trigonal","hardness_min":2.3,"hardness_max":2.3,"density":8.1,"density_range":null,"symbol":"Cin","mindat":"1052"},{"id":"Q421831","name":"stibnite","name_pt":"estibina","formula":"Sb2S3","elements":["Sb","S"],"class":"sulfides and sulfosalts","strunz":"2.DB.05","system":"orthorhombic","hardness_min":8,"hardness_max":8,"density":null,"density_range":null,"symbol":"Sbn","mindat":"3782"},{"id":"Q181395","name":"magnetite","name_pt":"magnetita","formula":"Fe2+Fe3+2O4","elements":["Fe","O"],"class":"oxides","strunz":"4.BB.05","system":"cubic","hardness_min":6,"hardness_max":6,"density":5.175,"density_range":null,"symbol":"Mag","mindat":"2538"},{"id":"Q103223","name":"hematite","name_pt":"hematite","formula":"Fe2O3","elements":["Fe","O"],"class":"oxides","strunz":"4.CB.05","system":"trigonal","hardness_min":6,"hardness_max":6,"density":5.1,"density_range":null,"symbol":"Hem","mindat":"36613"},{"id":"Q190729","name":"ilmenite","name_pt":"ilmenita","formula":"Fe2+Ti4+O3","elements":["Fe","Ti","O"],"class":"oxides","strunz":"4.CB.05","system":"trigonal","hardness_min":5.5,"hardness_max":5.5,"density":4.72,"density_range":null,"symbol":"Ilm","mindat":"2013"},{"id":"Q320603","name":"rutile","name_pt":"rutilo","formula":"TiO2","elements":["Ti","O"],"class":"oxides","strunz":"4.DB.05","system":"tetragonal","hardness_min":null,"hardness_max":null,"density":3.856,"density_range":null,"symbol":"Rt","mindat":"3486"},{"id":"Q191222","name":"cassiterite","name_pt":"cassiterite","formula":"SnO2","elements":["Sn","O"],"class":"oxides","strunz":"4.DB.05","system":"tetragonal","hardness_min":6.5,"hardness_max":6.5,"density":6.58,"density_range":null,"symbol":"Cst","mindat":"917"},{"id":"Q131777","name":"corundum","name_pt":"coríndon","formula":"Al2O3","elements":["Al","O"],"class":"oxides","strunz":"4.CB.05","system":"trigonal","hardness_min":9,"hardness_max":9,"density":null,"density_range":null,"symbol":"Crn","mindat":"1136"},{"id":"Q409096","name":"scheelite","name_pt":"scheelita","formula":"CaWO4","elements":["Ca","W","O"],"class":"sulfates","strunz":"7.GA.05","system":"tetragonal","hardness_min":null,"hardness_max":null,"density":6.1,"density_range":null,"symbol":"Sch","mindat":"3560"},{"id":"Q164411","name":"malachite","name_pt":"malaquite","formula":"Cu2(CO3)(OH)2","elements":["Cu","C","O","H"],"class":"carbonates and nitrates","strunz":"5.BA.10","system":"monoclinic","hardness_min":3.75,"hardness_max":3.75,"density":3.85,"density_range":null,"symbol":"Mlc","mindat":"26989"},{"id":"Q108212","name":"azurite","name_pt":"azurite","formula":"Cu3(CO3)2(OH)2","elements":["Cu","C","O","H"],"class":"carbonates and nitrates","strunz":"5.BA.05","system":"monoclinic","hardness_min":3.75,"hardness_max":3.75,"density":3.75,"density_range":null,"symbol":"Azu","mindat":"447"},{"id":"Q898406","name":"native gold","name_pt":null,"formula":"Au","elements":["Au"],"class":"elements","strunz":"1.AA.05","system":"cubic","hardness_min":2.75,"hardness_max":2.75,"density":17.4,"density_range":null,"symbol":"Au","mindat":"1720"},{"id":"Q1057174","name":"native silver","name_pt":null,"formula":"Ag","elements":["Ag"],"class":"elements","strunz":"1.AA.05","system":"cubic","hardness_min":2.75,"hardness_max":2.75,"density":10.5,"density_range":null,"symbol":"Ag","mindat":"3664"},{"id":"Q583353","name":"native copper","name_pt":null,"formula":"Cu","elements":["Cu"],"class":"elements","strunz":"1.AA.05","system":"cubic","hardness_min":2.75,"hardness_max":2.75,"density":8.5,"density_range":null,"symbol":"Cu","mindat":null},{"id":"Q5283","name":"diamond","name_pt":"diamante","formula":"C","elements":["C"],"class":"elements","strunz":"1.CB.10a","system":"cubic","hardness_min":10,"hardness_max":10,"density":3.513,"density_range":[3.51,3.515],"symbol":"Dia","mindat":"1282"},{"id":"Q5309","name":"graphite","name_pt":"grafite","formula":"C","elements":["C"],"class":"elements","strunz":"1.CB.05a","system":"hexagonal","hardness_min":1.5,"hardness_max":1.5,"density":2.16,"density_range":null,"symbol":"Gr","mindat":"14603"},{"id":"Q178928","name":"zircon","name_pt":"zircão","formula":"ZrSiO4","elements":["Zr","Si","O"],"class":"silicates","strunz":"9.AD.30","system":"tetragonal","hardness_min":7.5,"hardness_max":7.5,"density":4.65,"density_range":null,"symbol":"Zrn","mindat":null},{"id":"Q134985","name":"topaz","name_pt":"topázio","formula":"Al2SiO4F2","elements":["Al","Si","O","F"],"class":"silicates","strunz":"9.AF.35","system":"orthorhombic","hardness_min":8,"hardness_max":8,"density":3.53,"density_range":null,"symbol":"Tpz","mindat":"3996"},{"id":"Q134583","name":"talc","name_pt":"talco","formula":null,"elements":[],"class":"silicates","strunz":"9.EC.05","system":"hexagonal","hardness_min":1,"hardness_max":1,"density":2.75,"density_range":null,"symbol":"Tlc","mindat":"3875"},{"id":"Q223197","name":"kaolinite","name_pt":"caulinite","formula":"Al2Si2O5(OH)4","elements":["Al","Si","O","H"],"class":"silicates","strunz":"9.ED.05","system":"triclinic","hardness_min":1,"hardness_max":1,"density":null,"density_range":null,"symbol":"Kln","mindat":"2156"},{"id":"Q106532","name":"muscovite","name_pt":"moscovita","formula":"KAl2(Si3Al)O10(OH)2","elements":["K","Al","Si","O","H"],"class":"silicates","strunz":"9.EC.15","system":"monoclinic","hardness_min":null,"hardness_max":null,"density":null,"density_range":null,"symbol":"Ms","mindat":"2815"},{"id":"Q21813710","name":"orthoclase","name_pt":"ortoclase","formula":"K(AlSi3O8)","elements":["K","Al","Si","O"],"class":"silicates","strunz":"9.FA.30","system":"monoclinic","hardness_min":6,"hardness_max":6,"density":2.457,"density_range":null,"symbol":"Or","mindat":"3026"},{"id":"Q182264","name":"albite","name_pt":"albite","formula":"NaAlSi3O8","elements":["Na","Al","Si","O"],"class":"silicates","strunz":"9.FA.35","system":"triclinic","hardness_min":null,"hardness_max":null,"density":2.64,"density_range":null,"symbol":"Ab","mindat":"96"},{"id":"Q415037","name":"forsterite","name_pt":"forsterite","formula":"Mg2SiO4","elements":["Mg","Si","O"],"class":"silicates","strunz":"9.AC.05","system":"orthorhombic","hardness_min":7,"hardness_max":7,"density":3.236,"density_range":null,"symbol":"Fo","mindat":"1584"},{"id":"Q273663","name":"almandine","name_pt":null,"formula":"Fe2+3Al2(SiO4)3","elements":["Fe","Al","Si","O"],"class":"silicates","strunz":"9.AD.25","system":"cubic","hardness_min":7.5,"hardness_max":7.5,"density":4.3,"density_range":null,"symbol":"Alm","mindat":"452"},{"id":"Q416275","name":"fluorapatite","name_pt":null,"formula":"Ca5(PO4)3F","elements":["Ca","P","O","F"],"class":"phosphates","strunz":"8.BN.05","system":"hexagonal","hardness_min":5,"hardness_max":5,"density":3.208,"density_range":null,"symbol":"Fap","mindat":"1572"}] };
+  return { MINERALS_SAMPLE };
+})();
+
+/* ==== src/engine/minerals.js ==== */
+const __m8 = (() => {
+const { tool, frame, noun, fmt } = __m0;
+const { MINERALS_SAMPLE } = __m7;
+// Minerals (SPEC 13.8, packs as tables): mineral species from Wikidata, through gcu-library's minerals pack. A sample of 42
+// common species ships (data/minerals-sample.js, copied from the pack and labelled); the pack, installed from Packs, has
+// every species Wikidata lists (6304 on 15 Oct 2026). A mineral is looked up by name ("chalcopyrite", "hardness of
+// quartz"); minerals are found by their elements and class ("minerals with Cu and S", "sulfides with Bi"); the whole set
+// opens as a table ("open the minerals") for every table question ("count where hardness > 6 and density < 3"). What
+// Wikidata does not have stays empty and is said to be missing: nothing is estimated.
+
+const CLASSES = ['elements', 'sulfides and sulfosalts', 'halides', 'oxides', 'carbonates and nitrates', 'borates', 'sulfates', 'phosphates', 'silicates', 'organic compounds'];
+let DATA = null, BY = new Map();
+// a pack as installed: { version, retrieved, records }
+function useMinerals(pack) {
+  DATA = pack ? { kind: 'pack', version: pack.version, retrieved: pack.retrieved, of: pack.records.length, records: pack.records } : { kind: 'sample', version: 'sample', retrieved: MINERALS_SAMPLE.retrieved, of: MINERALS_SAMPLE.of, records: MINERALS_SAMPLE.records };
+  BY = new Map(); for (const r of DATA.records) for (const n of namesOf(r)) if (!BY.has(n)) BY.set(n, r);
+  return mineralsInfo();
+}
+const mineralsInfo = () => ({ kind: DATA.kind, version: DATA.version, count: DATA.records.length });
+// the names a record answers to: its own, its Portuguese one, without "native" ("gold"), and the usual spellings
+const ALIAS = { baryte: ['barite'], 'native gold': ['gold'], 'native silver': ['silver'], 'native copper': ['copper'], 'native sulfur': ['sulfur', 'sulphur'] };
+const namesOf = r => [...new Set([r.name, r.name_pt, ...(ALIAS[r.name.toLowerCase()] || [])].filter(Boolean).map(n => n.toLowerCase()))];
+useMinerals(null);
+const mineralRecords = () => DATA.records;
+const SRC = () => ({ t: 'src', text: DATA.kind === 'pack' ? `Wikidata · CC0 · retrieved ${DATA.retrieved} · gcu-library minerals pack ${DATA.version}` : `Wikidata · CC0 · retrieved ${DATA.retrieved} · the sample of ${DATA.records.length} that ships (the pack has ${DATA.of}; Packs installs it)` });
+const MISSING = 'not in Wikidata';
+const hard = r => r.hardness_min == null ? MISSING : r.hardness_min === r.hardness_max ? fmt(r.hardness_min, 3) : `${fmt(r.hardness_min, 3)} to ${fmt(r.hardness_max, 3)}`;
+const dens = r => r.density == null ? MISSING : `${fmt(r.density, 4)} g/cm³${r.density_range ? ` (Wikidata gives ${fmt(r.density_range[0], 4)} to ${fmt(r.density_range[1], 4)})` : ''}`;
+const PROPS = { formula: 'formula', hardness: 'Mohs hardness', density: 'density', system: 'crystal system', class: 'class', symbol: 'IMA symbol', elements: 'elements' };
+const valueOf = (r, p) => p === 'hardness' ? hard(r) : p === 'density' ? dens(r) : p === 'elements' ? (r.elements.length ? r.elements.join(', ') : MISSING) : p === 'class' ? (r.class ? `${r.class} (Nickel-Strunz ${r.strunz})` : MISSING) : r[p] == null ? MISSING : String(r[p]);
+
+/* ── one mineral ─────────────────────────────────────────────── */
+tool({
+  name: 'mineral',
+  skill: { group: 'Knowledge', title: 'Minerals', on: 'gcu-library minerals pack · Wikidata', about: 'Mineral species by name: formula, elements, Nickel-Strunz class, crystal system, Mohs hardness and density where Wikidata has them; minerals found by their elements and class; the whole set opened as a table. A sample of 42 ships; the pack has every species Wikidata lists.', examples: ['chalcopyrite', 'hardness of quartz', 'minerals with Cu and S', 'sulfides with Bi', 'open the minerals'] },
+  topic: a => [a.name, 2],
+  run: a => {
+    const r = BY.get(String(a.name).toLowerCase());
+    if (!r) return { read: ['mineral', { v: a.name }], body: [{ t: 'note', kind: 'err', text: `${a.name} is not in ${DATA.kind === 'pack' ? 'the minerals pack' : `the sample of ${DATA.records.length}; the minerals pack (Packs) has ${DATA.of}`}.` }, SRC()], trace: ['no such mineral'] };
+    const p = a.prop && PROPS[a.prop] ? a.prop : null;
+    const rows = Object.entries(PROPS).filter(([k]) => k !== 'formula' && k !== p).map(([k, label]) => [label, valueOf(r, k)]);
+    if (r.mindat) rows.push(['Mindat', `mineral ${r.mindat}`]);
+    rows.push(['Wikidata', r.id]);
+    const big = p ? { t: 'big', v: valueOf(r, p), unit: `${PROPS[p]} of ${r.name}`, size: valueOf(r, p).length > 24 ? 18 : undefined } : { t: 'big', v: r.formula || MISSING, unit: r.name };
+    const chips = [...(r.formula && !/[,?☐◻]/.test(r.formula) ? [`molar mass of ${r.formula}`] : []), ...(r.elements.length ? [`minerals with ${r.elements.filter(e => e !== 'O' && e !== 'H').slice(0, 3).join(' and ')}`] : [])].filter(c => !/with $/.test(c));
+    return { read: p ? [PROPS[p], 'of', { v: r.name }] : ['mineral', { v: r.name }], value: p ? valueOf(r, p) : r.formula,
+      body: [big, ...(p ? [{ t: 'sub', text: `${r.name}: ${r.formula || MISSING}` }] : []), { t: 'kv', rows }, ...(chips.length ? [{ t: 'chips', items: chips }] : []), SRC()],
+      trace: [`minerals: "${a.name}" → ${r.name} (${r.id})`, p ? `${p}: ${valueOf(r, p)}` : 'every field Wikidata has'], py: `minerals.get("${r.name}")${p ? `["${p}"]` : ''}` };
+  }
+});
+
+/* ── minerals by element and class ───────────────────────────── */
+tool({
+  name: 'mineralsWith',
+  topic: a => [`Minerals with ${(a.elements || []).join(' ')}`, 1],
+  run: a => {
+    const els = a.elements || [], cls = a.class || null;
+    const hits = DATA.records.filter(r => els.every(e => r.elements.includes(e)) && (!cls || r.class === cls) && (!a.only || r.elements.every(e => els.includes(e) || e === 'O' || e === 'H')));
+    const read = ['minerals', ...(cls ? [{ v: cls }] : []), ...(els.length ? ['with', { v: els.join(', ') }] : [])];
+    if (!hits.length) return { read, value: 0, body: [{ t: 'note', text: `None ${DATA.kind === 'sample' ? `in the sample of ${DATA.records.length} (the minerals pack has ${DATA.of})` : 'in the minerals pack'}.` }, SRC()], trace: [`${DATA.records.length} minerals, none with ${els.join(', ')}`] };
+    const shown = hits.slice(0, 40);
+    return { read, value: hits.length,
+      body: [{ t: 'big', v: String(hits.length), unit: `mineral${hits.length === 1 ? '' : 's'}${DATA.kind === 'sample' ? ` in the sample of ${DATA.records.length}` : ''}` },
+        { t: 'table', head: ['mineral', 'formula', 'class', 'system', 'hardness', 'density'], rows: shown.map(r => [r.name, r.formula || '', r.class || '', r.system || '', r.hardness_min == null ? '' : hard(r), r.density == null ? '' : fmt(r.density, 4)]) },
+        ...(hits.length > shown.length ? [{ t: 'sub', text: `The first ${shown.length} by name. "open the minerals" makes all of them a table to ask.` }] : []), SRC()],
+      trace: [`${DATA.records.length} minerals → ${hits.length} with ${els.join(', ') || 'any element'}${cls ? `, class ${cls}` : ''}`], py: `minerals.where(elements=${JSON.stringify(els)}${cls ? `, cls="${cls}"` : ''})` };
+  }
+});
+
+// the set as a table for the table tools ("open the minerals"): numbers as numbers, the elements as one column of symbols
+function mineralsTable() {
+  return { name: 'minerals', source: 'device', hash: 'minerals', roles: {},
+    cols: [{ name: 'name', type: 'category' }, { name: 'formula', type: 'category' }, { name: 'class', type: 'category' }, { name: 'system', type: 'category' }, { name: 'hardness', type: 'numeric' }, { name: 'hardness_max', type: 'numeric' }, { name: 'density', type: 'numeric', unit: 'g/cm3' }, { name: 'elements', type: 'category' }, { name: 'symbol', type: 'category' }],
+    rows: DATA.records.map(r => ({ name: r.name, formula: r.formula, class: r.class, system: r.system, hardness: r.hardness_min, hardness_max: r.hardness_max, density: r.density, elements: r.elements.join(' '), symbol: r.symbol })) };
+}
+const mineralsSource = () => SRC().text;
+
+/* ── what reads them ─────────────────────────────────────────── */
+noun(() => { const en = {}, pt = {}; for (const r of DATA.records) { const pn = (r.name_pt || '').toLowerCase(); en[r.name] = namesOf(r).filter(n => n !== pn || n === r.name.toLowerCase()); pt[r.name] = namesOf(r); } return { type: 'mineral', exact: true, words: en, words_pt: pt }; });
+// the one-letter element symbols, which the element noun leaves out (they are units and words elsewhere): only a
+// mineral search takes them ("minerals with Cu and S"); I is left out, it is the pronoun
+noun({ type: 'elsym', exact: true, words: Object.fromEntries('H B C N O F P S K V Y U W'.split(' ').map(e => [e, [e.toLowerCase()]])), words_pt: Object.fromEntries('H B C N O F P S K V Y U W'.split(' ').map(e => [e, [e.toLowerCase()]])) });
+noun({ type: 'mineralprop', words: { formula: ['formula', 'chemical formula'], hardness: ['hardness', 'mohs hardness', 'mohs'], density: ['density', 'specific gravity'], system: ['crystal system', 'system'], class: ['class', 'strunz class', 'mineral class'], symbol: ['ima symbol', 'symbol', 'abbreviation'], elements: ['elements'] },
+  words_pt: { formula: ['fórmula', 'formula'], hardness: ['dureza'], density: ['densidade'], system: ['sistema cristalino'], class: ['classe'], symbol: ['símbolo'], elements: ['elementos'] } });
+noun({ type: 'mineralclass', words: { any: ['minerals', 'mineral species'], 'sulfides and sulfosalts': ['sulfides', 'sulphides', 'sulfosalts'], oxides: ['oxides'], silicates: ['silicates'], carbonates: ['carbonates'], sulfates: ['sulfates', 'sulphates'], phosphates: ['phosphates'], halides: ['halides'], borates: ['borates'], elements: ['native elements'] },
+  words_pt: { any: ['minerais'], 'sulfides and sulfosalts': ['sulfetos'], oxides: ['óxidos'], silicates: ['silicatos'], carbonates: ['carbonatos'], sulfates: ['sulfatos'], phosphates: ['fosfatos'], halides: ['haletos'], borates: ['boratos'], elements: ['elementos nativos'] } });
+noun({ type: 'devtable', words: { minerals: ['the minerals', 'minerals table', 'the minerals table', 'mineral table'] }, words_pt: { minerals: ['os minerais', 'tabela de minerais'] } });
+const CLASS_OF = { any: null, carbonates: 'carbonates and nitrates' };
+// "chalcopyrite", "what is chalcopyrite", "tell me about quartz"
+frame({
+  name: 'mineral', label: 'Mineral', words: ['tell me about', 'look up', 'show'], elidable: true, theme: ['mineral'], required: ['theme'], roles: {},
+  words_pt: ['me fala sobre', 'mostra'], label_pt: 'Mineral',
+  bind: c => c.theme.length === 1 && c.theme[0].value ? { tool: 'mineral', args: { name: c.theme[0].value } } : null
+});
+// "hardness of quartz", "the density of pyrite", "formula of chalcopyrite"
+frame({
+  name: 'mineralProp', label: 'Mineral', words: [], elidable: true, theme: ['mineralprop'], required: ['theme', 'of'], roles: { of: { preps: ['of', 'for'], types: ['mineral'] } },
+  words_pt: [], label_pt: 'Mineral',
+  bind: c => { const of = c.roles.of && c.roles.of[0]; return of && of.value ? { tool: 'mineral', args: { name: of.value, prop: c.theme[0].value } } : null; }
+});
+// "minerals with Cu and S", "which minerals have bismuth", "sulfides with Bi", "silicates with Be"
+frame({
+  name: 'mineralsWith', label: 'Minerals with', words: ['which', 'list', 'show', 'find'], elidable: true, theme: ['mineralclass'], required: ['theme', 'with'],
+  roles: { with: { preps: ['with', 'containing', 'that have', 'have', 'having', 'that contain'], types: ['element', 'elsym'] } },
+  words_pt: ['quais', 'lista', 'mostra'], label_pt: 'Minerais com',
+  bind: c => { const els = (c.roles.with || []).map(n => n.value).filter(Boolean), k = c.theme[0].value; if (!els.length) return null; const cls = k in CLASS_OF ? CLASS_OF[k] : k; return { tool: 'mineralsWith', args: { elements: els, ...(cls ? { class: cls } : {}) } }; }
+});
+  return { useMinerals, mineralsInfo, mineralRecords, mineralsTable, mineralsSource, CLASSES };
+})();
+
+/* ==== src/vendor/yaml.js ==== */
+const __m9 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/yaml, the strict YAML subset (parse to a typed tree, emit canonical text), copied from ../auditable/ext/yaml/index.js at auditable 5fa5f72e (MIT).
 // Re-vendor by copying that file here.
 
@@ -6887,7 +7007,7 @@ function format(text) {
 })();
 
 /* ==== src/vendor/wkt.js ==== */
-const __m8 = (() => {
+const __m10 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/wkt, Well-Known Text to and from GeoJSON geometry, copied from ../auditable/ext/wkt/index.js at auditable 5fa5f72e (MIT).
 // Re-vendor by copying that file here.
 
@@ -7014,7 +7134,7 @@ function stringify(geom, opts = {}) {
 })();
 
 /* ==== src/vendor/dxf.js ==== */
-const __m9 = (() => {
+const __m11 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/dxf, the DXF reader and writer (R2000 ASCII), copied from ../auditable/ext/dxf/index.js at auditable 5fa5f72e (MIT).
 // Re-vendor by copying that file here.
 
@@ -8222,11 +8342,11 @@ function extractScene(doc) {
 })();
 
 /* ==== src/engine/interchange.js ==== */
-const __m10 = (() => {
+const __m12 = (() => {
 const { S, tool, frame, fmt } = __m0;
-const { parse: parseYaml, emit, scalar, mapNode, seqNode, mapEntry } = __m7;
-const { parse: parseWkt, stringify: toWkt } = __m8;
-const { read: readDxf, explode, arcFromBulge } = __m9;
+const { parse: parseYaml, emit, scalar, mapNode, seqNode, mapEntry } = __m9;
+const { parse: parseWkt, stringify: toWkt } = __m10;
+const { read: readDxf, explode, arcFromBulge } = __m11;
 // Formats that are not tables: YAML and JSON both ways (within the strict subset @gcu/yaml reads), WKT and
 // GeoJSON both ways (@gcu/wkt), and DXF to GeoJSON or WKT one way (@gcu/dxf). Pasted after a colon, or a
 // file from the picker kept on the device. What does not carry over is said on the card.
@@ -8402,7 +8522,7 @@ frame({
 })();
 
 /* ==== src/vendor/sadpan.js ==== */
-const __m11 = (() => {
+const __m13 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sadpan, DataFrame-style tables and series, copied from
 // ../auditable/ext/sadpan/index.js (built from its src/ by @gcu/build). Re-vendor by copying that file here.
 // golem uses series() for summary statistics.
@@ -10531,7 +10651,7 @@ if (typeof window !== 'undefined') {
 })();
 
 /* ==== src/vendor/recon.js ==== */
-const __m12 = (() => {
+const __m14 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/recon, copied from ../auditable/ext/recon/index.js (built from its src/ by @gcu/build).
 // Re-vendor by copying that file here.
 
@@ -11042,7 +11162,7 @@ function assemble(ctx) {
 })();
 
 /* ==== src/vendor/sift.js ==== */
-const __m13 = (() => {
+const __m15 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sift, copied from ../auditable/ext/sift/index.js (built from its src/ by @gcu/build).
 // Re-vendor by copying that file here.
 
@@ -11309,12 +11429,13 @@ function _wrap(n) { return n && PARENS.has(n.op) ? '(' + _str(n) + ')' : _str(n)
 })();
 
 /* ==== src/engine/table.js ==== */
-const __m14 = (() => {
+const __m16 = (() => {
 const { S, T, tool, frame, amend, noun, shape, postmod, qmod, compound, condition, fmt } = __m0;
-const { DOCUMENT } = __m10;
-const { series } = __m11;
-const { sniff, detectAnalyte, NULL_SENTINELS } = __m12;
-const { parsePredicate, evaluatePredicate, predicateToString } = __m13;
+const { mineralsTable } = __m8;
+const { DOCUMENT } = __m12;
+const { series } = __m13;
+const { sniff, detectAnalyte, NULL_SENTINELS } = __m14;
+const { parsePredicate, evaluatePredicate, predicateToString } = __m15;
 const { parseUnit } = __m2;
 // The open table: a real delimited file typed by @gcu/recon, or the synthetic sample; a histogram; and
 // table questions in controlled English answered through @gcu/sadpan and @gcu/sift (all vendored).
@@ -11421,7 +11542,8 @@ tool({
   topic: () => null,
   run: a => {
     let t;
-    if (a.device) {
+    if (a.device === 'minerals') t = mineralsTable();   // a pack, not device state: the minerals as a table (minerals.js)
+    else if (a.device) {
       const d = S.tables[a.device]; if (!d || !d.rows.length) return { read: ['open table', { v: a.device }], body: [{ t: 'note', kind: 'err', text: `The ${a.device} is empty. Say "log 5 km run" first.` }], trace: ['device table: empty'] };
       t = { name: a.device, source: 'device', hash: a.device, rows: d.rows.map(r => ({ ...r })), cols: d.cols.map(c => ({ ...c })), roles: {} };
     } else if (a.file) {
@@ -11737,7 +11859,7 @@ amend({ tools: ['query'], name: 'addagg', label: 'And', words: [], elidable: tru
 })();
 
 /* ==== src/engine/knowledge.js ==== */
-const __m15 = (() => {
+const __m17 = (() => {
 const { unit } = __m0;
 // Words for knowledge the packs carry: the units areas are asked in. The Factbook is factbook.js; definitions and the
 // style check are books.js.
@@ -11748,7 +11870,7 @@ for (const [u, words] of [['mi2', ['square miles', 'square mile', 'sq mi', 'mi2'
 })();
 
 /* ==== src/engine/factbook.js ==== */
-const __m16 = (() => {
+const __m18 = (() => {
 const { tool, frame, noun, compound, qmod, fmt } = __m0;
 const { parseUnit } = __m2;
 // The Factbook (SPEC 13.8): the rounded 14-country sample that ships with golem, or gcu-library's factbook pack once it is
@@ -11952,7 +12074,7 @@ frame({
 })();
 
 /* ==== src/engine/books.js ==== */
-const __m17 = (() => {
+const __m19 = (() => {
 const { tool, frame, noun } = __m0;
 // Books from packs (SPEC 13.8): definitions from Open Data Structures, a style check from The Elements of Style (1918).
 // Each works from a small sample that ships with golem, or from the gcu-library pack once the shell has installed it and
@@ -12058,7 +12180,7 @@ const bookInfo = slug => { const b = slug === 'ods' ? ODS : slug === 'elements-o
 })();
 
 /* ==== src/engine/device.js ==== */
-const __m18 = (() => {
+const __m20 = (() => {
 const { tool, frame, noun, postmod, fmt, iso } = __m0;
 const { findDate, findTime, today, fmtDate, dateWords } = __m4;
 const { parseUnit } = __m2;
@@ -12163,7 +12285,7 @@ postmod({ prep: '', heads: ['timer'], attr: 'duration', quantity: true });   // 
 })();
 
 /* ==== src/engine/structure.js ==== */
-const __m19 = (() => {
+const __m21 = (() => {
 const { frame, noun, postmod, qmod, tool, fmt, rad, deg, p3, p2 } = __m0;
 const { conversions, vec3, statistics } = __m5;
 const { oriOf } = __m6;
@@ -12339,7 +12461,7 @@ frame({
 })();
 
 /* ==== src/vendor/wmm.js ==== */
-const __m20 = (() => {
+const __m22 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/wmm, the World Magnetic Model (WMM2025) evaluated from NOAA's coefficients,
 // copied from ../auditable/ext/wmm/index.js. Re-vendor by copying that file here when the model is reissued.
 
@@ -12590,9 +12712,9 @@ function declination(lat, lon, date = new Date(), height = 0) {
 })();
 
 /* ==== src/engine/geo.js ==== */
-const __m21 = (() => {
+const __m23 = (() => {
 const { tool, frame, noun, qmod, clock, fmt, iso, p3 } = __m0;
-const { field, MODEL, VALID_FROM, VALID_TO } = __m20;
+const { field, MODEL, VALID_FROM, VALID_TO } = __m22;
 const { findDate, fmtDate, dateWords } = __m4;
 // Magnetic declination from @gcu/wmm (vendored WMM2025), and bearings between magnetic and true north.
 // A place is coordinates in the request; device location stays off (SPEC-skills 0.7).
@@ -12661,10 +12783,10 @@ frame({
 })();
 
 /* ==== src/engine/field.js ==== */
-const __m22 = (() => {
+const __m24 = (() => {
 const { tool, frame, noun, fmt, p3, p2, S, clock } = __m0;
 const { compass } = __m5;
-const { field } = __m20;
+const { field } = __m22;
 const { fmtDate } = __m4;
 // Field capture (SPEC 13, the field skills): a plane or a line measured with the phone, as a compass-clinometer is
 // used. The card asks for a reading (res.capture); the shell streams the phone's orientation (in the lead-acid app the
@@ -12740,11 +12862,11 @@ frame({
 })();
 
 /* ==== src/engine/notebook.js ==== */
-const __m23 = (() => {
+const __m25 = (() => {
 const { S, tool, frame, noun, shape, postmod, condition, fmt, iso, p3, p2, clock } = __m0;
 const { conversions, statistics } = __m5;
-const { field: wmm } = __m20;
-const { fromDevice } = __m22;
+const { field: wmm } = __m22;
+const { fromDevice } = __m24;
 const { oriOf } = __m6;
 // The field notebook: stations, the planes and lines measured at them, and samples, as a device table ("field") that
 // every table question can open. "station 14" starts a station where you stand (one fix on a tap) or at coordinates;
@@ -12957,7 +13079,7 @@ frame({
 })();
 
 /* ==== src/engine/data/timescale.js ==== */
-const __m24 = (() => {
+const __m26 = (() => {
 // The International Chronostratigraphic Chart as a records pack: one row per unit, five ranks.
 // Source: ICS (Cohen, Finney, Gibbard & Fan 2013; updated chart) as served by Macrostrat
 // (macrostrat.org/api/v2/defs/intervals?timescale_id=11, CC BY 4.0), fetched 8 Oct 2026. The Hadean is
@@ -13142,9 +13264,9 @@ const TIMESCALE = [
 })();
 
 /* ==== src/engine/timescale.js ==== */
-const __m25 = (() => {
+const __m27 = (() => {
 const { tool, frame, noun, unit, fmt } = __m0;
-const { TIMESCALE, TIMESCALE_SOURCE } = __m24;
+const { TIMESCALE, TIMESCALE_SOURCE } = __m26;
 // The geologic timescale: the ICS chart as a records pack (data/timescale.js). Ages, bounds, ranks,
 // what a unit sits in, what came before and after, what it is subdivided into, and which unit an age
 // in Ma falls in. Lookups only; the chart is the answer.
@@ -13244,7 +13366,7 @@ noun({ type: 'chron', words: Object.fromEntries(Object.keys(RETIRED).map(k => [k
 })();
 
 /* ==== src/engine/sample.js ==== */
-const __m26 = (() => {
+const __m28 = (() => {
 const { tool, frame, noun, compound, qmod, postmod, unit, fmt } = __m0;
 const { parseUnit } = __m2;
 const { core, sieve } = __m1;
@@ -13384,7 +13506,7 @@ frame({
 })();
 
 /* ==== src/engine/explain.js ==== */
-const __m27 = (() => {
+const __m29 = (() => {
 const { tool, frame, amend, noun, shape, clock, fmt } = __m0;
 // Explainers: formal notation parsed and described, one row per piece. Cron schedules, epoch times,
 // chmod modes, URLs and ECMAScript regular expressions. Each member has a recogniser so a bare
@@ -13759,7 +13881,7 @@ amend({ tools: ['explain'], name: 'explainas', label: 'Explain as', words: [], e
 })();
 
 /* ==== src/vendor/parquet.js ==== */
-const __m28 = (() => {
+const __m30 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/parquet, Parquet read and write over vendored hyparquet and hyparquet-writer, pure JS, minified by its own build, copied from ../auditable/ext/parquet/index.js at auditable 5fa5f72e (MIT; hyparquet MIT).
 // Re-vendor by copying that file here.
 
@@ -13768,9 +13890,9 @@ const e=["BOOLEAN","INT32","INT64","INT96","FLOAT","DOUBLE","BYTE_ARRAY","FIXED_
 })();
 
 /* ==== src/engine/convert.js ==== */
-const __m29 = (() => {
+const __m31 = (() => {
 const { S, tool, frame, amend, noun, fmt } = __m0;
-const { writeParquet } = __m28;
+const { writeParquet } = __m30;
 // Conversions that need no file format reader: hashes, text encodings both ways, and the open table
 // as CSV, TSV or JSON with a save action. Format readers (xlsx, dm, parquet) are the second pass.
 
@@ -13927,7 +14049,7 @@ for (const op of ['encode', 'decode']) amend({ tools: ['encode'], name: `op${op}
 })();
 
 /* ==== src/vendor/plan-calendar.js ==== */
-const __m30 = (() => {
+const __m32 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/plan's calendar engine and Brazilian holidays, copied from
 // ../auditable/ext/plan/src/calendar.js and src/holidays-br.js (MIT). The scheduling half of the package is not here.
 // Re-vendor by copying those two files here again and keeping the single export block at the end.
@@ -14284,10 +14406,10 @@ function brazilMunicipalities() {
 })();
 
 /* ==== src/engine/calendar.js ==== */
-const __m31 = (() => {
+const __m33 = (() => {
 const { S, tool, frame, amend, noun, shape, postmod, unit, clock, iso } = __m0;
 const { findDate, findTime, today, day0, fmtDate, dateWords } = __m4;
-const { isWorkingDay, addWorkingDays, brazilCalendar, federalHolidays } = __m30;
+const { isWorkingDay, addWorkingDays, brazilCalendar, federalHolidays } = __m32;
 // Working days and rosters over @gcu/plan's calendar engine (vendored), and time zones through Intl.
 // The calendar is a slot and is always shown: Brazil's federal holidays, or weekdays only.
 
@@ -14520,7 +14642,7 @@ amend({ tools: ['workdays'], name: 'workcal', label: 'Calendar', words: [], elid
 })();
 
 /* ==== src/engine/estimate.js ==== */
-const __m32 = (() => {
+const __m34 = (() => {
 const { amend, noun, tool, fmt } = __m0;
 const { U } = __m2;
 // Estimates with ranges: arithmetic over intervals by simulation, units carried through, the seed kept
@@ -14695,7 +14817,7 @@ amend({ tools: ['estimate'], name: 'estdist', label: 'Distribution', words: ['as
 })();
 
 /* ==== src/engine/data/elements.js ==== */
-const __m33 = (() => {
+const __m35 = (() => {
 // The elements with their standard atomic weights, abridged to five significant figures.
 // Source: IUPAC Commission on Isotopic Abundances and Atomic Weights (CIAAW), Standard Atomic Weights 2024
 // (ciaaw.org/atomic-weights.htm, the 2021 report with Gd, Lu and Zr revised in 2024), cross-checked against
@@ -14740,9 +14862,9 @@ const ELEMENTS = [
 })();
 
 /* ==== src/engine/chem.js ==== */
-const __m34 = (() => {
+const __m36 = (() => {
 const { tool, frame, noun, shape, postmod, fmt } = __m0;
-const { ELEMENTS, ELEMENTS_SOURCE } = __m33;
+const { ELEMENTS, ELEMENTS_SOURCE } = __m35;
 const { UNIT_TABLE } = __m2;
 // Molar mass, conversion factors and element fractions from a parsed formula over the IUPAC weights;
 // the periodic table lookup. No mineral names: the minerals pack is not here, so a formula is required.
@@ -14856,8 +14978,13 @@ shape({ type: 'formula', re: `(?=[a-z.]*\\d|[a-z]{2,4}(?![a-z\\d]))(?:(?:${SYMS}
 // symbols that are English words (in, as, at, no, be, he, so) and single letters stay out; the names cover them
 // and symbols that are units (cm, mg, pa, cd, pt, ga): "9 cm" is a length, not curium
 const PLAIN = new Set(['in', 'as', 'at', 'no', 'be', 'he', 'so', 'is', 'am', 'pm', 'or', 'es', 'md', 'ga', ...UNIT_TABLE.flatMap(u => u.words.map(w => w.toLowerCase()))]);
+// the Portuguese names of the elements that differ from the English ones, for "minerais com cobre" and "massa molar do ferro"
+const NAME_PT = { H: ['hidrogênio'], B: ['boro'], C: ['carbono'], N: ['nitrogênio'], O: ['oxigênio'], F: ['flúor'], Na: ['sódio'], Mg: ['magnésio'], Al: ['alumínio'], Si: ['silício'], P: ['fósforo'],
+  S: ['enxofre'], Cl: ['cloro'], K: ['potássio'], Ca: ['cálcio'], Ti: ['titânio'], V: ['vanádio'], Cr: ['cromo'], Mn: ['manganês'], Fe: ['ferro'], Co: ['cobalto'], Ni: ['níquel'], Cu: ['cobre'],
+  Zn: ['zinco'], As: ['arsênio', 'arsênico'], Sr: ['estrôncio'], Zr: ['zircônio'], Nb: ['nióbio'], Mo: ['molibdênio'], Ag: ['prata'], Sn: ['estanho'], Sb: ['antimônio'], Ba: ['bário'],
+  Ta: ['tântalo'], W: ['tungstênio'], Pt: ['platina'], Au: ['ouro'], Hg: ['mercúrio'], Pb: ['chumbo'], Bi: ['bismuto'], U: ['urânio'], Li: ['lítio'], Be: ['berílio'] };
 noun({ type: 'element', words: Object.fromEntries(ELEMENTS.map(e => [e[1], [e[2], ...(e[1].length > 1 && !PLAIN.has(e[1].toLowerCase()) ? [e[1].toLowerCase()] : [])]])),
-  words_pt: Object.fromEntries(ELEMENTS.map(e => [e[1], [e[2], ...(e[1].length > 1 && !PLAIN.has(e[1].toLowerCase()) ? [e[1].toLowerCase()] : [])]])) });
+  words_pt: Object.fromEntries(ELEMENTS.map(e => [e[1], [e[2], ...(NAME_PT[e[1]] || []), ...(e[1].length > 1 && !PLAIN.has(e[1].toLowerCase()) ? [e[1].toLowerCase()] : [])]])) });
 noun({ type: 'chemword', words: { mass: ['molar mass', 'molecular mass', 'molecular weight', 'formula weight', 'formula mass'], atomicmass: ['atomic mass', 'atomic weight'], number: ['atomic number'], element: ['element', 'element number', 'the element'], oxide: ['oxide', 'its oxide'] },
   words_pt: { mass: ['massa molar', 'peso molecular'], atomicmass: ['massa atômica', 'massa atomica'], number: ['número atômico', 'numero atomico'], element: ['elemento'], oxide: ['óxido', 'oxido'] } });
 postmod({ prep: '', heads: ['chemword'], attr: 'n', quantity: true });   // "element 26"
@@ -14901,7 +15028,7 @@ frame({
 })();
 
 /* ==== src/engine/text.js ==== */
-const __m35 = (() => {
+const __m37 = (() => {
 const { tool, frame, amend, noun, qmod, fmt } = __m0;
 // Text tools over a pasted payload: counts and readability, extracted key sentences, and a diff.
 // The payload is what follows the first colon, or every line after the first of a multi-line input;
@@ -15047,7 +15174,7 @@ amend({ tools: ['diff'], name: 'diffunit', label: 'Diff by', words: [], elidable
 })();
 
 /* ==== src/engine/forms.js ==== */
-const __m36 = (() => {
+const __m38 = (() => {
 const { tool, frame, amend, noun } = __m0;
 // The form card: a tool that still needs answers asks for them one at a time; each answer lands in
 // args and is an editable slot, and the result recomputes when any changes. The decision matrix is the
@@ -15124,10 +15251,10 @@ amend({ tools: ['decide'], name: 'score', label: 'Score', words: ['is', 'scores'
 })();
 
 /* ==== src/engine/econ.js ==== */
-const __m37 = (() => {
+const __m39 = (() => {
 const { tool, frame, noun, shape, postmod, qmod, fmt } = __m0;
-const { ELEMENTS } = __m33;
-const { numberAsk, firstNeed } = __m36;
+const { ELEMENTS } = __m35;
+const { numberAsk, firstNeed } = __m38;
 // Sampling theory and mine economics as declared formulas. Every term is a slot; a term the person did
 // not give is asked for, with the conventional value offered first and never applied on its own. Prices
 // are always the person's input. No geostatistics here: these are formulas over given numbers.
@@ -15238,7 +15365,7 @@ noun({ type: 'gylot', words: {}, generic: ['lot'], generic_pt: ['lote'] }); qmod
 noun({ type: 'precision', words: { p: ['precision', 'error', 'relative error'] }, words_pt: { p: ['precisão', 'erro'] } }); qmod({ head: 'precision', attr: 'value', dims: ['mass ratio'] });
 frame({
   name: 'gy', label: 'Sampling error', words: ['calculate', 'compute'], elidable: true, theme: ['gyword'], required: ['theme', 'at'],
-  roles: { for: { preps: ['for', 'of'], types: ['gysample', 'precision'] }, at: { preps: ['at', 'with'], types: ['quantity:length'] }, from: { preps: ['from', 'of', 'in'], types: ['gylot', 'quantity:mass ratio'] }, mineral: { preps: [''], types: ['text'] } },
+  roles: { for: { preps: ['for', 'of'], types: ['gysample', 'precision'] }, at: { preps: ['at', 'with'], types: ['quantity:length'] }, from: { preps: ['from', 'of', 'in'], types: ['gylot', 'quantity:mass ratio'] }, mineral: { preps: [''], types: ['text', 'mineral'] } },
   label_pt: 'Erro de amostragem',
   bind: c => {
     const w = c.theme[0].value, d = sizeCm(c.roles.at[0]); if (d == null) return null;
@@ -15291,7 +15418,7 @@ frame({
 })();
 
 /* ==== src/engine/log.js ==== */
-const __m38 = (() => {
+const __m40 = (() => {
 const { S, tool, frame, amend, noun, fmt, iso } = __m0;
 const { parseUnit, dimName } = __m2;
 const { findDate, today, fmtDate, dateWords } = __m4;
@@ -15440,7 +15567,7 @@ amend({ tools: ['logAdd'], name: 'logfix', label: 'Correct', words: ['that was',
 })();
 
 /* ==== src/engine/places.js ==== */
-const __m39 = (() => {
+const __m41 = (() => {
 const { S, tool, frame, amend, noun, shape, postmod, fmt, rad, deg } = __m0;
 // Places, distance and UTM. A place is coordinates in the request or a name saved on this device
 // ("home is -19.92, -43.94"); there is no gazetteer and device location is off, so an unknown name is
@@ -15606,11 +15733,11 @@ amend({ tools: ['utm'], name: 'utmband', label: 'Band', words: [], elidable: tru
 })();
 
 /* ==== src/engine/sky.js ==== */
-const __m40 = (() => {
+const __m42 = (() => {
 const { tool, frame, amend, noun, compound, fmt, rad, deg, iso } = __m0;
 const { findDate, today, fmtDate, dateWords } = __m4;
-const { zonesOf, offsetOf } = __m31;
-const { placeOf } = __m39;
+const { zonesOf, offsetOf } = __m33;
+const { placeOf } = __m41;
 // The sun by NOAA's solar position equations (after Meeus), and the moon's phase from the mean
 // synodic cycle, labelled with its accuracy. Times are given in the place's zone when the place name
 // has one, else in UTC and the card says so.
@@ -15692,10 +15819,10 @@ amend({ tools: ['sun'], name: 'sunzone', label: 'Zone', words: [], elidable: tru
 })();
 
 /* ==== src/engine/apply.js ==== */
-const __m41 = (() => {
+const __m43 = (() => {
 const { S, tool, fmt, rad, deg, p3, p2 } = __m0;
-const { whereOf } = __m14;
-const { evaluatePredicate, predicateToString } = __m13;
+const { whereOf } = __m16;
+const { evaluatePredicate, predicateToString } = __m15;
 const { conversions, vec3 } = __m5;
 // Field compute over a table: a single-value skill applied to every row the filter selects, the row's
 // columns bound to the skill's arguments through their names, constants filling what no column holds.
@@ -15759,7 +15886,7 @@ tool({
 })();
 
 /* ==== src/vendor/ipynb.js ==== */
-const __m42 = (() => {
+const __m44 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/ipynb, copied from ../auditable/ext/ipynb/index.js (MIT). golem uses importNotebook
 // for its import-substitution table only (numpy → natra, pandas → sadpan, …). Re-vendor by copying that file here.
 
@@ -16308,9 +16435,9 @@ function exportNotebook(cells, opts = {}) {
 })();
 
 /* ==== src/engine/python.js ==== */
-const __m43 = (() => {
+const __m45 = (() => {
 const { tool, frame, amend, result, fmt } = __m0;
-const { importNotebook } = __m42;
+const { importNotebook } = __m44;
 // Run and trace Python with adder, on the device. The tool itself stays synchronous: a first run returns a
 // "running" card carrying a job, the runner (a Web Worker in the page, adder in-process in the tests)
 // answers later, and the card is recomputed from the kept result. Replay reruns the code, which is
@@ -16380,7 +16507,7 @@ amend({ tools: ['python'], name: 'pytraceoff', label: 'Run', words: ['no trace',
 })();
 
 /* ==== src/vendor/librarian.js ==== */
-const __m44 = (() => {
+const __m46 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/librarian, the in-process text search (BM25F, fuzzy expansion, snippets, did-you-mean), copied from ../auditable/ext/librarian/index.js at auditable 5fa5f72e (MIT).
 // Re-vendor by copying that file here.
 
@@ -17656,9 +17783,9 @@ const Librarian = {
 })();
 
 /* ==== src/engine/docs.js ==== */
-const __m45 = (() => {
+const __m47 = (() => {
 const { S, tool, frame, amend, noun, postmod } = __m0;
-const { Librarian } = __m44;
+const { Librarian } = __m46;
 // Search my documents (A7). Markdown, plain text and HTML opened with the paperclip are kept on the device,
 // cut into passages (by heading, then by paragraph) and indexed by @gcu/librarian. A search returns
 // passages verbatim with the matched words marked; golem never rewrites them. The index is derived
@@ -17811,9 +17938,9 @@ amend({ tools: ['docPassage'], name: 'docstep', label: 'Passage', words: [], eli
 })();
 
 /* ==== src/engine/recipes.js ==== */
-const __m46 = (() => {
+const __m48 = (() => {
 const { S, tool, frame, noun, session, runTool } = __m0;
-const { listOf } = __m36;
+const { listOf } = __m38;
 // Recipes (A9): a session's plan saved under a name, with the subjects that may change between runs.
 // A recipe is stored as card specs, plain JSON like a session; running it replays every step with the
 // new subjects into a new session, and stops at the first step that no longer reads. Nothing is skipped
@@ -18007,7 +18134,7 @@ session({
 })();
 
 /* ==== src/vendor/sheet.js ==== */
-const __m47 = (() => {
+const __m49 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sheet, copied from ../auditable/ext/sheet/index.js (built from its src/ by @gcu/build, MIT).
 // Re-vendor by copying that file here. Reading is asynchronous (DecompressionStream), so golem converts at open time, not in a tool.
 
@@ -19239,7 +19366,7 @@ const sheet = {
 })();
 
 /* ==== src/vendor/dm.js ==== */
-const __m48 = (() => {
+const __m50 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/dm, the read-only Datamine .dm reader, copied from ../auditable/ext/dm/index.js (MIT).
 // Re-vendor by copying that file here.
 
@@ -19515,10 +19642,10 @@ function readDM(buffer) {
 })();
 
 /* ==== src/engine/formats.js ==== */
-const __m49 = (() => {
-const { sheet } = __m47;
-const { readDM } = __m48;
-const { readParquet, parquetInfo } = __m28;
+const __m51 = (() => {
+const { sheet } = __m49;
+const { readDM } = __m50;
+const { readParquet, parquetInfo } = __m30;
 // Binary table formats, converted to text when a file is opened: xlsx through @gcu/sheet (one text per
 // sheet), Datamine .dm through @gcu/dm, Parquet through @gcu/parquet. Tools stay synchronous and the device keeps the converted text,
 // so a session replays from it. What did not carry over is said on the card.
@@ -19569,7 +19696,7 @@ async function convertBinary(name, buffer) {
 })();
 
 /* ==== src/engine/notes.js ==== */
-const __m50 = (() => {
+const __m52 = (() => {
 const { S, tool, frame } = __m0;
 // Notes and taught words. Both belong to the device and are shared by every session.
 const textOf = c => c.theme[0] && c.theme[0].type === 'text' ? c.theme[0].value : null;
@@ -19620,7 +19747,7 @@ frame({
 })();
 
 /* ==== src/engine/skills.js ==== */
-const __m51 = (() => {
+const __m53 = (() => {
 const { TOOLS, tool, frame } = __m0;
 // The catalog: skills derived from the declarations, planned skills named here, and the packs golem
 // knows about. Examples feed the Skills tab, the "nearest skills" suggestions and the teach vocabulary.
@@ -19639,6 +19766,7 @@ const PACKS = [
   ['factbook', 'CIA World Factbook', '2.8 MB · CC0', 'samp', 'Records: lookup, convert, filter, rank.'],
   ['factbook-full', 'Factbook, full profiles', '2.3 MB · CC0', 'samp', 'Installed with the factbook when asked: which countries are landlocked, and their coastlines. More fields later.'],
   ['ods', 'Open Data Structures', '1.9 MB · CC BY 2.5', 'samp', 'Definitions: where a term is defined, with the defining passage once installed. Listings can run in adder later.'],
+  ['minerals', 'Mineral species (Wikidata)', '254 kB · CC0', 'samp', 'Every mineral species Wikidata lists: formula, elements, class, crystal system; hardness and density where Wikidata has them. Lookups, searches by element, and a table to ask.'],
   ['elements-of-style', 'The Elements of Style (1918)', '36 kB · public domain', 'samp', 'Its rules and the expressions of chapter V, compiled into a text checker that cites them.'],
   ['rtow · rtnw · rtrol', 'Ray Tracing series', '11.5 MB · CC0', 'plan', 'Reader only until a term index is built.'],
   ['arcr', 'arcr / gewgaw manual', '26 kB · CC0', 'plan', 'Reader only.'],
@@ -19691,9 +19819,9 @@ const SUGGESTIONS = ['pop means population', 'histogram of cu', 'log scale', 'po
 })();
 
 /* ==== src/engine/learn.js ==== */
-const __m52 = (() => {
+const __m54 = (() => {
 const { S, tool, frame, noun } = __m0;
-const { vocab } = __m51;
+const { vocab } = __m53;
 // Learning from the person, on the device (SPEC 13: the language that grows). Nothing is learned silently, and nothing
 // is sent: what did not read is kept in a list the person can see and teach from ("what couldn't you read"); a request
 // that did not read, followed by one that did and differs in a short stretch, offers to remember that stretch as a word
@@ -19793,11 +19921,11 @@ frame({
 })();
 
 /* ==== src/engine/ontology.js ==== */
-const __m53 = (() => {
+const __m55 = (() => {
 const { FRAMES, LEXICON, S } = __m0;
 const { UNIT_TABLE, COMPOUNDS, DIM, parseUnit, dimName } = __m2;
-const { ELEMENT } = __m14;
-const { TIMESCALE } = __m24;
+const { ELEMENT } = __m16;
+const { TIMESCALE } = __m26;
 // The clause ontology, assembled from what golem knows: units from the conversion table, nouns from the
 // sample packs, verb frames from the declarations. Inert data; the build writes it to dist/golem.json.
 // Portuguese synonyms are listed here by hand until packs carry them in their golem facet.
@@ -19874,7 +20002,7 @@ function ontology(only) {
 })();
 
 /* ==== src/vendor/dispatch.js ==== */
-const __m54 = (() => {
+const __m56 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/dispatch, built from ../auditable/ext/dispatch/src/ by its own build.
 // Source of truth: gentropic/auditable ext/dispatch (local clone: ../auditable). Re-vendor by copying
 // ext/dispatch/index.js here after 'node ext/dispatch/build.js'. golem uses the grammar rung only:
@@ -22027,14 +22155,14 @@ const PORTUGUESE = {
 })();
 
 /* ==== src/engine/reading.js ==== */
-const __m55 = (() => {
+const __m57 = (() => {
 const { S, T, TOOLS, FRAMES, tool, frame, amend, session, noun, toolByName, runTool, iso } = __m0;
-const { examples, vocab } = __m51;
-const { rankByPicks } = __m52;
-const { ontology } = __m53;
+const { examples, vocab } = __m53;
+const { rankByPicks } = __m54;
+const { ontology } = __m55;
 const { calcOf } = __m3;
-const { estimateOf } = __m32;
-const { createEngine, makeSession, ENGLISH, PORTUGUESE } = __m54;
+const { estimateOf } = __m34;
+const { createEngine, makeSession, ENGLISH, PORTUGUESE } = __m56;
 // The reading ladder: context (amendments, meta-intents), grammar (the clause parser, then the regex
 // rules the declarations carry), taught words (device lexicon rewrites, then grammar again). Plus the
 // tools that talk about the session itself: none, why, export.
@@ -22343,7 +22471,7 @@ function sessionRead(raw) {
 })();
 
 /* ==== src/engine/sessions.js ==== */
-const __m56 = (() => {
+const __m58 = (() => {
 const { S, toolByName, runTool, startJobs, clearResults } = __m0;
 // Sessions: stored as plans (card specs), replayed on open, named from the tools that ran.
 // The shell persists whatever `serialize()` returns and feeds it back through `hydrate()`.
@@ -22462,7 +22590,7 @@ function reset() {
 })();
 
 /* ==== src/vendor/sluice/accumulator.js ==== */
-const __m57 = (() => {
+const __m59 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sluice src/accumulator.js, copied from ../auditable/ext/sluice/src/accumulator.js at auditable 3a7b253c.
 // golem vendors sluice's accumulator modules only (src/engine/stream.js): its runner builds expressions with new Function,
 // which golem does not ship outside the Python worker.
@@ -22630,7 +22758,7 @@ function weightedStats() {
 })();
 
 /* ==== src/vendor/sluice/tdigest.js ==== */
-const __m58 = (() => {
+const __m60 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sluice src/tdigest.js, copied from ../auditable/ext/sluice/src/tdigest.js at auditable 3a7b253c.
 // golem vendors sluice's accumulator modules only (src/engine/stream.js): its runner builds expressions with new Function,
 // which golem does not ship outside the Python worker.
@@ -22745,7 +22873,7 @@ function quantile(state, q) {
 })();
 
 /* ==== src/vendor/sluice/histogram.js ==== */
-const __m59 = (() => {
+const __m61 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sluice src/histogram.js, copied from ../auditable/ext/sluice/src/histogram.js at auditable 3a7b253c.
 // golem vendors sluice's accumulator modules only (src/engine/stream.js): its runner builds expressions with new Function,
 // which golem does not ship outside the Python worker.
@@ -22797,14 +22925,14 @@ function cumulativeFromTop(counts) {
 })();
 
 /* ==== src/engine/stream.js ==== */
-const __m60 = (() => {
+const __m62 = (() => {
 const { S, T, fmt, result } = __m0;
-const { colOf, whereSrc, tableFromText, openTable } = __m14;
-const { parsePredicate, evaluatePredicate, predicateToString } = __m13;
-const { NULL_SENTINELS } = __m12;
-const { weightedStats } = __m57;
-const { tdigest, quantile } = __m58;
-const { histogram } = __m59;
+const { colOf, whereSrc, tableFromText, openTable } = __m16;
+const { parsePredicate, evaluatePredicate, predicateToString } = __m15;
+const { NULL_SENTINELS } = __m14;
+const { weightedStats } = __m59;
+const { tdigest, quantile } = __m60;
+const { histogram } = __m61;
 // Tables too large to hold (SPEC 13.7): a CSV or TSV over 20 MB is typed from its first megabyte by recon, like any
 // table, and its questions are answered by scanning the whole file as a job, through @gcu/sluice's accumulators
 // (mergeable, never holding the rows): Welford and weighted moments, t-digest quantiles, histograms. The shell runs the
@@ -22965,18 +23093,18 @@ for (const k of ['apply', 'tableExport']) T[k] = a => S.table && S.table.streame
 })();
 
 /* ==== src/engine/engine.js ==== */
-const __m61 = (() => {
+const __m63 = (() => {
 const { S, T, runTool, toolByName, startJobs, tool, CONDITIONS, EFFECTS, clock, iso } = __m0;
-const { DOCUMENT } = __m10;
-const { DOCTEXT } = __m45;
-const { bindingsOf, runSteps } = __m46;
-const { tableFromText } = __m14;
-const { convertBinary } = __m49;
-const { noteMiss, clearMiss, correctionOf, teachOfPick, notePick, setReader } = __m52;
-const { norm, grammar, context, taught, sessionRead, readingOf, guessRead, clauseEngine } = __m55;
-const { makeSession } = __m54;
-const { current, newSession, renameSession, touch } = __m56;
-const { streamedTable } = __m60;
+const { DOCUMENT } = __m12;
+const { DOCTEXT } = __m47;
+const { bindingsOf, runSteps } = __m48;
+const { tableFromText } = __m16;
+const { convertBinary } = __m51;
+const { noteMiss, clearMiss, correctionOf, teachOfPick, notePick, setReader } = __m54;
+const { norm, grammar, context, taught, sessionRead, readingOf, guessRead, clauseEngine } = __m57;
+const { makeSession } = __m56;
+const { current, newSession, renameSession, touch } = __m58;
+const { streamedTable } = __m62;
 // The entry point: submit(raw) reads a request and returns what happened. Cards are recomputed in
 // place by rerun(); answers and slot flips go through it, so args stay the only state that matters.
 
@@ -23242,8 +23370,8 @@ function seedExamples() {
 })();
 
 /* ==== src/engine/packs.js ==== */
-const __m62 = (() => {
-const { profilesOf } = __m16;
+const __m64 = (() => {
+const { profilesOf } = __m18;
 // Packs as gcu-library ships them: a .gcudat is a gzipped tar holding gcudat.json (the manifest) and the data files
 // (gcu-library tools/build-gcudat.mjs). Read here with the platform's own gunzip (DecompressionStream, in browsers and
 // in Node) and a small ustar reader; @gcu/archive reads every container, but golem needs only this one.
@@ -23274,6 +23402,14 @@ async function readGcudat(bytes) {
   return { manifest, json: p => { const f = at(p); if (!f) throw new Error(`the pack has no ${p}`); return JSON.parse(dec.decode(f)); } };
 }
 // the factbook-full expansion, kept small: which countries are landlocked, and their coastlines
+// the minerals pack (gcu-library data/minerals: Wikidata's mineral species), kept as its records: { version, retrieved, records }
+async function mineralsFromGcudat(bytes) {
+  const p = await readGcudat(bytes);
+  if (p.manifest.name !== 'minerals') throw new Error(`that is the ${p.manifest.name} pack, not the minerals`);
+  const index = p.json(p.manifest.index || 'dataset.json'), records = p.json(index.records || 'records.json');
+  if (!Array.isArray(records) || !records.length) throw new Error('the minerals pack holds no records');
+  return { name: 'minerals', version: p.manifest.version || index.version, retrieved: index.retrieved || null, records };
+}
 async function factbookProfiles(fullBytes) {
   const f = await readGcudat(fullBytes); if (f.manifest.name !== 'factbook-full') throw new Error(`that is the ${f.manifest.name} pack, not the factbook's full profiles`);
   const fi = f.json(f.manifest.index || 'dataset.json'), fr = f.json(fi.records || 'records.json');
@@ -23345,11 +23481,11 @@ async function compileStrunk(bytes) {
   }
   return { slug: 'elements-of-style', title: b.title, author: b.author, license: b.license, source: b.source, version: manifest.version || b.version || null, rules, phrases, entries };
 }
-  return { gunzip, untar, readGcudat, factbookProfiles, factbookFromGcudat, plain, compileOds, compileStrunk };
+  return { gunzip, untar, readGcudat, mineralsFromGcudat, factbookProfiles, factbookFromGcudat, plain, compileOds, compileStrunk };
 })();
 
 /* ==== src/vendor/vfs.js ==== */
-const __m63 = (() => {
+const __m65 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/vfs, copied from ../auditable/ext/vfs/index.js (built from its src/ by node ext/vfs/build.js), at
 // auditable 8837da6e. golem's shell keeps sessions, device state, files and packs in it over IndexedDB (src/shell/store.js).
 // golem constructs only IDBBackend and MemoryBackend; the network backends in this bundle (fetch, REST, Dropbox) are
@@ -27160,8 +27296,8 @@ function fromPicker(vfs, destPath, opts) {
 })();
 
 /* ==== src/shell/store.js ==== */
-const __m64 = (() => {
-const { VFS } = __m63;
+const __m66 = (() => {
+const { VFS } = __m65;
 // Where the device keeps golem (SPEC 13.9): @gcu/vfs over IndexedDB, one file per session, one per opened file, the
 // device state and a small meta file, so a session can be exported as itself and nothing has a size cap but the
 // browser's. Only what changed is written. When IndexedDB is not there, the whole state goes to localStorage as before;
@@ -27275,7 +27411,7 @@ function noStore() {
 })();
 
 /* ==== src/vendor/leadacid.js ==== */
-const __m65 = (() => {
+const __m67 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. The lead-acid shell shim, copied from ../auditable/ext/leadacid/index.js
 // (itself vendored from gentropic/lead-acid, lead-acid.js). Re-vendor by copying that file here.
 
@@ -27979,7 +28115,7 @@ function orientationFromRotationVector(v) {
 })();
 
 /* ==== src/vendor/plot.js ==== */
-const __m66 = (() => {
+const __m68 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/plot (matplotlib-shaped plotting; figures leave the worker as draw lists), copied from ../auditable/ext/plot/index.js at auditable 774234c3 (9 Oct 2026, MIT).
 // Loaded only inside the Python worker. Re-vendor by copying that file here.
 
@@ -30013,7 +30149,7 @@ if (typeof window !== 'undefined') {
 })();
 
 /* ==== src/shell/i18n.js ==== */
-const __m67 = (() => {
+const __m69 = (() => {
 // The interface in English or Brazilian Portuguese. golem's own words (the page, the sidebar, the composer, the cards'
 // frame, the messages) go through t(); the English is the key, so a sentence not translated yet shows in English and a
 // placeholder ({name}) is filled in after the lookup. What a tool answers is the tool's, in English for now.
@@ -30079,7 +30215,7 @@ const PT = {
   'Tap Take reading to turn the compass on.': 'Toque em Medir para ligar a bússola.', 'Compass on: hold the phone still, then take the reading.': 'Bússola ligada: segure o celular parado e meça.',
   'The compass needs the motion permission: allow it for this site in the browser.': 'A bússola precisa da permissão de movimento: permita para este site no navegador.', 'Position needs the location permission: allow it for this site in the browser.': 'A posição precisa da permissão de localização: permita para este site no navegador.',
   'In a browser the fix comes through the browser, which may ask its own location service for it.': 'No navegador a posição vem do navegador, que pode consultar o próprio serviço de localização.',
-  'Add to station {name}': 'Adicionar à estação {name}', 'Remember: “{word}” means “{means}”': 'Lembrar: “{word}” quer dizer “{means}”',
+  'Add to station {name}': 'Adicionar à estação {name}', 'A sample of 42 common minerals ships, copied from the pack.': 'Uma amostra de 42 minerais comuns vem junto, copiada do pacote.', 'Installed: {n} minerals.': 'Instalado: {n} minerais.', 'Removed. The sample of 42 minerals answers again.': 'Removido. A amostra de 42 minerais responde de novo.', 'Remember: “{word}” means “{means}”': 'Lembrar: “{word}” quer dizer “{means}”',
   'Measured.': 'Medido.', 'Measured. The phone moved while measuring; hold it still for a steadier reading.': 'Medido. O celular se mexeu durante a medida; segure parado para uma leitura mais firme.',
   'Waiting for a fix…': 'Esperando uma posição…', 'Position needs the location permission: allow it in the dialog, or in the app\'s settings.': 'A posição precisa da permissão de localização: permita na caixa de diálogo, ou nas configurações do app.',
   'No position: {e}': 'Sem posição: {e}', 'No fix. Go where the sky is open and try again.': 'Sem posição. Vá para onde o céu está aberto e tente de novo.', 'Position taken, ±{m} m.': 'Posição registrada, ±{m} m.',
@@ -30125,12 +30261,12 @@ const PT = {
 })();
 
 /* ==== src/shell/render.js ==== */
-const __m68 = (() => {
+const __m70 = (() => {
 const { fmt } = __m0;
 const { conversions, equalArea } = __m5;
-const { Figure } = __m66;
-const { t } = __m67;
-const { stationNow } = __m23;
+const { Figure } = __m68;
+const { t } = __m69;
+const { stationNow } = __m25;
 // Rendering. The engine hands over plain blocks; this is the only file that turns them into markup.
 
 // a measured plane or line, or a typed plane, can go into the field notebook at the open station: the button says
@@ -30275,7 +30411,7 @@ function figImage(ctx, x, y, w, h, cols, rows, b64) {
 })();
 
 /* ==== src/vendor/sw-register.js ==== */
-const __m69 = (() => {
+const __m71 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sw's page-side companion, copied from ../auditable/ext/sw/register.js (at auditable 8837da6e).
 
 // @gcu/sw — the page-side companion (ES module). Registration + persistent
@@ -30353,26 +30489,27 @@ function registerGcuSw(opts = {}) {
 })();
 
 /* ==== src/shell/main.js ==== */
-const __m70 = (() => {
+const __m72 = (() => {
 const { S } = __m0;
-const { submit, flipSlot, answer, capture, seedExamples, openFile, openBinary, openStreamed, preview } = __m61;
-const { scanTable, STREAM_OVER } = __m60;
-const { completions } = __m55;
-const { fromDevice } = __m22;
+const { submit, flipSlot, answer, capture, seedExamples, openFile, openBinary, openStreamed, preview } = __m63;
+const { scanTable, STREAM_OVER } = __m62;
+const { completions } = __m57;
+const { fromDevice } = __m24;
 const { conversions } = __m5;
-const { useFactbook, factbookInfo } = __m16;
-const { factbookFromGcudat, factbookProfiles, readGcudat, compileOds, compileStrunk } = __m62;
-const { useBook, bookInfo } = __m17;
-const { BINARY } = __m49;
+const { useFactbook, factbookInfo } = __m18;
+const { factbookFromGcudat, factbookProfiles, readGcudat, compileOds, compileStrunk, mineralsFromGcudat } = __m64;
+const { useMinerals, mineralsInfo } = __m8;
+const { useBook, bookInfo } = __m19;
+const { BINARY } = __m51;
 const { setRunner, onJobDone } = __m0;
-const { sessions, current, newSession, openSession, renameSession, deleteSession, searchHistory, parts, hydrate, onChange, exportSession, importSession, pinCard, branchSession } = __m56;
-const { openStore, putBlob, getBlob } = __m64;
-const { skills, PACKS, STARTERS, STARTERS_PT } = __m51;
-const { shell } = __m65;
-const { escHtml, pad, cardEl, drawCharts } = __m68;
-const { registerGcuSw } = __m69;
-const { t, plural, setUiLang, uiLang, applyStatic } = __m67;
-const { setLanguage } = __m55;
+const { sessions, current, newSession, openSession, renameSession, deleteSession, searchHistory, parts, hydrate, onChange, exportSession, importSession, pinCard, branchSession } = __m58;
+const { openStore, putBlob, getBlob } = __m66;
+const { skills, PACKS, STARTERS, STARTERS_PT } = __m53;
+const { shell } = __m67;
+const { escHtml, pad, cardEl, drawCharts } = __m70;
+const { registerGcuSw } = __m71;
+const { t, plural, setUiLang, uiLang, applyStatic } = __m69;
+const { setLanguage } = __m57;
 // The shell: wiring, tabs, the session drawer, storage, and the sleep switch. Everything that touches
 // the DOM or the browser lives here or in render.js; the engine never does.
 
@@ -30725,22 +30862,25 @@ async function keepFactbook(pack) {
   await store.writePack('factbook', pack);
   const i = useFactbook(pack); packNote = t('Installed: {n} countries{full}.', { n: i.count, full: pack.profiles ? t(', with the full profiles') : '' }); status(packNote);
 }
-// the book packs: compiled at install into the index golem uses (packs.js), kept, handed to books.js
+// the packs compiled at install into what golem uses (packs.js), kept, and handed to the engine: books.js by default, or
+// the entry's own use/info (the minerals)
+const useOf = slug => (BOOKS[slug].use || useBook), infoOf = slug => (BOOKS[slug].info || bookInfo)(slug);
 const BOOKS = {
   ods: { compile: compileOds, size: '1.9 MB', sample: 'A sample term index ships: where a term is defined, without the passage.', installed: i => t('Installed: {n} terms with their defining passages.', { n: i.count }), removed: 'Removed. The sample term index answers again.' },
+  minerals: { compile: mineralsFromGcudat, size: '254 kB', sample: 'A sample of 42 common minerals ships, copied from the pack.', installed: i => t('Installed: {n} minerals.', { n: i.count }), removed: 'Removed. The sample of 42 minerals answers again.', use: (s, c) => useMinerals(c), info: () => mineralsInfo() },
   'elements-of-style': { compile: compileStrunk, size: '36 kB', sample: 'A sample of rules 10, 11 and 13 ships.', installed: i => t('Installed: {n} checks from its rules and chapter V.', { n: i.count }), removed: 'Removed. The sample checks answer again.' },
 };
 const bookNote = {};
-async function keepBook(slug, compiled) { await store.writePack(slug, compiled); bookNote[slug] = BOOKS[slug].installed(useBook(slug, compiled)); status(bookNote[slug]); }
+async function keepBook(slug, compiled) { await store.writePack(slug, compiled); bookNote[slug] = BOOKS[slug].installed(useOf(slug)(slug, compiled)); status(bookNote[slug]); }
 async function installBook(slug) {
   if (packBusy) return; packBusy = true; bookNote[slug] = t('Installing…'); renderPacks();
   try { const e = (await registry())(slug); if (!e) throw new Error(`the library lists no ${slug} pack`); await keepBook(slug, await BOOKS[slug].compile(await fetchPack(e))); }
   catch (err) { bookNote[slug] = t('Not installed: {e}.', { e: err.message }); }
   packBusy = false; renderPacks();
 }
-async function removeBook(slug) { await store.removePack(slug); useBook(slug, null); bookNote[slug] = t(BOOKS[slug].removed); renderPacks(); }
+async function removeBook(slug) { await store.removePack(slug); useOf(slug)(slug, null); bookNote[slug] = t(BOOKS[slug].removed); renderPacks(); }
 function bookItem(slug) {
-  const i = bookInfo(slug), B = BOOKS[slug];
+  const i = infoOf(slug), B = BOOKS[slug];
   const acts = i.kind === 'sample' ? (inApp ? `<span class="sub">${OFFLINE_APP()}</span>` : `<button class="btn go" type="button" data-pk-install="${slug}">${t('Install from the library ({size})', { size: B.size })}</button>`) : `<button class="btn" type="button" data-pk-remove="${slug}">${t('Remove')}</button>`;
   return `<p>${i.kind === 'sample' ? t(B.sample) : escHtml(t('Installed: version {v}, kept on this device.', { v: i.version || '' }))}</p><div class="opts">${store && store.kind === 'idb' ? acts : `<span class="sub">${t('This browser gives golem no IndexedDB, so a pack cannot be kept.')}</span>`}${bookNote[slug] ? `<span class="sub">${escHtml(bookNote[slug])}</span>` : ''}</div>`;
 }
@@ -30772,7 +30912,7 @@ function renderPacks() {
   PACKS.forEach(([id, name, meta, st, d]) => {
     if (id === 'factbook') st = fbi.kind === 'sample' ? 'samp' : 'live';
     if (id === 'factbook-full') st = fbi.kind === 'pack' && fbi.profiles ? 'live' : 'plan';
-    if (BOOKS[id]) st = bookInfo(id).kind === 'pack' ? 'live' : 'samp';
+    if (BOOKS[id]) st = infoOf(id).kind === 'pack' ? 'live' : 'samp';
     h += `<div class="item"><h3>${escHtml(name)} <span class="tag ${st}">${lab[st]}</span></h3><p>${escHtml(d)}</p>${id === 'factbook' ? factbookItem() : BOOKS[id] ? bookItem(id) : ''}<div class="from">${escHtml(id)} · ${escHtml(meta)}</div></div>`;
   });
   const al = Object.entries(S.aliases);
@@ -31032,7 +31172,7 @@ if (shell.present) { $('st-where').dataset.tEn = 'in the lead-acid shell'; $('st
 (async () => {
   store = await openStore();
   const fb = await store.readPack('factbook').catch(() => null); if (fb) useFactbook(fb);   // before the sessions replay, so their cards read it
-  for (const slug of Object.keys(BOOKS)) { const b = await store.readPack(slug).catch(() => null); if (b) useBook(slug, b); }
+  for (const slug of Object.keys(BOOKS)) { const b = await store.readPack(slug).catch(() => null); if (b) useOf(slug)(slug, b); }
   const got = await store.load().catch(() => null);
   // a first visit: the examples are kept in the sidebar, and golem opens on the welcome in a session of its own
   if (!(got && hydrate(got.state)) && !sessions().length) { seedExamples(); newSession(); }
