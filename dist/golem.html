@@ -1238,9 +1238,9 @@ onDate('weekday', ['what day is', 'what day was', 'what day will be', 'what week
 const __m5 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/bearing, the structural-geology engine (projections, vectors, statistics),
 // copied from ../auditable/ext/bearing/index.js, itself synced from gentropic/bearing.js dist/bearing.mjs.
-// Re-vendor by copying that file here. golem uses conversions, vec3 and equalArea.
+// Re-vendor by copying that file here. golem uses conversions, vec3, equalArea and compass.
 
-// ⚠ VENDORED — DO NOT EDIT. @gcu/bearing v0.2.2, built ESM bundle.
+// ⚠ VENDORED — DO NOT EDIT. @gcu/bearing v0.2.4, built ESM bundle.
 // Source of truth: gentropic/bearing.js (dist/bearing.mjs). Update with:
 //   node ext/bearing/sync.mjs
 // See ext/bearing/README.md.
@@ -4247,22 +4247,19 @@ function deviceOrientationMatrix(alpha, beta, gamma) {
     cB * cG
   ];
 }
-function enuToBearing(v) {
-  return [v[0], v[1], -v[2]];
-}
 function applyDeclination(azimuth, declination) {
   return ((azimuth + (declination || 0)) % 360 + 360) % 360;
 }
 function planeFromDeviceOrientation(alpha, beta, gamma, options = {}) {
   const R = deviceOrientationMatrix(alpha, beta, gamma);
   const normalENU = [R[2], R[5], R[8]];
-  const [dipDir, dip] = dcosToPlane(enuToBearing(normalENU));
+  const [dipDir, dip] = dcosToPlane(normalENU);
   return [applyDeclination(dipDir, options.declination), dip];
 }
 function lineFromDeviceOrientation(alpha, beta, gamma, options = {}) {
   const R = deviceOrientationMatrix(alpha, beta, gamma);
   const dirENU = [R[1], R[4], R[7]];
-  const [trend, plunge] = dcosToLine(enuToBearing(dirENU));
+  const [trend, plunge] = dcosToLine(dirENU);
   return [applyDeclination(trend, options.declination), plunge];
 }
 
@@ -12655,7 +12652,7 @@ frame({
 /* ==== src/engine/field.js ==== */
 const __m22 = (() => {
 const { tool, frame, noun, fmt, p3, p2, S, clock } = __m0;
-const { compass, conversions } = __m5;
+const { compass } = __m5;
 const { field } = __m20;
 const { fmtDate } = __m4;
 // Field capture (SPEC 13, the field skills): a plane or a line measured with the phone, as a compass-clinometer is
@@ -12668,12 +12665,11 @@ const { fmtDate } = __m4;
 const ACC = { 3: 'high', 2: 'medium', 1: 'low', 0: 'unreliable: move the phone in a figure of eight to calibrate', '-1': 'no contact with the sensor' };
 const KIND = { plane: { label: 'plane', unit: 'dip direction/dip' }, line: { label: 'line', unit: 'trend/plunge' } };
 const ori = (a, b) => `${p3(a)}/${p2(b)}`;
-// The device's angles (W3C deviceorientation) to a plane or a line, from bearing's own rotation matrix and conversions.
-// Not bearing's compass.planeFromDeviceOrientation / lineFromDeviceOrientation: they flip the vertical axis although
-// bearing's frame is east, north, up, so their answers point the opposite way (a phone facing north with its top edge
-// raised 30° reads 000/30; the plane dips 180/30). Checked by hand in test/field.test.mjs; still to be reported to bearing.js.
-// plane: the screen's normal (the device z axis); line: the phone's long edge (the device y axis). Lower hemisphere.
-const fromDevice = (what, alpha, beta, gamma) => { const R = compass.deviceOrientationMatrix(alpha, beta, gamma); return what === 'line' ? conversions.dcosToLine([R[1], R[4], R[7]]) : conversions.dcosToPlane([R[2], R[5], R[8]]); };
+// The device's angles (W3C deviceorientation) to a plane or a line: bearing's compass. plane: the screen's normal (the
+// device z axis); line: the phone's long edge (the device y axis); lower hemisphere. Until bearing 0.2.4 these read 180°
+// off (a phone facing north with its top edge raised 30° gave 000/30; the plane dips 180/30), and golem did the
+// arithmetic itself; the cases worked by hand in test/field.test.mjs still hold it.
+const fromDevice = (what, alpha, beta, gamma) => what === 'line' ? compass.lineFromDeviceOrientation(alpha, beta, gamma) : compass.planeFromDeviceOrientation(alpha, beta, gamma);
 
 // what the setter freezes at the moment of the reading: the declination at home, if a home is saved
 function declAt(ms) {

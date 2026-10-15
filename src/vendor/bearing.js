@@ -1,8 +1,8 @@
 // ⚠ VENDORED — DO NOT EDIT. @gcu/bearing, the structural-geology engine (projections, vectors, statistics),
 // copied from ../auditable/ext/bearing/index.js, itself synced from gentropic/bearing.js dist/bearing.mjs.
-// Re-vendor by copying that file here. golem uses conversions, vec3 and equalArea.
+// Re-vendor by copying that file here. golem uses conversions, vec3, equalArea and compass.
 
-// ⚠ VENDORED — DO NOT EDIT. @gcu/bearing v0.2.2, built ESM bundle.
+// ⚠ VENDORED — DO NOT EDIT. @gcu/bearing v0.2.4, built ESM bundle.
 // Source of truth: gentropic/bearing.js (dist/bearing.mjs). Update with:
 //   node ext/bearing/sync.mjs
 // See ext/bearing/README.md.
@@ -3009,22 +3009,19 @@ function deviceOrientationMatrix(alpha, beta, gamma) {
     cB * cG
   ];
 }
-function enuToBearing(v) {
-  return [v[0], v[1], -v[2]];
-}
 function applyDeclination(azimuth, declination) {
   return ((azimuth + (declination || 0)) % 360 + 360) % 360;
 }
 function planeFromDeviceOrientation(alpha, beta, gamma, options = {}) {
   const R = deviceOrientationMatrix(alpha, beta, gamma);
   const normalENU = [R[2], R[5], R[8]];
-  const [dipDir, dip] = dcosToPlane(enuToBearing(normalENU));
+  const [dipDir, dip] = dcosToPlane(normalENU);
   return [applyDeclination(dipDir, options.declination), dip];
 }
 function lineFromDeviceOrientation(alpha, beta, gamma, options = {}) {
   const R = deviceOrientationMatrix(alpha, beta, gamma);
   const dirENU = [R[1], R[4], R[7]];
-  const [trend, plunge] = dcosToLine(enuToBearing(dirENU));
+  const [trend, plunge] = dcosToLine(dirENU);
   return [applyDeclination(trend, options.declination), plunge];
 }
 

@@ -1,6 +1,6 @@
 // Field capture: a plane or a line measured with the phone, and a position. The device angles are W3C
 // deviceorientation (α about up, β the top edge raised, γ the right side down); the answers are checked against cases
-// worked by hand, because bearing's own compass.planeFromDeviceOrientation reads them the opposite way round.
+// worked by hand (bearing's compass read them the opposite way round until 0.2.4).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as g from '../src/engine/index.js';

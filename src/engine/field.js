@@ -5,19 +5,18 @@
 // functions turn the angles into dip direction/dip or trend/plunge. North is magnetic as measured; with a saved home,
 // golem corrects it to true with the World Magnetic Model and keeps the correction in args, so a replay agrees.
 import { tool, frame, noun, fmt, p3, p2, S, clock } from './core.js';
-import { compass, conversions } from '../vendor/bearing.js';
+import { compass } from '../vendor/bearing.js';
 import { field } from '../vendor/wmm.js';
 import { fmtDate } from './dates.js';
 
 const ACC = { 3: 'high', 2: 'medium', 1: 'low', 0: 'unreliable: move the phone in a figure of eight to calibrate', '-1': 'no contact with the sensor' };
 const KIND = { plane: { label: 'plane', unit: 'dip direction/dip' }, line: { label: 'line', unit: 'trend/plunge' } };
 const ori = (a, b) => `${p3(a)}/${p2(b)}`;
-// The device's angles (W3C deviceorientation) to a plane or a line, from bearing's own rotation matrix and conversions.
-// Not bearing's compass.planeFromDeviceOrientation / lineFromDeviceOrientation: they flip the vertical axis although
-// bearing's frame is east, north, up, so their answers point the opposite way (a phone facing north with its top edge
-// raised 30° reads 000/30; the plane dips 180/30). Checked by hand in test/field.test.mjs; still to be reported to bearing.js.
-// plane: the screen's normal (the device z axis); line: the phone's long edge (the device y axis). Lower hemisphere.
-export const fromDevice = (what, alpha, beta, gamma) => { const R = compass.deviceOrientationMatrix(alpha, beta, gamma); return what === 'line' ? conversions.dcosToLine([R[1], R[4], R[7]]) : conversions.dcosToPlane([R[2], R[5], R[8]]); };
+// The device's angles (W3C deviceorientation) to a plane or a line: bearing's compass. plane: the screen's normal (the
+// device z axis); line: the phone's long edge (the device y axis); lower hemisphere. Until bearing 0.2.4 these read 180°
+// off (a phone facing north with its top edge raised 30° gave 000/30; the plane dips 180/30), and golem did the
+// arithmetic itself; the cases worked by hand in test/field.test.mjs still hold it.
+export const fromDevice = (what, alpha, beta, gamma) => what === 'line' ? compass.lineFromDeviceOrientation(alpha, beta, gamma) : compass.planeFromDeviceOrientation(alpha, beta, gamma);
 
 // what the setter freezes at the moment of the reading: the declination at home, if a home is saved
 function declAt(ms) {
