@@ -4,7 +4,8 @@
 // Working state. `cards` is the current session's cards (specs plus live results), `table` the open
 // table, `aliases` the taught words, `facts` the notes and `files` the opened files by hash (those three
 // belong to the device, not a session). `clause` is the parser's session, rebuilt when a session is opened.
-export const S = { cards: [], n: 0, aliases: {}, facts: [], files: {}, tables: {}, recipes: {}, table: null, clause: null };
+// `misses` (what did not read) and `picks` (guesses picked, by tool) are the device's too: learn.js.
+export const S = { cards: [], n: 0, aliases: {}, facts: [], files: {}, tables: {}, recipes: {}, misses: [], picks: {}, table: null, clause: null };
 
 // The tool table: T.name = args => Result | null. A tool returns null when its arguments do not apply.
 //   Result = { read: (string | Slot)[], body: Block[], trace: string[], py?, value?, ask?, copy? }

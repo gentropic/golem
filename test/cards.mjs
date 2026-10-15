@@ -88,6 +88,13 @@ check(await addBtn.count() === 1 && /Add to station 14/.test(await addBtn.textCo
 await addBtn.dispatchEvent('click'); await page.waitForTimeout(300);
 check(/Added to station 14/.test(await page.locator('#stream .card').last().textContent()), 'the button adds it to the station');
 
+// learning: a correction offers the word that changed, under the card that read; tapping it teaches it
+await ask('5 klicks in miles'); await ask('5 km in miles');
+const teachBtn = page.locator('#stream .card').last().locator('.teach [data-act="run"]');
+check(await teachBtn.count() === 1 && await teachBtn.getAttribute('data-q') === 'klicks means km', 'a correction offers to remember the word');
+await teachBtn.dispatchEvent('click'); await page.waitForTimeout(250); await ask('3 klicks in miles');
+check(/1\.86/.test(await page.locator('#stream .card').last().textContent()), 'the word taught reads from then on');
+
 // Chrome on Android (155) has DeviceOrientationEvent.requestPermission too, and allows motion already: the compass must
 // not wait for a tap there (it did, until tried on a phone). A page that only has the function still reads at once.
 const p2 = await ctx.newPage(); p2.on('pageerror', e => errors.push(e.message));

@@ -205,7 +205,7 @@ Status: **live** = works in `src/` today; **planned** = named, not built.
 | Device | Timer, alarm | live: `clock.timer`, `clock.alarm` in the app; in a browser the timer counts down in the page (14 Oct 2026) | lead-acid `intent` plugin |
 | Device | Map, dial, share | planned | lead-acid intent route; `share` exists today |
 | Session | Explain, amend, repeat, undo | live | section 3 |
-| Session | Teach a word | live | device lexicon |
+| Session | Teach a word; learning from the person | live; since 15 Oct 2026 learned from, on the device and never silently: what did not read is kept (`S.misses`, "what couldn't you read") and a request on it can be taught as a whole, only to something that reads; a request that did not read followed by one that did offers the stretch that changed as a word ("klicks means km"); a picked guess offers its repaired word, and the tools picked rank first among the next guesses (`S.picks`) | device lexicon, `learn.js` |
 | Session | Notes: remember and recall | live | glass later; a table now |
 | Session | Sessions, history, auto names | live | section 8 |
 | Session | Recipes | live (11 Oct 2026): a session's steps saved as card specs with the subjects that change (the table, columns), run again into a session of its own with every step re-read and the run stopped at the first step that does not read; batch over every kept table, one row each; recipes are device state | section 8 |

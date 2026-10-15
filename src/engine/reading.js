@@ -3,6 +3,7 @@
 // tools that talk about the session itself: none, why, export.
 import { S, T, TOOLS, FRAMES, tool, frame, amend, session, noun, toolByName, runTool, iso } from './core.js';
 import { examples, vocab } from './skills.js';
+import { rankByPicks } from './learn.js';
 import { ontology } from './ontology.js';
 import { calcOf } from './calc.js';
 import { estimateOf } from './estimate.js';
@@ -219,7 +220,7 @@ export function guessesOf(raw) {
     const echo = phraseOf(E.echo(c));
     out.push({ tool: b.tool, args: b.args, echo, changes: [...new Set([...changes, ...changesOf(raw, echo)])] });
   }
-  return out.slice(0, 3);
+  return rankByPicks(out).slice(0, 3);
 }
 export function guessRead(raw) {
   const cands = guessesOf(raw); if (!cands.length) return null;

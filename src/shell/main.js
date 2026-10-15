@@ -97,6 +97,14 @@ function replaceCard(c, focusKey) {
   if (open) old.querySelector('details.trace').open = true;
   if (focusKey) { const s = old.querySelector(`.slot[data-key="${focusKey}"]`); if (s) s.focus({ preventScroll: true }); }
 }
+// a word to learn, offered under the card that read after a correction or a picked guess (learn.js); the button says it
+// the way the teach frame reads it, and nothing is kept until it is tapped. It is not part of the card: a rerender drops it
+function offerTeach(c, teach) {
+  const el = teach && $('stream').querySelector(`[data-id="${c.id}"] .ans`); if (!el) return;
+  const d = document.createElement('div'); d.className = 'opts teach';
+  d.innerHTML = `<button class="btn" type="button" data-act="run" data-q="${escHtml(`${teach.word} means ${teach.means}`)}">${escHtml(t('Remember: “{word}” means “{means}”', teach))}</button>`;
+  el.appendChild(d);
+}
 let ready = false;   // the device state is back (see the start, below): until then a query would land in a session about to be replaced
 function run(raw) {
   if (!ready) { status('Opening your sessions…'); return; }
@@ -109,11 +117,11 @@ function show(o) {
     case 'recipe': renderStream(); status(o.msg); break;
     case 'drawer': openDrawer(); break;
     case 'rename': status(t('Session named “{name}”.', { name: o.name })); break;
-    case 'answered': replaceCard(o.card); status(t('Answered #{n}: {label}', { n: pad(o.card.id), label: o.label })); break;
+    case 'answered': replaceCard(o.card); offerTeach(o.card, o.teach); status(t('Answered #{n}: {label}', { n: pad(o.card.id), label: o.label })); break;
     case 'undo': { const el = $('stream').querySelector(`[data-id="${o.card.id}"]`); if (el) el.remove(); welcome(); status(t('Removed #{n}: {raw}', { n: pad(o.card.id), raw: o.card.raw })); break; }
     case 'nothing': status(o.msg); break;
     case 'card': {
-      const el = cardEl(o.card); $('stream').appendChild(el); drawCharts(el); welcome(); armCaptures(); if (voice.all) say(el); showTab('ask'); el.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+      const el = cardEl(o.card); $('stream').appendChild(el); drawCharts(el); offerTeach(o.card, o.teach); welcome(); armCaptures(); if (voice.all) say(el); showTab('ask'); el.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
       // for a screen reader: what was read and the start of the answer, once
       const ans = el.querySelector('.ans'), read = el.querySelector('.read');
       $('sr').textContent = `#${pad(o.card.id)}, ${(read ? read.innerText : o.card.raw).replace(/\s+/g, ' ')}. ${ans ? ans.innerText.replace(/\s+/g, ' ').slice(0, 220) : ''}`;
@@ -605,7 +613,7 @@ $('stream').addEventListener('click', e => {
   if (act === 'run') return run(b.dataset.q);
   if (!awake) return status('Asleep. Tap wake at the top right.');
   if (act === 'slot') { flipSlot(c, b.dataset.key); replaceCard(c, b.dataset.key); }
-  else if (act === 'answer') { answer(c, +b.dataset.i); replaceCard(c); }
+  else if (act === 'answer') { const p = answer(c, +b.dataset.i); replaceCard(c); if (p) offerTeach(c, p.teach); }
   else if (act === 'skills') showTab('skills');
   else if (['copyans', 'edit', 'pin', 'branch'].includes(act)) cardAction(c, act);
   else if (act === 'say') say(b.closest('.card'));

@@ -1433,6 +1433,27 @@
       ]
     },
     {
+      "type": "missnoun",
+      "words": {
+        "misses": [
+          "what couldn't you read",
+          "what could you not read",
+          "what you could not read",
+          "what you couldn't read",
+          "what didn't you understand",
+          "what did not read",
+          "what you did not understand"
+        ]
+      },
+      "words_pt": {
+        "misses": [
+          "o que você não entendeu",
+          "o que você não leu",
+          "o que não leu"
+        ]
+      }
+    },
+    {
       "type": "column",
       "words": {
         "hole": [
@@ -8856,6 +8877,47 @@
         "habilidades"
       ],
       "label_pt": "O que sei fazer"
+    },
+    {
+      "name": "misses",
+      "label": "What did not read",
+      "words": [
+        "show",
+        "list"
+      ],
+      "elidable": true,
+      "theme": [
+        "missnoun"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {},
+      "words_pt": [
+        "mostra",
+        "lista"
+      ],
+      "label_pt": "O que não leu"
+    },
+    {
+      "name": "missesClear",
+      "label": "Forget what did not read",
+      "words": [
+        "forget",
+        "clear"
+      ],
+      "theme": [
+        "missnoun"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {},
+      "words_pt": [
+        "esquece",
+        "limpa"
+      ],
+      "label_pt": "Esquecer o que não leu"
     },
     {
       "name": "convert",

@@ -1,6 +1,6 @@
 // The entry point: submit(raw) reads a request and returns what happened. Cards are recomputed in
 // place by rerun(); answers and slot flips go through it, so args stay the only state that matters.
-import { S, T, runTool, toolByName, startJobs, tool, CONDITIONS, EFFECTS } from './core.js';
+import { S, T, runTool, toolByName, startJobs, tool, CONDITIONS, EFFECTS, clock, iso } from './core.js';
 import './units.js';
 import './calc.js';
 import './dates.js';
@@ -35,6 +35,7 @@ import { bindingsOf, runSteps } from './recipes.js';
 import { tableFromText } from './table.js';
 import { convertBinary } from './formats.js';
 import './notes.js';
+import { noteMiss, clearMiss, correctionOf, teachOfPick, notePick, setReader } from './learn.js';
 import { norm, grammar, context, taught, sessionRead, readingOf, guessRead, clauseEngine } from './reading.js';
 import { makeSession } from '../vendor/dispatch.js';
 import { current, newSession, renameSession, touch } from './sessions.js';
@@ -45,6 +46,8 @@ export function addCard(raw, r, ms) {
   if (r.cmd !== undefined) Object.defineProperty(c, 'cmd', { value: r.cmd, writable: true, enumerable: false });   // the clause command, for amendments; not stored
   S.cards.push(c); touch(); startJobs([c], rerun); return c;
 }
+// what a request taught as a whole must be: something that reads by itself (learn.js checks it before keeping it)
+setReader(q => { const r = readingOf(q, null); return r && r.tool && ['grammar', 'taught'].includes(r.rung) && r.tool !== 'misses' ? r.echo : null; });
 export function rerun(c) {
   const t0 = performance.now(); c.res = runTool(c.tool, c.args); c.ms = performance.now() - t0; touch(); startJobs([c], rerun); return c;
 }
@@ -61,7 +64,9 @@ export function answer(c, i) {
     const k = c.args.cands[o.value], from = c.args.cands.length;
     c.tool = k.tool; c.args = JSON.parse(JSON.stringify(k.args)); rerun(c);
     if (c.res) c.res.trace.unshift(`guess: read as ${k.echo}${k.changes.length ? ' (' + k.changes.join('; ') + ')' : ''}, picked from ${from}`);
-    return o;
+    // the pick is learned from: the tool counts for the next guesses, and the repaired word is offered to teach
+    notePick(k.tool); clearMiss(c.raw); touch();
+    const teach = teachOfPick(k); return teach ? { ...o, teach } : o;
   }
   c.res.ask.set(c.args, o.value); rerun(c); return o;
 }
@@ -95,7 +100,7 @@ export function submit(raw) {
     if (Array.isArray(many) && many.length > 1) { last.res.ask.set(last.args, many); rerun(last); return { kind: 'answered', card: last, label: many.join(', ') }; }
     // an option by its label, as the card wrote it; "yes" when there is only one
     const os = last.res.ask.options, o = os.find(x => x.label.toLowerCase() === q) || os.find(x => x.label.length >= 3 && (x.label.toLowerCase().startsWith(q) || q.includes(x.label.toLowerCase()))) || (os.length === 1 && s && s.session === 'yes' ? os[0] : null);
-    if (o && last.tool === 'guess') { answer(last, os.indexOf(o)); return { kind: 'answered', card: last, label: o.label }; }
+    if (o && last.tool === 'guess') { const p = answer(last, os.indexOf(o)); return { kind: 'answered', card: last, label: o.label, ...(p && p.teach ? { teach: p.teach } : {}) }; }
     if (o) { last.res.ask.set(last.args, o.value); rerun(last); return { kind: 'answered', card: last, label: o.label }; }
     if (last.res.ask.parse) { const v = last.res.ask.parse(text); if (v != null) { last.res.ask.set(last.args, v); rerun(last); return { kind: 'answered', card: last, label: Array.isArray(v) ? v.join(', ') : String(v) }; } }
   }
@@ -108,7 +113,11 @@ export function submit(raw) {
   const steps = stepsOf(raw, last); if (steps) return chain(steps, raw);
   // a whole command first; then what amends the last card ("in feet", "2 sentences"); then the words taught on this device
   const r = grammar(text, q, 'grammar', raw) || context(q, last, raw) || taught(text, q, raw) || guessRead(raw) || { tool: 'none', args: { q }, rung: 'none', res: T.none({ q }) };
-  return { kind: 'card', card: addCard(raw, r, performance.now() - t0) };
+  // learned from (learn.js): what did not read goes on the device's list; what read comes off it, and when it follows
+  // something that did not read, the stretch that changed is offered as a word to teach
+  if (r.rung === 'none' || r.rung === 'guess') noteMiss(raw, iso(clock.now())); else clearMiss(raw);
+  const teach = r.rung === 'none' || r.rung === 'guess' ? null : correctionOf(last, raw);
+  return { kind: 'card', card: addCard(raw, r, performance.now() - t0), ...(teach ? { teach } : {}) };
 }
 
 /* ── the planner's sequence: steps said in order ── */
