@@ -43,7 +43,7 @@ await page.evaluate(() => { window.__copied = null; navigator.clipboard.writeTex
 await conv.locator('[data-act="copyans"]').click(); await page.waitForTimeout(100);
 const copied = await page.evaluate(() => window.__copied);
 check(copied == null || /3,10686/.test(copied), `what is copied is what the page shows (${copied})`);
-await tab('settings'); await page.selectOption('#pf-numbers', '"auto"'); await page.waitForTimeout(100);
+await tab('settings'); await page.selectOption('#pf-numbers', '"point"'); await page.waitForTimeout(100);
 
 // What golem keeps: taught things listed, one forgotten, still forgotten after a reload (the card that taught it is
 // replayed, but writes nothing again)

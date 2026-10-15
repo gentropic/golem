@@ -104,7 +104,6 @@ export const ANSWERS_PT = {
   "the zone the place is in": "a zona onde o lugar está",
   "metres and kilometres": "metros e quilômetros",
   "feet and miles": "pés e milhas",
-  "the language's": "o do idioma",
   "a point (1,234.5)": "um ponto (1,234.5)",
   "a comma (1.234,5)": "uma vírgula (1.234,5)",
   "on: kept on this device, offered to teach": "ligado: guardado neste aparelho, oferecido para ensinar",

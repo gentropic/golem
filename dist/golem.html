@@ -14676,8 +14676,8 @@ const PREFS = [
     tools: ['utm'], put: (a, v) => { if (a.place && !a.zoneForced) a.zoneForced = v; } },
   { key: 'units', group: 'answers', label: 'Distances and thicknesses', def: 'metric',
     options: [{ v: 'metric', label: 'metres and kilometres', words: ['metric','metres','si'] }, { v: 'imperial', label: 'feet and miles', words: ['imperial','feet'] }], tools: ['distance', 'thickness'], put: (a, v) => { a.units = v; } },
-  { key: 'numbers', group: 'device', label: 'Decimal mark', def: 'auto',
-    options: [{ v: 'auto', label: 'the language\'s', words: ['auto','language'] }, { v: 'point', label: 'a point (1,234.5)', words: ['point','dot','decimal point'] }, { v: 'comma', label: 'a comma (1.234,5)', words: ['comma','decimal comma'] }] },
+  { key: 'numbers', group: 'device', label: 'Decimal mark', def: 'point',
+    options: [{ v: 'point', label: 'a point (1,234.5)', words: ['point','dot','decimal point'] }, { v: 'comma', label: 'a comma (1.234,5)', words: ['comma','decimal comma'] }] },
   { key: 'learn', group: 'device', label: 'Learning from what did not read', def: 'on',
     options: [{ v: 'on', label: 'on: kept on this device, offered to teach', words: ['on','yes'] }, { v: 'off', label: 'off: nothing is kept', words: ['off','no'] }] },
   { key: 'fixAge', group: 'device', label: 'Oldest position fix taken', def: 120,
@@ -31545,7 +31545,6 @@ const ANSWERS_PT = {
   "the zone the place is in": "a zona onde o lugar está",
   "metres and kilometres": "metros e quilômetros",
   "feet and miles": "pés e milhas",
-  "the language's": "o do idioma",
   "a point (1,234.5)": "um ponto (1,234.5)",
   "a comma (1.234,5)": "uma vírgula (1.234,5)",
   "on: kept on this device, offered to teach": "ligado: guardado neste aparelho, oferecido para ensinar",
@@ -31794,11 +31793,12 @@ const __m83 = (() => {
 const { fmt } = __m0;
 const { conversions, equalArea } = __m5;
 const { Figure } = __m80;
-const { t, th, tx, uiLang } = __m82;
+const { t, th, tx } = __m82;
 const { prefOf } = __m41;
 const { stationNow } = __m28;
 const { staleOf, staleText } = __m32;
-// Rendering. The engine hands over plain blocks; this is the only file that turns them into markup.
+// Rendering. The engine hands over plain blocks; this is the only file that turns them into markup.
+
 // a card read with a taught value or formula that has changed since (tms.js): said under its reading, with its question
 // to run again; the answer itself stays what it was
 function staleLine(c) {
@@ -31874,12 +31874,12 @@ function svgCurve(b) {
   return s + '</svg>';
 }
 
-/* ── numbers, with the decimal mark of the settings (the language's by default: a comma in Portuguese) ── */
+/* ── numbers, with the decimal mark of the settings (a point unless the person chose the comma, in any language) ── */
 // Only how the page writes them (and so what is copied from it): the answer is unchanged, and the files golem saves keep the point. A number is one
 // with a decimal point or grouping commas, standing alone (not a version such as 0.2.4, not inside a word); two of them
 // separated by a comma (a latitude and longitude) are separated by a semicolon instead.
 const NUM = /(?<![\w.,])-?(?:\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+\.\d+)(?:e[+-]?\d+)?(?![\w]|[.,]\d)/g;
-const commaMark = () => { const m = prefOf('numbers'); return m === 'comma' || (m === 'auto' && uiLang() === 'pt'); };
+const commaMark = () => { const m = prefOf('numbers'); return m === 'comma'; };
 function marks(s) {
   if (s == null || !commaMark()) return s;
   return String(s).replace(/(\d\.\d+), (?=-?\d+\.\d)/g, '$1; ').replace(NUM, n => n.replace(/[.,]/g, c => (c === '.' ? ',' : '.')));

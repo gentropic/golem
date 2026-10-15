@@ -73,7 +73,7 @@ test('settings said in Portuguese; a value that is not one is a question, not a 
   const bad = say('set planes to banana');
   assert.equal(bad.rung, 'none'); assert.match(text(bad), /Plane notation: "dip direction", "strike\/dip"/);
   say('use decimal commas'); assert.equal(g.prefOf('numbers'), 'comma');
-  g.submit('undo'); assert.equal(g.prefOf('numbers'), 'auto');
+  g.submit('undo'); assert.equal(g.prefOf('numbers'), 'point');
   assert.match(text(say('mostra as configurações')), /Declination fixed, 21° west set here/);
   say('reset the settings'); assert.deepEqual(g.S.prefs, {});
   g.submit('undo'); assert.equal(g.prefOf('decl'), -21);

@@ -1,6 +1,6 @@
 // The interface in Portuguese: a pt-BR browser opens golem in Portuguese (the page, the welcome's starters, the cards'
 // frame, the About view), a Portuguese question reads, English still reads, and the language under Settings goes back to
-// English and is kept on the device; numbers are written with a decimal comma in Portuguese. Run with `npm test`; set CHROMIUM_PATH as for the smoke test.
+// English and is kept on the device; numbers keep the decimal point in Portuguese. Run with `npm test`; set CHROMIUM_PATH as for the smoke test.
 import { chromium } from 'playwright';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -19,8 +19,8 @@ const welcome = await page.textContent('#welcome');
 check(/Pergunte, calcule/.test(welcome) && /No campo/.test(welcome) && /espessura verdadeira/.test(welcome), 'the welcome and its starters are in Portuguese');
 check(await page.getAttribute('#q', 'placeholder') === 'Pergunte, calcule ou peça' && /Nova sessão/.test(await page.textContent('#newsess')), 'the box and the sidebar are in Portuguese');
 const c = await ask('converte 5 km para milhas'); const txt = await c.textContent();
-check(/3,10686/.test(txt) && /gramática/.test(txt) && /lido como/.test(txt) && /copiar/.test(txt), `a Portuguese question reads, in a Portuguese frame (${txt.replace(/\s+/g, ' ').slice(0, 70)})`);
-check(/0,8 km/.test(await (await ask('800 m in km')).textContent()), 'English still reads with Portuguese first; the number is written with a comma');
+check(/3.10686/.test(txt) && /gramática/.test(txt) && /lido como/.test(txt) && /copiar/.test(txt), `a Portuguese question reads, in a Portuguese frame (${txt.replace(/\s+/g, ' ').slice(0, 70)})`);
+check(/0.8 km/.test(await (await ask('800 m in km')).textContent()), 'English still reads with Portuguese first; the number keeps its point');
 // the answers in Portuguese: the reading's words, the labels, a sentence with values; a table's own columns untouched
 check(/converter/.test(txt) && /para/.test(txt), `the reading's words are Portuguese (${txt.replace(/\s+/g, ' ').slice(0, 60)})`);
 const st = await (await ask('o arenito sobrepõe o granito')).textContent();

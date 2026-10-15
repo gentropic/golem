@@ -2,7 +2,7 @@
 import { fmt } from '../engine/core.js';
 import { conversions, equalArea } from '../vendor/bearing.js';
 import { Figure } from '../vendor/plot.js';
-import { t, th, tx, uiLang } from './i18n.js';
+import { t, th, tx } from './i18n.js';
 import { prefOf } from '../engine/prefs.js';
 import { stationNow } from '../engine/notebook.js';
 import { staleOf, staleText } from '../engine/tms.js';
@@ -82,12 +82,12 @@ function svgCurve(b) {
   return s + '</svg>';
 }
 
-/* ── numbers, with the decimal mark of the settings (the language's by default: a comma in Portuguese) ── */
+/* ── numbers, with the decimal mark of the settings (a point unless the person chose the comma, in any language) ── */
 // Only how the page writes them (and so what is copied from it): the answer is unchanged, and the files golem saves keep the point. A number is one
 // with a decimal point or grouping commas, standing alone (not a version such as 0.2.4, not inside a word); two of them
 // separated by a comma (a latitude and longitude) are separated by a semicolon instead.
 const NUM = /(?<![\w.,])-?(?:\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+\.\d+)(?:e[+-]?\d+)?(?![\w]|[.,]\d)/g;
-export const commaMark = () => { const m = prefOf('numbers'); return m === 'comma' || (m === 'auto' && uiLang() === 'pt'); };
+export const commaMark = () => { const m = prefOf('numbers'); return m === 'comma'; };
 export function marks(s) {
   if (s == null || !commaMark()) return s;
   return String(s).replace(/(\d\.\d+), (?=-?\d+\.\d)/g, '$1; ').replace(NUM, n => n.replace(/[.,]/g, c => (c === '.' ? ',' : '.')));
