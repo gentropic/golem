@@ -95,6 +95,14 @@ check(await teachBtn.count() === 1 && await teachBtn.getAttribute('data-q') === 
 await teachBtn.dispatchEvent('click'); await page.waitForTimeout(250); await ask('3 klicks in miles');
 check(/1\.86/.test(await page.locator('#stream .card').last().textContent()), 'the word taught reads from then on');
 
+// sleep: nothing reads while asleep, and it stays asleep across a reload until woken
+await page.click('#power'); await page.waitForTimeout(150);
+check(await page.isDisabled('#q') && /asleep/.test(await page.textContent('#st-on')), 'asleep: the box is off');
+await page.reload(); await page.waitForSelector('html[data-ready]'); await page.waitForTimeout(200);
+check(await page.isDisabled('#q') && /asleep/.test(await page.textContent('#st-on')), 'still asleep after a reload');
+await page.click('#power'); await page.waitForTimeout(150);
+check(!(await page.isDisabled('#q')), 'woken, the box works again');
+
 // Chrome on Android (155) has DeviceOrientationEvent.requestPermission too, and allows motion already: the compass must
 // not wait for a tap there (it did, until tried on a phone). A page that only has the function still reads at once.
 const p2 = await ctx.newPage(); p2.on('pageerror', e => errors.push(e.message));

@@ -80,12 +80,12 @@ export const current = () => cur;
 export function serialize() {
   // files under a megabyte travel with the device state; larger ones stay in memory and say so on replay
   const files = Object.fromEntries(Object.entries(S.files).filter(([, f]) => f.text.length <= 1e6));
-  return { cur: cur && cur.id, sid, aliases: S.aliases, facts: S.facts, files, tables: S.tables, recipes: S.recipes, misses: S.misses, picks: S.picks, ss: SS.map(s => ({ ...s, cards: s.cards.map(spec) })) };
+  return { cur: cur && cur.id, sid, aliases: S.aliases, facts: S.facts, files, tables: S.tables, recipes: S.recipes, misses: S.misses, picks: S.picks, formulas: S.formulas, orders: S.orders, ss: SS.map(s => ({ ...s, cards: s.cards.map(spec) })) };
 }
 // the same state in parts, for a store that keeps each session and each file on its own (the shell's @gcu/vfs), with no
 // size cap on files; hydrate() takes the parts put back together ({ cur, sid, ...device, files, ss })
 export function parts() {
-  return { meta: { v: 1, cur: cur && cur.id, sid }, device: { aliases: S.aliases, facts: S.facts, tables: S.tables, recipes: S.recipes, misses: S.misses, picks: S.picks },
+  return { meta: { v: 1, cur: cur && cur.id, sid }, device: { aliases: S.aliases, facts: S.facts, tables: S.tables, recipes: S.recipes, misses: S.misses, picks: S.picks, formulas: S.formulas, orders: S.orders },
     sessions: SS.map(s => ({ ...s, cards: s.cards.map(spec) })), files: S.files };
 }
 // A session as a file of its own ("<name>.golem.json"): its card specs and the files they read, so it replays on another
@@ -105,10 +105,10 @@ export function importSession(d) {
 }
 export function hydrate(d) {
   if (!d || !Array.isArray(d.ss) || !d.ss.length) return false;
-  SS = d.ss; sid = d.sid || Math.max(...SS.map(s => s.id)); S.aliases = d.aliases || {}; S.facts = d.facts || []; S.files = d.files || {}; S.tables = d.tables || {}; S.recipes = d.recipes || {}; S.misses = d.misses || []; S.picks = d.picks || {};
+  SS = d.ss; sid = d.sid || Math.max(...SS.map(s => s.id)); S.aliases = d.aliases || {}; S.facts = d.facts || []; S.files = d.files || {}; S.tables = d.tables || {}; S.recipes = d.recipes || {}; S.misses = d.misses || []; S.picks = d.picks || {}; S.formulas = d.formulas || {}; S.orders = d.orders || [];
   load(SS.find(s => s.id === d.cur) || SS[0]); return true;
 }
 // forget everything: sessions, device state, working state (tests start here)
 export function reset() {
-  SS = []; cur = null; sid = 0; S.cards = []; S.n = 0; S.aliases = {}; S.facts = []; S.files = {}; S.tables = {}; S.recipes = {}; S.misses = []; S.picks = {}; S.table = null; S.clause = null; clearResults();
+  SS = []; cur = null; sid = 0; S.cards = []; S.n = 0; S.aliases = {}; S.facts = []; S.files = {}; S.tables = {}; S.recipes = {}; S.misses = []; S.picks = {}; S.formulas = {}; S.orders = []; S.table = null; S.clause = null; clearResults();
 }

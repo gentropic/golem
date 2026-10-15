@@ -4,8 +4,9 @@
 // Working state. `cards` is the current session's cards (specs plus live results), `table` the open
 // table, `aliases` the taught words, `facts` the notes and `files` the opened files by hash (those three
 // belong to the device, not a session). `clause` is the parser's session, rebuilt when a session is opened.
-// `misses` (what did not read) and `picks` (guesses picked, by tool) are the device's too: learn.js.
-export const S = { cards: [], n: 0, aliases: {}, facts: [], files: {}, tables: {}, recipes: {}, misses: [], picks: {}, table: null, clause: null };
+// `misses` (what did not read) and `picks` (guesses picked, by tool) are the device's too: learn.js. So are `formulas`
+// (taught: lore.js) and `orders` (standing orders: orders.js).
+export const S = { cards: [], n: 0, aliases: {}, facts: [], files: {}, tables: {}, recipes: {}, misses: [], picks: {}, formulas: {}, orders: [], table: null, clause: null };
 
 // The tool table: T.name = args => Result | null. A tool returns null when its arguments do not apply.
 //   Result = { read: (string | Slot)[], body: Block[], trace: string[], py?, value?, ask?, copy? }
@@ -128,3 +129,8 @@ export const p3 = x => String(Math.round(x) % 360).padStart(3, '0');
 export const p2 = x => String(Math.round(x)).padStart(2, '0');
 // a quantity node from the parser as a number in a base unit, given the unit's factor
 export const qty = (node, f) => node && node.type === 'quantity' ? node.n * f(node.unit) : null;
+
+// Checks that run whenever a table opens or a row is written to a device table (standing orders, orders.js): each
+// f(table, rows) → blocks for the card that opened or wrote it; rows, when given, are the ones just written.
+export const CHECKS = [];
+export const checksOf = (table, rows) => { try { return CHECKS.flatMap(f => f(table, rows)); } catch (e) { return []; } };

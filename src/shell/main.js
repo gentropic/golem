@@ -235,7 +235,7 @@ function voiceItem() {
    for a reading (res.capture) shows it live; the reading taken goes into the card's args (capture() in the engine). ── */
 if (inApp) document.documentElement.dataset.app = '1';
 const ACCW = { 3: 'high', 2: 'medium', 1: 'low', 0: 'unreliable', '-1': 'no sensor' };
-let orient = null, samples = [];
+let orient = null, samples = [], fixStream = null;   // the compass and a position being taken: sleep closes both
 const pendingCaptures = () => S.cards.filter(c => c.res && c.res.capture && ['plane', 'line'].includes(c.res.capture.kind));
 const angle = (u, v) => Math.acos(Math.max(-1, Math.min(1, Math.abs(u[0] * v[0] + u[1] * v[1] + u[2] * v[2])))) * 180 / Math.PI;
 const vecOf = (what, al, be, ga) => { const [x, y] = fromDevice(what, al, be, ga); return what === 'line' ? conversions.lineToDcos(x, y) : conversions.planeToDcos(x, y); };
@@ -327,9 +327,11 @@ async function takePosition(c) {
       const got = f => { if (f.lat == null || (f.t && Date.now() - f.t > 120000)) return; if (!best || (f.acc != null && f.acc < best.acc)) best = f; show(`±${Math.round(f.acc)} m…`); if (f.acc != null && f.acc <= 20) { clearTimeout(stop); done(); } };
       if (inApp) st.on('fix', d => got(data(d)));
       else st = browserFix(got, e => { clearTimeout(stop); if (best) done(); else fail(e); });
+      fixStream = { close() { clearTimeout(stop); done(); } };   // sleep ends the wait; the stream closes below
     });
   } catch (e) { show(''); status(e.status === 403 || (e.info && e.info.error === 'permission') ? (inApp ? t('Position needs the location permission: allow it in the dialog, or in the app\'s settings.') : t('Position needs the location permission: allow it for this site in the browser.')) : t('No position: {e}', { e: e.message })); return; }
-  finally { if (st) st.close(); }
+  finally { fixStream = null; if (st) st.close(); }
+  if (!awake) { show(''); return; }   // put to sleep while waiting: nothing is kept
   if (!best) { show(t('No fix. Go where the sky is open and try again.')); return; }
   capture(c, { lat: best.lat, lon: best.lon, acc: best.acc, at: best.t || Date.now() }); replaceCard(c); status(t('Position taken, ±{m} m.', { m: Math.round(best.acc) }));
 }
@@ -676,10 +678,18 @@ $('stream').addEventListener('click', e => {
   tick(); renderPacks();
 });
 function renderPower() { $('st-on').textContent = t(awake ? 'awake' : 'asleep'); $('power').textContent = t(awake ? 'sleep' : 'wake'); $('power').setAttribute('aria-pressed', String(!awake)); }
-$('power').addEventListener('click', () => {
-  awake = !awake; $('app').classList.toggle('asleep', !awake); $('q').disabled = !awake; renderPower();
-  status(awake ? 'Awake.' : 'Asleep. Nothing runs until you wake it.');
-});
+// Asleep: nothing is read or run, the compass and the position stop (their streams closed, not just ignored), and it
+// stays asleep across a reload on this device until someone wakes it. Standing orders run only when a card does, so
+// asleep they are still too.
+function setAwake(on, quiet) {
+  awake = on; $('app').classList.toggle('asleep', !awake); $('q').disabled = !awake; renderPower();
+  if (!awake) { if (orient) { orient.close(); orient = null; } samples = []; if (fixStream) { fixStream.close(); fixStream = null; } }
+  else armCaptures();
+  try { if (awake) localStorage.removeItem('golem.asleep'); else localStorage.setItem('golem.asleep', '1'); } catch (e) { /* storage off: asleep until the page closes */ }
+  if (!quiet) status(awake ? 'Awake.' : 'Asleep. Nothing runs, the compass and the position are off, and it stays asleep until you wake it.');
+}
+$('power').addEventListener('click', () => setAwake(!awake));
+try { if (localStorage.getItem('golem.asleep') === '1') setAwake(false, true); } catch (e) { /* storage off */ }
 $('menu').addEventListener('click', openDrawer);
 $('sname').addEventListener('click', openDrawer);
 $('dclose').addEventListener('click', closeDrawer);

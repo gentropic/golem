@@ -9,7 +9,8 @@
 // cutoff, lithostatic pressure, Darcy's law, Stokes settling. A formula is an equation as data (its residual); a slot
 // says which term is unknown ("solve for"), the others are asked, and a root search over the term's range finds the
 // value. Where the equation has more than one root in range, the card says so and shows each.
-import { tool, frame, noun, fmt } from './core.js';
+import { S, tool, frame, noun, fmt } from './core.js';
+import { calc } from './calc.js';
 import { parseUnit } from './units.js';
 import { numberAsk, firstNeed } from './forms.js';
 
@@ -103,11 +104,13 @@ export const FORMULAS = {
 // every root of eq in [lo, hi] for one term, the others fixed: a scan for sign changes (in log steps where the range spans
 // decades), then bisection on each to 1e-12 relative
 export function roots(F, key, known) {
-  const r = F.vars[key], f = x => F.eq({ ...known, [key]: x }), out = [];
-  const logs = r.lo > 0 && r.hi / r.lo > 1e3, N = 2000, at = i => logs ? r.lo * Math.pow(r.hi / r.lo, i / N) : r.lo + (r.hi - r.lo) * i / N;
-  let x0 = at(0), y0 = f(x0); if (y0 === 0) out.push(x0);
-  for (let i = 1; i <= N; i++) {
-    const x1 = at(i), y1 = f(x1);
+  const r = F.vars[key], f = x => { try { return F.eq({ ...known, [key]: x }); } catch (e) { return NaN; } }, out = [];
+  // a term with no range (a taught formula's): both signs, by decades from 1e-9 to 1e12, and zero
+  const N = 2000, logs = r.lo > 0 && r.hi / r.lo > 1e3, mag = i => 1e-9 * Math.pow(1e21, i / N);
+  const xs = r.lo == null ? [...Array.from({ length: N + 1 }, (_, i) => -mag(N - i)), 0, ...Array.from({ length: N + 1 }, (_, i) => mag(i))] : Array.from({ length: N + 1 }, (_, i) => logs ? r.lo * Math.pow(r.hi / r.lo, i / N) : r.lo + (r.hi - r.lo) * i / N);
+  let x0 = xs[0], y0 = f(x0); if (y0 === 0) out.push(x0);
+  for (let i = 1; i < xs.length; i++) {
+    const x1 = xs[i], y1 = f(x1);
     if (y1 === 0) out.push(x1);
     else if (isFinite(y0) && isFinite(y1) && y0 !== 0 && Math.sign(y0) !== Math.sign(y1)) {
       let a = x0, b = x1, fa = y0; for (let k = 0; k < 200 && Math.abs(b - a) > 1e-12 * Math.max(1, Math.abs(a)); k++) { const m = (a + b) / 2, fm = f(m); if (Math.sign(fm) === Math.sign(fa)) { a = m; fa = fm; } else b = m; }
@@ -117,15 +120,24 @@ export function roots(F, key, known) {
   }
   return out.filter((x, i) => i === 0 || Math.abs(x - out[i - 1]) > 1e-9 * Math.max(1, Math.abs(x)));
 }
+// a declared formula, or one taught on this device (lore.js: S.formulas[name] = { result, expr, vars }): result = expr
+export function formulaOf(name) {
+  if (FORMULAS[name]) return FORMULAS[name];
+  const u = S.formulas && S.formulas[name]; if (!u) return null;
+  const vars = { [u.result]: { label: u.label || u.result.replace(/_/g, ' '), unit: '', words: [u.result.replace(/_/g, ' ')] } };
+  for (const v of u.vars) vars[v] = { label: v.replace(/_/g, ' '), unit: '', words: [v.replace(/_/g, ' '), v] };
+  return { title: name, taught: true, words: [name], show: `${u.result} = ${u.expr}`, vars, eq: x => x[u.result] - calc(u.expr, x) };
+}
+const allFormulas = () => ({ ...FORMULAS, ...Object.fromEntries(Object.keys(S.formulas || {}).map(k => [k, formulaOf(k)])) });
 tool({
   name: 'formula',
   skill: { group: 'Compute', title: 'Formulas, solved for any term', on: 'declared equations · own root search', about: 'Tonnage, contained metal, strip ratio, the two-product recovery, break-even cutoff, lithostatic pressure, Darcy\'s law and Stokes settling, each solved for whichever term you leave out: the others are asked, and the root found by a search over the term\'s range. More than one root is said, not chosen.', examples: ['two-product recovery', 'solve the cutoff formula for price', 'stokes settling for diameter', 'what formulas do you know'] },
-  topic: a => [FORMULAS[a.formula] ? FORMULAS[a.formula].title : 'Formula', 1],
+  topic: a => [formulaOf(a.formula) ? formulaOf(a.formula).title : 'Formula', 1],
   run: a => {
-    const F = FORMULAS[a.formula]; if (!F) return null;
+    const F = formulaOf(a.formula); if (!F) return { read: ['formula', { v: a.formula }], body: [{ t: 'note', kind: 'err', text: `There is no formula called ${a.formula} on this device any more.` }], trace: ['no such formula'] };
     const keys = Object.keys(F.vars), solve = keys.includes(a.solve) ? a.solve : keys[0];
     const read = [F.title, 'solved for', { v: F.vars[solve].label, key: 'solve', alts: keys, cur: solve }];
-    const qs = keys.filter(k => k !== solve).map(k => ({ key: k, ask: numberAsk(`${F.vars[k].label[0].toUpperCase() + F.vars[k].label.slice(1)}, ${F.vars[k].unit}?`, { offer: F.vars[k].offer || [], min: F.vars[k].lo, max: F.vars[k].hi }) }));
+    const qs = keys.filter(k => k !== solve).map(k => ({ key: k, ask: numberAsk(`${F.vars[k].label[0].toUpperCase() + F.vars[k].label.slice(1)}${F.vars[k].unit ? ', ' + F.vars[k].unit : ''}?`, { offer: F.vars[k].offer || [], min: F.vars[k].lo, max: F.vars[k].hi }) }));
     const known = keys.filter(k => k !== solve && a[k] != null).map(k => [F.vars[k].label, `${fmt(a[k])} ${F.vars[k].unit}`]);
     const need = firstNeed(a, qs);
     if (need) return { read, body: [{ t: 'kv', rows: [['equation', F.show], ...known] }], ask: need, trace: ['blocked: a term is missing'] };
@@ -141,7 +153,7 @@ tool({
 tool({
   name: 'formulas',
   topic: () => ['Formulas', .5],
-  run: () => ({ read: ['the formulas I can solve'], body: [{ t: 'kv', rows: Object.values(FORMULAS).map(F => [F.title, `${F.show} · terms: ${Object.values(F.vars).map(v => v.label).join(', ')}`]) }, { t: 'chips', items: Object.values(FORMULAS).map(F => F.words[0]) }], trace: [`${Object.keys(FORMULAS).length} declared formulas`] })
+  run: () => ({ read: ['the formulas I can solve'], body: [{ t: 'kv', rows: Object.values(allFormulas()).map(F => [F.title + (F.taught ? ' (taught here)' : ''), `${F.show} · terms: ${Object.values(F.vars).map(v => v.label).join(', ')}`]) }, { t: 'chips', items: Object.values(allFormulas()).map(F => F.words[0]) }], trace: [`${Object.keys(FORMULAS).length} declared formulas, ${Object.keys(S.formulas || {}).length} taught on this device`] })
 });
 
 /* ── what reads them ─────────────────────────────────────────── */
@@ -164,14 +176,14 @@ for (const [dim, words, words_pt] of DIMQ) frame({
   }
 });
 // formulas: "two-product recovery", "solve the cutoff formula for price", "stokes settling for diameter", "darcy's law"
-noun({ type: 'formulaname', exact: true, words: Object.fromEntries(Object.entries(FORMULAS).map(([k, F]) => [k, F.words])), words_pt: { twoproduct: ['recuperação de dois produtos', 'fórmula de dois produtos'], tonnage: ['fórmula da tonelagem'], metal: ['metal contido'], strip: ['relação estéril-minério', 'razão de remoção'], cutoff: ['teor de corte de equilíbrio'], lithostatic: ['pressão litostática'], darcy: ['lei de darcy'], stokes: ['lei de stokes', 'velocidade de sedimentação'] } });
-const VARWORDS = {}; for (const F of Object.values(FORMULAS)) for (const V of Object.values(F.vars)) for (const w of V.words) VARWORDS[w] = [w];
-noun({ type: 'formulavar', words: VARWORDS });
+const FORMULA_PT = { twoproduct: ['recuperação de dois produtos', 'fórmula de dois produtos'], tonnage: ['fórmula da tonelagem'], metal: ['metal contido'], strip: ['relação estéril-minério', 'razão de remoção'], cutoff: ['teor de corte de equilíbrio'], lithostatic: ['pressão litostática'], darcy: ['lei de darcy'], stokes: ['lei de stokes', 'velocidade de sedimentação'] };
+noun(() => ({ type: 'formulaname', exact: true, words: Object.fromEntries(Object.entries(allFormulas()).map(([k, F]) => [k, F.words])), words_pt: { ...Object.fromEntries(Object.keys(S.formulas || {}).map(k => [k, [k]])), ...FORMULA_PT } }));
+noun(() => { const words = {}; for (const F of Object.values(allFormulas())) for (const V of Object.values(F.vars)) for (const w of V.words) words[w] = [w]; return { type: 'formulavar', words }; });
 noun({ type: 'formulalist', words: { all: ['what formulas do you know', 'which formulas do you know', 'the formulas', 'formulas'] }, words_pt: { all: ['quais fórmulas você conhece', 'as fórmulas', 'fórmulas'] } });
 frame({
   name: 'formula', label: 'Formula', words: ['solve', 'solve the', 'use', 'use the', 'compute'], elidable: true, theme: ['formulaname'], required: ['theme'], roles: { for: { preps: ['for'], types: ['formulavar'] } },
   words_pt: ['resolve', 'usa'], label_pt: 'Fórmula',
-  bind: c => { const f = c.theme[0].value, F = FORMULAS[f]; if (!F) return null; const w = c.roles.for && c.roles.for[0].value, key = w ? Object.keys(F.vars).find(k => F.vars[k].words.includes(w)) : null; if (w && !key) return null; return { tool: 'formula', args: { formula: f, ...(key ? { solve: key } : {}) } }; }
+  bind: c => { const f = c.theme[0].value, F = formulaOf(f); if (!F) return null; const w = c.roles.for && c.roles.for[0].value, key = w ? Object.keys(F.vars).find(k => F.vars[k].words.includes(w)) : null; if (w && !key) return null; return { tool: 'formula', args: { formula: f, ...(key ? { solve: key } : {}) } }; }
 });
 frame({
   name: 'formulas', label: 'Formulas', words: ['list', 'show'], elidable: true, theme: ['formulalist'], required: ['theme'], roles: {}, words_pt: ['lista', 'mostra'], label_pt: 'Fórmulas',

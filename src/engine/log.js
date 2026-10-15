@@ -1,7 +1,7 @@
 // The log: a device table of things done, written from cards and asked about in plain words.
 // Rows belong to the device, like notes; a card writes its row once (by id), undo removes it, and
 // "open the log" makes it the open table so every table question works on it.
-import { S, tool, frame, amend, noun, fmt, iso } from './core.js';
+import { S, tool, frame, amend, noun, fmt, iso, checksOf } from './core.js';
 import { parseUnit, dimName } from './units.js';
 import { findDate, today, fmtDate, dateWords } from './dates.js';
 
@@ -64,7 +64,7 @@ tool({
     const rowsKv = [['written', `${a.date} · ${a.activity}${a.value != null ? ` · ${fmt(a.value)}${a.unit ? ' ' + a.unit : ''}` : ''}${a.note ? ` · ${a.note}` : ''}`]];
     if (u) rowsKv.push([`${a.activity} this week`, `${fmt(total, 4)} ${a.unit} over ${comparable.length} entr${comparable.length === 1 ? 'y' : 'ies'}${week.length > comparable.length ? ` (${week.length - comparable.length} in another dimension left out)` : ''}`]);
     else rowsKv.push([`${a.activity} this week`, `${week.length} entr${week.length === 1 ? 'y' : 'ies'}`]);
-    return { read, value: a.value, body: [{ t: 'note', kind: 'ok', text: `Logged.${isNew ? ` New activity: ${a.activity}.` : ''} ${t.rows.length} row${t.rows.length === 1 ? '' : 's'} in the log.` }, { t: 'kv', rows: rowsKv }, SRC], trace: [`log.add(${JSON.stringify(row)})`, 'undo removes the row; "that was 6 km" corrects it'], py: `log.add(activity="${a.activity}", value=${a.value}, unit=${a.unit ? '"' + a.unit + '"' : 'None'}, date="${a.date}")` };
+    return { read, value: a.value, body: [{ t: 'note', kind: 'ok', text: `Logged.${isNew ? ` New activity: ${a.activity}.` : ''} ${t.rows.length} row${t.rows.length === 1 ? '' : 's'} in the log.` }, ...checksOf(t, [t.rows.find(r => r.id === a.id)]), { t: 'kv', rows: rowsKv }, SRC], trace: [`log.add(${JSON.stringify(row)})`, 'undo removes the row; "that was 6 km" corrects it'], py: `log.add(activity="${a.activity}", value=${a.value}, unit=${a.unit ? '"' + a.unit + '"' : 'None'}, date="${a.date}")` };
   }
 });
 

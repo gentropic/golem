@@ -208,6 +208,7 @@ Status: **live** = works in `src/` today; **planned** = named, not built.
 | Device | Map, dial, share | planned | lead-acid intent route; `share` exists today |
 | Session | Explain, amend, repeat, undo | live | section 3 |
 | Session | Teach a word; learning from the person | live; since 15 Oct 2026 learned from, on the device and never silently: what did not read is kept (`S.misses`, "what couldn't you read") and a request on it can be taught as a whole, only to something that reads; a request that did not read followed by one that did offers the stretch that changed as a word ("klicks means km"); a picked guess offers its repaired word, and the tools picked rank first among the next guesses (`S.picks`) | device lexicon, `learn.js` |
+| Session | Shaped by words, kept to orders, checked, and open about its words | live (15 Oct 2026). Taught values ("granite is 2.7 t/m3": a taught word whose meaning is a quantity, so it reads in conversions and reckoning) and taught formulas ("define the formula core recovery as recovered / drilled * 100": parsed by calc.js with names, never eval; solved for any term by the formula card); "forget". Standing orders ("flag rows with cu > 2.5", "require rows with from < to", in `S.orders`): checked whenever a table opens and whenever a row is written to the log or the field notebook, on any table with their columns, breaches said on that card; conditions may compare two number columns. "check yourself": known answers from outside golem (exact unit factors, FIPS 180-2, NOAA's WMM test point, WGS84, the compass cases, a formula both ways) and every starter read dry, without touching the session. "what words do you know for …": the parser's own ontology, searched | `lore.js`, `orders.js`, `selftest.js`, `vocab.js` |
 | Session | Notes: remember and recall | live | glass later; a table now |
 | Session | Sessions, history, auto names | live | section 8 |
 | Session | Recipes | live (11 Oct 2026): a session's steps saved as card specs with the subjects that change (the table, columns), run again into a session of its own with every step re-read and the run stopped at the first step that does not read; batch over every kept table, one row each; recipes are device state | section 8 |
@@ -310,7 +311,7 @@ Default to the user-confirms route: the app then requests no dangerous permissio
 - **Dock:** status line, a row of example chips, the input.
 - **Tabs:** Ask, Skills (catalog; examples run on tap), Packs (library, plus device state: taught words, notes, open table).
 - **Sessions sidebar:** new session, session list grouped by age, rename and two-step delete, history search. On a wide screen it stays beside the conversation; on a narrow one it is a drawer over it.
-- **The off switch.** The top-right control reads *sleep*. Tapping it puts golem to sleep: input disabled, nothing runs, the control reads *wake*. Plain words, no theatre.
+- **The off switch.** The top-right control reads *sleep*. Asleep (15 Oct 2026): input disabled, nothing reads or runs, the compass and any position being taken are closed (their streams, not just ignored), and it stays asleep on this device across a reload until someone taps *wake*. Plain words, no theatre.
 
 ---
 

@@ -4,7 +4,7 @@
 // the open station. A compass reading at a station with a position is corrected to true north with the World Magnetic
 // Model there, on the day it was taken, and the correction is kept with the row. Rows belong to the device, like the
 // log; a card writes its row once (by id) and undo removes it. Typed attitudes are kept as typed, north as you read it.
-import { S, tool, frame, noun, shape, postmod, condition, fmt, iso, p3, p2, clock } from './core.js';
+import { S, tool, frame, noun, shape, postmod, condition, fmt, iso, p3, p2, clock, checksOf } from './core.js';
 import { conversions, statistics } from '../vendor/bearing.js';
 import { field as wmm } from '../vendor/wmm.js';
 import { fromDevice } from './field.js';
@@ -74,10 +74,10 @@ tool({
     if (!st) return { read: ['add to station', { v: a.station }], body: [{ t: 'note', kind: 'err', text: `There is no station ${a.station} in the notebook. Start it with "station ${a.station}".` }], trace: ['no such station'] };
     const when = new Date((a.reading && a.reading.at) || a.at || clock.now()), at = a.sample ? null : attitude(a, st);
     const row = { id: a.id, station: a.station, date: iso(when), time: hhmm(when), feature: a.feature, azimuth: at ? +at.az.toFixed(1) : null, dip: at ? +at.dip.toFixed(1) : null, sample: a.sample || null, note: a.note || null, lat: st.lat, lon: st.lon, acc: st.acc, north: at ? at.north : null, via: at ? at.via : 'typed' };
-    const t = put(row), here = t.rows.filter(r => r.station === a.station && r.feature !== 'station');
+    const t = put(row), here = t.rows.filter(r => r.station === a.station && r.feature !== 'station'), orders = checksOf(t, [row]);
     const isLine = LINES.has(a.feature) || a.what === 'line';
     const read = ['add', { v: a.sample ? `sample ${a.sample}` : `${a.feature} ${p3(row.azimuth)}/${p2(row.dip)}` }, 'to station', { v: a.station }];
-    const body = [{ t: 'note', kind: 'ok', text: `Added to station ${a.station}: ${here.length} entr${here.length === 1 ? 'y' : 'ies'} there.` }];
+    const body = [{ t: 'note', kind: 'ok', text: `Added to station ${a.station}: ${here.length} entr${here.length === 1 ? 'y' : 'ies'} there.` }, ...orders];
     if (at) body.push({ t: 'big', v: `${p3(row.azimuth)}/${p2(row.dip)}`, unit: `${isLine ? 'trend/plunge' : 'dip direction/dip'}, ${a.feature}` }, isLine ? { t: 'net', planes: [], lines: [{ tr: row.azimuth, pl: row.dip, label: a.feature }] } : { t: 'net', planes: [{ dd: row.azimuth, dip: row.dip }], lines: [] });
     body.push({ t: 'kv', rows: [...(at ? [['north', at.north], ['from', at.via + (a.from ? `, card #${String(a.from).padStart(2, '0')}` : '')]] : []), ...(a.note ? [['note', a.note]] : []), ['station', `${a.station}${st.lat != null ? ` at ${fmtLL(st.lat, st.lon)}` : ', no position'}`]] }, SRC);
     return { read, value: at ? [row.azimuth, row.dip] : a.sample, body, trace: [...(at ? at.trace : [`sample ${a.sample}`]), `field.add(${JSON.stringify({ station: a.station, feature: a.feature, azimuth: row.azimuth, dip: row.dip, sample: row.sample })})`, 'undo removes the row'],

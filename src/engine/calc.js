@@ -2,7 +2,8 @@
 import { tool, frame, fmt, rad, deg } from './core.js';
 
 const FN = { sqrt: Math.sqrt, abs: Math.abs, exp: Math.exp, ln: Math.log, log: Math.log10, sin: x => Math.sin(rad(x)), cos: x => Math.cos(rad(x)), tan: x => Math.tan(rad(x)), asin: x => deg(Math.asin(x)), acos: x => deg(Math.acos(x)), atan: x => deg(Math.atan(x)) };
-export function calc(src) {
+// vars: for a taught formula (lore.js), names to numbers ("recovered / drilled * 100"); without it a name is a function
+export function calc(src, vars) {
   const s = src.replace(/\s+/g, '').replace(/×/g, '*').replace(/÷/g, '/').replace(/,/g, '');
   let i = 0;
   const pk = () => s[i];
@@ -10,9 +11,10 @@ export function calc(src) {
   function atom() {
     if (pk() === '(') return paren();
     if (pk() === '-') { i++; return -pow(); }
-    const w = /^[a-z]+/.exec(s.slice(i));
+    const w = (vars ? /^[a-z_][a-z0-9_]*/ : /^[a-z]+/).exec(s.slice(i));
     if (w) {
       i += w[0].length;
+      if (vars && pk() !== '(' && Object.prototype.hasOwnProperty.call(vars, w[0])) return vars[w[0]];
       if (w[0] === 'pi') return Math.PI;
       if (w[0] === 'e') return Math.E;
       if (!FN[w[0]] || pk() !== '(') throw 0;
@@ -47,3 +49,5 @@ frame({
   words_pt: ['calcula', 'calcule', 'quanto é', 'avalia'], label_pt: 'Calcular',
   bind: c => { const a = calcOf(c.theme[0].value); return a ? { tool: 'calc', args: a } : null; }
 });
+// the names an expression uses that are not functions or constants: a taught formula's terms
+export const namesIn = src => { const s = src.toLowerCase().replace(/\s+/g, ''); return [...new Set([...s.matchAll(/[a-z_][a-z0-9_]*/g)].filter(m => s[m.index + m[0].length] !== '(').map(m => m[0]).filter(w => !FN[w] && w !== 'pi' && w !== 'e'))]; };

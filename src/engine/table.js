@@ -1,7 +1,7 @@
 // The open table: a real delimited file typed by @gcu/recon, or the synthetic sample; a histogram; and
 // table questions in controlled English answered through @gcu/sadpan and @gcu/sift (all vendored).
 // Sample data stays labelled as sample data; a file is named on every card that reads it.
-import { S, T, tool, frame, amend, noun, shape, postmod, qmod, compound, condition, fmt } from './core.js';
+import { S, T, tool, frame, amend, noun, shape, postmod, qmod, compound, condition, fmt, checksOf } from './core.js';
 import { mineralsTable } from './minerals.js';
 import { DOCUMENT } from './interchange.js';
 import { series } from '../vendor/sadpan.js';
@@ -135,7 +135,7 @@ tool({
     const trace = [...(t.convTrace || []), t.source === 'sample' ? 'generate the sample table' : t.source === 'device' ? `device table ${t.name}: ${t.rows.length} rows` : `recon.sniff(${t.name}) → delimiter "${t.delimiter}", ${t.cols.length} columns typed`, `roles: ${Object.entries(t.roles).map(([k, v]) => `${k} = ${v}`).join(', ') || 'none found'}`, `tare: ${nulls} blank or sentinel cells, ${bdl.map(([c, n]) => `${n} negative ${c}`).join(', ') || 'no negative codes'}`];
     return {
       read: ['open table', { v: t.name }, ...(t.sheet && t.from === 'xlsx' ? [{ v: `sheet ${t.sheet}`, key: 'sheet', alts: Object.keys((S.files[t.hash] || {}).tables || {}).length > 1 ? Object.keys(S.files[t.hash].tables) : [t.sheet], cur: t.sheet }] : [])],
-      body: [{ t: 'kv', rows }, ...(t.from ? [{ t: 'note', text: `Converted from ${t.from === 'xlsx' ? 'xlsx by @gcu/sheet' : t.from === 'parquet' ? 'Parquet by @gcu/parquet' : 'Datamine .dm by @gcu/dm'} when the file was opened${t.lost && t.lost.length ? '; ' + t.lost.join('; ') : ''}.` }] : []), ...(bdl.length ? [{ t: 'note', text: `${bdl.map(([c, n]) => `${n} ${c} values are negative`).join('; ')}. That looks like a below-detection code. Statistics leave them out until you choose a policy on a card.` }] : []), { t: 'src', text: srcLine(t) }],
+      body: [{ t: 'kv', rows }, ...(t.from ? [{ t: 'note', text: `Converted from ${t.from === 'xlsx' ? 'xlsx by @gcu/sheet' : t.from === 'parquet' ? 'Parquet by @gcu/parquet' : 'Datamine .dm by @gcu/dm'} when the file was opened${t.lost && t.lost.length ? '; ' + t.lost.join('; ') : ''}.` }] : []), ...(bdl.length ? [{ t: 'note', text: `${bdl.map(([c, n]) => `${n} ${c} values are negative`).join('; ')}. That looks like a below-detection code. Statistics leave them out until you choose a policy on a card.` }] : []), ...checksOf(t), { t: 'src', text: srcLine(t) }],
       trace, py: t.source === 'device' ? `dh = device.table("${t.name}")` : `dh = read_csv("${t.name}")`
     };
   }
@@ -223,7 +223,9 @@ export function condToSift(c, table) {
   if (c.not) return `!(${condToSift(c.not, table)})`;
   const col = colOf(c.col.value, table); if (!col) throw new Error(`no column called "${c.col.value}"; the table has ${colNames(table)}`);
   // a number column compared with a word is refused: "cu equal to banana" is not a question with an answer of 0 rows
-  const v = x => { if (x.n != null) return String(inUnit(x, col)); if (col.type === 'numeric') throw new Error(`${col.name} holds numbers; "${x.s}" is not one`); return lit(table, col.name, x.s); };
+  // a word that names another number column compares the two ("from < to"); otherwise a number column takes a number
+  const other = x => x.n == null && x.s && col.type === 'numeric' ? colOf(x.s, table) : null;
+  const v = x => { if (x.n != null) return String(inUnit(x, col)); const o = other(x); if (o && o.type === 'numeric') return o.name; if (col.type === 'numeric') throw new Error(`${col.name} holds numbers; "${x.s}" is not one`); return lit(table, col.name, x.s); };
   if (c.op === 'between') return `(${col.name} >= ${v(c.vals[0])} && ${col.name} <= ${v(c.vals[1])})`;
   if (c.op === 'in') return `(${c.vals.map(x => `${col.name} == ${v(x)}`).join(' || ')})`;
   if (c.op === 'blank' || c.op === 'present') return `${col.name} ${c.op === 'blank' ? '==' : '!='} null`;
