@@ -13,6 +13,7 @@ import './device.js';
 import './structure.js';
 import './geo.js';
 import './field.js';
+import './notebook.js';
 import './timescale.js';
 import './sample.js';
 import './explain.js';

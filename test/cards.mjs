@@ -81,6 +81,13 @@ await page.locator('#stream .card').last().locator('[data-act="take"]').click();
 const here = await page.locator('#stream .card').last().textContent();
 check(/declination at -23.52, -46.19/.test(here) && /° west/.test(here), `declination here takes the browser's position (${here.replace(/[ ]+/g, ' ').slice(0, 70)})`);
 
+// the field notebook: with a station open, a plane on a card offers to go into it, and the button adds it
+await ask('station 14 at -19.92, -43.94'); await ask('plane 120/55');
+const addBtn = page.locator('#stream .card').last().locator('[data-act="run"][data-q^="add #"]');
+check(await addBtn.count() === 1 && /Add to station 14/.test(await addBtn.textContent()), 'a plane offers to go into the open station');
+await addBtn.dispatchEvent('click'); await page.waitForTimeout(300);
+check(/Added to station 14/.test(await page.locator('#stream .card').last().textContent()), 'the button adds it to the station');
+
 // Chrome on Android (155) has DeviceOrientationEvent.requestPermission too, and allows motion already: the compass must
 // not wait for a tap there (it did, until tried on a phone). A page that only has the function still reads at once.
 const p2 = await ctx.newPage(); p2.on('pageerror', e => errors.push(e.message));

@@ -3,6 +3,14 @@ import { fmt } from '../engine/core.js';
 import { conversions, equalArea } from '../vendor/bearing.js';
 import { Figure } from '../vendor/plot.js';
 import { t } from './i18n.js';
+import { stationNow } from '../engine/notebook.js';
+
+// a measured plane or line, or a typed plane, can go into the field notebook at the open station: the button says
+// "add #12 to station 14", which reads like anything typed and copies the card's values into the new card's args
+function toStation(c) {
+  const st = stationNow(); if (!st || !((c.tool === 'measure' && c.args.reading) || c.tool === 'plane')) return '';
+  return `<div class="opts"><button class="btn" type="button" data-act="run" data-q="${escHtml(`add #${c.id} to station ${st}`)}">${escHtml(t('Add to station {name}', { name: st }))}</button></div>`;
+}
 
 export const escHtml = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 export const pad = n => String(n).padStart(2, '0');
@@ -103,7 +111,7 @@ export function cardEl(c) {
   el.innerHTML = `<div class="q">${escHtml(c.raw)}</div>
     <div class="reply"><div class="chead"><span class="rung ${c.rung}">${t(RUNG[c.rung])}</span><span>#${pad(c.id)}</span>${c.amends ? `<span>${t('from #{n}', { n: pad(c.amends) })}</span>` : ''}<span class="ms">${c.ms < 10 ? c.ms.toFixed(1) : Math.round(c.ms)} ms</span></div>
     ${read ? `<div class="read"><span class="lbl">${t('read as')}</span> ${read}</div>` : ''}
-    <div class="ans">${r.body.map(blockHtml).join('')}${ask}</div>
+    <div class="ans">${r.body.map(blockHtml).join('')}${ask}${toStation(c)}</div>
     <div class="cfoot"><details class="trace"><summary>${t('how')} · ${r.trace.length} ${t(r.trace.length === 1 ? 'step' : 'steps')}</summary><ol>${r.trace.map(t => `<li>${escHtml(t)}</li>`).join('')}</ol></details>
     <span class="cacts"><button class="cact" type="button" data-act="copyans" title="${escHtml(t('Copy the answer (c)'))}">${t('copy')}</button><button class="cact" type="button" data-act="edit" title="${escHtml(t('Put this question back in the box to change it (e)'))}">${t('edit')}</button><button class="cact" type="button" data-act="pin" aria-pressed="${!!c.pinned}" title="${escHtml(t('Keep this card at the top of the session (p)'))}">${t(c.pinned ? 'pinned' : 'pin')}</button><button class="cact" type="button" data-act="branch" title="${escHtml(t('A new session with the cards up to this one'))}">${t('branch')}</button><button class="cact say" type="button" data-act="say" title="${escHtml(t('Read this answer aloud, with the phone\'s offline voice'))}">${t('say')}</button></span></div></div>`;
   const figs = r.body.filter(b => b.t === 'figure');

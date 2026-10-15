@@ -63,6 +63,7 @@ const PT = {
   'Tap Take reading to turn the compass on.': 'Toque em Medir para ligar a bússola.', 'Compass on: hold the phone still, then take the reading.': 'Bússola ligada: segure o celular parado e meça.',
   'The compass needs the motion permission: allow it for this site in the browser.': 'A bússola precisa da permissão de movimento: permita para este site no navegador.', 'Position needs the location permission: allow it for this site in the browser.': 'A posição precisa da permissão de localização: permita para este site no navegador.',
   'In a browser the fix comes through the browser, which may ask its own location service for it.': 'No navegador a posição vem do navegador, que pode consultar o próprio serviço de localização.',
+  'Add to station {name}': 'Adicionar à estação {name}',
   'Measured.': 'Medido.', 'Measured. The phone moved while measuring; hold it still for a steadier reading.': 'Medido. O celular se mexeu durante a medida; segure parado para uma leitura mais firme.',
   'Waiting for a fix…': 'Esperando uma posição…', 'Position needs the location permission: allow it in the dialog, or in the app\'s settings.': 'A posição precisa da permissão de localização: permita na caixa de diálogo, ou nas configurações do app.',
   'No position: {e}': 'Sem posição: {e}', 'No fix. Go where the sky is open and try again.': 'Sem posição. Vá para onde o céu está aberto e tente de novo.', 'Position taken, ±{m} m.': 'Posição registrada, ±{m} m.',

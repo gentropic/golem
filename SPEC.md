@@ -189,6 +189,7 @@ Status: **live** = works in `src/` today; **planned** = named, not built.
 | Field | Core and sample arithmetic: sample mass from core size, sieve sizes, specific gravity, recovery and RQD | `@gcu/units` vendored for its DCDMA and sieve tables (8 Oct 2026); the arithmetic is golem's | `@gcu/units` |
 | Field | Mineral identification key | removed 8 Oct 2026 until a mineral dataset with a clear licence is chosen | minerals pack; question choice could use `@gcu/learn` trees |
 | Field | Compass capture from phone sensors | live in the app (14 Oct 2026) and in a phone's browser (15 Oct): a plane or a line, magnetic or true with a home | lead-acid `sensor`, `@gcu/bearing`, `@gcu/wmm` |
+| Field | Field notebook: stations ("station 14", where you stand by one fix or at coordinates), attitudes and samples added at the open station ("add bedding 045/30", "add sample S-14-a", "add #12" from a measured or plotted card), compass readings corrected to true north with WMM at the station; a summary with a stereonet and the Fisher mean of each kind of plane; opened as a table; saved as GeoJSON or CSV. QR-coded sample bags are not read yet | live (15 Oct 2026); the `field` device table, `notebook.js`; a station is a declared precondition | `@gcu/bearing`, `@gcu/wmm` |
 | Field | Colour from camera to Munsell | planned | swatch (not found under `ext/`) |
 | Field | Kinematic slope check | planned | daylight / `@gcu/bearing` |
 | Table | Open, type and validate a table | live (synthetic data) | `@gcu/recon`, `@gcu/sadpan`, `@gcu/sluice`, `@gcu/dm` |

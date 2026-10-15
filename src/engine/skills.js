@@ -51,14 +51,14 @@ export const vocab = () => VOCAB || (VOCAB = new Set(examples().filter(e => !/ m
 // the welcome of an empty session: one line of what, one query that shows it
 // the welcome's starters, by what they are for: [group, [[title, query], …]]
 export const STARTERS = [
-  ['In the field', [['True thickness', 'true thickness of a 14 m intercept, hole 270/60, bedding 045/30'], ['Declination here', 'declination at -19.92, -43.94'], ['Apparent dip', 'apparent dip of 000/30 on a section at 045']]],
+  ['In the field', [['True thickness', 'true thickness of a 14 m intercept, hole 270/60, bedding 045/30'], ['Declination here', 'declination at -19.92, -43.94'], ['Apparent dip', 'apparent dip of 000/30 on a section at 045'], ['Field notebook', 'the field notebook']]],
   ['Lab and tables', [['A table to try (sample data)', 'open assays.csv'], ['Core mass', 'mass of 1 m of nq core at 2.7'], ['Molar mass', 'molar mass of CuFeS2']]],
   ['Units and numbers', [['Convert a grade', '0.35 oz per short ton in g/t'], ['With uncertainty', '2.7 ± 0.1 t/m3 * 1.35 Mm3'], ['Run some Python', 'run this: sum(x * x for x in range(10))']]],
   ['Every day', [['Set a reminder', 'remind me to send the samples to the lab on friday at 9'], ['Two time zones', '9am sao paulo in perth'], ['What can you do?', 'what can you do']]],
 ];
 // the same, for the Portuguese interface: each one reads in Portuguese (test/portuguese.test.mjs)
 export const STARTERS_PT = [
-  ['No campo', [['Espessura verdadeira', 'espessura verdadeira de 14 m, furo 270/60, acamamento 045/30'], ['Declinação', 'declinação em -19.92, -43.94'], ['Medir com o celular', 'mede o acamamento']]],
+  ['No campo', [['Espessura verdadeira', 'espessura verdadeira de 14 m, furo 270/60, acamamento 045/30'], ['Declinação', 'declinação em -19.92, -43.94'], ['Medir com o celular', 'mede o acamamento'], ['Caderneta de campo', 'a caderneta']]],
   ['Laboratório e tabelas', [['Uma tabela para testar (dados de amostra)', 'abre assays.csv'], ['Massa molar', 'massa molar de CuFeS2'], ['Histograma', 'histograma de cu']]],
   ['Unidades e números', [['Converter', 'converte 5 km para milhas'], ['Temperatura', '25 graus celsius em fahrenheit'], ['Dias úteis', 'quantos dias úteis até 20 de dezembro']]],
   ['Dia a dia', [['Lembrete', 'me lembra de mandar as amostras pro laboratório na sexta às 9'], ['Que horas são', 'que horas são em perth'], ['O que você faz?', 'o que você faz']]],

@@ -51,7 +51,10 @@ const STEPS = [
   ['log 5 km run', 'grammar', 'Logged'],
   ['how many km did i run this week', 'grammar', '5'],
   ['0, -45 in utm', 'grammar', '23N 500,000 E 0 N'],
-  ['distance from 0,0 to 0,1', 'grammar', '111.3']
+  ['distance from 0,0 to 0,1', 'grammar', '111.3'],
+  ['station 14 at -19.92, -43.94', 'grammar', 'Station 14 is open'],
+  ['add bedding 045/30', 'grammar', 'Added to station 14'],
+  ['station 14 summary', 'grammar', 'stations']
 ];
 
 const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
@@ -81,7 +84,7 @@ const nameOk = name === 'assays.csv: Au histogram, Cu histogram';
 console.log(`${nameOk ? 'ok  ' : 'FAIL'} session auto-name: ${name}`);
 await page.reload(); await page.waitForSelector('html[data-ready]'); await page.waitForSelector('#stream .card');
 const kept = await page.locator('#stream .card').count();
-console.log(`${kept === 22 ? 'ok  ' : 'FAIL'} session replays after reload: ${kept} cards`);
+console.log(`${kept === 25 ? 'ok  ' : 'FAIL'} session replays after reload: ${kept} cards`);
 const overflow = await page.evaluate(() => Math.max(...[document.documentElement, document.getElementById('v-ask')].map(e => e.scrollWidth - e.clientWidth)));
 console.log(`${overflow <= 0 ? 'ok  ' : 'FAIL'} no horizontal overflow at 420 px`);
 // a real file through the picker, then a table question on it
@@ -198,5 +201,5 @@ console.log(`${offered && picked ? 'ok  ' : 'FAIL'} no exact reading offers a gu
 if (!(offered && picked)) failed++;
 errors.forEach(e => console.log('FAIL ' + e));
 await browser.close();
-if (failed || !nameOk || kept !== 22 || overflow > 0 || errors.length) { console.log('\nsmoke test failed'); process.exit(1); }
+if (failed || !nameOk || kept !== 25 || overflow > 0 || errors.length) { console.log('\nsmoke test failed'); process.exit(1); }
 console.log('\nsmoke test passed');

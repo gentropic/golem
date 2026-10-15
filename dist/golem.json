@@ -2656,6 +2656,63 @@
       }
     },
     {
+      "type": "fieldnb",
+      "words": {
+        "notebook": [
+          "field notebook",
+          "the field notebook",
+          "my field notebook",
+          "notebook",
+          "stations",
+          "the stations"
+        ]
+      },
+      "words_pt": {
+        "notebook": [
+          "caderneta",
+          "caderneta de campo",
+          "a caderneta",
+          "estações"
+        ]
+      }
+    },
+    {
+      "type": "fieldfmt",
+      "words": {
+        "geojson": [
+          "geojson"
+        ],
+        "csv": [
+          "csv"
+        ]
+      },
+      "words_pt": {
+        "geojson": [
+          "geojson"
+        ],
+        "csv": [
+          "csv"
+        ]
+      }
+    },
+    {
+      "type": "devtable",
+      "words": {
+        "field": [
+          "field notebook",
+          "the field notebook",
+          "my field notebook"
+        ]
+      },
+      "words_pt": {
+        "field": [
+          "caderneta",
+          "caderneta de campo",
+          "a caderneta"
+        ]
+      }
+    },
+    {
       "type": "chronpart",
       "words": {
         "age": [
@@ -7438,6 +7495,22 @@
       "re": "-?\\d+(?:\\.\\d+)?\\s*,\\s*-?\\d+(?:\\.\\d+)?\\s*,\\s*-?\\d+(?:\\.\\d+)?"
     },
     {
+      "type": "stationid",
+      "re": "[a-z]{0,4}-?\\d{1,5}(?:-[a-z0-9]{1,4})*"
+    },
+    {
+      "type": "stationref",
+      "re": "(?:station|estação|estacao|ponto)\\s+[a-z]{0,4}-?\\d{1,5}(?:-[a-z0-9]{1,4})*"
+    },
+    {
+      "type": "stationsum",
+      "re": "(?:station|estação|estacao|ponto)\\s+[a-z]{0,4}-?\\d{1,5}(?:-[a-z0-9]{1,4})*\\s+(?:summary|resumo)"
+    },
+    {
+      "type": "cardref",
+      "re": "#\\d{1,4}"
+    },
+    {
       "type": "explainable",
       "re": "\\d{9,13}(?:\\.\\d+)?"
     },
@@ -8484,6 +8557,14 @@
       ],
       "attr": "angle",
       "quantity": true
+    },
+    {
+      "prep": "",
+      "heads": [
+        "measurable"
+      ],
+      "attr": "ori",
+      "mod": "orientation"
     },
     {
       "prep": "",
@@ -10162,6 +10243,199 @@
         "mede com o celular"
       ],
       "label_pt": "Medir"
+    },
+    {
+      "name": "station",
+      "label": "Station",
+      "words": [
+        "station",
+        "new station",
+        "start station",
+        "start a station",
+        "open station"
+      ],
+      "theme": [
+        "stationid"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {
+        "at": {
+          "preps": [
+            "at"
+          ],
+          "types": [
+            "coords"
+          ]
+        }
+      },
+      "words_pt": [
+        "estação",
+        "nova estação",
+        "ponto",
+        "novo ponto"
+      ],
+      "label_pt": "Estação"
+    },
+    {
+      "name": "stationBare",
+      "label": "Station",
+      "words": [],
+      "elidable": true,
+      "theme": [
+        "stationref"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {
+        "at": {
+          "preps": [
+            "at"
+          ],
+          "types": [
+            "coords"
+          ]
+        }
+      },
+      "words_pt": [],
+      "label_pt": "Estação"
+    },
+    {
+      "name": "fieldAdd",
+      "label": "Add to the station",
+      "words": [
+        "add",
+        "add a",
+        "add an",
+        "enter"
+      ],
+      "theme": [
+        "plane",
+        "measurable",
+        "orientation",
+        "cardref"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {
+        "to": {
+          "preps": [
+            "to",
+            "at"
+          ],
+          "types": [
+            "stationref",
+            "stationid"
+          ]
+        }
+      },
+      "words_pt": [
+        "adiciona",
+        "adicione",
+        "acrescenta"
+      ],
+      "label_pt": "Adicionar à estação"
+    },
+    {
+      "name": "fieldSample",
+      "label": "Sample",
+      "words": [
+        "add sample",
+        "sample",
+        "took sample",
+        "bagged sample"
+      ],
+      "theme": [
+        "text"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {},
+      "words_pt": [
+        "amostra",
+        "adiciona amostra",
+        "coletei a amostra"
+      ],
+      "label_pt": "Amostra"
+    },
+    {
+      "name": "fieldSummary",
+      "label": "Field summary",
+      "words": [
+        "summary",
+        "summary of",
+        "summarise",
+        "summarize",
+        "show"
+      ],
+      "theme": [
+        "fieldnb",
+        "stationref"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {},
+      "words_pt": [
+        "resumo",
+        "resumo da",
+        "resumo de",
+        "mostra"
+      ],
+      "label_pt": "Resumo de campo"
+    },
+    {
+      "name": "fieldSummaryBare",
+      "label": "Field summary",
+      "words": [],
+      "elidable": true,
+      "theme": [
+        "fieldnb",
+        "stationsum"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {},
+      "words_pt": [],
+      "label_pt": "Resumo de campo"
+    },
+    {
+      "name": "fieldExport",
+      "label": "Save the field notebook",
+      "words": [
+        "export",
+        "save",
+        "download"
+      ],
+      "theme": [
+        "fieldnb"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {
+        "as": {
+          "preps": [
+            "as",
+            "to",
+            "in"
+          ],
+          "types": [
+            "fieldfmt"
+          ]
+        }
+      },
+      "words_pt": [
+        "exporta",
+        "salva",
+        "baixa"
+      ],
+      "label_pt": "Salvar a caderneta"
     },
     {
       "name": "date",

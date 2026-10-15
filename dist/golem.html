@@ -12738,8 +12738,225 @@ frame({
   return { fromDevice };
 })();
 
-/* ==== src/engine/data/timescale.js ==== */
+/* ==== src/engine/notebook.js ==== */
 const __m23 = (() => {
+const { S, tool, frame, noun, shape, postmod, condition, fmt, iso, p3, p2, clock } = __m0;
+const { conversions, statistics } = __m5;
+const { field: wmm } = __m20;
+const { fromDevice } = __m22;
+const { oriOf } = __m6;
+// The field notebook: stations, the planes and lines measured at them, and samples, as a device table ("field") that
+// every table question can open. "station 14" starts a station where you stand (one fix on a tap) or at coordinates;
+// "add bedding 045/30", "add sample S-14-a" and "add #12" (a compass reading or a plane already on a card) write rows at
+// the open station. A compass reading at a station with a position is corrected to true north with the World Magnetic
+// Model there, on the day it was taken, and the correction is kept with the row. Rows belong to the device, like the
+// log; a card writes its row once (by id) and undo removes it. Typed attitudes are kept as typed, north as you read it.
+
+const FIELD_COLS = [{ name: 'station', type: 'category' }, { name: 'date', type: 'category' }, { name: 'time', type: 'category' }, { name: 'feature', type: 'category' },
+  { name: 'azimuth', type: 'numeric', unit: 'deg' }, { name: 'dip', type: 'numeric', unit: 'deg' }, { name: 'sample', type: 'category' }, { name: 'note', type: 'category' },
+  { name: 'lat', type: 'numeric' }, { name: 'lon', type: 'numeric' }, { name: 'acc', type: 'numeric', unit: 'm' }, { name: 'north', type: 'category' }, { name: 'via', type: 'category' }];
+const fieldTable = () => S.tables.field || (S.tables.field = { name: 'field', cols: FIELD_COLS, rows: [] });
+const rows = () => (S.tables.field ? S.tables.field.rows : []);
+const stationRow = name => rows().find(r => r.feature === 'station' && r.station === name);
+// the open station: the last one started on this device
+const stationNow = () => { const s = rows().filter(r => r.feature === 'station'); return s.length ? s[s.length - 1].station : null; };
+const LINES = new Set(['line', 'lineation', 'fold axis', 'striation']);
+const newId = () => Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36);
+const hhmm = d => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+const put = row => { const t = fieldTable(), at = t.rows.findIndex(r => r.id === row.id); if (at >= 0) t.rows[at] = row; else t.rows.push(row); return t; };
+const SRC = { t: 'src', text: 'the field notebook · a table on this device · nothing leaves it' };
+const fmtLL = (lat, lon) => `${fmt(lat, 7)}, ${fmt(lon, 7)}`;
+
+/* ── the precondition: a station is open ───────────────────── */
+condition('station', {
+  holds: () => !!stationNow(),
+  prompt: 'No station is open.', establish: () => [],
+  none: 'No station is open: start one where you stand with "station 14", or at coordinates with "station 14 at -19.92, -43.94".'
+});
+
+/* ── stations ───────────────────────────────────────────────── */
+tool({
+  name: 'station', effects: ['device'], post: ['station'],
+  skill: { group: 'Field', title: 'Field notebook', on: 'device table · @gcu/bearing · @gcu/wmm', about: 'Stations where you stand or at coordinates; planes, lines and samples added at the open station, compass readings corrected to true north at the station; a summary with a stereonet; the notebook opened as a table and saved as GeoJSON.', examples: ['station 14', 'add bedding 045/30', 'add sample S-14-a', 'station 14 summary', 'export the field notebook as geojson'] },
+  topic: a => [`Station ${a.name}`, 2],
+  undo: a => { const t = fieldTable(); t.rows = t.rows.filter(r => r.id !== a.id); },
+  run: a => {
+    const when = new Date(a.at || clock.now()), row = { id: a.id, station: a.name, date: iso(when), time: hhmm(when), feature: 'station', azimuth: null, dip: null, sample: null, note: a.note || null, lat: a.lat ?? null, lon: a.lon ?? null, acc: a.acc ?? null, north: null, via: a.fix ? 'position fix' : a.lat != null ? 'typed' : null };
+    const t = put(row), read = ['station', { v: a.name }, ...(a.lat != null ? ['at', { v: fmtLL(a.lat, a.lon) }] : [])];
+    const n = t.rows.filter(r => r.feature === 'station').length;
+    const capture = a.lat == null ? { kind: 'position', set: (args, v) => { args.lat = +(+v.lat).toFixed(6); args.lon = +(+v.lon).toFixed(6); args.acc = v.acc == null ? null : Math.round(+v.acc); args.fix = true; args.at = +v.at || args.at; } } : null;
+    return {
+      read, capture,
+      body: [...(capture ? [{ t: 'capture', kind: 'position', how: 'The station\'s position: one fix, kept with the station. Without one, the station has no place, and compass readings stay magnetic.' }] : []),
+        { t: 'note', kind: 'ok', text: `Station ${a.name} is open. ${n} station${n === 1 ? '' : 's'} in the notebook. Add to it: "add bedding 045/30", "add sample ${a.name}-a".` },
+        { t: 'kv', rows: [['started', `${row.date} ${row.time}`], ['position', a.lat != null ? `${fmtLL(a.lat, a.lon)}${a.acc != null ? ` ±${a.acc} m` : ''}` : 'none yet']] }, SRC],
+      trace: [`field.station(${JSON.stringify(a.name)})`, a.lat != null ? `position ${a.fix ? 'from one fix' : 'as typed'}` : 'wait: a position fix, or none'], py: `field.station("${a.name}"${a.lat != null ? `, lat=${a.lat}, lon=${a.lon}` : ''})`
+    };
+  }
+});
+
+/* ── adding to the open station ─────────────────────────────── */
+// a row's attitude: typed (as typed), or a compass reading (magnetic as measured; true with WMM at the station's position)
+function attitude(a, st) {
+  if (a.typed) return { az: a.typed[0], dip: a.typed[1], north: 'as typed', via: 'typed', trace: ['as typed'] };
+  if (!a.reading) return null;
+  const r = a.reading, [m, dip] = fromDevice(a.what, r.alpha, r.beta, r.gamma), mag = ((m % 360) + 360) % 360;
+  if (st && st.lat != null) {
+    const d = wmm(st.lat, st.lon, { date: new Date(r.at || clock.now()) }).decl, az = ((mag + d) % 360 + 360) % 360;
+    return { az, dip, north: `true (WMM at the station, ${fmt(d, 3)}°)`, via: r.via === 'browser' ? 'browser compass' : 'phone compass', trace: [`device α ${fmt(r.alpha, 5)}° β ${fmt(r.beta, 5)}° γ ${fmt(r.gamma, 5)}° → ${p3(mag)}/${p2(dip)} magnetic`, `+ declination ${fmt(d, 5)}° (WMM at ${fmtLL(st.lat, st.lon)}) → ${p3(az)}/${p2(dip)} true`] };
+  }
+  return { az: mag, dip, north: 'magnetic (the station has no position)', via: r.via === 'browser' ? 'browser compass' : 'phone compass', trace: [`device α ${fmt(r.alpha, 5)}° β ${fmt(r.beta, 5)}° γ ${fmt(r.gamma, 5)}° → ${p3(mag)}/${p2(dip)} magnetic`, 'north: magnetic (the station has no position)'] };
+}
+tool({
+  name: 'fieldAdd', effects: ['device'], pre: ['station'],
+  topic: a => [`Station ${a.station}`, 1],
+  undo: a => { const t = fieldTable(); t.rows = t.rows.filter(r => r.id !== a.id); },
+  run: a => {
+    const st = stationRow(a.station);
+    if (!st) return { read: ['add to station', { v: a.station }], body: [{ t: 'note', kind: 'err', text: `There is no station ${a.station} in the notebook. Start it with "station ${a.station}".` }], trace: ['no such station'] };
+    const when = new Date((a.reading && a.reading.at) || a.at || clock.now()), at = a.sample ? null : attitude(a, st);
+    const row = { id: a.id, station: a.station, date: iso(when), time: hhmm(when), feature: a.feature, azimuth: at ? +at.az.toFixed(1) : null, dip: at ? +at.dip.toFixed(1) : null, sample: a.sample || null, note: a.note || null, lat: st.lat, lon: st.lon, acc: st.acc, north: at ? at.north : null, via: at ? at.via : 'typed' };
+    const t = put(row), here = t.rows.filter(r => r.station === a.station && r.feature !== 'station');
+    const isLine = LINES.has(a.feature) || a.what === 'line';
+    const read = ['add', { v: a.sample ? `sample ${a.sample}` : `${a.feature} ${p3(row.azimuth)}/${p2(row.dip)}` }, 'to station', { v: a.station }];
+    const body = [{ t: 'note', kind: 'ok', text: `Added to station ${a.station}: ${here.length} entr${here.length === 1 ? 'y' : 'ies'} there.` }];
+    if (at) body.push({ t: 'big', v: `${p3(row.azimuth)}/${p2(row.dip)}`, unit: `${isLine ? 'trend/plunge' : 'dip direction/dip'}, ${a.feature}` }, isLine ? { t: 'net', planes: [], lines: [{ tr: row.azimuth, pl: row.dip, label: a.feature }] } : { t: 'net', planes: [{ dd: row.azimuth, dip: row.dip }], lines: [] });
+    body.push({ t: 'kv', rows: [...(at ? [['north', at.north], ['from', at.via + (a.from ? `, card #${String(a.from).padStart(2, '0')}` : '')]] : []), ...(a.note ? [['note', a.note]] : []), ['station', `${a.station}${st.lat != null ? ` at ${fmtLL(st.lat, st.lon)}` : ', no position'}`]] }, SRC);
+    return { read, value: at ? [row.azimuth, row.dip] : a.sample, body, trace: [...(at ? at.trace : [`sample ${a.sample}`]), `field.add(${JSON.stringify({ station: a.station, feature: a.feature, azimuth: row.azimuth, dip: row.dip, sample: row.sample })})`, 'undo removes the row'],
+      py: `field.add(station="${a.station}", feature="${a.feature}"${at ? `, azimuth=${row.azimuth}, dip=${row.dip}` : `, sample="${a.sample}"`})` };
+  }
+});
+
+/* ── a station, or the day, at a glance ─────────────────────── */
+const fisher = (items, planes) => {
+  if (items.length < 2) return null;
+  const st = statistics.fisherStats(items.map(([x, y]) => planes ? conversions.planeToDcos(x, y) : conversions.lineToDcos(x, y))), m = planes ? conversions.dcosToPlane(st.mean) : conversions.dcosToLine(st.mean);
+  return { m, n: items.length, a95: items.length >= 3 ? st.alpha95 : null };
+};
+tool({
+  name: 'fieldSummary',
+  topic: a => [a.station ? `Station ${a.station}` : 'Field notebook', 2],
+  run: a => {
+    const all = rows().filter(r => a.station ? r.station === a.station : a.date ? r.date === a.date : true);
+    const read = a.station ? ['station', { v: a.station }, 'summary'] : a.date ? ['field notebook on', { v: a.date }] : ['the field notebook'];
+    if (!all.length) return { read, body: [{ t: 'note', text: a.station ? `There is no station ${a.station} in the notebook.` : 'The field notebook is empty. Start a station with "station 14".' }, SRC], trace: ['field notebook: nothing to show'] };
+    const ent = all.filter(r => r.feature !== 'station' && r.azimuth != null), planes = ent.filter(r => !LINES.has(r.feature)), lines = ent.filter(r => LINES.has(r.feature)), samples = all.filter(r => r.sample);
+    const stations = [...new Set(all.map(r => r.station))], byKind = {};
+    for (const r of planes) (byKind[r.feature] = byKind[r.feature] || []).push([r.azimuth, r.dip]);
+    const kv = [['stations', `${stations.length}: ${stations.join(', ')}`], ['planes', String(planes.length)], ['lines', String(lines.length)], ['samples', samples.length ? samples.map(r => r.sample).join(', ') : 'none']];
+    for (const [k, items] of Object.entries(byKind)) { const f = fisher(items, true); if (f) kv.push([`mean ${k}`, `${p3(f.m[0])}/${p2(f.m[1])} from ${f.n}${f.a95 != null ? `, α95 ${fmt(f.a95, 3)}°` : ''}`]); }
+    const mixed = new Set(ent.map(r => (r.north || '').split(' ')[0])).size > 1;
+    const table = { t: 'table', head: ['station', 'time', 'feature', 'attitude', 'sample', 'north'], rows: all.filter(r => r.feature !== 'station').map(r => [r.station, r.time, r.feature, r.azimuth != null ? `${p3(r.azimuth)}/${p2(r.dip)}` : '', r.sample || '', r.north || '']) };
+    return {
+      read, value: ent.length,
+      body: [{ t: 'net', planes: planes.map(r => ({ dd: r.azimuth, dip: r.dip })), lines: lines.map(r => ({ tr: r.azimuth, pl: r.dip, label: r.feature })) }, { t: 'kv', rows: kv },
+        ...(mixed ? [{ t: 'note', kind: 'warn', text: 'These rows mix true and magnetic (or as-typed) north: the means put them together as they are.' }] : []),
+        ...(table.rows.length ? [table] : []), { t: 'chips', items: ['open the field notebook', 'export the field notebook as geojson'] }, SRC],
+      trace: [`${all.length} rows${a.station ? ` at station ${a.station}` : ''}`, 'bearing.statistics.fisherStats for each kind of plane with 2 or more'], py: `field.summary(${a.station ? `station="${a.station}"` : ''})`
+    };
+  }
+});
+
+/* ── saving the notebook ────────────────────────────────────── */
+tool({
+  name: 'fieldExport', effects: ['save'],
+  topic: () => ['Field notebook', 1],
+  run: a => {
+    const all = rows(), fmtName = a.fmt === 'csv' ? 'CSV' : 'GeoJSON', read = ['the field notebook as', { v: fmtName, key: 'fmt', alts: ['geojson', 'csv'], cur: a.fmt }];
+    if (!all.length) return { read, body: [{ t: 'note', text: 'The field notebook is empty. Start a station with "station 14".' }], trace: ['nothing to save'] };
+    const props = r => Object.fromEntries(FIELD_COLS.map(c => c.name).filter(n => n !== 'lat' && n !== 'lon').map(n => [n, r[n] ?? null]));
+    let text, name, mime;
+    if (a.fmt === 'csv') { const names = FIELD_COLS.map(c => c.name), cell = v => v == null ? '' : /[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v); text = [names.join(','), ...all.map(r => names.map(n => cell(r[n])).join(','))].join('\n') + '\n'; name = 'field-notebook.csv'; mime = 'text/csv'; }
+    else { text = JSON.stringify({ type: 'FeatureCollection', features: all.map(r => ({ type: 'Feature', geometry: r.lat != null ? { type: 'Point', coordinates: [r.lon, r.lat] } : null, properties: props(r) })) }, null, 1) + '\n'; name = 'field-notebook.geojson'; mime = 'application/geo+json'; }
+    const placed = all.filter(r => r.lat != null).length;
+    return { read, value: text, copy: text, file: { name, mime, text },
+      body: [{ t: 'pre', text: text.split('\n').slice(0, 12).join('\n') + '\n…' }, { t: 'kv', rows: [['rows', String(all.length)], ['with a position', `${placed} of ${all.length}${a.fmt === 'csv' ? '' : '; the others have no geometry'}`], ['coordinates', 'WGS84 longitude, latitude, as the phone or the typing gave them']] }, SRC],
+      trace: [`${all.length} rows → ${fmtName}`], py: `field.export("${a.fmt}")` };
+  }
+});
+
+/* ── what reads them ─────────────────────────────────────────── */
+// "station 14", "new station BH-3", "station 14 at -19.92, -43.94", "estação 14"
+shape({ type: 'stationid', re: String.raw`[a-z]{0,4}-?\d{1,5}(?:-[a-z0-9]{1,4})*` });
+// "station 14" as a thing rather than a command, for the summary: "summary of station 14", "station 14 summary"
+// (a bare "station 14" starts a station; with "summary" after it, it is the summary)
+shape({ type: 'stationref', re: String.raw`(?:station|estação|estacao|ponto)\s+[a-z]{0,4}-?\d{1,5}(?:-[a-z0-9]{1,4})*` });
+shape({ type: 'stationsum', re: String.raw`(?:station|estação|estacao|ponto)\s+[a-z]{0,4}-?\d{1,5}(?:-[a-z0-9]{1,4})*\s+(?:summary|resumo)` });
+const stationOfRef = v => String(v).trim().split(/\s+/)[1].toUpperCase();
+// "#12": a card of this session, by its number
+shape({ type: 'cardref', re: String.raw`#\d{1,4}` });
+noun({ type: 'fieldnb', words: { notebook: ['field notebook', 'the field notebook', 'my field notebook', 'notebook', 'stations', 'the stations'] }, words_pt: { notebook: ['caderneta', 'caderneta de campo', 'a caderneta', 'estações'] } });
+postmod({ prep: '', heads: ['measurable'], attr: 'ori', mod: 'orientation' });   // "lineation 30/200"
+noun({ type: 'fieldfmt', words: { geojson: ['geojson'], csv: ['csv'] }, words_pt: { geojson: ['geojson'], csv: ['csv'] } });
+noun({ type: 'devtable', words: { field: ['field notebook', 'the field notebook', 'my field notebook'] }, words_pt: { field: ['caderneta', 'caderneta de campo', 'a caderneta'] } });
+const llOf = n => { const m = n && n.type === 'coords' && /^(-?[\d.]+)\s*,\s*(-?[\d.]+)$/.exec(n.value); return m ? { lat: +m[1], lon: +m[2] } : null; };
+const idOf = n => n && String(n.type === 'quantity' ? n.n : n.value).trim();
+frame({
+  name: 'station', label: 'Station', words: ['station', 'new station', 'start station', 'start a station', 'open station'], theme: ['stationid'], required: ['theme'],
+  roles: { at: { preps: ['at'], types: ['coords'] } },
+  words_pt: ['estação', 'nova estação', 'ponto', 'novo ponto'], label_pt: 'Estação',
+  bind: c => stationArgs(idOf(c.theme[0]), c)
+});
+// the bare form, "station 14" and "station 14 at -19.92, -43.94": the words are one token (the stationref shape, which the
+// summary needs), so it is read as that thing said alone
+frame({
+  name: 'stationBare', label: 'Station', words: [], elidable: true, theme: ['stationref'], required: ['theme'],
+  roles: { at: { preps: ['at'], types: ['coords'] } }, words_pt: [], label_pt: 'Estação',
+  bind: c => stationArgs(stationOfRef(c.theme[0].value), c)
+});
+function stationArgs(name, c) { const ll = llOf(c.roles.at && c.roles.at[0]); return name ? { tool: 'station', args: { id: newId(), name: name.toUpperCase(), at: +clock.now(), ...(ll ? { lat: ll.lat, lon: ll.lon } : {}) } } : null; }
+// "add bedding 045/30", "add a joint 120/80", "add lineation 30/200: on the hinge", "add #12", "add sample S-14-a"
+const entryArgs = (feature, extra) => ({ id: newId(), station: stationNow(), feature, at: +clock.now(), ...extra });
+function fromCard(ref) {
+  const n = +String(ref).replace('#', ''), c = S.cards.find(x => x.id === n); if (!c) return null;
+  if (c.tool === 'measure' && c.args.reading) return entryArgs(c.args.name || (c.args.what === 'line' ? 'line' : 'plane'), { what: c.args.what === 'line' ? 'line' : 'plane', reading: JSON.parse(JSON.stringify(c.args.reading)), from: n });
+  if (c.tool === 'plane') return entryArgs('plane', { typed: [c.args.conv === 'sd' ? (c.args.a1 + 90) % 360 : c.args.a1, c.args.a2], from: n });
+  return null;
+}
+frame({
+  name: 'fieldAdd', label: 'Add to the station', words: ['add', 'add a', 'add an', 'enter'], theme: ['plane', 'measurable', 'orientation', 'cardref'], required: ['theme'],
+  roles: { to: { preps: ['to', 'at'], types: ['stationref', 'stationid'] } },
+  words_pt: ['adiciona', 'adicione', 'acrescenta'], label_pt: 'Adicionar à estação',
+  bind: c => {
+    const th = c.theme[0], to = c.roles.to && (c.roles.to[0].type === 'stationref' ? stationOfRef(c.roles.to[0].value) : idOf(c.roles.to[0]));
+    let a = null;
+    if (th.type === 'cardref') a = fromCard(th.value);
+    else { const o = oriOf(th); if (!o) return null; const feature = th.type === 'orientation' ? 'plane' : String(th.value); a = entryArgs(feature, { what: LINES.has(feature) ? 'line' : 'plane', typed: o }); }
+    if (!a) return null;
+    if (to) a.station = to.toUpperCase();
+    return { tool: 'fieldAdd', args: a };
+  }
+});
+frame({
+  name: 'fieldSample', label: 'Sample', words: ['add sample', 'sample', 'took sample', 'bagged sample'], theme: ['text'], required: ['theme'], roles: {},
+  words_pt: ['amostra', 'adiciona amostra', 'coletei a amostra'], label_pt: 'Amostra',
+  bind: c => {
+    const s = String(c.theme[0].value).trim(), m = /^(\S+)(?:\s*[:,-]\s*|\s+)?(.*)$/.exec(s); if (!m || !/\d/.test(m[1])) return null;
+    return { tool: 'fieldAdd', args: entryArgs('sample', { sample: m[1].toUpperCase(), ...(m[2] ? { note: m[2] } : {}) }) };
+  }
+});
+// "summary of station 14", "show station 14", "station 14 summary", "the field notebook": a bare "station 14" stays the
+// command that starts a station, so a station is a summary only after a verb or with "summary" after it
+const summaryBind = c => { const th = c.theme[0], st = th.type === 'stationref' || th.type === 'stationsum' ? stationOfRef(th.value) : null; return { tool: 'fieldSummary', args: st ? { station: st } : {} }; };
+frame({
+  name: 'fieldSummary', label: 'Field summary', words: ['summary', 'summary of', 'summarise', 'summarize', 'show'], theme: ['fieldnb', 'stationref'], required: ['theme'], roles: {},
+  words_pt: ['resumo', 'resumo da', 'resumo de', 'mostra'], label_pt: 'Resumo de campo', bind: summaryBind
+});
+frame({
+  name: 'fieldSummaryBare', label: 'Field summary', words: [], elidable: true, theme: ['fieldnb', 'stationsum'], required: ['theme'], roles: {},
+  words_pt: [], label_pt: 'Resumo de campo', bind: summaryBind
+});
+frame({
+  name: 'fieldExport', label: 'Save the field notebook', words: ['export', 'save', 'download'], theme: ['fieldnb'], required: ['theme'],
+  roles: { as: { preps: ['as', 'to', 'in'], types: ['fieldfmt'] } },
+  words_pt: ['exporta', 'salva', 'baixa'], label_pt: 'Salvar a caderneta',
+  bind: c => ({ tool: 'fieldExport', args: { fmt: c.roles.as ? c.roles.as[0].value : 'geojson' } })
+});
+  return { FIELD_COLS, fieldTable, stationNow };
+})();
+
+/* ==== src/engine/data/timescale.js ==== */
+const __m24 = (() => {
 // The International Chronostratigraphic Chart as a records pack: one row per unit, five ranks.
 // Source: ICS (Cohen, Finney, Gibbard & Fan 2013; updated chart) as served by Macrostrat
 // (macrostrat.org/api/v2/defs/intervals?timescale_id=11, CC BY 4.0), fetched 8 Oct 2026. The Hadean is
@@ -12924,9 +13141,9 @@ const TIMESCALE = [
 })();
 
 /* ==== src/engine/timescale.js ==== */
-const __m24 = (() => {
+const __m25 = (() => {
 const { tool, frame, noun, unit, fmt } = __m0;
-const { TIMESCALE, TIMESCALE_SOURCE } = __m23;
+const { TIMESCALE, TIMESCALE_SOURCE } = __m24;
 // The geologic timescale: the ICS chart as a records pack (data/timescale.js). Ages, bounds, ranks,
 // what a unit sits in, what came before and after, what it is subdivided into, and which unit an age
 // in Ma falls in. Lookups only; the chart is the answer.
@@ -13026,7 +13243,7 @@ noun({ type: 'chron', words: Object.fromEntries(Object.keys(RETIRED).map(k => [k
 })();
 
 /* ==== src/engine/sample.js ==== */
-const __m25 = (() => {
+const __m26 = (() => {
 const { tool, frame, noun, compound, qmod, postmod, unit, fmt } = __m0;
 const { parseUnit } = __m2;
 const { core, sieve } = __m1;
@@ -13166,7 +13383,7 @@ frame({
 })();
 
 /* ==== src/engine/explain.js ==== */
-const __m26 = (() => {
+const __m27 = (() => {
 const { tool, frame, amend, noun, shape, clock, fmt } = __m0;
 // Explainers: formal notation parsed and described, one row per piece. Cron schedules, epoch times,
 // chmod modes, URLs and ECMAScript regular expressions. Each member has a recogniser so a bare
@@ -13541,7 +13758,7 @@ amend({ tools: ['explain'], name: 'explainas', label: 'Explain as', words: [], e
 })();
 
 /* ==== src/vendor/parquet.js ==== */
-const __m27 = (() => {
+const __m28 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/parquet, Parquet read and write over vendored hyparquet and hyparquet-writer, pure JS, minified by its own build, copied from ../auditable/ext/parquet/index.js at auditable 5fa5f72e (MIT; hyparquet MIT).
 // Re-vendor by copying that file here.
 
@@ -13550,9 +13767,9 @@ const e=["BOOLEAN","INT32","INT64","INT96","FLOAT","DOUBLE","BYTE_ARRAY","FIXED_
 })();
 
 /* ==== src/engine/convert.js ==== */
-const __m28 = (() => {
+const __m29 = (() => {
 const { S, tool, frame, amend, noun, fmt } = __m0;
-const { writeParquet } = __m27;
+const { writeParquet } = __m28;
 // Conversions that need no file format reader: hashes, text encodings both ways, and the open table
 // as CSV, TSV or JSON with a save action. Format readers (xlsx, dm, parquet) are the second pass.
 
@@ -13709,7 +13926,7 @@ for (const op of ['encode', 'decode']) amend({ tools: ['encode'], name: `op${op}
 })();
 
 /* ==== src/vendor/plan-calendar.js ==== */
-const __m29 = (() => {
+const __m30 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/plan's calendar engine and Brazilian holidays, copied from
 // ../auditable/ext/plan/src/calendar.js and src/holidays-br.js (MIT). The scheduling half of the package is not here.
 // Re-vendor by copying those two files here again and keeping the single export block at the end.
@@ -14066,10 +14283,10 @@ function brazilMunicipalities() {
 })();
 
 /* ==== src/engine/calendar.js ==== */
-const __m30 = (() => {
+const __m31 = (() => {
 const { S, tool, frame, amend, noun, shape, postmod, unit, clock, iso } = __m0;
 const { findDate, findTime, today, day0, fmtDate, dateWords } = __m4;
-const { isWorkingDay, addWorkingDays, brazilCalendar, federalHolidays } = __m29;
+const { isWorkingDay, addWorkingDays, brazilCalendar, federalHolidays } = __m30;
 // Working days and rosters over @gcu/plan's calendar engine (vendored), and time zones through Intl.
 // The calendar is a slot and is always shown: Brazil's federal holidays, or weekdays only.
 
@@ -14302,7 +14519,7 @@ amend({ tools: ['workdays'], name: 'workcal', label: 'Calendar', words: [], elid
 })();
 
 /* ==== src/engine/estimate.js ==== */
-const __m31 = (() => {
+const __m32 = (() => {
 const { amend, noun, tool, fmt } = __m0;
 const { U } = __m2;
 // Estimates with ranges: arithmetic over intervals by simulation, units carried through, the seed kept
@@ -14477,7 +14694,7 @@ amend({ tools: ['estimate'], name: 'estdist', label: 'Distribution', words: ['as
 })();
 
 /* ==== src/engine/data/elements.js ==== */
-const __m32 = (() => {
+const __m33 = (() => {
 // The elements with their standard atomic weights, abridged to five significant figures.
 // Source: IUPAC Commission on Isotopic Abundances and Atomic Weights (CIAAW), Standard Atomic Weights 2024
 // (ciaaw.org/atomic-weights.htm, the 2021 report with Gd, Lu and Zr revised in 2024), cross-checked against
@@ -14522,9 +14739,9 @@ const ELEMENTS = [
 })();
 
 /* ==== src/engine/chem.js ==== */
-const __m33 = (() => {
+const __m34 = (() => {
 const { tool, frame, noun, shape, postmod, fmt } = __m0;
-const { ELEMENTS, ELEMENTS_SOURCE } = __m32;
+const { ELEMENTS, ELEMENTS_SOURCE } = __m33;
 const { UNIT_TABLE } = __m2;
 // Molar mass, conversion factors and element fractions from a parsed formula over the IUPAC weights;
 // the periodic table lookup. No mineral names: the minerals pack is not here, so a formula is required.
@@ -14683,7 +14900,7 @@ frame({
 })();
 
 /* ==== src/engine/text.js ==== */
-const __m34 = (() => {
+const __m35 = (() => {
 const { tool, frame, amend, noun, qmod, fmt } = __m0;
 // Text tools over a pasted payload: counts and readability, extracted key sentences, and a diff.
 // The payload is what follows the first colon, or every line after the first of a multi-line input;
@@ -14829,7 +15046,7 @@ amend({ tools: ['diff'], name: 'diffunit', label: 'Diff by', words: [], elidable
 })();
 
 /* ==== src/engine/forms.js ==== */
-const __m35 = (() => {
+const __m36 = (() => {
 const { tool, frame, amend, noun } = __m0;
 // The form card: a tool that still needs answers asks for them one at a time; each answer lands in
 // args and is an editable slot, and the result recomputes when any changes. The decision matrix is the
@@ -14906,10 +15123,10 @@ amend({ tools: ['decide'], name: 'score', label: 'Score', words: ['is', 'scores'
 })();
 
 /* ==== src/engine/econ.js ==== */
-const __m36 = (() => {
+const __m37 = (() => {
 const { tool, frame, noun, shape, postmod, qmod, fmt } = __m0;
-const { ELEMENTS } = __m32;
-const { numberAsk, firstNeed } = __m35;
+const { ELEMENTS } = __m33;
+const { numberAsk, firstNeed } = __m36;
 // Sampling theory and mine economics as declared formulas. Every term is a slot; a term the person did
 // not give is asked for, with the conventional value offered first and never applied on its own. Prices
 // are always the person's input. No geostatistics here: these are formulas over given numbers.
@@ -15073,7 +15290,7 @@ frame({
 })();
 
 /* ==== src/engine/log.js ==== */
-const __m37 = (() => {
+const __m38 = (() => {
 const { S, tool, frame, amend, noun, fmt, iso } = __m0;
 const { parseUnit, dimName } = __m2;
 const { findDate, today, fmtDate, dateWords } = __m4;
@@ -15222,7 +15439,7 @@ amend({ tools: ['logAdd'], name: 'logfix', label: 'Correct', words: ['that was',
 })();
 
 /* ==== src/engine/places.js ==== */
-const __m38 = (() => {
+const __m39 = (() => {
 const { S, tool, frame, amend, noun, shape, postmod, fmt, rad, deg } = __m0;
 // Places, distance and UTM. A place is coordinates in the request or a name saved on this device
 // ("home is -19.92, -43.94"); there is no gazetteer and device location is off, so an unknown name is
@@ -15388,11 +15605,11 @@ amend({ tools: ['utm'], name: 'utmband', label: 'Band', words: [], elidable: tru
 })();
 
 /* ==== src/engine/sky.js ==== */
-const __m39 = (() => {
+const __m40 = (() => {
 const { tool, frame, amend, noun, compound, fmt, rad, deg, iso } = __m0;
 const { findDate, today, fmtDate, dateWords } = __m4;
-const { zonesOf, offsetOf } = __m30;
-const { placeOf } = __m38;
+const { zonesOf, offsetOf } = __m31;
+const { placeOf } = __m39;
 // The sun by NOAA's solar position equations (after Meeus), and the moon's phase from the mean
 // synodic cycle, labelled with its accuracy. Times are given in the place's zone when the place name
 // has one, else in UTC and the card says so.
@@ -15474,7 +15691,7 @@ amend({ tools: ['sun'], name: 'sunzone', label: 'Zone', words: [], elidable: tru
 })();
 
 /* ==== src/engine/apply.js ==== */
-const __m40 = (() => {
+const __m41 = (() => {
 const { S, tool, fmt, rad, deg, p3, p2 } = __m0;
 const { whereOf } = __m14;
 const { evaluatePredicate, predicateToString } = __m13;
@@ -15541,7 +15758,7 @@ tool({
 })();
 
 /* ==== src/vendor/ipynb.js ==== */
-const __m41 = (() => {
+const __m42 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/ipynb, copied from ../auditable/ext/ipynb/index.js (MIT). golem uses importNotebook
 // for its import-substitution table only (numpy → natra, pandas → sadpan, …). Re-vendor by copying that file here.
 
@@ -16090,9 +16307,9 @@ function exportNotebook(cells, opts = {}) {
 })();
 
 /* ==== src/engine/python.js ==== */
-const __m42 = (() => {
+const __m43 = (() => {
 const { tool, frame, amend, result, fmt } = __m0;
-const { importNotebook } = __m41;
+const { importNotebook } = __m42;
 // Run and trace Python with adder, on the device. The tool itself stays synchronous: a first run returns a
 // "running" card carrying a job, the runner (a Web Worker in the page, adder in-process in the tests)
 // answers later, and the card is recomputed from the kept result. Replay reruns the code, which is
@@ -16162,7 +16379,7 @@ amend({ tools: ['python'], name: 'pytraceoff', label: 'Run', words: ['no trace',
 })();
 
 /* ==== src/vendor/librarian.js ==== */
-const __m43 = (() => {
+const __m44 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/librarian, the in-process text search (BM25F, fuzzy expansion, snippets, did-you-mean), copied from ../auditable/ext/librarian/index.js at auditable 5fa5f72e (MIT).
 // Re-vendor by copying that file here.
 
@@ -17438,9 +17655,9 @@ const Librarian = {
 })();
 
 /* ==== src/engine/docs.js ==== */
-const __m44 = (() => {
+const __m45 = (() => {
 const { S, tool, frame, amend, noun, postmod } = __m0;
-const { Librarian } = __m43;
+const { Librarian } = __m44;
 // Search my documents (A7). Markdown, plain text and HTML opened with the paperclip are kept on the device,
 // cut into passages (by heading, then by paragraph) and indexed by @gcu/librarian. A search returns
 // passages verbatim with the matched words marked; golem never rewrites them. The index is derived
@@ -17593,9 +17810,9 @@ amend({ tools: ['docPassage'], name: 'docstep', label: 'Passage', words: [], eli
 })();
 
 /* ==== src/engine/recipes.js ==== */
-const __m45 = (() => {
+const __m46 = (() => {
 const { S, tool, frame, noun, session, runTool } = __m0;
-const { listOf } = __m35;
+const { listOf } = __m36;
 // Recipes (A9): a session's plan saved under a name, with the subjects that may change between runs.
 // A recipe is stored as card specs, plain JSON like a session; running it replays every step with the
 // new subjects into a new session, and stops at the first step that no longer reads. Nothing is skipped
@@ -17789,7 +18006,7 @@ session({
 })();
 
 /* ==== src/vendor/sheet.js ==== */
-const __m46 = (() => {
+const __m47 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sheet, copied from ../auditable/ext/sheet/index.js (built from its src/ by @gcu/build, MIT).
 // Re-vendor by copying that file here. Reading is asynchronous (DecompressionStream), so golem converts at open time, not in a tool.
 
@@ -19021,7 +19238,7 @@ const sheet = {
 })();
 
 /* ==== src/vendor/dm.js ==== */
-const __m47 = (() => {
+const __m48 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/dm, the read-only Datamine .dm reader, copied from ../auditable/ext/dm/index.js (MIT).
 // Re-vendor by copying that file here.
 
@@ -19297,10 +19514,10 @@ function readDM(buffer) {
 })();
 
 /* ==== src/engine/formats.js ==== */
-const __m48 = (() => {
-const { sheet } = __m46;
-const { readDM } = __m47;
-const { readParquet, parquetInfo } = __m27;
+const __m49 = (() => {
+const { sheet } = __m47;
+const { readDM } = __m48;
+const { readParquet, parquetInfo } = __m28;
 // Binary table formats, converted to text when a file is opened: xlsx through @gcu/sheet (one text per
 // sheet), Datamine .dm through @gcu/dm, Parquet through @gcu/parquet. Tools stay synchronous and the device keeps the converted text,
 // so a session replays from it. What did not carry over is said on the card.
@@ -19351,7 +19568,7 @@ async function convertBinary(name, buffer) {
 })();
 
 /* ==== src/engine/notes.js ==== */
-const __m49 = (() => {
+const __m50 = (() => {
 const { S, tool, frame } = __m0;
 // Notes and taught words. Both belong to the device and are shared by every session.
 const textOf = c => c.theme[0] && c.theme[0].type === 'text' ? c.theme[0].value : null;
@@ -19402,7 +19619,7 @@ frame({
 })();
 
 /* ==== src/engine/skills.js ==== */
-const __m50 = (() => {
+const __m51 = (() => {
 const { TOOLS, tool, frame } = __m0;
 // The catalog: skills derived from the declarations, planned skills named here, and the packs golem
 // knows about. Examples feed the Skills tab, the "nearest skills" suggestions and the teach vocabulary.
@@ -19456,14 +19673,14 @@ const vocab = () => VOCAB || (VOCAB = new Set(examples().filter(e => !/ means /.
 // the welcome of an empty session: one line of what, one query that shows it
 // the welcome's starters, by what they are for: [group, [[title, query], …]]
 const STARTERS = [
-  ['In the field', [['True thickness', 'true thickness of a 14 m intercept, hole 270/60, bedding 045/30'], ['Declination here', 'declination at -19.92, -43.94'], ['Apparent dip', 'apparent dip of 000/30 on a section at 045']]],
+  ['In the field', [['True thickness', 'true thickness of a 14 m intercept, hole 270/60, bedding 045/30'], ['Declination here', 'declination at -19.92, -43.94'], ['Apparent dip', 'apparent dip of 000/30 on a section at 045'], ['Field notebook', 'the field notebook']]],
   ['Lab and tables', [['A table to try (sample data)', 'open assays.csv'], ['Core mass', 'mass of 1 m of nq core at 2.7'], ['Molar mass', 'molar mass of CuFeS2']]],
   ['Units and numbers', [['Convert a grade', '0.35 oz per short ton in g/t'], ['With uncertainty', '2.7 ± 0.1 t/m3 * 1.35 Mm3'], ['Run some Python', 'run this: sum(x * x for x in range(10))']]],
   ['Every day', [['Set a reminder', 'remind me to send the samples to the lab on friday at 9'], ['Two time zones', '9am sao paulo in perth'], ['What can you do?', 'what can you do']]],
 ];
 // the same, for the Portuguese interface: each one reads in Portuguese (test/portuguese.test.mjs)
 const STARTERS_PT = [
-  ['No campo', [['Espessura verdadeira', 'espessura verdadeira de 14 m, furo 270/60, acamamento 045/30'], ['Declinação', 'declinação em -19.92, -43.94'], ['Medir com o celular', 'mede o acamamento']]],
+  ['No campo', [['Espessura verdadeira', 'espessura verdadeira de 14 m, furo 270/60, acamamento 045/30'], ['Declinação', 'declinação em -19.92, -43.94'], ['Medir com o celular', 'mede o acamamento'], ['Caderneta de campo', 'a caderneta']]],
   ['Laboratório e tabelas', [['Uma tabela para testar (dados de amostra)', 'abre assays.csv'], ['Massa molar', 'massa molar de CuFeS2'], ['Histograma', 'histograma de cu']]],
   ['Unidades e números', [['Converter', 'converte 5 km para milhas'], ['Temperatura', '25 graus celsius em fahrenheit'], ['Dias úteis', 'quantos dias úteis até 20 de dezembro']]],
   ['Dia a dia', [['Lembrete', 'me lembra de mandar as amostras pro laboratório na sexta às 9'], ['Que horas são', 'que horas são em perth'], ['O que você faz?', 'o que você faz']]],
@@ -19473,11 +19690,11 @@ const SUGGESTIONS = ['pop means population', 'histogram of cu', 'log scale', 'po
 })();
 
 /* ==== src/engine/ontology.js ==== */
-const __m51 = (() => {
+const __m52 = (() => {
 const { FRAMES, LEXICON, S } = __m0;
 const { UNIT_TABLE, COMPOUNDS, DIM, parseUnit, dimName } = __m2;
 const { ELEMENT } = __m14;
-const { TIMESCALE } = __m23;
+const { TIMESCALE } = __m24;
 // The clause ontology, assembled from what golem knows: units from the conversion table, nouns from the
 // sample packs, verb frames from the declarations. Inert data; the build writes it to dist/golem.json.
 // Portuguese synonyms are listed here by hand until packs carry them in their golem facet.
@@ -19554,7 +19771,7 @@ function ontology(only) {
 })();
 
 /* ==== src/vendor/dispatch.js ==== */
-const __m52 = (() => {
+const __m53 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/dispatch, built from ../auditable/ext/dispatch/src/ by its own build.
 // Source of truth: gentropic/auditable ext/dispatch (local clone: ../auditable). Re-vendor by copying
 // ext/dispatch/index.js here after 'node ext/dispatch/build.js'. golem uses the grammar rung only:
@@ -21707,13 +21924,13 @@ const PORTUGUESE = {
 })();
 
 /* ==== src/engine/reading.js ==== */
-const __m53 = (() => {
+const __m54 = (() => {
 const { S, T, TOOLS, FRAMES, tool, frame, amend, session, noun, toolByName, runTool, iso } = __m0;
-const { examples, vocab } = __m50;
-const { ontology } = __m51;
+const { examples, vocab } = __m51;
+const { ontology } = __m52;
 const { calcOf } = __m3;
-const { estimateOf } = __m31;
-const { createEngine, makeSession, ENGLISH, PORTUGUESE } = __m52;
+const { estimateOf } = __m32;
+const { createEngine, makeSession, ENGLISH, PORTUGUESE } = __m53;
 // The reading ladder: context (amendments, meta-intents), grammar (the clause parser, then the regex
 // rules the declarations carry), taught words (device lexicon rewrites, then grammar again). Plus the
 // tools that talk about the session itself: none, why, export.
@@ -22022,7 +22239,7 @@ function sessionRead(raw) {
 })();
 
 /* ==== src/engine/sessions.js ==== */
-const __m54 = (() => {
+const __m55 = (() => {
 const { S, toolByName, runTool, startJobs, clearResults } = __m0;
 // Sessions: stored as plans (card specs), replayed on open, named from the tools that ran.
 // The shell persists whatever `serialize()` returns and feeds it back through `hydrate()`.
@@ -22141,7 +22358,7 @@ function reset() {
 })();
 
 /* ==== src/vendor/sluice/accumulator.js ==== */
-const __m55 = (() => {
+const __m56 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sluice src/accumulator.js, copied from ../auditable/ext/sluice/src/accumulator.js at auditable 3a7b253c.
 // golem vendors sluice's accumulator modules only (src/engine/stream.js): its runner builds expressions with new Function,
 // which golem does not ship outside the Python worker.
@@ -22309,7 +22526,7 @@ function weightedStats() {
 })();
 
 /* ==== src/vendor/sluice/tdigest.js ==== */
-const __m56 = (() => {
+const __m57 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sluice src/tdigest.js, copied from ../auditable/ext/sluice/src/tdigest.js at auditable 3a7b253c.
 // golem vendors sluice's accumulator modules only (src/engine/stream.js): its runner builds expressions with new Function,
 // which golem does not ship outside the Python worker.
@@ -22424,7 +22641,7 @@ function quantile(state, q) {
 })();
 
 /* ==== src/vendor/sluice/histogram.js ==== */
-const __m57 = (() => {
+const __m58 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sluice src/histogram.js, copied from ../auditable/ext/sluice/src/histogram.js at auditable 3a7b253c.
 // golem vendors sluice's accumulator modules only (src/engine/stream.js): its runner builds expressions with new Function,
 // which golem does not ship outside the Python worker.
@@ -22476,14 +22693,14 @@ function cumulativeFromTop(counts) {
 })();
 
 /* ==== src/engine/stream.js ==== */
-const __m58 = (() => {
+const __m59 = (() => {
 const { S, T, fmt, result } = __m0;
 const { colOf, whereSrc, tableFromText, openTable } = __m14;
 const { parsePredicate, evaluatePredicate, predicateToString } = __m13;
 const { NULL_SENTINELS } = __m12;
-const { weightedStats } = __m55;
-const { tdigest, quantile } = __m56;
-const { histogram } = __m57;
+const { weightedStats } = __m56;
+const { tdigest, quantile } = __m57;
+const { histogram } = __m58;
 // Tables too large to hold (SPEC 13.7): a CSV or TSV over 20 MB is typed from its first megabyte by recon, like any
 // table, and its questions are answered by scanning the whole file as a job, through @gcu/sluice's accumulators
 // (mergeable, never holding the rows): Welford and weighted moments, t-digest quantiles, histograms. The shell runs the
@@ -22644,17 +22861,17 @@ for (const k of ['apply', 'tableExport']) T[k] = a => S.table && S.table.streame
 })();
 
 /* ==== src/engine/engine.js ==== */
-const __m59 = (() => {
+const __m60 = (() => {
 const { S, T, runTool, toolByName, startJobs, tool, CONDITIONS, EFFECTS } = __m0;
 const { DOCUMENT } = __m10;
-const { DOCTEXT } = __m44;
-const { bindingsOf, runSteps } = __m45;
+const { DOCTEXT } = __m45;
+const { bindingsOf, runSteps } = __m46;
 const { tableFromText } = __m14;
-const { convertBinary } = __m48;
-const { norm, grammar, context, taught, sessionRead, readingOf, guessRead, clauseEngine } = __m53;
-const { makeSession } = __m52;
-const { current, newSession, renameSession, touch } = __m54;
-const { streamedTable } = __m58;
+const { convertBinary } = __m49;
+const { norm, grammar, context, taught, sessionRead, readingOf, guessRead, clauseEngine } = __m54;
+const { makeSession } = __m53;
+const { current, newSession, renameSession, touch } = __m55;
+const { streamedTable } = __m59;
 // The entry point: submit(raw) reads a request and returns what happened. Cards are recomputed in
 // place by rerun(); answers and slot flips go through it, so args stay the only state that matters.
 
@@ -22912,7 +23129,7 @@ function seedExamples() {
 })();
 
 /* ==== src/engine/packs.js ==== */
-const __m60 = (() => {
+const __m61 = (() => {
 const { profilesOf } = __m16;
 // Packs as gcu-library ships them: a .gcudat is a gzipped tar holding gcudat.json (the manifest) and the data files
 // (gcu-library tools/build-gcudat.mjs). Read here with the platform's own gunzip (DecompressionStream, in browsers and
@@ -23019,7 +23236,7 @@ async function compileStrunk(bytes) {
 })();
 
 /* ==== src/vendor/vfs.js ==== */
-const __m61 = (() => {
+const __m62 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/vfs, copied from ../auditable/ext/vfs/index.js (built from its src/ by node ext/vfs/build.js), at
 // auditable 8837da6e. golem's shell keeps sessions, device state, files and packs in it over IndexedDB (src/shell/store.js).
 // golem constructs only IDBBackend and MemoryBackend; the network backends in this bundle (fetch, REST, Dropbox) are
@@ -26830,8 +27047,8 @@ function fromPicker(vfs, destPath, opts) {
 })();
 
 /* ==== src/shell/store.js ==== */
-const __m62 = (() => {
-const { VFS } = __m61;
+const __m63 = (() => {
+const { VFS } = __m62;
 // Where the device keeps golem (SPEC 13.9): @gcu/vfs over IndexedDB, one file per session, one per opened file, the
 // device state and a small meta file, so a session can be exported as itself and nothing has a size cap but the
 // browser's. Only what changed is written. When IndexedDB is not there, the whole state goes to localStorage as before;
@@ -26945,7 +27162,7 @@ function noStore() {
 })();
 
 /* ==== src/vendor/leadacid.js ==== */
-const __m63 = (() => {
+const __m64 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. The lead-acid shell shim, copied from ../auditable/ext/leadacid/index.js
 // (itself vendored from gentropic/lead-acid, lead-acid.js). Re-vendor by copying that file here.
 
@@ -27649,7 +27866,7 @@ function orientationFromRotationVector(v) {
 })();
 
 /* ==== src/vendor/plot.js ==== */
-const __m64 = (() => {
+const __m65 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/plot (matplotlib-shaped plotting; figures leave the worker as draw lists), copied from ../auditable/ext/plot/index.js at auditable 774234c3 (9 Oct 2026, MIT).
 // Loaded only inside the Python worker. Re-vendor by copying that file here.
 
@@ -29683,7 +29900,7 @@ if (typeof window !== 'undefined') {
 })();
 
 /* ==== src/shell/i18n.js ==== */
-const __m65 = (() => {
+const __m66 = (() => {
 // The interface in English or Brazilian Portuguese. golem's own words (the page, the sidebar, the composer, the cards'
 // frame, the messages) go through t(); the English is the key, so a sentence not translated yet shows in English and a
 // placeholder ({name}) is filled in after the lookup. What a tool answers is the tool's, in English for now.
@@ -29749,6 +29966,7 @@ const PT = {
   'Tap Take reading to turn the compass on.': 'Toque em Medir para ligar a bússola.', 'Compass on: hold the phone still, then take the reading.': 'Bússola ligada: segure o celular parado e meça.',
   'The compass needs the motion permission: allow it for this site in the browser.': 'A bússola precisa da permissão de movimento: permita para este site no navegador.', 'Position needs the location permission: allow it for this site in the browser.': 'A posição precisa da permissão de localização: permita para este site no navegador.',
   'In a browser the fix comes through the browser, which may ask its own location service for it.': 'No navegador a posição vem do navegador, que pode consultar o próprio serviço de localização.',
+  'Add to station {name}': 'Adicionar à estação {name}',
   'Measured.': 'Medido.', 'Measured. The phone moved while measuring; hold it still for a steadier reading.': 'Medido. O celular se mexeu durante a medida; segure parado para uma leitura mais firme.',
   'Waiting for a fix…': 'Esperando uma posição…', 'Position needs the location permission: allow it in the dialog, or in the app\'s settings.': 'A posição precisa da permissão de localização: permita na caixa de diálogo, ou nas configurações do app.',
   'No position: {e}': 'Sem posição: {e}', 'No fix. Go where the sky is open and try again.': 'Sem posição. Vá para onde o céu está aberto e tente de novo.', 'Position taken, ±{m} m.': 'Posição registrada, ±{m} m.',
@@ -29794,12 +30012,20 @@ const PT = {
 })();
 
 /* ==== src/shell/render.js ==== */
-const __m66 = (() => {
+const __m67 = (() => {
 const { fmt } = __m0;
 const { conversions, equalArea } = __m5;
-const { Figure } = __m64;
-const { t } = __m65;
+const { Figure } = __m65;
+const { t } = __m66;
+const { stationNow } = __m23;
 // Rendering. The engine hands over plain blocks; this is the only file that turns them into markup.
+
+// a measured plane or line, or a typed plane, can go into the field notebook at the open station: the button says
+// "add #12 to station 14", which reads like anything typed and copies the card's values into the new card's args
+function toStation(c) {
+  const st = stationNow(); if (!st || !((c.tool === 'measure' && c.args.reading) || c.tool === 'plane')) return '';
+  return `<div class="opts"><button class="btn" type="button" data-act="run" data-q="${escHtml(`add #${c.id} to station ${st}`)}">${escHtml(t('Add to station {name}', { name: st }))}</button></div>`;
+}
 
 const escHtml = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const pad = n => String(n).padStart(2, '0');
@@ -29900,7 +30126,7 @@ function cardEl(c) {
   el.innerHTML = `<div class="q">${escHtml(c.raw)}</div>
     <div class="reply"><div class="chead"><span class="rung ${c.rung}">${t(RUNG[c.rung])}</span><span>#${pad(c.id)}</span>${c.amends ? `<span>${t('from #{n}', { n: pad(c.amends) })}</span>` : ''}<span class="ms">${c.ms < 10 ? c.ms.toFixed(1) : Math.round(c.ms)} ms</span></div>
     ${read ? `<div class="read"><span class="lbl">${t('read as')}</span> ${read}</div>` : ''}
-    <div class="ans">${r.body.map(blockHtml).join('')}${ask}</div>
+    <div class="ans">${r.body.map(blockHtml).join('')}${ask}${toStation(c)}</div>
     <div class="cfoot"><details class="trace"><summary>${t('how')} · ${r.trace.length} ${t(r.trace.length === 1 ? 'step' : 'steps')}</summary><ol>${r.trace.map(t => `<li>${escHtml(t)}</li>`).join('')}</ol></details>
     <span class="cacts"><button class="cact" type="button" data-act="copyans" title="${escHtml(t('Copy the answer (c)'))}">${t('copy')}</button><button class="cact" type="button" data-act="edit" title="${escHtml(t('Put this question back in the box to change it (e)'))}">${t('edit')}</button><button class="cact" type="button" data-act="pin" aria-pressed="${!!c.pinned}" title="${escHtml(t('Keep this card at the top of the session (p)'))}">${t(c.pinned ? 'pinned' : 'pin')}</button><button class="cact" type="button" data-act="branch" title="${escHtml(t('A new session with the cards up to this one'))}">${t('branch')}</button><button class="cact say" type="button" data-act="say" title="${escHtml(t('Read this answer aloud, with the phone\'s offline voice'))}">${t('say')}</button></span></div></div>`;
   const figs = r.body.filter(b => b.t === 'figure');
@@ -29936,7 +30162,7 @@ function figImage(ctx, x, y, w, h, cols, rows, b64) {
 })();
 
 /* ==== src/vendor/sw-register.js ==== */
-const __m67 = (() => {
+const __m68 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sw's page-side companion, copied from ../auditable/ext/sw/register.js (at auditable 8837da6e).
 
 // @gcu/sw — the page-side companion (ES module). Registration + persistent
@@ -30014,26 +30240,26 @@ function registerGcuSw(opts = {}) {
 })();
 
 /* ==== src/shell/main.js ==== */
-const __m68 = (() => {
+const __m69 = (() => {
 const { S } = __m0;
-const { submit, flipSlot, answer, capture, seedExamples, openFile, openBinary, openStreamed, preview } = __m59;
-const { scanTable, STREAM_OVER } = __m58;
-const { completions } = __m53;
+const { submit, flipSlot, answer, capture, seedExamples, openFile, openBinary, openStreamed, preview } = __m60;
+const { scanTable, STREAM_OVER } = __m59;
+const { completions } = __m54;
 const { fromDevice } = __m22;
 const { conversions } = __m5;
 const { useFactbook, factbookInfo } = __m16;
-const { factbookFromGcudat, factbookProfiles, readGcudat, compileOds, compileStrunk } = __m60;
+const { factbookFromGcudat, factbookProfiles, readGcudat, compileOds, compileStrunk } = __m61;
 const { useBook, bookInfo } = __m17;
-const { BINARY } = __m48;
+const { BINARY } = __m49;
 const { setRunner, onJobDone } = __m0;
-const { sessions, current, newSession, openSession, renameSession, deleteSession, searchHistory, parts, hydrate, onChange, exportSession, importSession, pinCard, branchSession } = __m54;
-const { openStore, putBlob, getBlob } = __m62;
-const { skills, PACKS, STARTERS, STARTERS_PT } = __m50;
-const { shell } = __m63;
-const { escHtml, pad, cardEl, drawCharts } = __m66;
-const { registerGcuSw } = __m67;
-const { t, plural, setUiLang, uiLang, applyStatic } = __m65;
-const { setLanguage } = __m53;
+const { sessions, current, newSession, openSession, renameSession, deleteSession, searchHistory, parts, hydrate, onChange, exportSession, importSession, pinCard, branchSession } = __m55;
+const { openStore, putBlob, getBlob } = __m63;
+const { skills, PACKS, STARTERS, STARTERS_PT } = __m51;
+const { shell } = __m64;
+const { escHtml, pad, cardEl, drawCharts } = __m67;
+const { registerGcuSw } = __m68;
+const { t, plural, setUiLang, uiLang, applyStatic } = __m66;
+const { setLanguage } = __m54;
 // The shell: wiring, tabs, the session drawer, storage, and the sleep switch. Everything that touches
 // the DOM or the browser lives here or in render.js; the engine never does.
 
