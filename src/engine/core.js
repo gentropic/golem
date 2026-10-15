@@ -94,9 +94,15 @@ export function startJobs(cards, redo) {
 }
 // every job started so far has finished and its cards are recomputed (tests wait on this)
 export async function settle() { while (INFLIGHT.size) await Promise.all([...INFLIGHT.values()]); await Promise.resolve(); await Promise.resolve(); }
+// A generation, bumped whenever state that the parser's nouns read may have changed: a tool ran (it may open a table or
+// teach a word), a session changed, a pack was installed. The parsers are rebuilt only when it moves (reading.js), so a
+// reading, or a preview while typing, does not rebuild and compare the whole vocabulary each time.
+export const STATE = { gen: 0 };
+export const bump = () => { STATE.gen++; };
 export function runTool(name, args) {
   const d = toolByName(name);
   if (!d || !d.run) return null;
+  bump();
   if (args && args.auto === true && !args.plan) args.plan = [{ label: 'open assays.csv', tool: 'open', args: {} }];   // cards from before the planner
   const steps = (args && args.plan) || [], traces = [];
   for (const s of steps) { const r = T[s.tool] && T[s.tool](s.args); if (r) traces.push(`plan: ${s.label} → ${readOf(r)}`); else traces.push(`plan: ${s.label} failed`); }
@@ -108,7 +114,7 @@ export function runTool(name, args) {
     return { read: [name], body: [], trace: [...traces, `blocked: ${c} (precondition)`],
       ask: { prompt: options.length === 1 ? C.prompt.replace('{one}', options[0].name || options[0].label) : C.many || C.prompt.replace('{one}', 'which?'), options: options.map(o => ({ label: o.label, value: o })), set: (a, v) => { a.plan = [...(a.plan || []), { label: v.label, tool: v.tool, args: v.args }]; } } };
   }
-  const res = T[name](args);
+  const res = T[name](args); bump();
   if (res && traces.length) res.trace.unshift(...traces);
   return res;
 }

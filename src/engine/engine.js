@@ -22,6 +22,7 @@ import './orders.js';
 import './selftest.js';
 import './vocab.js';
 import './strata.js';
+import './tms.js';
 import './timescale.js';
 import './sample.js';
 import './explain.js';
@@ -51,6 +52,8 @@ import { streamedTable } from './stream.js';   // last: it wraps the table tools
 
 export function addCard(raw, r, ms) {
   const c = { id: ++S.n, raw, tool: r.tool, args: r.args, rung: r.rung, amends: r.amends, res: r.res, ms };
+  // what it read through (tms.js): the taught words the reading applied, and what the tool declares it read
+  const d = toolByName(r.tool), uses = { ...(r.uses || {}), ...((d && d.uses && d.uses(r.args)) || {}) }; if (Object.keys(uses).length) c.uses = uses;
   if (r.cmd !== undefined) Object.defineProperty(c, 'cmd', { value: r.cmd, writable: true, enumerable: false });   // the clause command, for amendments; not stored
   S.cards.push(c); touch(); startJobs([c], rerun); return c;
 }

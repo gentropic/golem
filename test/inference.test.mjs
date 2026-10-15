@@ -40,3 +40,22 @@ test('a contradiction is said, with the chain that makes it; undo takes it back;
   g.undo(); g.undo(); assert.equal(g.S.strata.length, 2); assert.doesNotMatch(g.textOf(say('the order')), /contradicts/);
   const saved = JSON.parse(JSON.stringify(g.serialize())); g.reset(); g.hydrate(saved); assert.equal(g.S.strata.length, 2);
 });
+
+test('truth maintenance: a card keeps what it read through, and is marked, never rewritten, when that changes', async () => {
+  const { staleOf, staleCards } = await import('../src/engine/tms.js');
+  fresh();
+  say('granite is 2.7 t/m3'); const a = say('how heavy is 1000 m3 of granite');
+  assert.deepEqual(a.uses, { granite: '2.7 t/m3' }); assert.deepEqual(staleOf(a), []);
+  const b = say('granite is 2.65 t/m3');
+  assert.match(g.textOf(b), /1 earlier card read with the old value: their answers stay as they were/); assert.match(g.textOf(b), /#02 how heavy is 1000 m3 of granite/);
+  assert.equal(a.res.value, 2700, 'the old answer stays'); assert.deepEqual(staleOf(a), [{ key: 'granite', was: '2.7 t/m3', now: '2.65 t/m3' }]);
+  assert.match(g.textOf(say('which cards are out of date')), /granite = 2\.7 t\/m3; it is now 2\.65 t\/m3/);
+  assert.equal(say('how heavy is 1000 m3 of granite').res.value, 2650, 'run again, it reads the new value');
+  // formulas too; and it survives a replay, and other sessions are searched
+  say('define the formula core recovery as recovered / drilled * 100'); const f = say('core recovery'); say('2'); say('2.5');
+  assert.deepEqual(f.uses, { 'formula core recovery': 'recovered / drilled * 100' });
+  assert.match(g.textOf(say('redefine core recovery as recovered / drilled * 99')), /1 earlier card read with the old formula/);
+  const saved = JSON.parse(JSON.stringify(g.serialize())); g.reset(); g.hydrate(saved);
+  assert.equal(staleCards().length, 2); g.newSession(); assert.equal(staleCards().length, 2, 'from another session too');
+  say('forget granite'); assert.match(staleCards().map(x => x.stale.map(s => s.now === null ? 'forgotten' : s.now).join()).join(' '), /forgotten/);
+});

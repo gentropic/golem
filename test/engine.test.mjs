@@ -117,9 +117,9 @@ test('the clock can be pinned, and dates follow it', () => {
 
 test('declarations drive the catalog, the names and the amendments', () => {
   const rows = g.skills();
-  assert.equal(rows.length, 60);
+  assert.equal(rows.length, 61);
   assert.deepEqual([...new Set(rows.map(r => r.group))], ['Compute', 'Field', 'Table', 'Knowledge', 'Device', 'Session']);
-  assert.equal(rows.filter(r => r.live).length, 54);
+  assert.equal(rows.filter(r => r.live).length, 55);
   for (const name of Object.keys(g.T)) assert.ok(g.toolByName(name), `a declaration for ${name}`);
   assert.deepEqual(g.tagOf({ tool: 'hist', args: { col: 'au' } }), ['Au histogram', 3]);
   assert.ok(g.FRAMES.some(f => f.amends && f.amends.includes('extract')) && g.FRAMES.some(f => f.amends && f.amends.includes('*')), 'amendments are frames, scoped to their tools');

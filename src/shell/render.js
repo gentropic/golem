@@ -4,6 +4,14 @@ import { conversions, equalArea } from '../vendor/bearing.js';
 import { Figure } from '../vendor/plot.js';
 import { t } from './i18n.js';
 import { stationNow } from '../engine/notebook.js';
+import { staleOf, staleText } from '../engine/tms.js';
+
+// a card read with a taught value or formula that has changed since (tms.js): said under its reading, with its question
+// to run again; the answer itself stays what it was
+function staleLine(c) {
+  const st = staleOf(c); if (!st.length) return '';
+  return `<div class="stale"><span>${escHtml(t('Read with {what}.', { what: st.map(staleText).join('; ') }))}</span> <button class="cact" type="button" data-act="run" data-q="${escHtml(c.raw)}">${t('run again')}</button></div>`;
+}
 
 // a measured plane or line, or a typed plane, can go into the field notebook at the open station: the button says
 // "add #12 to station 14", which reads like anything typed and copies the card's values into the new card's args
@@ -110,7 +118,7 @@ export function cardEl(c) {
   const ask = r.ask ? `<div class="note">${escHtml(r.ask.prompt)}</div>${r.ask.options.length ? `<div class="opts">${r.ask.options.map((o, i) => `<button class="btn" type="button" data-act="answer" data-i="${i}">${escHtml(o.label)}</button>`).join('')}${r.ask.parse ? `<span class="sub">${t('or type it')}</span>` : ''}</div>` : ''}` : '';
   el.innerHTML = `<div class="q">${escHtml(c.raw)}</div>
     <div class="reply"><div class="chead"><span class="rung ${c.rung}">${t(RUNG[c.rung])}</span><span>#${pad(c.id)}</span>${c.amends ? `<span>${t('from #{n}', { n: pad(c.amends) })}</span>` : ''}<span class="ms">${c.ms < 10 ? c.ms.toFixed(1) : Math.round(c.ms)} ms</span></div>
-    ${read ? `<div class="read"><span class="lbl">${t('read as')}</span> ${read}</div>` : ''}
+    ${read ? `<div class="read"><span class="lbl">${t('read as')}</span> ${read}</div>` : ''}${staleLine(c)}
     <div class="ans">${r.body.map(blockHtml).join('')}${ask}${toStation(c)}</div>
     <div class="cfoot"><details class="trace"><summary>${t('how')} · ${r.trace.length} ${t(r.trace.length === 1 ? 'step' : 'steps')}</summary><ol>${r.trace.map(t => `<li>${escHtml(t)}</li>`).join('')}</ol></details>
     <span class="cacts"><button class="cact" type="button" data-act="copyans" title="${escHtml(t('Copy the answer (c)'))}">${t('copy')}</button><button class="cact" type="button" data-act="edit" title="${escHtml(t('Put this question back in the box to change it (e)'))}">${t('edit')}</button><button class="cact" type="button" data-act="pin" aria-pressed="${!!c.pinned}" title="${escHtml(t('Keep this card at the top of the session (p)'))}">${t(c.pinned ? 'pinned' : 'pin')}</button><button class="cact" type="button" data-act="branch" title="${escHtml(t('A new session with the cards up to this one'))}">${t('branch')}</button><button class="cact say" type="button" data-act="say" title="${escHtml(t('Read this answer aloud, with the phone\'s offline voice'))}">${t('say')}</button></span></div></div>`;

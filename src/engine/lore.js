@@ -7,6 +7,7 @@
 import { S, tool, frame, noun, fmt } from './core.js';
 import { parseUnit } from './units.js';
 import { calc, namesIn } from './calc.js';
+import { staleBlocks } from './tms.js';
 
 const slug = s => String(s).toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
 
@@ -20,7 +21,7 @@ tool({
     const was = S.aliases[a.name], now = `${a.n} ${a.unit}`;
     S.aliases[a.name] = now;
     return { read: ['learn that', { v: a.name }, 'is', { v: now }], value: a.n,
-      body: [{ t: 'note', kind: 'ok', text: `Learned. "${a.name}" now reads as ${now} on this device${was && was !== now ? ` (it was ${was})` : ''}.` }, { t: 'chips', items: [`${a.name} in ${parseUnit(a.unit).dim === 'M/V' ? 'lb/ft3' : a.unit}`] }],
+      body: [{ t: 'note', kind: 'ok', text: `Learned. "${a.name}" now reads as ${now} on this device${was && was !== now ? ` (it was ${was})` : ''}.` }, ...staleBlocks(a.name), { t: 'chips', items: [`${a.name} in ${parseUnit(a.unit).dim === 'M/V' ? 'lb/ft3' : a.unit}`] }],
       trace: [`lexicon.add(${JSON.stringify(a.name)} → ${JSON.stringify(now)})`, `${a.unit}: a ${parseUnit(a.unit).dim} unit golem knows`] };
   }
 });
@@ -37,7 +38,7 @@ tool({
     if (vars.includes(result)) return { read, body: [{ t: 'note', kind: 'err', text: `The formula's name, ${a.name}, is also one of its terms.` }], trace: ['refused: the result is a term'] };
     S.formulas[a.name] = { result, label: a.name, expr: a.expr.toLowerCase(), vars };
     return { read, value: vars.length,
-      body: [{ t: 'note', kind: 'ok', text: `Learned: ${result} = ${a.expr}. I solve it for any of its ${vars.length + 1} terms.` }, { t: 'kv', rows: [['terms', [result, ...vars].join(', ')], ['parsed by', 'golem\'s own expression parser, never eval']] },
+      body: [{ t: 'note', kind: 'ok', text: `Learned: ${result} = ${a.expr}. I solve it for any of its ${vars.length + 1} terms.` }, ...staleBlocks(`formula ${a.name}`), { t: 'kv', rows: [['terms', [result, ...vars].join(', ')], ['parsed by', 'golem\'s own expression parser, never eval']] },
         { t: 'chips', items: [a.name, ...vars.slice(0, 2).map(v => `solve ${a.name} for ${v.replace(/_/g, ' ')}`)] }],
       trace: [`expr.parse(${JSON.stringify(a.expr)}) → terms ${vars.join(', ')}`, `formula ${JSON.stringify(a.name)}: ${result} = ${a.expr}`] };
   }
@@ -47,9 +48,9 @@ tool({
   topic: a => [`Forget ${a.name}`, .2],
   run: a => {
     const isF = a.kind === 'formula' || (!S.aliases[a.name] && S.formulas[a.name]);
-    if (isF) { const had = !!S.formulas[a.name]; if (had && !a.done) { a.was = S.formulas[a.name]; delete S.formulas[a.name]; a.done = true; } return { read: ['forget the formula', { v: a.name }], body: [{ t: 'note', kind: a.was ? 'ok' : 'err', text: a.was ? `Forgotten: the formula ${a.name}.` : `There is no formula called ${a.name}.` }], trace: ['S.formulas'] }; }
+    if (isF) { const had = !!S.formulas[a.name]; if (had && !a.done) { a.was = S.formulas[a.name]; delete S.formulas[a.name]; a.done = true; } return { read: ['forget the formula', { v: a.name }], body: [{ t: 'note', kind: a.was ? 'ok' : 'err', text: a.was ? `Forgotten: the formula ${a.name}.` : `There is no formula called ${a.name}.` }, ...staleBlocks(`formula ${a.name}`)], trace: ['S.formulas'] }; }
     if (!a.done && S.aliases[a.name]) { a.was = S.aliases[a.name]; delete S.aliases[a.name]; a.done = true; }
-    return { read: ['forget', { v: a.name }], body: [{ t: 'note', kind: a.was ? 'ok' : 'err', text: a.was ? `Forgotten: "${a.name}" (it read as ${a.was}).` : `I was not taught "${a.name}".` }], trace: ['lexicon'] };
+    return { read: ['forget', { v: a.name }], body: [{ t: 'note', kind: a.was ? 'ok' : 'err', text: a.was ? `Forgotten: "${a.name}" (it read as ${a.was}).` : `I was not taught "${a.name}".` }, ...staleBlocks(a.name)], trace: ['lexicon'] };
   },
   undo: a => { if (!a.was) return; if (typeof a.was === 'string') S.aliases[a.name] = a.was; else S.formulas[a.name] = a.was; }
 });
@@ -76,6 +77,12 @@ frame({
     const name = m[1].toLowerCase().replace(/^(?:the|a|an)\s+/, '').trim(), expr = m[2].trim();
     return name && !/\d/.test(name) && expr ? { tool: 'defineFormula', args: { name, expr } } : null;
   }
+});
+// "define the formula core recovery as …" again: the name is now a formula (a noun), so the rest is the "as" role
+frame({
+  name: 'redefineFormula', label: 'Teach a formula', words: ['define the formula', 'define formula', 'redefine the formula', 'redefine', 'teach the formula'], theme: ['formulaname'], required: ['theme', 'as'], roles: { as: { preps: ['as', 'be'], types: ['text'] } },
+  words_pt: ['define a fórmula', 'redefine a fórmula'], label_pt: 'Ensinar uma fórmula',
+  bind: c => { const name = c.theme[0].value, expr = c.roles.as && String(c.roles.as[0].value).trim(); return S.formulas[name] && expr ? { tool: 'defineFormula', args: { name, expr } } : null; }
 });
 noun(() => ({ type: 'taughtthing', exact: true, words: { ...Object.fromEntries(Object.keys(S.aliases).map(k => [k, [k]])), ...Object.fromEntries(Object.keys(S.formulas).map(k => [k, [k, `the formula ${k}`]])) } }));
 frame({

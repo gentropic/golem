@@ -161,6 +161,7 @@ button{cursor:pointer}
 .rung.none{color:var(--au-error);background:var(--au-error-soft)}
 .rung.guess{color:var(--au-warn);background:var(--au-warn-soft)}
 .read{display:flex;flex-wrap:wrap;align-items:center;gap:4px 5px;font-size:13.5px;color:var(--au-fg-muted)}
+.stale{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;margin:6px 0 0;font-size:13px;color:var(--au-warn-fg,var(--au-fg-muted));border-left:2px solid var(--au-warn,var(--au-rule));padding-left:8px}
 .read .lbl{margin-right:2px}
 .slot{font:12px var(--mono);background:var(--au-surface-raised);border:1px solid var(--au-border);border-radius:2px;padding:1px 6px;color:var(--au-fg)}
 button.slot{border-style:dashed;border-color:var(--au-action);color:var(--au-action)}
@@ -540,9 +541,15 @@ function startJobs(cards, redo) {
 }
 // every job started so far has finished and its cards are recomputed (tests wait on this)
 async function settle() { while (INFLIGHT.size) await Promise.all([...INFLIGHT.values()]); await Promise.resolve(); await Promise.resolve(); }
+// A generation, bumped whenever state that the parser's nouns read may have changed: a tool ran (it may open a table or
+// teach a word), a session changed, a pack was installed. The parsers are rebuilt only when it moves (reading.js), so a
+// reading, or a preview while typing, does not rebuild and compare the whole vocabulary each time.
+const STATE = { gen: 0 };
+const bump = () => { STATE.gen++; };
 function runTool(name, args) {
   const d = toolByName(name);
   if (!d || !d.run) return null;
+  bump();
   if (args && args.auto === true && !args.plan) args.plan = [{ label: 'open assays.csv', tool: 'open', args: {} }];   // cards from before the planner
   const steps = (args && args.plan) || [], traces = [];
   for (const s of steps) { const r = T[s.tool] && T[s.tool](s.args); if (r) traces.push(`plan: ${s.label} → ${readOf(r)}`); else traces.push(`plan: ${s.label} failed`); }
@@ -554,7 +561,7 @@ function runTool(name, args) {
     return { read: [name], body: [], trace: [...traces, `blocked: ${c} (precondition)`],
       ask: { prompt: options.length === 1 ? C.prompt.replace('{one}', options[0].name || options[0].label) : C.many || C.prompt.replace('{one}', 'which?'), options: options.map(o => ({ label: o.label, value: o })), set: (a, v) => { a.plan = [...(a.plan || []), { label: v.label, tool: v.tool, args: v.args }]; } } };
   }
-  const res = T[name](args);
+  const res = T[name](args); bump();
   if (res && traces.length) res.trace.unshift(...traces);
   return res;
 }
@@ -580,7 +587,7 @@ const qty = (node, f) => node && node.type === 'quantity' ? node.n * f(node.unit
 // f(table, rows) → blocks for the card that opened or wrote it; rows, when given, are the ones just written.
 const CHECKS = [];
 const checksOf = (table, rows) => { try { return CHECKS.flatMap(f => f(table, rows)); } catch (e) { return []; } };
-  return { S, T, EFFECTS, TOOLS, tool, toolByName, FRAMES, frame, amend, session, LEXICON, noun, shape, postmod, unit, qmod, compound, CONDITIONS, condition, setRunner, onJobDone, result, clearResults, startJobs, settle, runTool, clock, fmt, iso, rad, deg, p3, p2, qty, CHECKS, checksOf };
+  return { S, T, EFFECTS, TOOLS, tool, toolByName, FRAMES, frame, amend, session, LEXICON, noun, shape, postmod, unit, qmod, compound, CONDITIONS, condition, setRunner, onJobDone, result, clearResults, startJobs, settle, STATE, bump, runTool, clock, fmt, iso, rad, deg, p3, p2, qty, CHECKS, checksOf };
 })();
 
 /* ==== src/vendor/units.js ==== */
@@ -5278,19 +5285,19 @@ const MINERALS_SAMPLE = { retrieved: '2026-10-15', of: 6304, records: [{"id":"Q4
 
 /* ==== src/engine/minerals.js ==== */
 const __m8 = (() => {
-const { tool, frame, noun, fmt } = __m0;
+const { tool, frame, noun, fmt, bump } = __m0;
 const { MINERALS_SAMPLE } = __m7;
 // Minerals (SPEC 13.8, packs as tables): mineral species from Wikidata, through gcu-library's minerals pack. A sample of 42
 // common species ships (data/minerals-sample.js, copied from the pack and labelled); the pack, installed from Packs, has
 // every species Wikidata lists (6304 on 15 Oct 2026). A mineral is looked up by name ("chalcopyrite", "hardness of
 // quartz"); minerals are found by their elements and class ("minerals with Cu and S", "sulfides with Bi"); the whole set
 // opens as a table ("open the minerals") for every table question ("count where hardness > 6 and density < 3"). What
-// Wikidata does not have stays empty and is said to be missing: nothing is estimated.
-
+// Wikidata does not have stays empty and is said to be missing: nothing is estimated.
 const CLASSES = ['elements', 'sulfides and sulfosalts', 'halides', 'oxides', 'carbonates and nitrates', 'borates', 'sulfates', 'phosphates', 'silicates', 'organic compounds'];
 let DATA = null, BY = new Map();
 // a pack as installed: { version, retrieved, records }
 function useMinerals(pack) {
+  bump();
   DATA = pack ? { kind: 'pack', version: pack.version, retrieved: pack.retrieved, of: pack.records.length, records: pack.records } : { kind: 'sample', version: 'sample', retrieved: MINERALS_SAMPLE.retrieved, of: MINERALS_SAMPLE.of, records: MINERALS_SAMPLE.records };
   BY = new Map(); for (const r of DATA.records) for (const n of namesOf(r)) if (!BY.has(n)) BY.set(n, r);
   return mineralsInfo();
@@ -11881,13 +11888,12 @@ for (const [u, words] of [['mi2', ['square miles', 'square mile', 'sq mi', 'mi2'
 
 /* ==== src/engine/factbook.js ==== */
 const __m18 = (() => {
-const { tool, frame, noun, compound, qmod, fmt } = __m0;
+const { tool, frame, noun, compound, qmod, fmt, bump } = __m0;
 const { parseUnit } = __m2;
 // The Factbook (SPEC 13.8): the rounded 14-country sample that ships with golem, or gcu-library's factbook pack once it is
 // installed on this device (the shell keeps it, and hands it here with useFactbook()). Lookups of every field, with
 // units through @gcu/units; lists ranked, by region, and filtered by the grammar's conditions ("population above 100
-// million"); "landlocked" only where the data says it (the sample, or the pack with its full profiles).
-
+// million"); "landlocked" only where the data says it (the sample, or the pack with its full profiles).
 /* ── the data in use ─────────────────────────────────────────── */
 // the sample: [name, iso2, region, capital, area km², population, landlocked]
 const SAMPLE_ROWS = [['Australia', 'au', 'australia-oceania', 'Canberra', 7741220, 26.8e6, 0], ['Brazil', 'br', 'south-america', 'Brasília', 8515770, 220.1e6, 0],
@@ -11907,7 +11913,7 @@ function normalize(p) {
       area: toNum(r.area_km2), population: toNum(r.population), gdp: toNum(r.gdp_ppp_usd), government: r.government || null, coords: Array.isArray(r.coordinates) ? r.coordinates : null,
       background: r.background || null, landlocked: prof ? (prof[r.id] ? !!prof[r.id].landlocked : null) : null, coastline: prof && prof[r.id] ? prof[r.id].coastline : null })) };
 }
-function useFactbook(pack) { DATA = pack ? normalize(pack) : SAMPLE; index(); return factbookInfo(); }
+function useFactbook(pack) { bump(); DATA = pack ? normalize(pack) : SAMPLE; index(); return factbookInfo(); }
 const factbookInfo = () => ({ kind: DATA.kind, version: DATA.version, count: DATA.records.length, profiles: DATA.kind === 'sample' || !!DATA.profiles });
 // what the full profiles add, kept small: the pack's factbook-full records → { id: { landlocked, coastline } }
 function profilesOf(fullRecords) {
@@ -12085,11 +12091,10 @@ frame({
 
 /* ==== src/engine/books.js ==== */
 const __m19 = (() => {
-const { tool, frame, noun } = __m0;
+const { tool, frame, noun, bump } = __m0;
 // Books from packs (SPEC 13.8): definitions from Open Data Structures, a style check from The Elements of Style (1918).
 // Each works from a small sample that ships with golem, or from the gcu-library pack once the shell has installed it and
-// handed its compiled index here (useBook). Packs are compiled at install by packs.js; only the index is kept.
-
+// handed its compiled index here (useBook). Packs are compiled at install by packs.js; only the index is kept.
 const READER = 'https://gentropic.org/gcu-library/read.html?book=';
 
 /* ── Open Data Structures: where a term is defined ───────────── */
@@ -12180,6 +12185,7 @@ frame({
 
 // a book pack compiled at install (packs.js), or null for the sample
 function useBook(slug, compiled) {
+  bump();
   if (slug === 'ods') ODS = compiled || null;
   else if (slug === 'elements-of-style') STRUNK = compiled || null;
   else throw new Error(`golem has no use for the ${slug} pack yet`);
@@ -13298,6 +13304,7 @@ function formulaOf(name) {
 const allFormulas = () => ({ ...FORMULAS, ...Object.fromEntries(Object.keys(S.formulas || {}).map(k => [k, formulaOf(k)])) });
 tool({
   name: 'formula',
+  uses: a => S.formulas && S.formulas[a.formula] ? { [`formula ${a.formula}`]: S.formulas[a.formula].expr } : null,
   skill: { group: 'Compute', title: 'Formulas, solved for any term', on: 'declared equations · own root search', about: 'Tonnage, contained metal, strip ratio, the two-product recovery, break-even cutoff, lithostatic pressure, Darcy\'s law and Stokes settling, each solved for whichever term you leave out: the others are asked, and the root found by a search over the term\'s range. More than one root is said, not chosen.', examples: ['two-product recovery', 'solve the cutoff formula for price', 'stokes settling for diameter', 'what formulas do you know'] },
   topic: a => [formulaOf(a.formula) ? formulaOf(a.formula).title : 'Formula', 1],
   run: a => {
@@ -13361,7 +13368,7 @@ frame({
 
 /* ==== src/engine/sessions.js ==== */
 const __m28 = (() => {
-const { S, toolByName, runTool, startJobs, clearResults } = __m0;
+const { S, toolByName, runTool, startJobs, clearResults, bump } = __m0;
 // Sessions: stored as plans (card specs), replayed on open, named from the tools that ran.
 // The shell persists whatever `serialize()` returns and feeds it back through `hydrate()`.
 let SS = [], cur = null;
@@ -13369,10 +13376,11 @@ let sid = 0;
 const listeners = [];
 // the shell registers here to persist and redraw after any change to the session store
 const onChange = fn => { listeners.push(fn); };
-const changed = () => listeners.forEach(f => f());
+const changed = () => { bump(); listeners.forEach(f => f()); };
 
 // what a session keeps of a card: enough to recompute it, and nothing else
-const spec = c => ({ id: c.id, raw: c.raw, tool: c.tool, args: c.args, rung: c.rung, amends: c.amends, ms: c.ms, ...(c.pinned ? { pinned: true } : {}) });
+// uses: what device state the card read through (a taught word's meaning, a taught formula), for tms.js
+const spec = c => ({ id: c.id, raw: c.raw, tool: c.tool, args: c.args, rung: c.rung, amends: c.amends, ms: c.ms, ...(c.pinned ? { pinned: true } : {}), ...(c.uses ? { uses: c.uses } : {}) });
 
 // what a card contributes to its session's name: [label, weight], from the tool's declaration
 function tagOf(c) { const d = toolByName(c.tool); return d && d.topic ? d.topic(c.args) : null; }
@@ -13472,7 +13480,7 @@ function hydrate(d) {
 }
 // forget everything: sessions, device state, working state (tests start here)
 function reset() {
-  SS = []; cur = null; sid = 0; S.cards = []; S.n = 0; S.aliases = {}; S.facts = []; S.files = {}; S.tables = {}; S.recipes = {}; S.misses = []; S.picks = {}; S.formulas = {}; S.orders = []; S.strata = []; S.table = null; S.clause = null; clearResults();
+  bump(); SS = []; cur = null; sid = 0; S.cards = []; S.n = 0; S.aliases = {}; S.facts = []; S.files = {}; S.tables = {}; S.recipes = {}; S.misses = []; S.picks = {}; S.formulas = {}; S.orders = []; S.strata = []; S.table = null; S.clause = null; clearResults();
 }
   return { onChange, spec, tagOf, autoName, touch, load, openSession, newSession, renameSession, deleteSession, pinCard, branchSession, searchHistory, sessions, current, serialize, parts, exportSession, importSession, hydrate, reset };
 })();
@@ -13547,18 +13555,67 @@ tool({
   return { canonical, unsigned, notebookOf, exportSession };
 })();
 
-/* ==== src/engine/lore.js ==== */
+/* ==== src/engine/tms.js ==== */
 const __m30 = (() => {
+const { S, tool, frame } = __m0;
+const { sessions } = __m28;
+// Truth maintenance (SPEC 13: what depends on what). A card that read through device state — a taught word's meaning
+// ("granite" read as 2.7 t/m3), a taught formula — keeps what it used (card.uses, saved with the card). When that state
+// changes, the card's answer is still true of what it was given, so it is not rewritten; it is marked: "read with
+// granite = 2.7 t/m3; it is now 2.65 t/m3", with its question to run again. "which cards are out of date" lists them in
+// every session; teaching a new value lists the cards it leaves behind.
+
+// what a key means now: a taught word's meaning, a taught formula's expression, or nothing (forgotten)
+const nowOf = k => k.startsWith('formula ') ? (S.formulas && S.formulas[k.slice(8)] ? S.formulas[k.slice(8)].expr : null) : (S.aliases[k] ?? null);
+function staleOf(card) {
+  if (!card || !card.uses) return [];
+  return Object.entries(card.uses).filter(([k, was]) => nowOf(k) !== was).map(([k, was]) => ({ key: k, was, now: nowOf(k) }));
+}
+// every card, in every session, read with something that has since changed
+function staleCards(key) {
+  const out = [];
+  for (const s of sessions()) for (const c of s.cards || []) { const st = staleOf(c).filter(x => !key || x.key === key); if (st.length) out.push({ session: s.name || 'untitled', current: s.cards === S.cards, id: c.id, raw: c.raw, stale: st }); }
+  return out;
+}
+const staleText = x => x.now == null ? `${x.key} = ${x.was}, since forgotten` : `${x.key} = ${x.was}; it is now ${x.now}`;
+// the blocks a card that changed something adds: the earlier cards it leaves out of date, each to run again
+function staleBlocks(key) {
+  const st = staleCards(key); if (!st.length) return [];
+  return [{ t: 'note', kind: 'warn', text: `${st.length} earlier card${st.length === 1 ? '' : 's'} read with the old ${key.startsWith('formula ') ? 'formula' : 'value'}: their answers stay as they were, true of what they were given.` },
+    { t: 'list', items: st.slice(0, 8).map(x => `#${String(x.id).padStart(2, '0')} ${x.raw}${x.current ? '' : ` (in “${x.session}”)`}`) }, { t: 'chips', items: [...new Set(st.slice(0, 4).map(x => x.raw))] }];
+}
+tool({
+  name: 'stale',
+  skill: { group: 'Session', title: 'What is out of date', on: 'the cards\' own record of what they used', about: 'Cards remember the taught values and formulas they read with; when one changes, they are marked, never silently rewritten, and listed here to run again.', examples: ['which cards are out of date'] },
+  topic: () => ['Out of date', .2],
+  run: () => {
+    const st = staleCards();
+    if (!st.length) return { read: ['which cards are out of date'], value: 0, body: [{ t: 'note', kind: 'ok', text: 'None: every card was read with the values and formulas this device holds now.' }], trace: [`${sessions().reduce((n, s) => n + (s.cards || []).length, 0)} cards checked`] };
+    return { read: ['which cards are out of date'], value: st.length,
+      body: [{ t: 'table', head: ['card', 'session', 'read with'], rows: st.slice(0, 30).map(x => [`#${String(x.id).padStart(2, '0')} ${x.raw}`, x.current ? 'this one' : x.session, x.stale.map(staleText).join('; ')]) }, { t: 'chips', items: [...new Set(st.filter(x => x.current).slice(0, 4).map(x => x.raw))] }],
+      trace: [`${st.length} cards read with something that has changed`] };
+  }
+});
+frame({
+  name: 'stale', label: 'Out of date', words: ['which cards are out of date', 'what is out of date', 'which cards are stale', 'what is stale', 'out of date cards', 'stale cards'], theme: [], required: [], roles: {},
+  words_pt: ['quais cartões estão desatualizados', 'o que está desatualizado'], label_pt: 'Desatualizados',
+  bind: () => ({ tool: 'stale', args: {} })
+});
+  return { staleOf, staleCards, staleText, staleBlocks };
+})();
+
+/* ==== src/engine/lore.js ==== */
+const __m31 = (() => {
 const { S, tool, frame, noun, fmt } = __m0;
 const { parseUnit } = __m2;
 const { calc, namesIn } = __m3;
+const { staleBlocks } = __m30;
 // What golem is told, kept (SPEC 13: shaped by words). Two kinds beside the taught words of notes.js:
 //   a value: "granite is 2.7 t/m3" — a taught word whose meaning is a quantity, so "granite in lb/ft3" and "how heavy is
 //     1000 m3 of granite" read with the quantity in its place (the taught rung's rewrite, the quantity checked first);
 //   a formula: "define core recovery as recovered / drilled * 100" — result = expression, parsed by calc.js (never eval),
 //     kept as S.formulas and solved for any term by reckon.js's formula card, like the declared ones.
-// Both are device state, undone by undo, forgotten by "forget granite" / "forget the formula core recovery".
-
+// Both are device state, undone by undo, forgotten by "forget granite" / "forget the formula core recovery".
 const slug = s => String(s).toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
 
 /* ── values ──────────────────────────────────────────────────── */
@@ -13571,7 +13628,7 @@ tool({
     const was = S.aliases[a.name], now = `${a.n} ${a.unit}`;
     S.aliases[a.name] = now;
     return { read: ['learn that', { v: a.name }, 'is', { v: now }], value: a.n,
-      body: [{ t: 'note', kind: 'ok', text: `Learned. "${a.name}" now reads as ${now} on this device${was && was !== now ? ` (it was ${was})` : ''}.` }, { t: 'chips', items: [`${a.name} in ${parseUnit(a.unit).dim === 'M/V' ? 'lb/ft3' : a.unit}`] }],
+      body: [{ t: 'note', kind: 'ok', text: `Learned. "${a.name}" now reads as ${now} on this device${was && was !== now ? ` (it was ${was})` : ''}.` }, ...staleBlocks(a.name), { t: 'chips', items: [`${a.name} in ${parseUnit(a.unit).dim === 'M/V' ? 'lb/ft3' : a.unit}`] }],
       trace: [`lexicon.add(${JSON.stringify(a.name)} → ${JSON.stringify(now)})`, `${a.unit}: a ${parseUnit(a.unit).dim} unit golem knows`] };
   }
 });
@@ -13588,7 +13645,7 @@ tool({
     if (vars.includes(result)) return { read, body: [{ t: 'note', kind: 'err', text: `The formula's name, ${a.name}, is also one of its terms.` }], trace: ['refused: the result is a term'] };
     S.formulas[a.name] = { result, label: a.name, expr: a.expr.toLowerCase(), vars };
     return { read, value: vars.length,
-      body: [{ t: 'note', kind: 'ok', text: `Learned: ${result} = ${a.expr}. I solve it for any of its ${vars.length + 1} terms.` }, { t: 'kv', rows: [['terms', [result, ...vars].join(', ')], ['parsed by', 'golem\'s own expression parser, never eval']] },
+      body: [{ t: 'note', kind: 'ok', text: `Learned: ${result} = ${a.expr}. I solve it for any of its ${vars.length + 1} terms.` }, ...staleBlocks(`formula ${a.name}`), { t: 'kv', rows: [['terms', [result, ...vars].join(', ')], ['parsed by', 'golem\'s own expression parser, never eval']] },
         { t: 'chips', items: [a.name, ...vars.slice(0, 2).map(v => `solve ${a.name} for ${v.replace(/_/g, ' ')}`)] }],
       trace: [`expr.parse(${JSON.stringify(a.expr)}) → terms ${vars.join(', ')}`, `formula ${JSON.stringify(a.name)}: ${result} = ${a.expr}`] };
   }
@@ -13598,9 +13655,9 @@ tool({
   topic: a => [`Forget ${a.name}`, .2],
   run: a => {
     const isF = a.kind === 'formula' || (!S.aliases[a.name] && S.formulas[a.name]);
-    if (isF) { const had = !!S.formulas[a.name]; if (had && !a.done) { a.was = S.formulas[a.name]; delete S.formulas[a.name]; a.done = true; } return { read: ['forget the formula', { v: a.name }], body: [{ t: 'note', kind: a.was ? 'ok' : 'err', text: a.was ? `Forgotten: the formula ${a.name}.` : `There is no formula called ${a.name}.` }], trace: ['S.formulas'] }; }
+    if (isF) { const had = !!S.formulas[a.name]; if (had && !a.done) { a.was = S.formulas[a.name]; delete S.formulas[a.name]; a.done = true; } return { read: ['forget the formula', { v: a.name }], body: [{ t: 'note', kind: a.was ? 'ok' : 'err', text: a.was ? `Forgotten: the formula ${a.name}.` : `There is no formula called ${a.name}.` }, ...staleBlocks(`formula ${a.name}`)], trace: ['S.formulas'] }; }
     if (!a.done && S.aliases[a.name]) { a.was = S.aliases[a.name]; delete S.aliases[a.name]; a.done = true; }
-    return { read: ['forget', { v: a.name }], body: [{ t: 'note', kind: a.was ? 'ok' : 'err', text: a.was ? `Forgotten: "${a.name}" (it read as ${a.was}).` : `I was not taught "${a.name}".` }], trace: ['lexicon'] };
+    return { read: ['forget', { v: a.name }], body: [{ t: 'note', kind: a.was ? 'ok' : 'err', text: a.was ? `Forgotten: "${a.name}" (it read as ${a.was}).` : `I was not taught "${a.name}".` }, ...staleBlocks(a.name)], trace: ['lexicon'] };
   },
   undo: a => { if (!a.was) return; if (typeof a.was === 'string') S.aliases[a.name] = a.was; else S.formulas[a.name] = a.was; }
 });
@@ -13628,6 +13685,12 @@ frame({
     return name && !/\d/.test(name) && expr ? { tool: 'defineFormula', args: { name, expr } } : null;
   }
 });
+// "define the formula core recovery as …" again: the name is now a formula (a noun), so the rest is the "as" role
+frame({
+  name: 'redefineFormula', label: 'Teach a formula', words: ['define the formula', 'define formula', 'redefine the formula', 'redefine', 'teach the formula'], theme: ['formulaname'], required: ['theme', 'as'], roles: { as: { preps: ['as', 'be'], types: ['text'] } },
+  words_pt: ['define a fórmula', 'redefine a fórmula'], label_pt: 'Ensinar uma fórmula',
+  bind: c => { const name = c.theme[0].value, expr = c.roles.as && String(c.roles.as[0].value).trim(); return S.formulas[name] && expr ? { tool: 'defineFormula', args: { name, expr } } : null; }
+});
 noun(() => ({ type: 'taughtthing', exact: true, words: { ...Object.fromEntries(Object.keys(S.aliases).map(k => [k, [k]])), ...Object.fromEntries(Object.keys(S.formulas).map(k => [k, [k, `the formula ${k}`]])) } }));
 frame({
   name: 'forget', label: 'Forget', words: ['forget', 'unlearn'], theme: ['taughtthing'], required: ['theme'], roles: {},
@@ -13638,7 +13701,7 @@ frame({
 })();
 
 /* ==== src/engine/orders.js ==== */
-const __m31 = (() => {
+const __m32 = (() => {
 const { S, tool, frame, noun, CHECKS } = __m0;
 const { whereOf } = __m16;
 const { evaluatePredicate } = __m15;
@@ -13742,7 +13805,7 @@ frame({
 })();
 
 /* ==== src/vendor/parquet.js ==== */
-const __m32 = (() => {
+const __m33 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/parquet, Parquet read and write over vendored hyparquet and hyparquet-writer, pure JS, minified by its own build, copied from ../auditable/ext/parquet/index.js at auditable 5fa5f72e (MIT; hyparquet MIT).
 // Re-vendor by copying that file here.
 
@@ -13751,9 +13814,9 @@ const e=["BOOLEAN","INT32","INT64","INT96","FLOAT","DOUBLE","BYTE_ARRAY","FIXED_
 })();
 
 /* ==== src/engine/convert.js ==== */
-const __m33 = (() => {
+const __m34 = (() => {
 const { S, tool, frame, amend, noun, fmt } = __m0;
-const { writeParquet } = __m32;
+const { writeParquet } = __m33;
 // Conversions that need no file format reader: hashes, text encodings both ways, and the open table
 // as CSV, TSV or JSON with a save action. Format readers (xlsx, dm, parquet) are the second pass.
 
@@ -13910,7 +13973,7 @@ for (const op of ['encode', 'decode']) amend({ tools: ['encode'], name: `op${op}
 })();
 
 /* ==== src/engine/data/elements.js ==== */
-const __m34 = (() => {
+const __m35 = (() => {
 // The elements with their standard atomic weights, abridged to five significant figures.
 // Source: IUPAC Commission on Isotopic Abundances and Atomic Weights (CIAAW), Standard Atomic Weights 2024
 // (ciaaw.org/atomic-weights.htm, the 2021 report with Gd, Lu and Zr revised in 2024), cross-checked against
@@ -13955,9 +14018,9 @@ const ELEMENTS = [
 })();
 
 /* ==== src/engine/chem.js ==== */
-const __m35 = (() => {
+const __m36 = (() => {
 const { tool, frame, noun, shape, postmod, fmt } = __m0;
-const { ELEMENTS, ELEMENTS_SOURCE } = __m34;
+const { ELEMENTS, ELEMENTS_SOURCE } = __m35;
 const { UNIT_TABLE } = __m2;
 // Molar mass, conversion factors and element fractions from a parsed formula over the IUPAC weights;
 // the periodic table lookup. No mineral names: the minerals pack is not here, so a formula is required.
@@ -14121,7 +14184,7 @@ frame({
 })();
 
 /* ==== src/engine/places.js ==== */
-const __m36 = (() => {
+const __m37 = (() => {
 const { S, tool, frame, amend, noun, shape, postmod, fmt, rad, deg } = __m0;
 // Places, distance and UTM. A place is coordinates in the request or a name saved on this device
 // ("home is -19.92, -43.94"); there is no gazetteer and device location is off, so an unknown name is
@@ -14287,7 +14350,7 @@ amend({ tools: ['utm'], name: 'utmband', label: 'Band', words: [], elidable: tru
 })();
 
 /* ==== src/engine/skills.js ==== */
-const __m37 = (() => {
+const __m38 = (() => {
 const { TOOLS, tool, frame } = __m0;
 // The catalog: skills derived from the declarations, planned skills named here, and the packs golem
 // knows about. Examples feed the Skills tab, the "nearest skills" suggestions and the teach vocabulary.
@@ -14359,9 +14422,9 @@ const SUGGESTIONS = ['pop means population', 'histogram of cu', 'log scale', 'po
 })();
 
 /* ==== src/engine/learn.js ==== */
-const __m38 = (() => {
+const __m39 = (() => {
 const { S, tool, frame, noun } = __m0;
-const { vocab } = __m37;
+const { vocab } = __m38;
 // Learning from the person, on the device (SPEC 13: the language that grows). Nothing is learned silently, and nothing
 // is sent: what did not read is kept in a list the person can see and teach from ("what couldn't you read"); a request
 // that did not read, followed by one that did and differs in a short stretch, offers to remember that stretch as a word
@@ -14461,7 +14524,7 @@ frame({
 })();
 
 /* ==== src/engine/data/timescale.js ==== */
-const __m39 = (() => {
+const __m40 = (() => {
 // The International Chronostratigraphic Chart as a records pack: one row per unit, five ranks.
 // Source: ICS (Cohen, Finney, Gibbard & Fan 2013; updated chart) as served by Macrostrat
 // (macrostrat.org/api/v2/defs/intervals?timescale_id=11, CC BY 4.0), fetched 8 Oct 2026. The Hadean is
@@ -14646,11 +14709,11 @@ const TIMESCALE = [
 })();
 
 /* ==== src/engine/ontology.js ==== */
-const __m40 = (() => {
+const __m41 = (() => {
 const { FRAMES, LEXICON, S } = __m0;
 const { UNIT_TABLE, COMPOUNDS, DIM, parseUnit, dimName } = __m2;
 const { ELEMENT } = __m16;
-const { TIMESCALE } = __m39;
+const { TIMESCALE } = __m40;
 // The clause ontology, assembled from what golem knows: units from the conversion table, nouns from the
 // sample packs, verb frames from the declarations. Inert data; the build writes it to dist/golem.json.
 // Portuguese synonyms are listed here by hand until packs carry them in their golem facet.
@@ -14727,7 +14790,7 @@ function ontology(only) {
 })();
 
 /* ==== src/engine/estimate.js ==== */
-const __m41 = (() => {
+const __m42 = (() => {
 const { amend, noun, tool, fmt } = __m0;
 const { U } = __m2;
 // Estimates with ranges: arithmetic over intervals by simulation, units carried through, the seed kept
@@ -14902,7 +14965,7 @@ amend({ tools: ['estimate'], name: 'estdist', label: 'Distribution', words: ['as
 })();
 
 /* ==== src/vendor/dispatch.js ==== */
-const __m42 = (() => {
+const __m43 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/dispatch, built from ../auditable/ext/dispatch/src/ by its own build.
 // Source of truth: gentropic/auditable ext/dispatch (local clone: ../auditable). Re-vendor by copying
 // ext/dispatch/index.js here after 'node ext/dispatch/build.js'. golem uses the grammar rung only:
@@ -17055,18 +17118,17 @@ const PORTUGUESE = {
 })();
 
 /* ==== src/engine/reading.js ==== */
-const __m43 = (() => {
-const { S, T, TOOLS, FRAMES, tool, frame, amend, session, noun, toolByName, runTool, iso } = __m0;
-const { examples, vocab } = __m37;
-const { rankByPicks } = __m38;
-const { ontology } = __m40;
+const __m44 = (() => {
+const { S, T, TOOLS, FRAMES, tool, frame, amend, session, noun, toolByName, runTool, iso, STATE } = __m0;
+const { examples, vocab } = __m38;
+const { rankByPicks } = __m39;
+const { ontology } = __m41;
 const { calcOf } = __m3;
-const { estimateOf } = __m41;
-const { createEngine, makeSession, ENGLISH, PORTUGUESE } = __m42;
+const { estimateOf } = __m42;
+const { createEngine, makeSession, ENGLISH, PORTUGUESE } = __m43;
 // The reading ladder: context (amendments, meta-intents), grammar (the clause parser, then the regex
 // rules the declarations carry), taught words (device lexicon rewrites, then grammar again). Plus the
-// tools that talk about the session itself: none, why, export.
-
+// tools that talk about the session itself: none, why, export.
 // The languages golem reads, the person's first: a phrase reads in whichever it is in ("converte 5 km para mi" or
 // "convert 5 km to mi"), and a tie goes to the person's. The shell sets it (the device's language, or the choice).
 const LOCALES = { en: ENGLISH, pt: PORTUGUESE };
@@ -17074,14 +17136,18 @@ let order = ['en', 'pt'];
 function setLanguage(l) { order = l === 'pt' ? ['pt', 'en'] : ['en', 'pt']; }
 const language = () => order[0];
 // an engine per language over the same ontology, rebuilt when the ontology changes
-function enginesFor(cache, o) { const key = JSON.stringify(o); if (cache.key !== key) { cache.key = key; cache.E = {}; } return loc => cache.E[loc] || (cache.E[loc] = createEngine(o, LOCALES[loc])); }
+// (the ontology is built and compared only when STATE.gen moved: a reading or a preview between changes reuses them)
+function enginesFor(cache, build) {
+  if (cache.gen !== STATE.gen) { const o = build(), key = JSON.stringify(o); cache.gen = STATE.gen; if (cache.key !== key) { cache.key = key; cache.E = {}; cache.o = o; } }
+  return loc => cache.E[loc] || (cache.E[loc] = createEngine(cache.o, LOCALES[loc]));
+}
 
 const norm = s => s.trim().replace(/\s+/g, ' ').replace(/[?.!]+$/, '');
 
 /* ── rung 2, first half: the clause parser over golem's ontology ── */
 const clauses = {};
 // rebuilt whenever what it reads changes: the open table's columns, kept files, saved places, logged activities
-const clauseEngine = (loc = order[0]) => enginesFor(clauses, ontology())(loc);
+const clauseEngine = (loc = order[0]) => enginesFor(clauses, () => ontology())(loc);
 const clauseSession = () => makeSession([]);   // no memory of its own: what came before is the cards', read by the context rung
 // The parser's verdict on a text, then the frame's bind(): a frame may answer { tool, args }, or
 // { clarify } when the reading is whole but a value is missing, which becomes a clarify verdict too.
@@ -17178,9 +17244,9 @@ function fragmentRead(raw, last, dry) {
 // an amendment frame of the last card's tool: "2 sentences", "trace it", "next passage", "why"
 let amendEngines = {};
 function amendEngine(tool) {
-  const frames = FRAMES.filter(f => f.amends && (f.amends.includes(tool) || f.amends.includes('*'))), o = ontology(frames), key = JSON.stringify(o);
+  const frames = FRAMES.filter(f => f.amends && (f.amends.includes(tool) || f.amends.includes('*')));
   const cache = amendEngines[tool] || (amendEngines[tool] = {});
-  return { frames, at: enginesFor(cache, o) };
+  return { frames, at: enginesFor(cache, () => ontology(frames)) };
 }
 function amendRead(raw, last, dry) {
   for (const loc of order) { const r = amendIn(raw, last, dry, loc, loc !== order[0]); if (r) return r; }
@@ -17229,11 +17295,11 @@ function readingOf(raw, last) {
 const completions = (raw, n = 6) => { try { return clauseEngine().suggest(raw, makeSession([]), n); } catch (e) { return []; } };
 /* ── rung 3: taught words rewrite the query, then the grammar reads it again ── */
 function taught(text, q, raw) {
-  let q2 = ' ' + q + ' ', t2 = ' ' + text + ' ';
-  Object.entries(S.aliases).forEach(([k, v]) => { const re = new RegExp('(?<=\\s)' + k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?=\\s)', 'gi'); q2 = q2.replace(re, v); t2 = t2.replace(re, v); });
+  let q2 = ' ' + q + ' ', t2 = ' ' + text + ' '; const uses = {};
+  Object.entries(S.aliases).forEach(([k, v]) => { const re = new RegExp('(?<=\\s)' + k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?=\\s)', 'gi'); if (re.test(q2)) uses[k] = v; re.lastIndex = 0; q2 = q2.replace(re, v); t2 = t2.replace(re, v); });
   q2 = q2.trim(); if (q2 === q) return null;
   const r = grammar(t2.trim(), q2, 'taught', null);
-  if (r) r.res.trace.unshift(`lexicon: "${q}" → "${q2}"`);
+  if (r) { r.res.trace.unshift(`lexicon: "${q}" → "${q2}"`); r.uses = uses; }   // what it read through, for tms.js
   return r;
 }
 function lev(a, b) { const d = Array.from({ length: a.length + 1 }, (_, i) => [i]); for (let j = 1; j <= b.length; j++) d[0][j] = j; for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] !== b[j - 1])); return d[a.length][b.length]; }
@@ -17359,7 +17425,7 @@ session({ name: 'again', label: 'Again', words: ['again', 'repeat', 'rerun', 'do
 session({ name: 'yes', label: 'Yes', words: ['yes', 'ok', 'okay', 'sure', 'do it', 'go', 'go ahead', 'yes please', 'yep', 'yeah', 'please do', 'that one'], theme: [], required: [], roles: {}, words_pt: ['sim', 'pode', 'isso'], label_pt: 'Sim', bind: () => ({ session: 'yes' }) });
 const sessionEngines = {};
 function sessionRead(raw) {
-  const frames = FRAMES.filter(f => f.session), at = enginesFor(sessionEngines, ontology(frames));
+  const frames = FRAMES.filter(f => f.session), at = enginesFor(sessionEngines, () => ontology(frames));
   for (const loc of order) {
     const r = at(loc).understand(raw, makeSession([]));
     if (r.status !== 'ok' || (loc !== order[0] && repaired(r))) continue;
@@ -17371,18 +17437,18 @@ function sessionRead(raw) {
 })();
 
 /* ==== src/engine/selftest.js ==== */
-const __m44 = (() => {
+const __m45 = (() => {
 const { tool, frame, fmt } = __m0;
 const { parseUnit } = __m2;
-const { sha256 } = __m33;
-const { parseFormula, molarMass } = __m35;
-const { vincenty } = __m36;
+const { sha256 } = __m34;
+const { parseFormula, molarMass } = __m36;
+const { vincenty } = __m37;
 const { fromDevice } = __m24;
 const { quantitiesOf, combos, roots, FORMULAS } = __m27;
 const { conversions, statistics } = __m5;
 const { field: wmm, MODEL } = __m22;
-const { STARTERS, STARTERS_PT } = __m37;
-const { readingOf, setLanguage, language } = __m43;
+const { STARTERS, STARTERS_PT } = __m38;
+const { readingOf, setLanguage, language } = __m44;
 const { factbookInfo } = __m18;
 const { mineralsInfo } = __m8;
 const { bookInfo } = __m19;
@@ -17456,10 +17522,10 @@ frame({
 })();
 
 /* ==== src/engine/vocab.js ==== */
-const __m45 = (() => {
+const __m46 = (() => {
 const { S, tool, frame, FRAMES } = __m0;
-const { ontology } = __m40;
-const { examples } = __m37;
+const { ontology } = __m41;
+const { examples } = __m38;
 // The words golem obeys, shown (SPEC 13: nothing hidden). "what words do you know for density": every command whose
 // words carry it, every thing (noun) and unit it names, and what was taught on this device, from the live ontology —
 // the same one the parser reads with, so what is listed is what reads (the open table's columns and an installed
@@ -17518,7 +17584,7 @@ const frameCount = () => FRAMES.length;
 })();
 
 /* ==== src/engine/logic.js ==== */
-const __m46 = (() => {
+const __m47 = (() => {
 // A small Datalog (SPEC 13: inference, not only computation). Facts are { rel, args }, rules are { name, head, body },
 // a term is a constant or a variable (a string starting with an upper-case letter or "_"). infer() applies the rules
 // until nothing new follows (naive evaluation: the fact sets here are a notebook's, tens to hundreds), and keeps for
@@ -17569,9 +17635,9 @@ function proofOf(known, key, seen = new Set()) {
 })();
 
 /* ==== src/engine/strata.js ==== */
-const __m47 = (() => {
+const __m48 = (() => {
 const { S, tool, frame, noun } = __m0;
-const { infer, proofOf, keyOf } = __m46;
+const { infer, proofOf, keyOf } = __m47;
 // Relative ages by Steno's principles (SPEC 13: inference). What you say of the units — "the sandstone overlies the
 // granite", "the dyke cuts the sandstone", "the conglomerate contains clasts of the granite", "the basalt is younger than
 // the dyke" — is kept on the device (S.strata) as facts; the principles are Datalog rules (logic.js): superposition
@@ -17701,9 +17767,9 @@ frame({ name: 'strataWhy', label: 'Relative ages', words: ['why is', 'how do you
 })();
 
 /* ==== src/engine/timescale.js ==== */
-const __m48 = (() => {
+const __m49 = (() => {
 const { tool, frame, noun, unit, fmt } = __m0;
-const { TIMESCALE, TIMESCALE_SOURCE } = __m39;
+const { TIMESCALE, TIMESCALE_SOURCE } = __m40;
 // The geologic timescale: the ICS chart as a records pack (data/timescale.js). Ages, bounds, ranks,
 // what a unit sits in, what came before and after, what it is subdivided into, and which unit an age
 // in Ma falls in. Lookups only; the chart is the answer.
@@ -17803,7 +17869,7 @@ noun({ type: 'chron', words: Object.fromEntries(Object.keys(RETIRED).map(k => [k
 })();
 
 /* ==== src/engine/sample.js ==== */
-const __m49 = (() => {
+const __m50 = (() => {
 const { tool, frame, noun, compound, qmod, postmod, unit, fmt } = __m0;
 const { parseUnit } = __m2;
 const { core, sieve } = __m1;
@@ -17943,7 +18009,7 @@ frame({
 })();
 
 /* ==== src/engine/explain.js ==== */
-const __m50 = (() => {
+const __m51 = (() => {
 const { tool, frame, amend, noun, shape, clock, fmt } = __m0;
 // Explainers: formal notation parsed and described, one row per piece. Cron schedules, epoch times,
 // chmod modes, URLs and ECMAScript regular expressions. Each member has a recogniser so a bare
@@ -18318,7 +18384,7 @@ amend({ tools: ['explain'], name: 'explainas', label: 'Explain as', words: [], e
 })();
 
 /* ==== src/vendor/plan-calendar.js ==== */
-const __m51 = (() => {
+const __m52 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/plan's calendar engine and Brazilian holidays, copied from
 // ../auditable/ext/plan/src/calendar.js and src/holidays-br.js (MIT). The scheduling half of the package is not here.
 // Re-vendor by copying those two files here again and keeping the single export block at the end.
@@ -18675,10 +18741,10 @@ function brazilMunicipalities() {
 })();
 
 /* ==== src/engine/calendar.js ==== */
-const __m52 = (() => {
+const __m53 = (() => {
 const { S, tool, frame, amend, noun, shape, postmod, unit, clock, iso } = __m0;
 const { findDate, findTime, today, day0, fmtDate, dateWords } = __m4;
-const { isWorkingDay, addWorkingDays, brazilCalendar, federalHolidays } = __m51;
+const { isWorkingDay, addWorkingDays, brazilCalendar, federalHolidays } = __m52;
 // Working days and rosters over @gcu/plan's calendar engine (vendored), and time zones through Intl.
 // The calendar is a slot and is always shown: Brazil's federal holidays, or weekdays only.
 
@@ -18911,7 +18977,7 @@ amend({ tools: ['workdays'], name: 'workcal', label: 'Calendar', words: [], elid
 })();
 
 /* ==== src/engine/text.js ==== */
-const __m53 = (() => {
+const __m54 = (() => {
 const { tool, frame, amend, noun, qmod, fmt } = __m0;
 // Text tools over a pasted payload: counts and readability, extracted key sentences, and a diff.
 // The payload is what follows the first colon, or every line after the first of a multi-line input;
@@ -19057,9 +19123,9 @@ amend({ tools: ['diff'], name: 'diffunit', label: 'Diff by', words: [], elidable
 })();
 
 /* ==== src/engine/econ.js ==== */
-const __m54 = (() => {
+const __m55 = (() => {
 const { tool, frame, noun, shape, postmod, qmod, fmt } = __m0;
-const { ELEMENTS } = __m34;
+const { ELEMENTS } = __m35;
 const { numberAsk, firstNeed } = __m26;
 // Sampling theory and mine economics as declared formulas. Every term is a slot; a term the person did
 // not give is asked for, with the conventional value offered first and never applied on its own. Prices
@@ -19224,7 +19290,7 @@ frame({
 })();
 
 /* ==== src/engine/log.js ==== */
-const __m55 = (() => {
+const __m56 = (() => {
 const { S, tool, frame, amend, noun, fmt, iso, checksOf } = __m0;
 const { parseUnit, dimName } = __m2;
 const { findDate, today, fmtDate, dateWords } = __m4;
@@ -19372,11 +19438,11 @@ amend({ tools: ['logAdd'], name: 'logfix', label: 'Correct', words: ['that was',
 })();
 
 /* ==== src/engine/sky.js ==== */
-const __m56 = (() => {
+const __m57 = (() => {
 const { tool, frame, amend, noun, compound, fmt, rad, deg, iso } = __m0;
 const { findDate, today, fmtDate, dateWords } = __m4;
-const { zonesOf, offsetOf } = __m52;
-const { placeOf } = __m36;
+const { zonesOf, offsetOf } = __m53;
+const { placeOf } = __m37;
 // The sun by NOAA's solar position equations (after Meeus), and the moon's phase from the mean
 // synodic cycle, labelled with its accuracy. Times are given in the place's zone when the place name
 // has one, else in UTC and the card says so.
@@ -19458,7 +19524,7 @@ amend({ tools: ['sun'], name: 'sunzone', label: 'Zone', words: [], elidable: tru
 })();
 
 /* ==== src/engine/apply.js ==== */
-const __m57 = (() => {
+const __m58 = (() => {
 const { S, tool, fmt, rad, deg, p3, p2 } = __m0;
 const { whereOf } = __m16;
 const { evaluatePredicate, predicateToString } = __m15;
@@ -19525,7 +19591,7 @@ tool({
 })();
 
 /* ==== src/vendor/ipynb.js ==== */
-const __m58 = (() => {
+const __m59 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/ipynb, copied from ../auditable/ext/ipynb/index.js (MIT). golem uses importNotebook
 // for its import-substitution table only (numpy → natra, pandas → sadpan, …). Re-vendor by copying that file here.
 
@@ -20074,9 +20140,9 @@ function exportNotebook(cells, opts = {}) {
 })();
 
 /* ==== src/engine/python.js ==== */
-const __m59 = (() => {
+const __m60 = (() => {
 const { tool, frame, amend, result, fmt } = __m0;
-const { importNotebook } = __m58;
+const { importNotebook } = __m59;
 // Run and trace Python with adder, on the device. The tool itself stays synchronous: a first run returns a
 // "running" card carrying a job, the runner (a Web Worker in the page, adder in-process in the tests)
 // answers later, and the card is recomputed from the kept result. Replay reruns the code, which is
@@ -20146,7 +20212,7 @@ amend({ tools: ['python'], name: 'pytraceoff', label: 'Run', words: ['no trace',
 })();
 
 /* ==== src/vendor/librarian.js ==== */
-const __m60 = (() => {
+const __m61 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/librarian, the in-process text search (BM25F, fuzzy expansion, snippets, did-you-mean), copied from ../auditable/ext/librarian/index.js at auditable 5fa5f72e (MIT).
 // Re-vendor by copying that file here.
 
@@ -21422,9 +21488,9 @@ const Librarian = {
 })();
 
 /* ==== src/engine/docs.js ==== */
-const __m61 = (() => {
+const __m62 = (() => {
 const { S, tool, frame, amend, noun, postmod } = __m0;
-const { Librarian } = __m60;
+const { Librarian } = __m61;
 // Search my documents (A7). Markdown, plain text and HTML opened with the paperclip are kept on the device,
 // cut into passages (by heading, then by paragraph) and indexed by @gcu/librarian. A search returns
 // passages verbatim with the matched words marked; golem never rewrites them. The index is derived
@@ -21577,7 +21643,7 @@ amend({ tools: ['docPassage'], name: 'docstep', label: 'Passage', words: [], eli
 })();
 
 /* ==== src/engine/recipes.js ==== */
-const __m62 = (() => {
+const __m63 = (() => {
 const { S, tool, frame, noun, session, runTool } = __m0;
 const { listOf } = __m26;
 // Recipes (A9): a session's plan saved under a name, with the subjects that may change between runs.
@@ -21773,7 +21839,7 @@ session({
 })();
 
 /* ==== src/vendor/sheet.js ==== */
-const __m63 = (() => {
+const __m64 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sheet, copied from ../auditable/ext/sheet/index.js (built from its src/ by @gcu/build, MIT).
 // Re-vendor by copying that file here. Reading is asynchronous (DecompressionStream), so golem converts at open time, not in a tool.
 
@@ -23005,7 +23071,7 @@ const sheet = {
 })();
 
 /* ==== src/vendor/dm.js ==== */
-const __m64 = (() => {
+const __m65 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/dm, the read-only Datamine .dm reader, copied from ../auditable/ext/dm/index.js (MIT).
 // Re-vendor by copying that file here.
 
@@ -23281,10 +23347,10 @@ function readDM(buffer) {
 })();
 
 /* ==== src/engine/formats.js ==== */
-const __m65 = (() => {
-const { sheet } = __m63;
-const { readDM } = __m64;
-const { readParquet, parquetInfo } = __m32;
+const __m66 = (() => {
+const { sheet } = __m64;
+const { readDM } = __m65;
+const { readParquet, parquetInfo } = __m33;
 // Binary table formats, converted to text when a file is opened: xlsx through @gcu/sheet (one text per
 // sheet), Datamine .dm through @gcu/dm, Parquet through @gcu/parquet. Tools stay synchronous and the device keeps the converted text,
 // so a session replays from it. What did not carry over is said on the card.
@@ -23335,7 +23401,7 @@ async function convertBinary(name, buffer) {
 })();
 
 /* ==== src/engine/notes.js ==== */
-const __m66 = (() => {
+const __m67 = (() => {
 const { S, tool, frame } = __m0;
 // Notes and taught words. Both belong to the device and are shared by every session.
 const textOf = c => c.theme[0] && c.theme[0].type === 'text' ? c.theme[0].value : null;
@@ -23386,7 +23452,7 @@ frame({
 })();
 
 /* ==== src/vendor/sluice/accumulator.js ==== */
-const __m67 = (() => {
+const __m68 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sluice src/accumulator.js, copied from ../auditable/ext/sluice/src/accumulator.js at auditable 3a7b253c.
 // golem vendors sluice's accumulator modules only (src/engine/stream.js): its runner builds expressions with new Function,
 // which golem does not ship outside the Python worker.
@@ -23554,7 +23620,7 @@ function weightedStats() {
 })();
 
 /* ==== src/vendor/sluice/tdigest.js ==== */
-const __m68 = (() => {
+const __m69 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sluice src/tdigest.js, copied from ../auditable/ext/sluice/src/tdigest.js at auditable 3a7b253c.
 // golem vendors sluice's accumulator modules only (src/engine/stream.js): its runner builds expressions with new Function,
 // which golem does not ship outside the Python worker.
@@ -23669,7 +23735,7 @@ function quantile(state, q) {
 })();
 
 /* ==== src/vendor/sluice/histogram.js ==== */
-const __m69 = (() => {
+const __m70 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sluice src/histogram.js, copied from ../auditable/ext/sluice/src/histogram.js at auditable 3a7b253c.
 // golem vendors sluice's accumulator modules only (src/engine/stream.js): its runner builds expressions with new Function,
 // which golem does not ship outside the Python worker.
@@ -23721,14 +23787,14 @@ function cumulativeFromTop(counts) {
 })();
 
 /* ==== src/engine/stream.js ==== */
-const __m70 = (() => {
+const __m71 = (() => {
 const { S, T, fmt, result } = __m0;
 const { colOf, whereSrc, tableFromText, openTable } = __m16;
 const { parsePredicate, evaluatePredicate, predicateToString } = __m15;
 const { NULL_SENTINELS } = __m14;
-const { weightedStats } = __m67;
-const { tdigest, quantile } = __m68;
-const { histogram } = __m69;
+const { weightedStats } = __m68;
+const { tdigest, quantile } = __m69;
+const { histogram } = __m70;
 // Tables too large to hold (SPEC 13.7): a CSV or TSV over 20 MB is typed from its first megabyte by recon, like any
 // table, and its questions are answered by scanning the whole file as a job, through @gcu/sluice's accumulators
 // (mergeable, never holding the rows): Welford and weighted moments, t-digest quantiles, histograms. The shell runs the
@@ -23889,23 +23955,24 @@ for (const k of ['apply', 'tableExport']) T[k] = a => S.table && S.table.streame
 })();
 
 /* ==== src/engine/engine.js ==== */
-const __m71 = (() => {
+const __m72 = (() => {
 const { S, T, runTool, toolByName, startJobs, tool, CONDITIONS, EFFECTS, clock, iso } = __m0;
 const { DOCUMENT } = __m12;
-const { DOCTEXT } = __m61;
-const { bindingsOf, runSteps } = __m62;
+const { DOCTEXT } = __m62;
+const { bindingsOf, runSteps } = __m63;
 const { tableFromText } = __m16;
-const { convertBinary } = __m65;
-const { noteMiss, clearMiss, correctionOf, teachOfPick, notePick, setReader } = __m38;
-const { norm, grammar, context, taught, sessionRead, readingOf, guessRead, clauseEngine } = __m43;
-const { makeSession } = __m42;
+const { convertBinary } = __m66;
+const { noteMiss, clearMiss, correctionOf, teachOfPick, notePick, setReader } = __m39;
+const { norm, grammar, context, taught, sessionRead, readingOf, guessRead, clauseEngine } = __m44;
+const { makeSession } = __m43;
 const { current, newSession, renameSession, touch } = __m28;
-const { streamedTable } = __m70;
+const { streamedTable } = __m71;
 // The entry point: submit(raw) reads a request and returns what happened. Cards are recomputed in
-// place by rerun(); answers and slot flips go through it, so args stay the only state that matters.
-
+// place by rerun(); answers and slot flips go through it, so args stay the only state that matters.
 function addCard(raw, r, ms) {
   const c = { id: ++S.n, raw, tool: r.tool, args: r.args, rung: r.rung, amends: r.amends, res: r.res, ms };
+  // what it read through (tms.js): the taught words the reading applied, and what the tool declares it read
+  const d = toolByName(r.tool), uses = { ...(r.uses || {}), ...((d && d.uses && d.uses(r.args)) || {}) }; if (Object.keys(uses).length) c.uses = uses;
   if (r.cmd !== undefined) Object.defineProperty(c, 'cmd', { value: r.cmd, writable: true, enumerable: false });   // the clause command, for amendments; not stored
   S.cards.push(c); touch(); startJobs([c], rerun); return c;
 }
@@ -24166,7 +24233,7 @@ function seedExamples() {
 })();
 
 /* ==== src/engine/packs.js ==== */
-const __m72 = (() => {
+const __m73 = (() => {
 const { profilesOf } = __m18;
 // Packs as gcu-library ships them: a .gcudat is a gzipped tar holding gcudat.json (the manifest) and the data files
 // (gcu-library tools/build-gcudat.mjs). Read here with the platform's own gunzip (DecompressionStream, in browsers and
@@ -24281,7 +24348,7 @@ async function compileStrunk(bytes) {
 })();
 
 /* ==== src/vendor/vfs.js ==== */
-const __m73 = (() => {
+const __m74 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/vfs, copied from ../auditable/ext/vfs/index.js (built from its src/ by node ext/vfs/build.js), at
 // auditable 8837da6e. golem's shell keeps sessions, device state, files and packs in it over IndexedDB (src/shell/store.js).
 // golem constructs only IDBBackend and MemoryBackend; the network backends in this bundle (fetch, REST, Dropbox) are
@@ -28092,8 +28159,8 @@ function fromPicker(vfs, destPath, opts) {
 })();
 
 /* ==== src/shell/store.js ==== */
-const __m74 = (() => {
-const { VFS } = __m73;
+const __m75 = (() => {
+const { VFS } = __m74;
 // Where the device keeps golem (SPEC 13.9): @gcu/vfs over IndexedDB, one file per session, one per opened file, the
 // device state and a small meta file, so a session can be exported as itself and nothing has a size cap but the
 // browser's. Only what changed is written. When IndexedDB is not there, the whole state goes to localStorage as before;
@@ -28207,7 +28274,7 @@ function noStore() {
 })();
 
 /* ==== src/vendor/leadacid.js ==== */
-const __m75 = (() => {
+const __m76 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. The lead-acid shell shim, copied from ../auditable/ext/leadacid/index.js
 // (itself vendored from gentropic/lead-acid, lead-acid.js). Re-vendor by copying that file here.
 
@@ -28911,7 +28978,7 @@ function orientationFromRotationVector(v) {
 })();
 
 /* ==== src/vendor/plot.js ==== */
-const __m76 = (() => {
+const __m77 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/plot (matplotlib-shaped plotting; figures leave the worker as draw lists), copied from ../auditable/ext/plot/index.js at auditable 774234c3 (9 Oct 2026, MIT).
 // Loaded only inside the Python worker. Re-vendor by copying that file here.
 
@@ -30945,7 +31012,7 @@ if (typeof window !== 'undefined') {
 })();
 
 /* ==== src/shell/i18n.js ==== */
-const __m77 = (() => {
+const __m78 = (() => {
 // The interface in English or Brazilian Portuguese. golem's own words (the page, the sidebar, the composer, the cards'
 // frame, the messages) go through t(); the English is the key, so a sentence not translated yet shows in English and a
 // placeholder ({name}) is filled in after the lookup. What a tool answers is the tool's, in English for now.
@@ -31011,7 +31078,7 @@ const PT = {
   'Tap Take reading to turn the compass on.': 'Toque em Medir para ligar a bússola.', 'Compass on: hold the phone still, then take the reading.': 'Bússola ligada: segure o celular parado e meça.',
   'The compass needs the motion permission: allow it for this site in the browser.': 'A bússola precisa da permissão de movimento: permita para este site no navegador.', 'Position needs the location permission: allow it for this site in the browser.': 'A posição precisa da permissão de localização: permita para este site no navegador.',
   'In a browser the fix comes through the browser, which may ask its own location service for it.': 'No navegador a posição vem do navegador, que pode consultar o próprio serviço de localização.',
-  'Add to station {name}': 'Adicionar à estação {name}',
+  'Add to station {name}': 'Adicionar à estação {name}', 'Read with {what}.': 'Lido com {what}.', 'run again': 'rodar de novo',
   "Imported \"{name}\". It is not signed.": "\"{name}\" importada. Não está assinada.", "Imported \"{name}\". Signed by key {fp} ({security}), unchanged since it was signed.": "\"{name}\" importada. Assinada pela chave {fp} ({security}), sem alteração desde a assinatura.", "Imported \"{name}\", but its signature does not match: the file was changed after key {fp} signed it.": "\"{name}\" importada, mas a assinatura não confere: o arquivo foi alterado depois que a chave {fp} o assinou.", "Saved unsigned: {e}": "Salvo sem assinatura: {e}", "Signing key": "Chave de assinatura", "Exported sessions and notebooks are signed with this device's key, {fp} ({security}). A signature shows that a file is unchanged since this key signed it; golem checks it when the file is opened.": "Sessões e notebooks exportados são assinados com a chave deste aparelho, {fp} ({security}). A assinatura mostra que o arquivo não mudou desde que esta chave o assinou; o golem confere ao abrir o arquivo.", "Reading this device's key…": "Lendo a chave deste aparelho…", 'A sample of 42 common minerals ships, copied from the pack.': 'Uma amostra de 42 minerais comuns vem junto, copiada do pacote.', 'Installed: {n} minerals.': 'Instalado: {n} minerais.', 'Removed. The sample of 42 minerals answers again.': 'Removido. A amostra de 42 minerais responde de novo.', 'Remember: “{word}” means “{means}”': 'Lembrar: “{word}” quer dizer “{means}”',
   'Measured.': 'Medido.', 'Measured. The phone moved while measuring; hold it still for a steadier reading.': 'Medido. O celular se mexeu durante a medida; segure parado para uma leitura mais firme.',
   'Waiting for a fix…': 'Esperando uma posição…', 'Position needs the location permission: allow it in the dialog, or in the app\'s settings.': 'A posição precisa da permissão de localização: permita na caixa de diálogo, ou nas configurações do app.',
@@ -31058,13 +31125,20 @@ const PT = {
 })();
 
 /* ==== src/shell/render.js ==== */
-const __m78 = (() => {
+const __m79 = (() => {
 const { fmt } = __m0;
 const { conversions, equalArea } = __m5;
-const { Figure } = __m76;
-const { t } = __m77;
+const { Figure } = __m77;
+const { t } = __m78;
 const { stationNow } = __m25;
-// Rendering. The engine hands over plain blocks; this is the only file that turns them into markup.
+const { staleOf, staleText } = __m30;
+// Rendering. The engine hands over plain blocks; this is the only file that turns them into markup.
+// a card read with a taught value or formula that has changed since (tms.js): said under its reading, with its question
+// to run again; the answer itself stays what it was
+function staleLine(c) {
+  const st = staleOf(c); if (!st.length) return '';
+  return `<div class="stale"><span>${escHtml(t('Read with {what}.', { what: st.map(staleText).join('; ') }))}</span> <button class="cact" type="button" data-act="run" data-q="${escHtml(c.raw)}">${t('run again')}</button></div>`;
+}
 
 // a measured plane or line, or a typed plane, can go into the field notebook at the open station: the button says
 // "add #12 to station 14", which reads like anything typed and copies the card's values into the new card's args
@@ -31171,7 +31245,7 @@ function cardEl(c) {
   const ask = r.ask ? `<div class="note">${escHtml(r.ask.prompt)}</div>${r.ask.options.length ? `<div class="opts">${r.ask.options.map((o, i) => `<button class="btn" type="button" data-act="answer" data-i="${i}">${escHtml(o.label)}</button>`).join('')}${r.ask.parse ? `<span class="sub">${t('or type it')}</span>` : ''}</div>` : ''}` : '';
   el.innerHTML = `<div class="q">${escHtml(c.raw)}</div>
     <div class="reply"><div class="chead"><span class="rung ${c.rung}">${t(RUNG[c.rung])}</span><span>#${pad(c.id)}</span>${c.amends ? `<span>${t('from #{n}', { n: pad(c.amends) })}</span>` : ''}<span class="ms">${c.ms < 10 ? c.ms.toFixed(1) : Math.round(c.ms)} ms</span></div>
-    ${read ? `<div class="read"><span class="lbl">${t('read as')}</span> ${read}</div>` : ''}
+    ${read ? `<div class="read"><span class="lbl">${t('read as')}</span> ${read}</div>` : ''}${staleLine(c)}
     <div class="ans">${r.body.map(blockHtml).join('')}${ask}${toStation(c)}</div>
     <div class="cfoot"><details class="trace"><summary>${t('how')} · ${r.trace.length} ${t(r.trace.length === 1 ? 'step' : 'steps')}</summary><ol>${r.trace.map(t => `<li>${escHtml(t)}</li>`).join('')}</ol></details>
     <span class="cacts"><button class="cact" type="button" data-act="copyans" title="${escHtml(t('Copy the answer (c)'))}">${t('copy')}</button><button class="cact" type="button" data-act="edit" title="${escHtml(t('Put this question back in the box to change it (e)'))}">${t('edit')}</button><button class="cact" type="button" data-act="pin" aria-pressed="${!!c.pinned}" title="${escHtml(t('Keep this card at the top of the session (p)'))}">${t(c.pinned ? 'pinned' : 'pin')}</button><button class="cact" type="button" data-act="branch" title="${escHtml(t('A new session with the cards up to this one'))}">${t('branch')}</button><button class="cact say" type="button" data-act="say" title="${escHtml(t('Read this answer aloud, with the phone\'s offline voice'))}">${t('say')}</button></span></div></div>`;
@@ -31208,7 +31282,7 @@ function figImage(ctx, x, y, w, h, cols, rows, b64) {
 })();
 
 /* ==== src/vendor/sw-register.js ==== */
-const __m79 = (() => {
+const __m80 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sw's page-side companion, copied from ../auditable/ext/sw/register.js (at auditable 8837da6e).
 
 // @gcu/sw — the page-side companion (ES module). Registration + persistent
@@ -31286,8 +31360,8 @@ function registerGcuSw(opts = {}) {
 })();
 
 /* ==== src/shell/sign.js ==== */
-const __m80 = (() => {
-const { shell } = __m75;
+const __m81 = (() => {
+const { shell } = __m76;
 // Signing what golem exports, and checking what it opens (SPEC 13: things you can trust). One signature format for both
 // homes, ECDSA P-256 over SHA-256, the signature raw (r‖s) and the public key as SPKI, both base64: inside the lead-acid
 // app the phone's hardware key signs (lead-acid's attest plugin: StrongBox, else the TEE); in a browser, a WebCrypto key
@@ -31338,29 +31412,30 @@ async function fingerprint(pubB64) {
 })();
 
 /* ==== src/shell/main.js ==== */
-const __m81 = (() => {
+const __m82 = (() => {
 const { S } = __m0;
-const { submit, flipSlot, answer, capture, seedExamples, openFile, openBinary, openStreamed, preview } = __m71;
-const { scanTable, STREAM_OVER } = __m70;
-const { completions } = __m43;
+const { submit, flipSlot, answer, capture, seedExamples, openFile, openBinary, openStreamed, preview } = __m72;
+const { scanTable, STREAM_OVER } = __m71;
+const { completions } = __m44;
 const { fromDevice } = __m24;
 const { conversions } = __m5;
 const { useFactbook, factbookInfo } = __m18;
-const { factbookFromGcudat, factbookProfiles, readGcudat, compileOds, compileStrunk, mineralsFromGcudat } = __m72;
+const { factbookFromGcudat, factbookProfiles, readGcudat, compileOds, compileStrunk, mineralsFromGcudat } = __m73;
 const { useMinerals, mineralsInfo } = __m8;
 const { useBook, bookInfo } = __m19;
-const { BINARY } = __m65;
+const { BINARY } = __m66;
 const { setRunner, onJobDone } = __m0;
 const { sessions, current, newSession, openSession, renameSession, deleteSession, searchHistory, parts, hydrate, onChange, exportSession, importSession, pinCard, branchSession } = __m28;
-const { openStore, putBlob, getBlob } = __m74;
-const { skills, PACKS, STARTERS, STARTERS_PT } = __m37;
-const { shell } = __m75;
-const { escHtml, pad, cardEl, drawCharts } = __m78;
-const { registerGcuSw } = __m79;
-const { sign, verify, fingerprint, deviceKey, canSign } = __m80;
+const { openStore, putBlob, getBlob } = __m75;
+const { skills, PACKS, STARTERS, STARTERS_PT } = __m38;
+const { shell } = __m76;
+const { escHtml, pad, cardEl, drawCharts } = __m79;
+const { registerGcuSw } = __m80;
+const { sign, verify, fingerprint, deviceKey, canSign } = __m81;
 const { canonical, unsigned } = __m29;
-const { t, plural, setUiLang, uiLang, applyStatic } = __m77;
-const { setLanguage } = __m43;
+const { staleOf } = __m30;
+const { t, plural, setUiLang, uiLang, applyStatic } = __m78;
+const { setLanguage } = __m44;
 // The shell: wiring, tabs, the session drawer, storage, and the sleep switch. Everything that touches
 // the DOM or the browser lives here or in render.js; the engine never does.
 const $ = id => document.getElementById(id);
@@ -31448,6 +31523,11 @@ function offerTeach(c, teach) {
   d.innerHTML = `<button class="btn" type="button" data-act="run" data-q="${escHtml(`${teach.word} means ${teach.means}`)}">${escHtml(t('Remember: “{word}” means “{means}”', teach))}</button>`;
   el.appendChild(d);
 }
+// after an answer that changed a taught value or formula, the cards on screen that read with the old one are drawn again,
+// so they say so (tms.js); a card's answer itself is not changed
+function markStale() {
+  for (const c of S.cards) { const el = $('stream').querySelector(`[data-id="${c.id}"]`); if (el && !!el.querySelector('.stale') !== staleOf(c).length > 0) replaceCard(c); }
+}
 let ready = false;   // the device state is back (see the start, below): until then a query would land in a session about to be replaced
 function run(raw) {
   if (!ready) { status('Opening your sessions…'); return; }
@@ -31460,11 +31540,11 @@ function show(o) {
     case 'recipe': renderStream(); status(o.msg); break;
     case 'drawer': openDrawer(); break;
     case 'rename': status(t('Session named “{name}”.', { name: o.name })); break;
-    case 'answered': replaceCard(o.card); offerTeach(o.card, o.teach); status(t('Answered #{n}: {label}', { n: pad(o.card.id), label: o.label })); break;
+    case 'answered': replaceCard(o.card); offerTeach(o.card, o.teach); markStale(); status(t('Answered #{n}: {label}', { n: pad(o.card.id), label: o.label })); break;
     case 'undo': { const el = $('stream').querySelector(`[data-id="${o.card.id}"]`); if (el) el.remove(); welcome(); status(t('Removed #{n}: {raw}', { n: pad(o.card.id), raw: o.card.raw })); break; }
     case 'nothing': status(o.msg); break;
     case 'card': {
-      const el = cardEl(o.card); $('stream').appendChild(el); drawCharts(el); offerTeach(o.card, o.teach); welcome(); armCaptures(); if (voice.all) say(el); showTab('ask'); el.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+      const el = cardEl(o.card); $('stream').appendChild(el); drawCharts(el); offerTeach(o.card, o.teach); markStale(); welcome(); armCaptures(); if (voice.all) say(el); showTab('ask'); el.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
       // for a screen reader: what was read and the start of the answer, once
       const ans = el.querySelector('.ans'), read = el.querySelector('.read');
       $('sr').textContent = `#${pad(o.card.id)}, ${(read ? read.innerText : o.card.raw).replace(/\s+/g, ' ')}. ${ans ? ans.innerText.replace(/\s+/g, ' ').slice(0, 220) : ''}`;

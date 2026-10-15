@@ -20,6 +20,7 @@ import { escHtml, pad, cardEl, drawCharts } from './render.js';
 import { registerGcuSw } from '../vendor/sw-register.js';
 import { sign, verify, fingerprint, deviceKey, canSign } from './sign.js';
 import { canonical, unsigned } from '../engine/share.js';
+import { staleOf } from '../engine/tms.js';
 import { t, plural, setUiLang, uiLang, applyStatic } from './i18n.js';
 import { setLanguage } from '../engine/reading.js';
 
@@ -108,6 +109,11 @@ function offerTeach(c, teach) {
   d.innerHTML = `<button class="btn" type="button" data-act="run" data-q="${escHtml(`${teach.word} means ${teach.means}`)}">${escHtml(t('Remember: “{word}” means “{means}”', teach))}</button>`;
   el.appendChild(d);
 }
+// after an answer that changed a taught value or formula, the cards on screen that read with the old one are drawn again,
+// so they say so (tms.js); a card's answer itself is not changed
+function markStale() {
+  for (const c of S.cards) { const el = $('stream').querySelector(`[data-id="${c.id}"]`); if (el && !!el.querySelector('.stale') !== staleOf(c).length > 0) replaceCard(c); }
+}
 let ready = false;   // the device state is back (see the start, below): until then a query would land in a session about to be replaced
 function run(raw) {
   if (!ready) { status('Opening your sessions…'); return; }
@@ -120,11 +126,11 @@ function show(o) {
     case 'recipe': renderStream(); status(o.msg); break;
     case 'drawer': openDrawer(); break;
     case 'rename': status(t('Session named “{name}”.', { name: o.name })); break;
-    case 'answered': replaceCard(o.card); offerTeach(o.card, o.teach); status(t('Answered #{n}: {label}', { n: pad(o.card.id), label: o.label })); break;
+    case 'answered': replaceCard(o.card); offerTeach(o.card, o.teach); markStale(); status(t('Answered #{n}: {label}', { n: pad(o.card.id), label: o.label })); break;
     case 'undo': { const el = $('stream').querySelector(`[data-id="${o.card.id}"]`); if (el) el.remove(); welcome(); status(t('Removed #{n}: {raw}', { n: pad(o.card.id), raw: o.card.raw })); break; }
     case 'nothing': status(o.msg); break;
     case 'card': {
-      const el = cardEl(o.card); $('stream').appendChild(el); drawCharts(el); offerTeach(o.card, o.teach); welcome(); armCaptures(); if (voice.all) say(el); showTab('ask'); el.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+      const el = cardEl(o.card); $('stream').appendChild(el); drawCharts(el); offerTeach(o.card, o.teach); markStale(); welcome(); armCaptures(); if (voice.all) say(el); showTab('ask'); el.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
       // for a screen reader: what was read and the start of the answer, once
       const ans = el.querySelector('.ans'), read = el.querySelector('.read');
       $('sr').textContent = `#${pad(o.card.id)}, ${(read ? read.innerText : o.card.raw).replace(/\s+/g, ' ')}. ${ans ? ans.innerText.replace(/\s+/g, ' ').slice(0, 220) : ''}`;

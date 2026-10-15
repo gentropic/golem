@@ -2,7 +2,7 @@
 // installed on this device (the shell keeps it, and hands it here with useFactbook()). Lookups of every field, with
 // units through @gcu/units; lists ranked, by region, and filtered by the grammar's conditions ("population above 100
 // million"); "landlocked" only where the data says it (the sample, or the pack with its full profiles).
-import { tool, frame, noun, compound, qmod, fmt } from './core.js';
+import { tool, frame, noun, compound, qmod, fmt, bump } from './core.js';
 import { parseUnit } from './units.js';
 
 /* ── the data in use ─────────────────────────────────────────── */
@@ -24,7 +24,7 @@ function normalize(p) {
       area: toNum(r.area_km2), population: toNum(r.population), gdp: toNum(r.gdp_ppp_usd), government: r.government || null, coords: Array.isArray(r.coordinates) ? r.coordinates : null,
       background: r.background || null, landlocked: prof ? (prof[r.id] ? !!prof[r.id].landlocked : null) : null, coastline: prof && prof[r.id] ? prof[r.id].coastline : null })) };
 }
-export function useFactbook(pack) { DATA = pack ? normalize(pack) : SAMPLE; index(); return factbookInfo(); }
+export function useFactbook(pack) { bump(); DATA = pack ? normalize(pack) : SAMPLE; index(); return factbookInfo(); }
 export const factbookInfo = () => ({ kind: DATA.kind, version: DATA.version, count: DATA.records.length, profiles: DATA.kind === 'sample' || !!DATA.profiles });
 // what the full profiles add, kept small: the pack's factbook-full records → { id: { landlocked, coastline } }
 export function profilesOf(fullRecords) {

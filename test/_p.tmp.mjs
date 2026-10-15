@@ -1,0 +1,11 @@
+import * as g from '../src/engine/index.js';
+import { staleOf } from '../src/engine/tms.js';
+g.reset(); g.newSession();
+const say = q => { const o = g.submit(q); return o.card || g.S.cards[g.S.cards.length - 1]; };
+say('granite is 2.7 t/m3'); const a = say('how heavy is 1000 m3 of granite'); console.log('uses', JSON.stringify(a.uses), a.res.value);
+const b = say('granite is 2.65 t/m3'); console.log(g.textOf(b).replace(/\s+/g, ' ').slice(0, 300));
+console.log('stale', JSON.stringify(staleOf(a)));
+console.log(g.textOf(say('which cards are out of date')).replace(/\s+/g, ' ').slice(0, 250));
+say('define the formula core recovery as recovered / drilled * 100'); const f = say('core recovery'); say('2'); say('2.5'); console.log('f uses', JSON.stringify(f.uses), f.res.value);
+const f2 = say('redefine core recovery as recovered / drilled * 99'); console.log(g.textOf(f2).replace(/\s+/g, ' ').slice(0, 220));
+const saved = JSON.parse(JSON.stringify(g.serialize())); g.reset(); g.hydrate(saved); console.log('after replay', JSON.stringify(staleOf(g.S.cards[1])));

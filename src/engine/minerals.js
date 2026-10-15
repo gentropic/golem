@@ -4,13 +4,14 @@
 // quartz"); minerals are found by their elements and class ("minerals with Cu and S", "sulfides with Bi"); the whole set
 // opens as a table ("open the minerals") for every table question ("count where hardness > 6 and density < 3"). What
 // Wikidata does not have stays empty and is said to be missing: nothing is estimated.
-import { tool, frame, noun, fmt } from './core.js';
+import { tool, frame, noun, fmt, bump } from './core.js';
 import { MINERALS_SAMPLE } from './data/minerals-sample.js';
 
 const CLASSES = ['elements', 'sulfides and sulfosalts', 'halides', 'oxides', 'carbonates and nitrates', 'borates', 'sulfates', 'phosphates', 'silicates', 'organic compounds'];
 let DATA = null, BY = new Map();
 // a pack as installed: { version, retrieved, records }
 export function useMinerals(pack) {
+  bump();
   DATA = pack ? { kind: 'pack', version: pack.version, retrieved: pack.retrieved, of: pack.records.length, records: pack.records } : { kind: 'sample', version: 'sample', retrieved: MINERALS_SAMPLE.retrieved, of: MINERALS_SAMPLE.of, records: MINERALS_SAMPLE.records };
   BY = new Map(); for (const r of DATA.records) for (const n of namesOf(r)) if (!BY.has(n)) BY.set(n, r);
   return mineralsInfo();

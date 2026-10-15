@@ -1,7 +1,7 @@
 // The reading ladder: context (amendments, meta-intents), grammar (the clause parser, then the regex
 // rules the declarations carry), taught words (device lexicon rewrites, then grammar again). Plus the
 // tools that talk about the session itself: none, why, export.
-import { S, T, TOOLS, FRAMES, tool, frame, amend, session, noun, toolByName, runTool, iso } from './core.js';
+import { S, T, TOOLS, FRAMES, tool, frame, amend, session, noun, toolByName, runTool, iso, STATE } from './core.js';
 import { examples, vocab } from './skills.js';
 import { rankByPicks } from './learn.js';
 import { ontology } from './ontology.js';
@@ -16,14 +16,18 @@ let order = ['en', 'pt'];
 export function setLanguage(l) { order = l === 'pt' ? ['pt', 'en'] : ['en', 'pt']; }
 export const language = () => order[0];
 // an engine per language over the same ontology, rebuilt when the ontology changes
-function enginesFor(cache, o) { const key = JSON.stringify(o); if (cache.key !== key) { cache.key = key; cache.E = {}; } return loc => cache.E[loc] || (cache.E[loc] = createEngine(o, LOCALES[loc])); }
+// (the ontology is built and compared only when STATE.gen moved: a reading or a preview between changes reuses them)
+function enginesFor(cache, build) {
+  if (cache.gen !== STATE.gen) { const o = build(), key = JSON.stringify(o); cache.gen = STATE.gen; if (cache.key !== key) { cache.key = key; cache.E = {}; cache.o = o; } }
+  return loc => cache.E[loc] || (cache.E[loc] = createEngine(cache.o, LOCALES[loc]));
+}
 
 export const norm = s => s.trim().replace(/\s+/g, ' ').replace(/[?.!]+$/, '');
 
 /* ── rung 2, first half: the clause parser over golem's ontology ── */
 const clauses = {};
 // rebuilt whenever what it reads changes: the open table's columns, kept files, saved places, logged activities
-export const clauseEngine = (loc = order[0]) => enginesFor(clauses, ontology())(loc);
+export const clauseEngine = (loc = order[0]) => enginesFor(clauses, () => ontology())(loc);
 const clauseSession = () => makeSession([]);   // no memory of its own: what came before is the cards', read by the context rung
 // The parser's verdict on a text, then the frame's bind(): a frame may answer { tool, args }, or
 // { clarify } when the reading is whole but a value is missing, which becomes a clarify verdict too.
@@ -120,9 +124,9 @@ function fragmentRead(raw, last, dry) {
 // an amendment frame of the last card's tool: "2 sentences", "trace it", "next passage", "why"
 let amendEngines = {};
 function amendEngine(tool) {
-  const frames = FRAMES.filter(f => f.amends && (f.amends.includes(tool) || f.amends.includes('*'))), o = ontology(frames), key = JSON.stringify(o);
+  const frames = FRAMES.filter(f => f.amends && (f.amends.includes(tool) || f.amends.includes('*')));
   const cache = amendEngines[tool] || (amendEngines[tool] = {});
-  return { frames, at: enginesFor(cache, o) };
+  return { frames, at: enginesFor(cache, () => ontology(frames)) };
 }
 function amendRead(raw, last, dry) {
   for (const loc of order) { const r = amendIn(raw, last, dry, loc, loc !== order[0]); if (r) return r; }
@@ -171,11 +175,11 @@ export function readingOf(raw, last) {
 export const completions = (raw, n = 6) => { try { return clauseEngine().suggest(raw, makeSession([]), n); } catch (e) { return []; } };
 /* ── rung 3: taught words rewrite the query, then the grammar reads it again ── */
 export function taught(text, q, raw) {
-  let q2 = ' ' + q + ' ', t2 = ' ' + text + ' ';
-  Object.entries(S.aliases).forEach(([k, v]) => { const re = new RegExp('(?<=\\s)' + k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?=\\s)', 'gi'); q2 = q2.replace(re, v); t2 = t2.replace(re, v); });
+  let q2 = ' ' + q + ' ', t2 = ' ' + text + ' '; const uses = {};
+  Object.entries(S.aliases).forEach(([k, v]) => { const re = new RegExp('(?<=\\s)' + k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?=\\s)', 'gi'); if (re.test(q2)) uses[k] = v; re.lastIndex = 0; q2 = q2.replace(re, v); t2 = t2.replace(re, v); });
   q2 = q2.trim(); if (q2 === q) return null;
   const r = grammar(t2.trim(), q2, 'taught', null);
-  if (r) r.res.trace.unshift(`lexicon: "${q}" → "${q2}"`);
+  if (r) { r.res.trace.unshift(`lexicon: "${q}" → "${q2}"`); r.uses = uses; }   // what it read through, for tms.js
   return r;
 }
 function lev(a, b) { const d = Array.from({ length: a.length + 1 }, (_, i) => [i]); for (let j = 1; j <= b.length; j++) d[0][j] = j; for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] !== b[j - 1])); return d[a.length][b.length]; }
@@ -301,7 +305,7 @@ session({ name: 'again', label: 'Again', words: ['again', 'repeat', 'rerun', 'do
 session({ name: 'yes', label: 'Yes', words: ['yes', 'ok', 'okay', 'sure', 'do it', 'go', 'go ahead', 'yes please', 'yep', 'yeah', 'please do', 'that one'], theme: [], required: [], roles: {}, words_pt: ['sim', 'pode', 'isso'], label_pt: 'Sim', bind: () => ({ session: 'yes' }) });
 const sessionEngines = {};
 export function sessionRead(raw) {
-  const frames = FRAMES.filter(f => f.session), at = enginesFor(sessionEngines, ontology(frames));
+  const frames = FRAMES.filter(f => f.session), at = enginesFor(sessionEngines, () => ontology(frames));
   for (const loc of order) {
     const r = at(loc).understand(raw, makeSession([]));
     if (r.status !== 'ok' || (loc !== order[0] && repaired(r))) continue;

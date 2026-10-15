@@ -11684,6 +11684,26 @@
       "label_pt": "Fórmulas"
     },
     {
+      "name": "stale",
+      "label": "Out of date",
+      "words": [
+        "which cards are out of date",
+        "what is out of date",
+        "which cards are stale",
+        "what is stale",
+        "out of date cards",
+        "stale cards"
+      ],
+      "theme": [],
+      "required": [],
+      "roles": {},
+      "words_pt": [
+        "quais cartões estão desatualizados",
+        "o que está desatualizado"
+      ],
+      "label_pt": "Desatualizados"
+    },
+    {
       "name": "value",
       "label": "Teach a value",
       "words": [
@@ -11729,6 +11749,40 @@
       "words_pt": [
         "define a fórmula",
         "nova fórmula"
+      ],
+      "label_pt": "Ensinar uma fórmula"
+    },
+    {
+      "name": "redefineFormula",
+      "label": "Teach a formula",
+      "words": [
+        "define the formula",
+        "define formula",
+        "redefine the formula",
+        "redefine",
+        "teach the formula"
+      ],
+      "theme": [
+        "formulaname"
+      ],
+      "required": [
+        "theme",
+        "as"
+      ],
+      "roles": {
+        "as": {
+          "preps": [
+            "as",
+            "be"
+          ],
+          "types": [
+            "text"
+          ]
+        }
+      },
+      "words_pt": [
+        "define a fórmula",
+        "redefine a fórmula"
       ],
       "label_pt": "Ensinar uma fórmula"
     },

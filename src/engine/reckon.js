@@ -131,6 +131,7 @@ export function formulaOf(name) {
 const allFormulas = () => ({ ...FORMULAS, ...Object.fromEntries(Object.keys(S.formulas || {}).map(k => [k, formulaOf(k)])) });
 tool({
   name: 'formula',
+  uses: a => S.formulas && S.formulas[a.formula] ? { [`formula ${a.formula}`]: S.formulas[a.formula].expr } : null,
   skill: { group: 'Compute', title: 'Formulas, solved for any term', on: 'declared equations · own root search', about: 'Tonnage, contained metal, strip ratio, the two-product recovery, break-even cutoff, lithostatic pressure, Darcy\'s law and Stokes settling, each solved for whichever term you leave out: the others are asked, and the root found by a search over the term\'s range. More than one root is said, not chosen.', examples: ['two-product recovery', 'solve the cutoff formula for price', 'stokes settling for diameter', 'what formulas do you know'] },
   topic: a => [formulaOf(a.formula) ? formulaOf(a.formula).title : 'Formula', 1],
   run: a => {

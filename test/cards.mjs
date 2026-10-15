@@ -95,6 +95,12 @@ check(await teachBtn.count() === 1 && await teachBtn.getAttribute('data-q') === 
 await teachBtn.dispatchEvent('click'); await page.waitForTimeout(250); await ask('3 klicks in miles');
 check(/1\.86/.test(await page.locator('#stream .card').last().textContent()), 'the word taught reads from then on');
 
+// truth maintenance: a card on screen read with a value that changes says so, with its question to run again
+await ask('granite is 2.7 t/m3'); await ask('how heavy is 1000 m3 of granite'); const heavyId = await page.locator('#stream .card').last().getAttribute('data-id');
+await ask('granite is 2.65 t/m3');
+const stale = page.locator(`#stream .card[data-id="${heavyId}"] .stale`);
+check(await stale.count() === 1 && /granite = 2\.7 t\/m3; it is now 2\.65 t\/m3/.test(await stale.textContent()), 'the earlier card says it was read with the old value');
+
 // sleep: nothing reads while asleep, and it stays asleep across a reload until woken
 await page.click('#power'); await page.waitForTimeout(150);
 check(await page.isDisabled('#q') && /asleep/.test(await page.textContent('#st-on')), 'asleep: the box is off');

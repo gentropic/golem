@@ -1,16 +1,17 @@
 // Sessions: stored as plans (card specs), replayed on open, named from the tools that ran.
 // The shell persists whatever `serialize()` returns and feeds it back through `hydrate()`.
-import { S, toolByName, runTool, startJobs, clearResults } from './core.js';
+import { S, toolByName, runTool, startJobs, clearResults, bump } from './core.js';
 
 let SS = [], cur = null;
 let sid = 0;
 const listeners = [];
 // the shell registers here to persist and redraw after any change to the session store
 export const onChange = fn => { listeners.push(fn); };
-const changed = () => listeners.forEach(f => f());
+const changed = () => { bump(); listeners.forEach(f => f()); };
 
 // what a session keeps of a card: enough to recompute it, and nothing else
-export const spec = c => ({ id: c.id, raw: c.raw, tool: c.tool, args: c.args, rung: c.rung, amends: c.amends, ms: c.ms, ...(c.pinned ? { pinned: true } : {}) });
+// uses: what device state the card read through (a taught word's meaning, a taught formula), for tms.js
+export const spec = c => ({ id: c.id, raw: c.raw, tool: c.tool, args: c.args, rung: c.rung, amends: c.amends, ms: c.ms, ...(c.pinned ? { pinned: true } : {}), ...(c.uses ? { uses: c.uses } : {}) });
 
 // what a card contributes to its session's name: [label, weight], from the tool's declaration
 export function tagOf(c) { const d = toolByName(c.tool); return d && d.topic ? d.topic(c.args) : null; }
@@ -110,5 +111,5 @@ export function hydrate(d) {
 }
 // forget everything: sessions, device state, working state (tests start here)
 export function reset() {
-  SS = []; cur = null; sid = 0; S.cards = []; S.n = 0; S.aliases = {}; S.facts = []; S.files = {}; S.tables = {}; S.recipes = {}; S.misses = []; S.picks = {}; S.formulas = {}; S.orders = []; S.strata = []; S.table = null; S.clause = null; clearResults();
+  bump(); SS = []; cur = null; sid = 0; S.cards = []; S.n = 0; S.aliases = {}; S.facts = []; S.files = {}; S.tables = {}; S.recipes = {}; S.misses = []; S.picks = {}; S.formulas = {}; S.orders = []; S.strata = []; S.table = null; S.clause = null; clearResults();
 }

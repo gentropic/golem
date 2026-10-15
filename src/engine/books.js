@@ -1,7 +1,7 @@
 // Books from packs (SPEC 13.8): definitions from Open Data Structures, a style check from The Elements of Style (1918).
 // Each works from a small sample that ships with golem, or from the gcu-library pack once the shell has installed it and
 // handed its compiled index here (useBook). Packs are compiled at install by packs.js; only the index is kept.
-import { tool, frame, noun } from './core.js';
+import { tool, frame, noun, bump } from './core.js';
 
 const READER = 'https://gentropic.org/gcu-library/read.html?book=';
 
@@ -93,6 +93,7 @@ frame({
 
 // a book pack compiled at install (packs.js), or null for the sample
 export function useBook(slug, compiled) {
+  bump();
   if (slug === 'ods') ODS = compiled || null;
   else if (slug === 'elements-of-style') STRUNK = compiled || null;
   else throw new Error(`golem has no use for the ${slug} pack yet`);
