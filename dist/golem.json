@@ -3264,6 +3264,270 @@
       }
     },
     {
+      "type": "decision",
+      "words": {
+        "matrix": [
+          "decision matrix",
+          "weighted decision",
+          "these options",
+          "the options",
+          "my options",
+          "options"
+        ]
+      },
+      "words_pt": {
+        "matrix": [
+          "matriz de decisão",
+          "essas opções",
+          "as opções"
+        ]
+      }
+    },
+    {
+      "type": "formulaname",
+      "exact": true,
+      "words": {
+        "tonnage": [
+          "tonnage formula",
+          "tonnage equation"
+        ],
+        "metal": [
+          "contained metal",
+          "metal content"
+        ],
+        "strip": [
+          "strip ratio",
+          "stripping ratio"
+        ],
+        "twoproduct": [
+          "two-product recovery",
+          "two product formula",
+          "two-product formula",
+          "recovery formula"
+        ],
+        "cutoff": [
+          "break-even cutoff",
+          "breakeven cutoff",
+          "cutoff formula",
+          "cut-off formula"
+        ],
+        "lithostatic": [
+          "lithostatic pressure",
+          "overburden pressure"
+        ],
+        "darcy": [
+          "darcy's law",
+          "darcy law",
+          "darcy"
+        ],
+        "stokes": [
+          "stokes settling",
+          "stokes' law",
+          "stokes law",
+          "settling velocity"
+        ]
+      },
+      "words_pt": {
+        "twoproduct": [
+          "recuperação de dois produtos",
+          "fórmula de dois produtos"
+        ],
+        "tonnage": [
+          "fórmula da tonelagem"
+        ],
+        "metal": [
+          "metal contido"
+        ],
+        "strip": [
+          "relação estéril-minério",
+          "razão de remoção"
+        ],
+        "cutoff": [
+          "teor de corte de equilíbrio"
+        ],
+        "lithostatic": [
+          "pressão litostática"
+        ],
+        "darcy": [
+          "lei de darcy"
+        ],
+        "stokes": [
+          "lei de stokes",
+          "velocidade de sedimentação"
+        ]
+      }
+    },
+    {
+      "type": "formulavar",
+      "words": {
+        "tonnage": [
+          "tonnage"
+        ],
+        "tonnes": [
+          "tonnes"
+        ],
+        "mass": [
+          "mass"
+        ],
+        "volume": [
+          "volume"
+        ],
+        "density": [
+          "density"
+        ],
+        "metal": [
+          "metal"
+        ],
+        "contained metal": [
+          "contained metal"
+        ],
+        "ore": [
+          "ore"
+        ],
+        "grade": [
+          "grade"
+        ],
+        "strip ratio": [
+          "strip ratio"
+        ],
+        "ratio": [
+          "ratio"
+        ],
+        "waste": [
+          "waste"
+        ],
+        "recovery": [
+          "recovery"
+        ],
+        "feed": [
+          "feed"
+        ],
+        "feed grade": [
+          "feed grade"
+        ],
+        "head grade": [
+          "head grade"
+        ],
+        "concentrate": [
+          "concentrate"
+        ],
+        "concentrate grade": [
+          "concentrate grade"
+        ],
+        "tail": [
+          "tail"
+        ],
+        "tails": [
+          "tails"
+        ],
+        "tail grade": [
+          "tail grade"
+        ],
+        "tailings grade": [
+          "tailings grade"
+        ],
+        "cutoff": [
+          "cutoff"
+        ],
+        "cutoff grade": [
+          "cutoff grade"
+        ],
+        "price": [
+          "price"
+        ],
+        "metal price": [
+          "metal price"
+        ],
+        "processing": [
+          "processing"
+        ],
+        "processing cost": [
+          "processing cost"
+        ],
+        "g&a": [
+          "g&a"
+        ],
+        "overhead": [
+          "overhead"
+        ],
+        "selling cost": [
+          "selling cost"
+        ],
+        "pressure": [
+          "pressure"
+        ],
+        "depth": [
+          "depth"
+        ],
+        "flow": [
+          "flow"
+        ],
+        "discharge": [
+          "discharge"
+        ],
+        "conductivity": [
+          "conductivity"
+        ],
+        "hydraulic conductivity": [
+          "hydraulic conductivity"
+        ],
+        "k": [
+          "k"
+        ],
+        "area": [
+          "area"
+        ],
+        "gradient": [
+          "gradient"
+        ],
+        "hydraulic gradient": [
+          "hydraulic gradient"
+        ],
+        "velocity": [
+          "velocity"
+        ],
+        "settling velocity": [
+          "settling velocity"
+        ],
+        "particle density": [
+          "particle density"
+        ],
+        "fluid density": [
+          "fluid density"
+        ],
+        "diameter": [
+          "diameter"
+        ],
+        "grain size": [
+          "grain size"
+        ],
+        "grain diameter": [
+          "grain diameter"
+        ],
+        "viscosity": [
+          "viscosity"
+        ]
+      }
+    },
+    {
+      "type": "formulalist",
+      "words": {
+        "all": [
+          "what formulas do you know",
+          "which formulas do you know",
+          "the formulas",
+          "formulas"
+        ]
+      },
+      "words_pt": {
+        "all": [
+          "quais fórmulas você conhece",
+          "as fórmulas",
+          "fórmulas"
+        ]
+      }
+    },
+    {
       "type": "chronpart",
       "words": {
         "age": [
@@ -7560,26 +7824,6 @@
       }
     },
     {
-      "type": "decision",
-      "words": {
-        "matrix": [
-          "decision matrix",
-          "weighted decision",
-          "these options",
-          "the options",
-          "my options",
-          "options"
-        ]
-      },
-      "words_pt": {
-        "matrix": [
-          "matriz de decisão",
-          "essas opções",
-          "as opções"
-        ]
-      }
-    },
-    {
       "type": "gyword",
       "words": {
         "sigma": [
@@ -11162,6 +11406,239 @@
       "label_pt": "Salvar a caderneta"
     },
     {
+      "name": "decide",
+      "label": "Decide",
+      "words": [
+        "decide",
+        "choose",
+        "pick",
+        "weigh up",
+        "help me decide",
+        "help me choose",
+        "help me pick"
+      ],
+      "theme": [],
+      "required": [],
+      "roles": {
+        "between": {
+          "preps": [
+            "between",
+            "among",
+            "from",
+            ""
+          ],
+          "types": [
+            "text"
+          ]
+        }
+      },
+      "words_pt": [
+        "decide",
+        "decidir",
+        "escolhe",
+        "escolher",
+        "me ajuda a decidir"
+      ],
+      "label_pt": "Decidir"
+    },
+    {
+      "name": "decideblank",
+      "label": "Decide",
+      "words": [
+        "compare",
+        "weigh",
+        "make a"
+      ],
+      "elidable": true,
+      "theme": [
+        "decision"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {},
+      "label_pt": "Decidir"
+    },
+    {
+      "name": "reckont",
+      "label": "Reckon",
+      "words": [
+        "how long",
+        "how long to",
+        "how long does it take to",
+        "how long will it take to",
+        "how long would it take to",
+        "how much time",
+        "time to",
+        "time for"
+      ],
+      "theme": [
+        "text"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {},
+      "words_pt": [
+        "quanto tempo",
+        "quanto tempo para",
+        "quanto tempo leva para",
+        "em quanto tempo"
+      ],
+      "label_pt": "Calcular"
+    },
+    {
+      "name": "reckonL",
+      "label": "Reckon",
+      "words": [
+        "how far",
+        "how deep",
+        "what distance",
+        "how far is"
+      ],
+      "theme": [
+        "text"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {},
+      "words_pt": [
+        "qual a distância",
+        "quão longe",
+        "que distância"
+      ],
+      "label_pt": "Calcular"
+    },
+    {
+      "name": "reckonM",
+      "label": "Reckon",
+      "words": [
+        "how heavy",
+        "how heavy is",
+        "how much does",
+        "what mass",
+        "what tonnage",
+        "what is the tonnage of",
+        "how much ore",
+        "how much metal",
+        "how much copper",
+        "how much gold"
+      ],
+      "theme": [
+        "text"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {},
+      "words_pt": [
+        "quanto pesa",
+        "qual a massa",
+        "qual a tonelagem",
+        "quanto metal"
+      ],
+      "label_pt": "Calcular"
+    },
+    {
+      "name": "reckonV",
+      "label": "Reckon",
+      "words": [
+        "what volume",
+        "how much volume",
+        "what is the volume of"
+      ],
+      "theme": [
+        "text"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {},
+      "words_pt": [
+        "qual o volume",
+        "que volume"
+      ],
+      "label_pt": "Calcular"
+    },
+    {
+      "name": "reckon",
+      "label": "Reckon",
+      "words": [
+        "reckon",
+        "work out",
+        "how much",
+        "how many"
+      ],
+      "theme": [
+        "text"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {},
+      "words_pt": [
+        "calcula",
+        "quanto",
+        "quantos"
+      ],
+      "label_pt": "Calcular"
+    },
+    {
+      "name": "formula",
+      "label": "Formula",
+      "words": [
+        "solve",
+        "solve the",
+        "use",
+        "use the",
+        "compute"
+      ],
+      "elidable": true,
+      "theme": [
+        "formulaname"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {
+        "for": {
+          "preps": [
+            "for"
+          ],
+          "types": [
+            "formulavar"
+          ]
+        }
+      },
+      "words_pt": [
+        "resolve",
+        "usa"
+      ],
+      "label_pt": "Fórmula"
+    },
+    {
+      "name": "formulas",
+      "label": "Formulas",
+      "words": [
+        "list",
+        "show"
+      ],
+      "elidable": true,
+      "theme": [
+        "formulalist"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {},
+      "words_pt": [
+        "lista",
+        "mostra"
+      ],
+      "label_pt": "Fórmulas"
+    },
+    {
       "name": "date",
       "label": "Date",
       "words": [
@@ -12245,60 +12722,6 @@
         "o que mudou entre"
       ],
       "label_pt": "Diferença"
-    },
-    {
-      "name": "decide",
-      "label": "Decide",
-      "words": [
-        "decide",
-        "choose",
-        "pick",
-        "weigh up",
-        "help me decide",
-        "help me choose",
-        "help me pick"
-      ],
-      "theme": [],
-      "required": [],
-      "roles": {
-        "between": {
-          "preps": [
-            "between",
-            "among",
-            "from",
-            ""
-          ],
-          "types": [
-            "text"
-          ]
-        }
-      },
-      "words_pt": [
-        "decide",
-        "decidir",
-        "escolhe",
-        "escolher",
-        "me ajuda a decidir"
-      ],
-      "label_pt": "Decidir"
-    },
-    {
-      "name": "decideblank",
-      "label": "Decide",
-      "words": [
-        "compare",
-        "weigh",
-        "make a"
-      ],
-      "elidable": true,
-      "theme": [
-        "decision"
-      ],
-      "required": [
-        "theme"
-      ],
-      "roles": {},
-      "label_pt": "Decidir"
     },
     {
       "name": "gy",

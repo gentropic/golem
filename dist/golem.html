@@ -13078,8 +13078,269 @@ frame({
   return { FIELD_COLS, fieldTable, stationNow };
 })();
 
-/* ==== src/engine/data/timescale.js ==== */
+/* ==== src/engine/forms.js ==== */
 const __m26 = (() => {
+const { tool, frame, amend, noun } = __m0;
+// The form card: a tool that still needs answers asks for them one at a time; each answer lands in
+// args and is an editable slot, and the result recomputes when any changes. The decision matrix is the
+// first form; the economics formulas use the same helpers.
+
+// an open question answered by a typed number (or an offered option); the whole answer must be the number
+const numberAsk = (prompt, { offer = [], min, max, unit } = {}) => ({
+  prompt: `${prompt}${offer.length ? '' : ' Type it below.'}`,
+  options: offer.map(o => ({ label: o.label, value: o.value })),
+  parse: s => { const m = /^(?:about |around |~)?(-?\d+(?:[.,]\d+)?)\s*(?:[a-zµ%°$][\w%°$/³²]*)?$/i.exec(s.trim()); if (!m) return null; const v = +m[1].replace(',', '.'); return (min != null && v < min) || (max != null && v > max) ? null : v; },
+  hint: unit || null
+});
+// an open question answered by a list: "a, b and c"
+const listAsk = prompt => ({ prompt: `${prompt} Type them below, separated by commas.`, options: [], parse: s => { const xs = listOf(s); return xs.length >= 2 ? xs : null; } });
+const listOf = s => s.split(/\s*,\s*|\s+and\s+|\s+or\s+|\s*;\s*/).map(x => x.trim().replace(/^(?:the|a|an)\s+/i, '')).filter(Boolean);
+// the first unanswered question of a list [{ key, ask }] → { key, ask with set } | null
+function firstNeed(a, qs) {
+  for (const q of qs) { if (a[q.key] != null) continue; const ask = typeof q.ask === 'function' ? q.ask(a) : q.ask; return { ...ask, set: (x, v) => { x[q.key] = v; } }; }
+  return null;
+}
+const ONE_TO_FIVE = [1, 2, 3, 4, 5].map(n => ({ label: String(n), value: n }));
+const slot = (label, key, cur) => ({ v: `${label} ${cur}`, key, alts: [1, 2, 3, 4, 5], cur });
+
+/* ── the decision matrix ────────────────────────────────────── */
+tool({
+  name: 'decide',
+  skill: { group: 'Compute', title: 'Decision matrix', on: 'form card', about: 'Options, criteria, a weight for each criterion and a score for each option on each, asked one at a time; weighted totals, bars, and the smallest single weight change that would change the top option. It reports the highest score and does not say what to do.', examples: ['help me decide between perth, vancouver and santiago', 'compare these options'] },
+  topic: a => ['Decision matrix', 1],
+  run: a => {
+    if (a._set) { a[a._set.key] = a._set.v; delete a._set; }
+    const read = ['decide between', { v: a.options ? a.options.join(', ') : '…' }];
+    const qs = [{ key: 'options', ask: listAsk('Which options?') }, { key: 'criteria', ask: listAsk('Which criteria matter?') }];
+    for (const c of a.criteria || []) qs.push({ key: 'w:' + c, ask: numberAsk(`How much does ${c} weigh, 1 (least) to 5 (most)?`, { offer: ONE_TO_FIVE, min: 1, max: 5 }) });
+    for (const o of a.options || []) for (const c of a.criteria || []) qs.push({ key: `s:${o}|${c}`, ask: numberAsk(`Score ${o} on ${c}, 1 (poor) to 5 (best)?`, { offer: ONE_TO_FIVE, min: 1, max: 5 }) });
+    const answered = qs.filter(q => a[q.key] != null).length, need = firstNeed(a, qs);
+    if (a.criteria) read.push('by', ...a.criteria.map(c => slot(c, 'w:' + c, a['w:' + c] || '?')).filter(s => s.cur !== '?'));
+    if (need) return { read, body: [...(a.criteria ? [{ t: 'kv', rows: [['options', a.options.join(', ')], ['criteria', a.criteria.join(', ')], ['answered', `${answered} of ${qs.length}`]] }] : [])], ask: need, trace: [`form: ${answered} of ${qs.length} answered`, 'blocked: next question'] };
+    const W = a.criteria.map(c => a['w:' + c]), totals = a.options.map(o => a.criteria.reduce((s, c, i) => s + W[i] * a[`s:${o}|${c}`], 0));
+    const best = Math.max(...totals), top = a.options.filter((o, i) => totals[i] === best);
+    const argmax = ws => { const t = a.options.map(o => a.criteria.reduce((s, c, i) => s + ws[i] * a[`s:${o}|${c}`], 0)); const m = Math.max(...t); return a.options.filter((o, i) => t[i] === m).join(' & '); };
+    let flip = null;
+    a.criteria.forEach((c, i) => { for (const w of [1, 2, 3, 4, 5]) { if (w === W[i]) continue; const ws = W.slice(); ws[i] = w; const who = argmax(ws); if (who !== top.join(' & ') && (!flip || Math.abs(w - W[i]) < flip.d)) flip = { c, from: W[i], to: w, who, d: Math.abs(w - W[i]) }; } });
+    const rows = a.options.map((o, i) => [o, ...a.criteria.map(c => `${a[`s:${o}|${c}`]}`), String(totals[i])]);
+    return {
+      read, value: top.join(' & '),
+      body: [
+        { t: 'big', v: top.length > 1 ? `Tie: ${top.join(', ')}` : `Highest score: ${top[0]}`, unit: `${best} of ${5 * W.reduce((x, y) => x + y, 0)}` },
+        { t: 'table', head: ['Option', ...a.criteria.map((c, i) => `${c} ×${W[i]}`), 'Total'], num: [false, ...a.criteria.map(() => true), true], rows },
+        { t: 'hbars', rows: a.options.map((o, i) => [o, totals[i], String(totals[i])]) },
+        { t: 'sub', text: flip ? `Sensitivity: if ${flip.c} weighed ${flip.to} instead of ${flip.from}, the highest score would be ${flip.who}. No smaller single weight change does that.` : 'Sensitivity: no single weight change (1 to 5) changes which option scores highest.' },
+        { t: 'sub', text: 'Weights and scores are yours; tap one in the reading to change it, or say "cost is 3" or "perth on cost is 4".' }
+      ],
+      trace: [`weights: ${a.criteria.map((c, i) => `${c} ${W[i]}`).join(', ')}`, ...a.options.map((o, i) => `${o}: ${a.criteria.map((c, j) => `${W[j]}×${a[`s:${o}|${c}`]}`).join(' + ')} = ${totals[i]}`), flip ? `sensitivity: ${flip.c} ${flip.from}→${flip.to} gives ${flip.who}` : 'sensitivity: none'],
+      py: `decide.matrix(options=${JSON.stringify(a.options)}, criteria=${JSON.stringify(a.criteria)}, weights=${JSON.stringify(W)}, scores=${JSON.stringify(a.options.map(o => a.criteria.map(c => a[`s:${o}|${c}`])))})`
+    };
+  }
+});
+// "help me decide between perth, vancouver and santiago", "compare these options", "decision matrix"
+frame({
+  name: 'decide', label: 'Decide', words: ['decide', 'choose', 'pick', 'weigh up', 'help me decide', 'help me choose', 'help me pick'], theme: [], required: [],
+  roles: { between: { preps: ['between', 'among', 'from', ''], types: ['text'] } }, words_pt: ['decide', 'decidir', 'escolhe', 'escolher', 'me ajuda a decidir'], label_pt: 'Decidir',
+  bind: c => { const t = c.roles.between && c.roles.between[0]; if (!t) return { tool: 'decide', args: {} }; const xs = listOf(t.value); return xs.length >= 2 ? { tool: 'decide', args: { options: xs } } : null; }
+});
+noun({ type: 'decision', words: { matrix: ['decision matrix', 'weighted decision', 'these options', 'the options', 'my options', 'options'] }, words_pt: { matrix: ['matriz de decisão', 'essas opções', 'as opções'] } });
+frame({ name: 'decideblank', label: 'Decide', words: ['compare', 'weigh', 'make a'], elidable: true, theme: ['decision'], required: ['theme'], roles: {}, label_pt: 'Decidir', bind: () => ({ tool: 'decide', args: {} }) });
+// "price weighs 3", "perth on price is 4": the names are the matrix's own
+const named = (xs, w) => (xs || []).find(x => x.toLowerCase() === w.trim().toLowerCase());
+amend({ tools: ['decide'], name: 'weigh', label: 'Weight', words: ['weighs', 'weight', 'has weight', 'is weighted'], subject: ['text'], theme: ['quantity:bare'], required: ['theme', 'subject'], roles: {},
+  bind: (c, a) => { const crit = named(a.criteria, c.roles.subject[0].value.replace(/^(?:the )?weight (?:of |for )?/i, '')), v = c.theme[0].n; return crit && v >= 1 && v <= 5 ? { args: { ...a, _set: { key: 'w:' + crit, v } } } : null; } });
+amend({ tools: ['decide'], name: 'score', label: 'Score', words: ['is', 'scores', 'gets', '='], subject: ['text'], theme: ['quantity:bare'], required: ['theme', 'subject'], roles: {},
+  bind: (c, a) => { const m = /^(.+?)\s+(?:on|for)\s+(.+)$/i.exec(c.roles.subject[0].value.trim()), v = c.theme[0].n; if (!m || v < 1 || v > 5) return null;
+    const o = named(a.options, m[1]), k = named(a.criteria, m[2]); return o && k ? { args: { ...a, _set: { key: `s:${o}|${k}`, v } } } : null; } });
+  return { numberAsk, listAsk, listOf, firstNeed };
+})();
+
+/* ==== src/engine/reckon.js ==== */
+const __m27 = (() => {
+const { tool, frame, noun, fmt } = __m0;
+const { parseUnit } = __m2;
+const { numberAsk, firstNeed } = __m26;
+// Reckoning, the old-fashioned way (SPEC 13: reasoning without a model). Two pieces:
+//
+// Dimensional search: "how long to drill 300 m at 25 m/h", "how heavy is 1000 m3 at 2.7 t/m3", "how far in 3 h at
+// 5 km/h". The question says the dimension it wants (or "in hours" does); the request's quantities are multiplied and
+// divided, each used once or not at all, until the dimension comes out. Combinations that use every quantity win; when
+// more than one does, the card asks which, and runs none until one is picked. Units through golem's own table.
+//
+// Declared formulas, solvable for any term: tonnage, contained metal, strip ratio, the two-product recovery, break-even
+// cutoff, lithostatic pressure, Darcy's law, Stokes settling. A formula is an equation as data (its residual); a slot
+// says which term is unknown ("solve for"), the others are asked, and a root search over the term's range finds the
+// value. Where the equation has more than one root in range, the card says so and shows each.
+
+/* ── dimensions ─────────────────────────────────────────────── */
+// golem's unit dimensions ('L', 'M/V', 'L/t', …) as exponent vectors over length, mass, time, temperature
+const BASE = { L: { L: 1 }, M: { M: 1 }, t: { T: 1 }, A: { L: 2 }, V: { L: 3 }, R: {}, T: { K: 1 }, P: { M: 1, L: -1, T: -2 } };
+const add = (a, b, k = 1) => { const o = { ...a }; for (const [x, e] of Object.entries(b)) { o[x] = (o[x] || 0) + k * e; if (!o[x]) delete o[x]; } return o; };
+function vecOf(dim) {
+  if (dim == null) return null;
+  const [num, den] = String(dim).split('/'); if (!BASE[num] || (den && !BASE[den])) return null;
+  return den ? add(BASE[num], BASE[den], -1) : { ...BASE[num] };
+}
+const same = (a, b) => { const ks = new Set([...Object.keys(a), ...Object.keys(b)]); for (const k of ks) if ((a[k] || 0) !== (b[k] || 0)) return false; return true; };
+const DIM_WORD = { t: 'time', L: 'length', M: 'mass', V: 'volume', A: 'area', R: 'ratio', 'L/t': 'speed', 'M/V': 'density' };
+// the unit a result is shown in: the one asked for, else one of the request's own with that dimension, else a usual one
+function showUnit(vec, siValue, asked, quantities) {
+  if (asked) { const u = parseUnit(asked); if (u && same(vecOf(u.dim), vec)) return { unit: asked, f: u.f }; }
+  const usual = [['t', s => s < 60 ? 's' : s < 3600 ? 'min' : s < 72 * 3600 ? 'h' : 'day'], ['L', s => s >= 1000 ? 'km' : 'm'], ['M', s => s >= 1000 ? 't' : 'kg'], ['V', () => 'm3'], ['A', s => s >= 1e6 ? 'km2' : 'm2'], ['R', () => '%']];
+  for (const [d, pick] of usual) if (same(vec, vecOf(d))) { const unit = pick(Math.abs(siValue)), u = parseUnit(unit); return { unit, f: u.f }; }
+  const own = quantities.find(q => same(vecOf(q.dim), vec)); if (own) return { unit: own.unit, f: own.f };
+  return { unit: Object.entries(vec).map(([k, e]) => ({ L: 'm', M: 'kg', T: 's', K: 'K' }[k] + (e !== 1 ? e : ''))).join('·') || '', f: 1 };
+}
+// the quantities in a request: a number and the unit after it, as golem's unit table reads it ("25 m/h", "2.7 t/m3",
+// "1.2 %"); a number with no unit is a count
+function quantitiesOf(text) {
+  const out = [], words = String(text).replace(/(\d)([a-zµ%])/gi, '$1 $2').split(/\s+/).filter(Boolean);
+  for (let i = 0; i < words.length; i++) {
+    const n = /^-?\d+(?:[.,]\d+)?$/.test(words[i]) ? +words[i].replace(',', '.') : null; if (n == null) continue;
+    let best = null;
+    for (let k = Math.min(3, words.length - i - 1); k >= 1; k--) { const w = words.slice(i + 1, i + 1 + k).join(' ').replace(/[,;.]$/, ''), u = parseUnit(w); if (u && !u.amb && vecOf(u.dim)) { best = { unit: w, u, k }; break; } }
+    if (best) { out.push({ n, unit: best.unit, dim: best.u.dim, f: best.u.f, si: n * best.u.f }); i += best.k; } else out.push({ n, unit: '', dim: 'R', f: 1, si: n });
+  }
+  return out;
+}
+// every way of multiplying and dividing the quantities (each used once or not at all) that gives the dimension wanted
+function combos(qs, want) {
+  const out = [], e = new Array(qs.length).fill(0);
+  const walk = i => {
+    if (i === qs.length) { if (e.every(x => x === 0)) return; let v = {}; e.forEach((x, j) => { if (x) v = add(v, vecOf(qs[j].dim), x); }); if (!want || same(v, want)) out.push({ e: [...e], vec: v, used: e.filter(Boolean).length }); return; }
+    for (const x of [1, -1, 0]) { e[i] = x; walk(i + 1); }
+  };
+  walk(0);
+  const most = Math.max(0, ...out.map(c => c.used));
+  return out.filter(c => c.used === most);
+}
+const termOf = (qs, e) => { const up = qs.filter((_, j) => e[j] > 0).map(q => `${fmt(q.n)}${q.unit ? ' ' + q.unit : ''}`), down = qs.filter((_, j) => e[j] < 0).map(q => `${fmt(q.n)}${q.unit ? ' ' + q.unit : ''}`); return `${up.length ? up.join(' × ') : '1'}${down.length ? ' ÷ ' + (down.length > 1 ? `(${down.join(' × ')})` : down[0]) : ''}`; };
+const valueOf = (qs, e) => qs.reduce((v, q, j) => e[j] ? v * Math.pow(q.si, e[j]) : v, 1);
+
+tool({
+  name: 'reckon',
+  skill: { group: 'Compute', title: 'Reckon by dimensions', on: 'own dimensional analysis · golem units', about: 'Questions answered from their quantities alone: the dimension asked for (how long, how far, how heavy, what volume, or "in hours") found by multiplying and dividing what was given, each once. One way: the answer, with its equation. More than one: a choice, never a guess.', examples: ['how long to drill 300 m at 25 m/h', 'how heavy is 1000 m3 at 2.7 t/m3', 'how far in 3 h at 5 km/h', 'how much copper in 2700 t at 1.2 %'] },
+  topic: a => [`Reckon: ${a.text}`, 1],
+  run: a => {
+    const qs = quantitiesOf(a.text), want = a.want ? vecOf(a.want) : a.in ? vecOf((parseUnit(a.in) || {}).dim) : null;
+    const read = [a.want ? `${DIM_WORD[a.want] || a.want} for` : 'reckon', { v: a.text }, ...(a.in ? ['in', { v: a.in }] : [])];
+    if (qs.length < 2) return { read, body: [{ t: 'note', kind: 'err', text: 'I need at least two quantities with their units to reckon from, as in "300 m at 25 m/h".' }], trace: [`quantities: ${qs.length}`] };
+    const cs = combos(qs, want);
+    const qline = `quantities: ${qs.map(q => `${fmt(q.n)}${q.unit ? ' ' + q.unit : ''} (${q.unit ? DIM_WORD[q.dim] || q.dim : 'a count'})`).join(', ')}`;
+    if (!cs.length) return { read, body: [{ t: 'note', kind: 'err', text: `No product or quotient of ${qs.map(q => `${fmt(q.n)} ${q.unit}`.trim()).join(', ')} gives ${want ? DIM_WORD[a.want] || 'that dimension' : 'an answer'}. I do not guess the missing quantity.` }], trace: [qline, 'dimension search: nothing matches'] };
+    const pick = a.pick != null ? cs.find(c => c.e.join() === a.pick) : cs.length === 1 ? cs[0] : null;
+    if (!pick) return { read, body: [{ t: 'note', text: `${cs.length} ways of combining these give ${want ? DIM_WORD[a.want] || 'that dimension' : 'an answer'}. Which one is meant?` }, { t: 'list', items: cs.map(c => termOf(qs, c.e)) }],
+      ask: { prompt: 'Which one?', options: cs.map(c => { const v = valueOf(qs, c.e), s = showUnit(c.vec, v, a.in, qs); return { label: `${termOf(qs, c.e)} = ${fmt(v / s.f, 5)} ${s.unit}`, value: c.e.join() }; }), set: (x, v) => { x.pick = v; } },
+      trace: [qline, `dimension search: ${cs.length} combinations use every quantity`, 'wait: which one'] };
+    const si = valueOf(qs, pick.e), s = showUnit(pick.vec, si, a.in, qs), v = si / s.f;
+    return { read, value: v,
+      body: [{ t: 'big', v: fmt(v, 5), unit: s.unit }, { t: 'kv', rows: [['as', `${termOf(qs, pick.e)} = ${fmt(v, 5)} ${s.unit}`], ['dimension', DIM_WORD[Object.keys(DIM_WORD).find(d => same(vecOf(d), pick.vec))] || Object.entries(pick.vec).map(([k, e]) => `${k}^${e}`).join(' ') || 'none'], ...(cs.length === 1 && a.pick == null ? [['found', 'the only product or quotient of all the quantities with that dimension']] : [])] },
+        { t: 'src', text: 'own dimensional analysis · golem units · exact factors' }],
+      trace: [qline, `dimension search over ${3 ** qs.length - 1} products and quotients → ${termOf(qs, pick.e)}`, `in SI: ${fmt(si, 6)}, shown in ${s.unit}`], py: `${termOf(qs, pick.e).replace(/×/g, '*').replace(/÷/g, '/')}  # in ${s.unit}` };
+  }
+});
+
+/* ── declared formulas, solvable for any term ───────────────── */
+// vars: key → { label, unit (shown), lo, hi (the range searched for a root), offer?, words (what the term is called) }
+// eq(v) → the residual, zero when the equation holds; show: the equation as written
+const FORMULAS = {
+  tonnage: { title: 'Tonnage', words: ['tonnage formula', 'tonnage equation'], show: 'T = V · ρ', vars: { T: { label: 'tonnage', unit: 't', lo: 1e-6, hi: 1e15, words: ['tonnage', 'tonnes', 'mass'] }, V: { label: 'volume', unit: 'm³', lo: 1e-6, hi: 1e15, words: ['volume'] }, rho: { label: 'density', unit: 't/m³', lo: 0.1, hi: 25, words: ['density'] } }, eq: v => v.T - v.V * v.rho },
+  metal: { title: 'Contained metal', words: ['contained metal', 'metal content'], show: 'M = T · g / 100', vars: { M: { label: 'metal', unit: 't', lo: 1e-9, hi: 1e12, words: ['metal', 'contained metal'] }, T: { label: 'tonnage', unit: 't', lo: 1e-6, hi: 1e15, words: ['tonnage', 'ore'] }, g: { label: 'grade', unit: '%', lo: 1e-9, hi: 100, words: ['grade'] } }, eq: v => v.M - v.T * v.g / 100 },
+  strip: { title: 'Strip ratio', words: ['strip ratio', 'stripping ratio'], show: 'SR = W / O', vars: { SR: { label: 'strip ratio', unit: 't/t', lo: 1e-6, hi: 1e4, words: ['strip ratio', 'ratio'] }, W: { label: 'waste', unit: 't', lo: 1e-6, hi: 1e15, words: ['waste'] }, O: { label: 'ore', unit: 't', lo: 1e-6, hi: 1e15, words: ['ore'] } }, eq: v => v.SR * v.O - v.W },
+  twoproduct: { title: 'Two-product recovery', words: ['two-product recovery', 'two product formula', 'two-product formula', 'recovery formula'], show: 'R = 100 · c (f − t) / (f (c − t))',
+    vars: { R: { label: 'recovery', unit: '%', lo: 0, hi: 100, words: ['recovery'] }, f: { label: 'feed grade', unit: '%', lo: 1e-9, hi: 100, words: ['feed', 'feed grade', 'head grade'] }, c: { label: 'concentrate grade', unit: '%', lo: 1e-9, hi: 100, words: ['concentrate', 'concentrate grade'] }, t: { label: 'tail grade', unit: '%', lo: 0, hi: 100, words: ['tail', 'tails', 'tail grade', 'tailings grade'] } },
+    eq: v => v.R * v.f * (v.c - v.t) - 100 * v.c * (v.f - v.t) },
+  cutoff: { title: 'Break-even cutoff', words: ['break-even cutoff', 'breakeven cutoff', 'cutoff formula', 'cut-off formula'], show: 'g = 100 · (Cp + Cga) / (R/100 · (P − Cs))',
+    vars: { g: { label: 'cutoff grade', unit: '% metal', lo: 1e-9, hi: 100, words: ['grade', 'cutoff', 'cutoff grade'] }, P: { label: 'metal price', unit: 'per t of metal', lo: 1e-6, hi: 1e9, words: ['price', 'metal price'] }, R: { label: 'recovery', unit: '%', lo: 1e-6, hi: 100, words: ['recovery'] }, Cp: { label: 'processing cost', unit: 'per t of ore', lo: 0, hi: 1e6, words: ['processing', 'processing cost'] }, Cga: { label: 'G&A cost', unit: 'per t of ore', lo: 0, hi: 1e6, offer: [{ label: '0 (none)', value: 0 }], words: ['g&a', 'overhead'] }, Cs: { label: 'selling cost', unit: 'per t of metal', lo: 0, hi: 1e9, offer: [{ label: '0 (none)', value: 0 }], words: ['selling cost'] } },
+    eq: v => v.g * (v.R / 100) * (v.P - v.Cs) - 100 * (v.Cp + v.Cga) },
+  lithostatic: { title: 'Lithostatic pressure', words: ['lithostatic pressure', 'overburden pressure'], show: 'P = ρ · g₀ · h / 1000  (g₀ = 9.80665 m/s²)', vars: { P: { label: 'pressure', unit: 'MPa', lo: 1e-9, hi: 1e6, words: ['pressure'] }, rho: { label: 'density', unit: 't/m³', lo: 0.1, hi: 25, offer: [{ label: '2.7 (average crust)', value: 2.7 }], words: ['density'] }, h: { label: 'depth', unit: 'm', lo: 1e-6, hi: 1e6, words: ['depth'] } }, eq: v => v.P - v.rho * 9.80665 * v.h / 1000 },
+  darcy: { title: "Darcy's law", words: ["darcy's law", 'darcy law', 'darcy'], show: 'Q = K · A · i', vars: { Q: { label: 'flow', unit: 'm³/s', lo: 1e-15, hi: 1e6, words: ['flow', 'discharge'] }, K: { label: 'hydraulic conductivity', unit: 'm/s', lo: 1e-15, hi: 10, words: ['conductivity', 'hydraulic conductivity', 'k'] }, A: { label: 'area', unit: 'm²', lo: 1e-9, hi: 1e12, words: ['area'] }, i: { label: 'hydraulic gradient', unit: 'm/m', lo: 1e-9, hi: 100, words: ['gradient', 'hydraulic gradient'] } }, eq: v => v.Q - v.K * v.A * v.i },
+  stokes: { title: 'Stokes settling', words: ['stokes settling', "stokes' law", 'stokes law', 'settling velocity'], show: 'v = (ρp − ρf) · g₀ · d² / (18 μ)',
+    vars: { v: { label: 'settling velocity', unit: 'm/s', lo: 1e-15, hi: 100, words: ['velocity', 'settling velocity'] }, rp: { label: 'particle density', unit: 'kg/m³', lo: 1, hi: 25000, offer: [{ label: '2650 (quartz)', value: 2650 }], words: ['particle density'] }, rf: { label: 'fluid density', unit: 'kg/m³', lo: 0, hi: 25000, offer: [{ label: '1000 (water)', value: 1000 }], words: ['fluid density'] }, d: { label: 'grain diameter', unit: 'm', lo: 1e-9, hi: 1, words: ['diameter', 'grain size', 'grain diameter'] }, mu: { label: 'viscosity', unit: 'Pa·s', lo: 1e-9, hi: 1e6, offer: [{ label: '0.001 (water at 20 °C)', value: 0.001 }], words: ['viscosity'] } },
+    eq: v => 18 * v.mu * v.v - (v.rp - v.rf) * 9.80665 * v.d * v.d }
+};
+// every root of eq in [lo, hi] for one term, the others fixed: a scan for sign changes (in log steps where the range spans
+// decades), then bisection on each to 1e-12 relative
+function roots(F, key, known) {
+  const r = F.vars[key], f = x => F.eq({ ...known, [key]: x }), out = [];
+  const logs = r.lo > 0 && r.hi / r.lo > 1e3, N = 2000, at = i => logs ? r.lo * Math.pow(r.hi / r.lo, i / N) : r.lo + (r.hi - r.lo) * i / N;
+  let x0 = at(0), y0 = f(x0); if (y0 === 0) out.push(x0);
+  for (let i = 1; i <= N; i++) {
+    const x1 = at(i), y1 = f(x1);
+    if (y1 === 0) out.push(x1);
+    else if (isFinite(y0) && isFinite(y1) && y0 !== 0 && Math.sign(y0) !== Math.sign(y1)) {
+      let a = x0, b = x1, fa = y0; for (let k = 0; k < 200 && Math.abs(b - a) > 1e-12 * Math.max(1, Math.abs(a)); k++) { const m = (a + b) / 2, fm = f(m); if (Math.sign(fm) === Math.sign(fa)) { a = m; fa = fm; } else b = m; }
+      out.push((a + b) / 2);
+    }
+    x0 = x1; y0 = y1;
+  }
+  return out.filter((x, i) => i === 0 || Math.abs(x - out[i - 1]) > 1e-9 * Math.max(1, Math.abs(x)));
+}
+tool({
+  name: 'formula',
+  skill: { group: 'Compute', title: 'Formulas, solved for any term', on: 'declared equations · own root search', about: 'Tonnage, contained metal, strip ratio, the two-product recovery, break-even cutoff, lithostatic pressure, Darcy\'s law and Stokes settling, each solved for whichever term you leave out: the others are asked, and the root found by a search over the term\'s range. More than one root is said, not chosen.', examples: ['two-product recovery', 'solve the cutoff formula for price', 'stokes settling for diameter', 'what formulas do you know'] },
+  topic: a => [FORMULAS[a.formula] ? FORMULAS[a.formula].title : 'Formula', 1],
+  run: a => {
+    const F = FORMULAS[a.formula]; if (!F) return null;
+    const keys = Object.keys(F.vars), solve = keys.includes(a.solve) ? a.solve : keys[0];
+    const read = [F.title, 'solved for', { v: F.vars[solve].label, key: 'solve', alts: keys, cur: solve }];
+    const qs = keys.filter(k => k !== solve).map(k => ({ key: k, ask: numberAsk(`${F.vars[k].label[0].toUpperCase() + F.vars[k].label.slice(1)}, ${F.vars[k].unit}?`, { offer: F.vars[k].offer || [], min: F.vars[k].lo, max: F.vars[k].hi }) }));
+    const known = keys.filter(k => k !== solve && a[k] != null).map(k => [F.vars[k].label, `${fmt(a[k])} ${F.vars[k].unit}`]);
+    const need = firstNeed(a, qs);
+    if (need) return { read, body: [{ t: 'kv', rows: [['equation', F.show], ...known] }], ask: need, trace: ['blocked: a term is missing'] };
+    const vals = Object.fromEntries(keys.filter(k => k !== solve).map(k => [k, a[k]])), rs = roots(F, solve, vals), V = F.vars[solve];
+    if (!rs.length) return { read, body: [{ t: 'note', kind: 'err', text: `No ${V.label} between ${fmt(V.lo)} and ${fmt(V.hi)} ${V.unit} satisfies ${F.show} with these values.` }, { t: 'kv', rows: known }], trace: [`root search for ${solve} in [${V.lo}, ${V.hi}]: no sign change`] };
+    const x = rs[0], check = F.eq({ ...vals, [solve]: x });
+    return { read, value: x,
+      body: [{ t: 'big', v: fmt(x, 6), unit: `${V.unit}, ${V.label}` }, ...(rs.length > 1 ? [{ t: 'note', kind: 'warn', text: `${rs.length} values satisfy the equation in range: ${rs.map(r => fmt(r, 6)).join(', ')}. The first is shown; I do not choose between them.` }] : []),
+        { t: 'kv', rows: [['equation', F.show], ...known, ['check', `residual ${fmt(check, 3)} with ${V.label} = ${fmt(x, 8)}`]] }, { t: 'src', text: 'declared equation · root search: a scan for sign changes, then bisection' }],
+      trace: [`${F.show}, unknown ${solve}`, `scan of [${V.lo}, ${V.hi}] in 2000 steps → ${rs.length} root${rs.length > 1 ? 's' : ''}`, `bisection → ${fmt(x, 10)}`], py: `scipy.optimize.brentq(lambda ${solve}: ${F.show.split('=')[1].trim()}, ...)  # ${F.title}` };
+  }
+});
+tool({
+  name: 'formulas',
+  topic: () => ['Formulas', .5],
+  run: () => ({ read: ['the formulas I can solve'], body: [{ t: 'kv', rows: Object.values(FORMULAS).map(F => [F.title, `${F.show} · terms: ${Object.values(F.vars).map(v => v.label).join(', ')}`]) }, { t: 'chips', items: Object.values(FORMULAS).map(F => F.words[0]) }], trace: [`${Object.keys(FORMULAS).length} declared formulas`] })
+});
+
+/* ── what reads them ─────────────────────────────────────────── */
+// dimensional questions: the question word says the dimension; the request after it is free text whose quantities count
+const DIMQ = [
+  ['t', ['how long', 'how long to', 'how long does it take to', 'how long will it take to', 'how long would it take to', 'how much time', 'time to', 'time for'], ['quanto tempo', 'quanto tempo para', 'quanto tempo leva para', 'em quanto tempo']],
+  ['L', ['how far', 'how deep', 'what distance', 'how far is'], ['qual a distância', 'quão longe', 'que distância']],
+  ['M', ['how heavy', 'how heavy is', 'how much does', 'what mass', 'what tonnage', 'what is the tonnage of', 'how much ore', 'how much metal', 'how much copper', 'how much gold'], ['quanto pesa', 'qual a massa', 'qual a tonelagem', 'quanto metal']],
+  ['V', ['what volume', 'how much volume', 'what is the volume of'], ['qual o volume', 'que volume']],
+  [null, ['reckon', 'work out', 'how much', 'how many'], ['calcula', 'quanto', 'quantos']]
+];
+for (const [dim, words, words_pt] of DIMQ) frame({
+  name: `reckon${dim || ''}`, label: 'Reckon', words, theme: ['text'], required: ['theme'], roles: {}, words_pt, label_pt: 'Calcular',
+  bind: c => {
+    let text = String(c.theme[0].value).trim(), into = null;
+    const m = /\s+in\s+(\S+(?:\s+\S+)?)\s*\??$/i.exec(text); if (m && parseUnit(m[1]) && vecOf(parseUnit(m[1]).dim)) { into = m[1]; text = text.slice(0, m.index); }
+    text = text.replace(/\?\s*$/, '').replace(/^(?:in|is|of|for|to|the)\s+/i, '').replace(/,\s*$/, '').trim();
+    if (quantitiesOf(text).filter(q => q.unit).length < 1 || quantitiesOf(text).length < 2) return null;
+    return { tool: 'reckon', args: { text, ...(dim ? { want: dim } : {}), ...(into ? { in: into } : {}) } };
+  }
+});
+// formulas: "two-product recovery", "solve the cutoff formula for price", "stokes settling for diameter", "darcy's law"
+noun({ type: 'formulaname', exact: true, words: Object.fromEntries(Object.entries(FORMULAS).map(([k, F]) => [k, F.words])), words_pt: { twoproduct: ['recuperação de dois produtos', 'fórmula de dois produtos'], tonnage: ['fórmula da tonelagem'], metal: ['metal contido'], strip: ['relação estéril-minério', 'razão de remoção'], cutoff: ['teor de corte de equilíbrio'], lithostatic: ['pressão litostática'], darcy: ['lei de darcy'], stokes: ['lei de stokes', 'velocidade de sedimentação'] } });
+const VARWORDS = {}; for (const F of Object.values(FORMULAS)) for (const V of Object.values(F.vars)) for (const w of V.words) VARWORDS[w] = [w];
+noun({ type: 'formulavar', words: VARWORDS });
+noun({ type: 'formulalist', words: { all: ['what formulas do you know', 'which formulas do you know', 'the formulas', 'formulas'] }, words_pt: { all: ['quais fórmulas você conhece', 'as fórmulas', 'fórmulas'] } });
+frame({
+  name: 'formula', label: 'Formula', words: ['solve', 'solve the', 'use', 'use the', 'compute'], elidable: true, theme: ['formulaname'], required: ['theme'], roles: { for: { preps: ['for'], types: ['formulavar'] } },
+  words_pt: ['resolve', 'usa'], label_pt: 'Fórmula',
+  bind: c => { const f = c.theme[0].value, F = FORMULAS[f]; if (!F) return null; const w = c.roles.for && c.roles.for[0].value, key = w ? Object.keys(F.vars).find(k => F.vars[k].words.includes(w)) : null; if (w && !key) return null; return { tool: 'formula', args: { formula: f, ...(key ? { solve: key } : {}) } }; }
+});
+frame({
+  name: 'formulas', label: 'Formulas', words: ['list', 'show'], elidable: true, theme: ['formulalist'], required: ['theme'], roles: {}, words_pt: ['lista', 'mostra'], label_pt: 'Fórmulas',
+  bind: () => ({ tool: 'formulas', args: {} })
+});
+  return { vecOf, quantitiesOf, combos, FORMULAS, roots };
+})();
+
+/* ==== src/engine/data/timescale.js ==== */
+const __m28 = (() => {
 // The International Chronostratigraphic Chart as a records pack: one row per unit, five ranks.
 // Source: ICS (Cohen, Finney, Gibbard & Fan 2013; updated chart) as served by Macrostrat
 // (macrostrat.org/api/v2/defs/intervals?timescale_id=11, CC BY 4.0), fetched 8 Oct 2026. The Hadean is
@@ -13264,9 +13525,9 @@ const TIMESCALE = [
 })();
 
 /* ==== src/engine/timescale.js ==== */
-const __m27 = (() => {
+const __m29 = (() => {
 const { tool, frame, noun, unit, fmt } = __m0;
-const { TIMESCALE, TIMESCALE_SOURCE } = __m26;
+const { TIMESCALE, TIMESCALE_SOURCE } = __m28;
 // The geologic timescale: the ICS chart as a records pack (data/timescale.js). Ages, bounds, ranks,
 // what a unit sits in, what came before and after, what it is subdivided into, and which unit an age
 // in Ma falls in. Lookups only; the chart is the answer.
@@ -13366,7 +13627,7 @@ noun({ type: 'chron', words: Object.fromEntries(Object.keys(RETIRED).map(k => [k
 })();
 
 /* ==== src/engine/sample.js ==== */
-const __m28 = (() => {
+const __m30 = (() => {
 const { tool, frame, noun, compound, qmod, postmod, unit, fmt } = __m0;
 const { parseUnit } = __m2;
 const { core, sieve } = __m1;
@@ -13506,7 +13767,7 @@ frame({
 })();
 
 /* ==== src/engine/explain.js ==== */
-const __m29 = (() => {
+const __m31 = (() => {
 const { tool, frame, amend, noun, shape, clock, fmt } = __m0;
 // Explainers: formal notation parsed and described, one row per piece. Cron schedules, epoch times,
 // chmod modes, URLs and ECMAScript regular expressions. Each member has a recogniser so a bare
@@ -13881,7 +14142,7 @@ amend({ tools: ['explain'], name: 'explainas', label: 'Explain as', words: [], e
 })();
 
 /* ==== src/vendor/parquet.js ==== */
-const __m30 = (() => {
+const __m32 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/parquet, Parquet read and write over vendored hyparquet and hyparquet-writer, pure JS, minified by its own build, copied from ../auditable/ext/parquet/index.js at auditable 5fa5f72e (MIT; hyparquet MIT).
 // Re-vendor by copying that file here.
 
@@ -13890,9 +14151,9 @@ const e=["BOOLEAN","INT32","INT64","INT96","FLOAT","DOUBLE","BYTE_ARRAY","FIXED_
 })();
 
 /* ==== src/engine/convert.js ==== */
-const __m31 = (() => {
+const __m33 = (() => {
 const { S, tool, frame, amend, noun, fmt } = __m0;
-const { writeParquet } = __m30;
+const { writeParquet } = __m32;
 // Conversions that need no file format reader: hashes, text encodings both ways, and the open table
 // as CSV, TSV or JSON with a save action. Format readers (xlsx, dm, parquet) are the second pass.
 
@@ -14049,7 +14310,7 @@ for (const op of ['encode', 'decode']) amend({ tools: ['encode'], name: `op${op}
 })();
 
 /* ==== src/vendor/plan-calendar.js ==== */
-const __m32 = (() => {
+const __m34 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/plan's calendar engine and Brazilian holidays, copied from
 // ../auditable/ext/plan/src/calendar.js and src/holidays-br.js (MIT). The scheduling half of the package is not here.
 // Re-vendor by copying those two files here again and keeping the single export block at the end.
@@ -14406,10 +14667,10 @@ function brazilMunicipalities() {
 })();
 
 /* ==== src/engine/calendar.js ==== */
-const __m33 = (() => {
+const __m35 = (() => {
 const { S, tool, frame, amend, noun, shape, postmod, unit, clock, iso } = __m0;
 const { findDate, findTime, today, day0, fmtDate, dateWords } = __m4;
-const { isWorkingDay, addWorkingDays, brazilCalendar, federalHolidays } = __m32;
+const { isWorkingDay, addWorkingDays, brazilCalendar, federalHolidays } = __m34;
 // Working days and rosters over @gcu/plan's calendar engine (vendored), and time zones through Intl.
 // The calendar is a slot and is always shown: Brazil's federal holidays, or weekdays only.
 
@@ -14642,7 +14903,7 @@ amend({ tools: ['workdays'], name: 'workcal', label: 'Calendar', words: [], elid
 })();
 
 /* ==== src/engine/estimate.js ==== */
-const __m34 = (() => {
+const __m36 = (() => {
 const { amend, noun, tool, fmt } = __m0;
 const { U } = __m2;
 // Estimates with ranges: arithmetic over intervals by simulation, units carried through, the seed kept
@@ -14817,7 +15078,7 @@ amend({ tools: ['estimate'], name: 'estdist', label: 'Distribution', words: ['as
 })();
 
 /* ==== src/engine/data/elements.js ==== */
-const __m35 = (() => {
+const __m37 = (() => {
 // The elements with their standard atomic weights, abridged to five significant figures.
 // Source: IUPAC Commission on Isotopic Abundances and Atomic Weights (CIAAW), Standard Atomic Weights 2024
 // (ciaaw.org/atomic-weights.htm, the 2021 report with Gd, Lu and Zr revised in 2024), cross-checked against
@@ -14862,9 +15123,9 @@ const ELEMENTS = [
 })();
 
 /* ==== src/engine/chem.js ==== */
-const __m36 = (() => {
+const __m38 = (() => {
 const { tool, frame, noun, shape, postmod, fmt } = __m0;
-const { ELEMENTS, ELEMENTS_SOURCE } = __m35;
+const { ELEMENTS, ELEMENTS_SOURCE } = __m37;
 const { UNIT_TABLE } = __m2;
 // Molar mass, conversion factors and element fractions from a parsed formula over the IUPAC weights;
 // the periodic table lookup. No mineral names: the minerals pack is not here, so a formula is required.
@@ -15028,7 +15289,7 @@ frame({
 })();
 
 /* ==== src/engine/text.js ==== */
-const __m37 = (() => {
+const __m39 = (() => {
 const { tool, frame, amend, noun, qmod, fmt } = __m0;
 // Text tools over a pasted payload: counts and readability, extracted key sentences, and a diff.
 // The payload is what follows the first colon, or every line after the first of a multi-line input;
@@ -15173,88 +15434,11 @@ amend({ tools: ['diff'], name: 'diffunit', label: 'Diff by', words: [], elidable
   return { payloadOf, words, sentences, syllables, textrank, myers };
 })();
 
-/* ==== src/engine/forms.js ==== */
-const __m38 = (() => {
-const { tool, frame, amend, noun } = __m0;
-// The form card: a tool that still needs answers asks for them one at a time; each answer lands in
-// args and is an editable slot, and the result recomputes when any changes. The decision matrix is the
-// first form; the economics formulas use the same helpers.
-
-// an open question answered by a typed number (or an offered option); the whole answer must be the number
-const numberAsk = (prompt, { offer = [], min, max, unit } = {}) => ({
-  prompt: `${prompt}${offer.length ? '' : ' Type it below.'}`,
-  options: offer.map(o => ({ label: o.label, value: o.value })),
-  parse: s => { const m = /^(?:about |around |~)?(-?\d+(?:[.,]\d+)?)\s*(?:[a-zµ%°$][\w%°$/³²]*)?$/i.exec(s.trim()); if (!m) return null; const v = +m[1].replace(',', '.'); return (min != null && v < min) || (max != null && v > max) ? null : v; },
-  hint: unit || null
-});
-// an open question answered by a list: "a, b and c"
-const listAsk = prompt => ({ prompt: `${prompt} Type them below, separated by commas.`, options: [], parse: s => { const xs = listOf(s); return xs.length >= 2 ? xs : null; } });
-const listOf = s => s.split(/\s*,\s*|\s+and\s+|\s+or\s+|\s*;\s*/).map(x => x.trim().replace(/^(?:the|a|an)\s+/i, '')).filter(Boolean);
-// the first unanswered question of a list [{ key, ask }] → { key, ask with set } | null
-function firstNeed(a, qs) {
-  for (const q of qs) { if (a[q.key] != null) continue; const ask = typeof q.ask === 'function' ? q.ask(a) : q.ask; return { ...ask, set: (x, v) => { x[q.key] = v; } }; }
-  return null;
-}
-const ONE_TO_FIVE = [1, 2, 3, 4, 5].map(n => ({ label: String(n), value: n }));
-const slot = (label, key, cur) => ({ v: `${label} ${cur}`, key, alts: [1, 2, 3, 4, 5], cur });
-
-/* ── the decision matrix ────────────────────────────────────── */
-tool({
-  name: 'decide',
-  skill: { group: 'Compute', title: 'Decision matrix', on: 'form card', about: 'Options, criteria, a weight for each criterion and a score for each option on each, asked one at a time; weighted totals, bars, and the smallest single weight change that would change the top option. It reports the highest score and does not say what to do.', examples: ['help me decide between perth, vancouver and santiago', 'compare these options'] },
-  topic: a => ['Decision matrix', 1],
-  run: a => {
-    if (a._set) { a[a._set.key] = a._set.v; delete a._set; }
-    const read = ['decide between', { v: a.options ? a.options.join(', ') : '…' }];
-    const qs = [{ key: 'options', ask: listAsk('Which options?') }, { key: 'criteria', ask: listAsk('Which criteria matter?') }];
-    for (const c of a.criteria || []) qs.push({ key: 'w:' + c, ask: numberAsk(`How much does ${c} weigh, 1 (least) to 5 (most)?`, { offer: ONE_TO_FIVE, min: 1, max: 5 }) });
-    for (const o of a.options || []) for (const c of a.criteria || []) qs.push({ key: `s:${o}|${c}`, ask: numberAsk(`Score ${o} on ${c}, 1 (poor) to 5 (best)?`, { offer: ONE_TO_FIVE, min: 1, max: 5 }) });
-    const answered = qs.filter(q => a[q.key] != null).length, need = firstNeed(a, qs);
-    if (a.criteria) read.push('by', ...a.criteria.map(c => slot(c, 'w:' + c, a['w:' + c] || '?')).filter(s => s.cur !== '?'));
-    if (need) return { read, body: [...(a.criteria ? [{ t: 'kv', rows: [['options', a.options.join(', ')], ['criteria', a.criteria.join(', ')], ['answered', `${answered} of ${qs.length}`]] }] : [])], ask: need, trace: [`form: ${answered} of ${qs.length} answered`, 'blocked: next question'] };
-    const W = a.criteria.map(c => a['w:' + c]), totals = a.options.map(o => a.criteria.reduce((s, c, i) => s + W[i] * a[`s:${o}|${c}`], 0));
-    const best = Math.max(...totals), top = a.options.filter((o, i) => totals[i] === best);
-    const argmax = ws => { const t = a.options.map(o => a.criteria.reduce((s, c, i) => s + ws[i] * a[`s:${o}|${c}`], 0)); const m = Math.max(...t); return a.options.filter((o, i) => t[i] === m).join(' & '); };
-    let flip = null;
-    a.criteria.forEach((c, i) => { for (const w of [1, 2, 3, 4, 5]) { if (w === W[i]) continue; const ws = W.slice(); ws[i] = w; const who = argmax(ws); if (who !== top.join(' & ') && (!flip || Math.abs(w - W[i]) < flip.d)) flip = { c, from: W[i], to: w, who, d: Math.abs(w - W[i]) }; } });
-    const rows = a.options.map((o, i) => [o, ...a.criteria.map(c => `${a[`s:${o}|${c}`]}`), String(totals[i])]);
-    return {
-      read, value: top.join(' & '),
-      body: [
-        { t: 'big', v: top.length > 1 ? `Tie: ${top.join(', ')}` : `Highest score: ${top[0]}`, unit: `${best} of ${5 * W.reduce((x, y) => x + y, 0)}` },
-        { t: 'table', head: ['Option', ...a.criteria.map((c, i) => `${c} ×${W[i]}`), 'Total'], num: [false, ...a.criteria.map(() => true), true], rows },
-        { t: 'hbars', rows: a.options.map((o, i) => [o, totals[i], String(totals[i])]) },
-        { t: 'sub', text: flip ? `Sensitivity: if ${flip.c} weighed ${flip.to} instead of ${flip.from}, the highest score would be ${flip.who}. No smaller single weight change does that.` : 'Sensitivity: no single weight change (1 to 5) changes which option scores highest.' },
-        { t: 'sub', text: 'Weights and scores are yours; tap one in the reading to change it, or say "cost is 3" or "perth on cost is 4".' }
-      ],
-      trace: [`weights: ${a.criteria.map((c, i) => `${c} ${W[i]}`).join(', ')}`, ...a.options.map((o, i) => `${o}: ${a.criteria.map((c, j) => `${W[j]}×${a[`s:${o}|${c}`]}`).join(' + ')} = ${totals[i]}`), flip ? `sensitivity: ${flip.c} ${flip.from}→${flip.to} gives ${flip.who}` : 'sensitivity: none'],
-      py: `decide.matrix(options=${JSON.stringify(a.options)}, criteria=${JSON.stringify(a.criteria)}, weights=${JSON.stringify(W)}, scores=${JSON.stringify(a.options.map(o => a.criteria.map(c => a[`s:${o}|${c}`])))})`
-    };
-  }
-});
-// "help me decide between perth, vancouver and santiago", "compare these options", "decision matrix"
-frame({
-  name: 'decide', label: 'Decide', words: ['decide', 'choose', 'pick', 'weigh up', 'help me decide', 'help me choose', 'help me pick'], theme: [], required: [],
-  roles: { between: { preps: ['between', 'among', 'from', ''], types: ['text'] } }, words_pt: ['decide', 'decidir', 'escolhe', 'escolher', 'me ajuda a decidir'], label_pt: 'Decidir',
-  bind: c => { const t = c.roles.between && c.roles.between[0]; if (!t) return { tool: 'decide', args: {} }; const xs = listOf(t.value); return xs.length >= 2 ? { tool: 'decide', args: { options: xs } } : null; }
-});
-noun({ type: 'decision', words: { matrix: ['decision matrix', 'weighted decision', 'these options', 'the options', 'my options', 'options'] }, words_pt: { matrix: ['matriz de decisão', 'essas opções', 'as opções'] } });
-frame({ name: 'decideblank', label: 'Decide', words: ['compare', 'weigh', 'make a'], elidable: true, theme: ['decision'], required: ['theme'], roles: {}, label_pt: 'Decidir', bind: () => ({ tool: 'decide', args: {} }) });
-// "price weighs 3", "perth on price is 4": the names are the matrix's own
-const named = (xs, w) => (xs || []).find(x => x.toLowerCase() === w.trim().toLowerCase());
-amend({ tools: ['decide'], name: 'weigh', label: 'Weight', words: ['weighs', 'weight', 'has weight', 'is weighted'], subject: ['text'], theme: ['quantity:bare'], required: ['theme', 'subject'], roles: {},
-  bind: (c, a) => { const crit = named(a.criteria, c.roles.subject[0].value.replace(/^(?:the )?weight (?:of |for )?/i, '')), v = c.theme[0].n; return crit && v >= 1 && v <= 5 ? { args: { ...a, _set: { key: 'w:' + crit, v } } } : null; } });
-amend({ tools: ['decide'], name: 'score', label: 'Score', words: ['is', 'scores', 'gets', '='], subject: ['text'], theme: ['quantity:bare'], required: ['theme', 'subject'], roles: {},
-  bind: (c, a) => { const m = /^(.+?)\s+(?:on|for)\s+(.+)$/i.exec(c.roles.subject[0].value.trim()), v = c.theme[0].n; if (!m || v < 1 || v > 5) return null;
-    const o = named(a.options, m[1]), k = named(a.criteria, m[2]); return o && k ? { args: { ...a, _set: { key: `s:${o}|${k}`, v } } } : null; } });
-  return { numberAsk, listAsk, listOf, firstNeed };
-})();
-
 /* ==== src/engine/econ.js ==== */
-const __m39 = (() => {
+const __m40 = (() => {
 const { tool, frame, noun, shape, postmod, qmod, fmt } = __m0;
-const { ELEMENTS } = __m35;
-const { numberAsk, firstNeed } = __m38;
+const { ELEMENTS } = __m37;
+const { numberAsk, firstNeed } = __m26;
 // Sampling theory and mine economics as declared formulas. Every term is a slot; a term the person did
 // not give is asked for, with the conventional value offered first and never applied on its own. Prices
 // are always the person's input. No geostatistics here: these are formulas over given numbers.
@@ -15418,7 +15602,7 @@ frame({
 })();
 
 /* ==== src/engine/log.js ==== */
-const __m40 = (() => {
+const __m41 = (() => {
 const { S, tool, frame, amend, noun, fmt, iso } = __m0;
 const { parseUnit, dimName } = __m2;
 const { findDate, today, fmtDate, dateWords } = __m4;
@@ -15567,7 +15751,7 @@ amend({ tools: ['logAdd'], name: 'logfix', label: 'Correct', words: ['that was',
 })();
 
 /* ==== src/engine/places.js ==== */
-const __m41 = (() => {
+const __m42 = (() => {
 const { S, tool, frame, amend, noun, shape, postmod, fmt, rad, deg } = __m0;
 // Places, distance and UTM. A place is coordinates in the request or a name saved on this device
 // ("home is -19.92, -43.94"); there is no gazetteer and device location is off, so an unknown name is
@@ -15733,11 +15917,11 @@ amend({ tools: ['utm'], name: 'utmband', label: 'Band', words: [], elidable: tru
 })();
 
 /* ==== src/engine/sky.js ==== */
-const __m42 = (() => {
+const __m43 = (() => {
 const { tool, frame, amend, noun, compound, fmt, rad, deg, iso } = __m0;
 const { findDate, today, fmtDate, dateWords } = __m4;
-const { zonesOf, offsetOf } = __m33;
-const { placeOf } = __m41;
+const { zonesOf, offsetOf } = __m35;
+const { placeOf } = __m42;
 // The sun by NOAA's solar position equations (after Meeus), and the moon's phase from the mean
 // synodic cycle, labelled with its accuracy. Times are given in the place's zone when the place name
 // has one, else in UTC and the card says so.
@@ -15819,7 +16003,7 @@ amend({ tools: ['sun'], name: 'sunzone', label: 'Zone', words: [], elidable: tru
 })();
 
 /* ==== src/engine/apply.js ==== */
-const __m43 = (() => {
+const __m44 = (() => {
 const { S, tool, fmt, rad, deg, p3, p2 } = __m0;
 const { whereOf } = __m16;
 const { evaluatePredicate, predicateToString } = __m15;
@@ -15886,7 +16070,7 @@ tool({
 })();
 
 /* ==== src/vendor/ipynb.js ==== */
-const __m44 = (() => {
+const __m45 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/ipynb, copied from ../auditable/ext/ipynb/index.js (MIT). golem uses importNotebook
 // for its import-substitution table only (numpy → natra, pandas → sadpan, …). Re-vendor by copying that file here.
 
@@ -16435,9 +16619,9 @@ function exportNotebook(cells, opts = {}) {
 })();
 
 /* ==== src/engine/python.js ==== */
-const __m45 = (() => {
+const __m46 = (() => {
 const { tool, frame, amend, result, fmt } = __m0;
-const { importNotebook } = __m44;
+const { importNotebook } = __m45;
 // Run and trace Python with adder, on the device. The tool itself stays synchronous: a first run returns a
 // "running" card carrying a job, the runner (a Web Worker in the page, adder in-process in the tests)
 // answers later, and the card is recomputed from the kept result. Replay reruns the code, which is
@@ -16507,7 +16691,7 @@ amend({ tools: ['python'], name: 'pytraceoff', label: 'Run', words: ['no trace',
 })();
 
 /* ==== src/vendor/librarian.js ==== */
-const __m46 = (() => {
+const __m47 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/librarian, the in-process text search (BM25F, fuzzy expansion, snippets, did-you-mean), copied from ../auditable/ext/librarian/index.js at auditable 5fa5f72e (MIT).
 // Re-vendor by copying that file here.
 
@@ -17783,9 +17967,9 @@ const Librarian = {
 })();
 
 /* ==== src/engine/docs.js ==== */
-const __m47 = (() => {
+const __m48 = (() => {
 const { S, tool, frame, amend, noun, postmod } = __m0;
-const { Librarian } = __m46;
+const { Librarian } = __m47;
 // Search my documents (A7). Markdown, plain text and HTML opened with the paperclip are kept on the device,
 // cut into passages (by heading, then by paragraph) and indexed by @gcu/librarian. A search returns
 // passages verbatim with the matched words marked; golem never rewrites them. The index is derived
@@ -17938,9 +18122,9 @@ amend({ tools: ['docPassage'], name: 'docstep', label: 'Passage', words: [], eli
 })();
 
 /* ==== src/engine/recipes.js ==== */
-const __m48 = (() => {
+const __m49 = (() => {
 const { S, tool, frame, noun, session, runTool } = __m0;
-const { listOf } = __m38;
+const { listOf } = __m26;
 // Recipes (A9): a session's plan saved under a name, with the subjects that may change between runs.
 // A recipe is stored as card specs, plain JSON like a session; running it replays every step with the
 // new subjects into a new session, and stops at the first step that no longer reads. Nothing is skipped
@@ -18134,7 +18318,7 @@ session({
 })();
 
 /* ==== src/vendor/sheet.js ==== */
-const __m49 = (() => {
+const __m50 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sheet, copied from ../auditable/ext/sheet/index.js (built from its src/ by @gcu/build, MIT).
 // Re-vendor by copying that file here. Reading is asynchronous (DecompressionStream), so golem converts at open time, not in a tool.
 
@@ -19366,7 +19550,7 @@ const sheet = {
 })();
 
 /* ==== src/vendor/dm.js ==== */
-const __m50 = (() => {
+const __m51 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/dm, the read-only Datamine .dm reader, copied from ../auditable/ext/dm/index.js (MIT).
 // Re-vendor by copying that file here.
 
@@ -19642,10 +19826,10 @@ function readDM(buffer) {
 })();
 
 /* ==== src/engine/formats.js ==== */
-const __m51 = (() => {
-const { sheet } = __m49;
-const { readDM } = __m50;
-const { readParquet, parquetInfo } = __m30;
+const __m52 = (() => {
+const { sheet } = __m50;
+const { readDM } = __m51;
+const { readParquet, parquetInfo } = __m32;
 // Binary table formats, converted to text when a file is opened: xlsx through @gcu/sheet (one text per
 // sheet), Datamine .dm through @gcu/dm, Parquet through @gcu/parquet. Tools stay synchronous and the device keeps the converted text,
 // so a session replays from it. What did not carry over is said on the card.
@@ -19696,7 +19880,7 @@ async function convertBinary(name, buffer) {
 })();
 
 /* ==== src/engine/notes.js ==== */
-const __m52 = (() => {
+const __m53 = (() => {
 const { S, tool, frame } = __m0;
 // Notes and taught words. Both belong to the device and are shared by every session.
 const textOf = c => c.theme[0] && c.theme[0].type === 'text' ? c.theme[0].value : null;
@@ -19747,7 +19931,7 @@ frame({
 })();
 
 /* ==== src/engine/skills.js ==== */
-const __m53 = (() => {
+const __m54 = (() => {
 const { TOOLS, tool, frame } = __m0;
 // The catalog: skills derived from the declarations, planned skills named here, and the packs golem
 // knows about. Examples feed the Skills tab, the "nearest skills" suggestions and the teach vocabulary.
@@ -19819,9 +20003,9 @@ const SUGGESTIONS = ['pop means population', 'histogram of cu', 'log scale', 'po
 })();
 
 /* ==== src/engine/learn.js ==== */
-const __m54 = (() => {
+const __m55 = (() => {
 const { S, tool, frame, noun } = __m0;
-const { vocab } = __m53;
+const { vocab } = __m54;
 // Learning from the person, on the device (SPEC 13: the language that grows). Nothing is learned silently, and nothing
 // is sent: what did not read is kept in a list the person can see and teach from ("what couldn't you read"); a request
 // that did not read, followed by one that did and differs in a short stretch, offers to remember that stretch as a word
@@ -19921,11 +20105,11 @@ frame({
 })();
 
 /* ==== src/engine/ontology.js ==== */
-const __m55 = (() => {
+const __m56 = (() => {
 const { FRAMES, LEXICON, S } = __m0;
 const { UNIT_TABLE, COMPOUNDS, DIM, parseUnit, dimName } = __m2;
 const { ELEMENT } = __m16;
-const { TIMESCALE } = __m26;
+const { TIMESCALE } = __m28;
 // The clause ontology, assembled from what golem knows: units from the conversion table, nouns from the
 // sample packs, verb frames from the declarations. Inert data; the build writes it to dist/golem.json.
 // Portuguese synonyms are listed here by hand until packs carry them in their golem facet.
@@ -20002,7 +20186,7 @@ function ontology(only) {
 })();
 
 /* ==== src/vendor/dispatch.js ==== */
-const __m56 = (() => {
+const __m57 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/dispatch, built from ../auditable/ext/dispatch/src/ by its own build.
 // Source of truth: gentropic/auditable ext/dispatch (local clone: ../auditable). Re-vendor by copying
 // ext/dispatch/index.js here after 'node ext/dispatch/build.js'. golem uses the grammar rung only:
@@ -22155,14 +22339,14 @@ const PORTUGUESE = {
 })();
 
 /* ==== src/engine/reading.js ==== */
-const __m57 = (() => {
+const __m58 = (() => {
 const { S, T, TOOLS, FRAMES, tool, frame, amend, session, noun, toolByName, runTool, iso } = __m0;
-const { examples, vocab } = __m53;
-const { rankByPicks } = __m54;
-const { ontology } = __m55;
+const { examples, vocab } = __m54;
+const { rankByPicks } = __m55;
+const { ontology } = __m56;
 const { calcOf } = __m3;
-const { estimateOf } = __m34;
-const { createEngine, makeSession, ENGLISH, PORTUGUESE } = __m56;
+const { estimateOf } = __m36;
+const { createEngine, makeSession, ENGLISH, PORTUGUESE } = __m57;
 // The reading ladder: context (amendments, meta-intents), grammar (the clause parser, then the regex
 // rules the declarations carry), taught words (device lexicon rewrites, then grammar again). Plus the
 // tools that talk about the session itself: none, why, export.
@@ -22471,7 +22655,7 @@ function sessionRead(raw) {
 })();
 
 /* ==== src/engine/sessions.js ==== */
-const __m58 = (() => {
+const __m59 = (() => {
 const { S, toolByName, runTool, startJobs, clearResults } = __m0;
 // Sessions: stored as plans (card specs), replayed on open, named from the tools that ran.
 // The shell persists whatever `serialize()` returns and feeds it back through `hydrate()`.
@@ -22590,7 +22774,7 @@ function reset() {
 })();
 
 /* ==== src/vendor/sluice/accumulator.js ==== */
-const __m59 = (() => {
+const __m60 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sluice src/accumulator.js, copied from ../auditable/ext/sluice/src/accumulator.js at auditable 3a7b253c.
 // golem vendors sluice's accumulator modules only (src/engine/stream.js): its runner builds expressions with new Function,
 // which golem does not ship outside the Python worker.
@@ -22758,7 +22942,7 @@ function weightedStats() {
 })();
 
 /* ==== src/vendor/sluice/tdigest.js ==== */
-const __m60 = (() => {
+const __m61 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sluice src/tdigest.js, copied from ../auditable/ext/sluice/src/tdigest.js at auditable 3a7b253c.
 // golem vendors sluice's accumulator modules only (src/engine/stream.js): its runner builds expressions with new Function,
 // which golem does not ship outside the Python worker.
@@ -22873,7 +23057,7 @@ function quantile(state, q) {
 })();
 
 /* ==== src/vendor/sluice/histogram.js ==== */
-const __m61 = (() => {
+const __m62 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sluice src/histogram.js, copied from ../auditable/ext/sluice/src/histogram.js at auditable 3a7b253c.
 // golem vendors sluice's accumulator modules only (src/engine/stream.js): its runner builds expressions with new Function,
 // which golem does not ship outside the Python worker.
@@ -22925,14 +23109,14 @@ function cumulativeFromTop(counts) {
 })();
 
 /* ==== src/engine/stream.js ==== */
-const __m62 = (() => {
+const __m63 = (() => {
 const { S, T, fmt, result } = __m0;
 const { colOf, whereSrc, tableFromText, openTable } = __m16;
 const { parsePredicate, evaluatePredicate, predicateToString } = __m15;
 const { NULL_SENTINELS } = __m14;
-const { weightedStats } = __m59;
-const { tdigest, quantile } = __m60;
-const { histogram } = __m61;
+const { weightedStats } = __m60;
+const { tdigest, quantile } = __m61;
+const { histogram } = __m62;
 // Tables too large to hold (SPEC 13.7): a CSV or TSV over 20 MB is typed from its first megabyte by recon, like any
 // table, and its questions are answered by scanning the whole file as a job, through @gcu/sluice's accumulators
 // (mergeable, never holding the rows): Welford and weighted moments, t-digest quantiles, histograms. The shell runs the
@@ -23093,18 +23277,18 @@ for (const k of ['apply', 'tableExport']) T[k] = a => S.table && S.table.streame
 })();
 
 /* ==== src/engine/engine.js ==== */
-const __m63 = (() => {
+const __m64 = (() => {
 const { S, T, runTool, toolByName, startJobs, tool, CONDITIONS, EFFECTS, clock, iso } = __m0;
 const { DOCUMENT } = __m12;
-const { DOCTEXT } = __m47;
-const { bindingsOf, runSteps } = __m48;
+const { DOCTEXT } = __m48;
+const { bindingsOf, runSteps } = __m49;
 const { tableFromText } = __m16;
-const { convertBinary } = __m51;
-const { noteMiss, clearMiss, correctionOf, teachOfPick, notePick, setReader } = __m54;
-const { norm, grammar, context, taught, sessionRead, readingOf, guessRead, clauseEngine } = __m57;
-const { makeSession } = __m56;
-const { current, newSession, renameSession, touch } = __m58;
-const { streamedTable } = __m62;
+const { convertBinary } = __m52;
+const { noteMiss, clearMiss, correctionOf, teachOfPick, notePick, setReader } = __m55;
+const { norm, grammar, context, taught, sessionRead, readingOf, guessRead, clauseEngine } = __m58;
+const { makeSession } = __m57;
+const { current, newSession, renameSession, touch } = __m59;
+const { streamedTable } = __m63;
 // The entry point: submit(raw) reads a request and returns what happened. Cards are recomputed in
 // place by rerun(); answers and slot flips go through it, so args stay the only state that matters.
 
@@ -23370,7 +23554,7 @@ function seedExamples() {
 })();
 
 /* ==== src/engine/packs.js ==== */
-const __m64 = (() => {
+const __m65 = (() => {
 const { profilesOf } = __m18;
 // Packs as gcu-library ships them: a .gcudat is a gzipped tar holding gcudat.json (the manifest) and the data files
 // (gcu-library tools/build-gcudat.mjs). Read here with the platform's own gunzip (DecompressionStream, in browsers and
@@ -23485,7 +23669,7 @@ async function compileStrunk(bytes) {
 })();
 
 /* ==== src/vendor/vfs.js ==== */
-const __m65 = (() => {
+const __m66 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/vfs, copied from ../auditable/ext/vfs/index.js (built from its src/ by node ext/vfs/build.js), at
 // auditable 8837da6e. golem's shell keeps sessions, device state, files and packs in it over IndexedDB (src/shell/store.js).
 // golem constructs only IDBBackend and MemoryBackend; the network backends in this bundle (fetch, REST, Dropbox) are
@@ -27296,8 +27480,8 @@ function fromPicker(vfs, destPath, opts) {
 })();
 
 /* ==== src/shell/store.js ==== */
-const __m66 = (() => {
-const { VFS } = __m65;
+const __m67 = (() => {
+const { VFS } = __m66;
 // Where the device keeps golem (SPEC 13.9): @gcu/vfs over IndexedDB, one file per session, one per opened file, the
 // device state and a small meta file, so a session can be exported as itself and nothing has a size cap but the
 // browser's. Only what changed is written. When IndexedDB is not there, the whole state goes to localStorage as before;
@@ -27411,7 +27595,7 @@ function noStore() {
 })();
 
 /* ==== src/vendor/leadacid.js ==== */
-const __m67 = (() => {
+const __m68 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. The lead-acid shell shim, copied from ../auditable/ext/leadacid/index.js
 // (itself vendored from gentropic/lead-acid, lead-acid.js). Re-vendor by copying that file here.
 
@@ -28115,7 +28299,7 @@ function orientationFromRotationVector(v) {
 })();
 
 /* ==== src/vendor/plot.js ==== */
-const __m68 = (() => {
+const __m69 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/plot (matplotlib-shaped plotting; figures leave the worker as draw lists), copied from ../auditable/ext/plot/index.js at auditable 774234c3 (9 Oct 2026, MIT).
 // Loaded only inside the Python worker. Re-vendor by copying that file here.
 
@@ -30149,7 +30333,7 @@ if (typeof window !== 'undefined') {
 })();
 
 /* ==== src/shell/i18n.js ==== */
-const __m69 = (() => {
+const __m70 = (() => {
 // The interface in English or Brazilian Portuguese. golem's own words (the page, the sidebar, the composer, the cards'
 // frame, the messages) go through t(); the English is the key, so a sentence not translated yet shows in English and a
 // placeholder ({name}) is filled in after the lookup. What a tool answers is the tool's, in English for now.
@@ -30261,11 +30445,11 @@ const PT = {
 })();
 
 /* ==== src/shell/render.js ==== */
-const __m70 = (() => {
+const __m71 = (() => {
 const { fmt } = __m0;
 const { conversions, equalArea } = __m5;
-const { Figure } = __m68;
-const { t } = __m69;
+const { Figure } = __m69;
+const { t } = __m70;
 const { stationNow } = __m25;
 // Rendering. The engine hands over plain blocks; this is the only file that turns them into markup.
 
@@ -30411,7 +30595,7 @@ function figImage(ctx, x, y, w, h, cols, rows, b64) {
 })();
 
 /* ==== src/vendor/sw-register.js ==== */
-const __m71 = (() => {
+const __m72 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sw's page-side companion, copied from ../auditable/ext/sw/register.js (at auditable 8837da6e).
 
 // @gcu/sw — the page-side companion (ES module). Registration + persistent
@@ -30489,27 +30673,27 @@ function registerGcuSw(opts = {}) {
 })();
 
 /* ==== src/shell/main.js ==== */
-const __m72 = (() => {
+const __m73 = (() => {
 const { S } = __m0;
-const { submit, flipSlot, answer, capture, seedExamples, openFile, openBinary, openStreamed, preview } = __m63;
-const { scanTable, STREAM_OVER } = __m62;
-const { completions } = __m57;
+const { submit, flipSlot, answer, capture, seedExamples, openFile, openBinary, openStreamed, preview } = __m64;
+const { scanTable, STREAM_OVER } = __m63;
+const { completions } = __m58;
 const { fromDevice } = __m24;
 const { conversions } = __m5;
 const { useFactbook, factbookInfo } = __m18;
-const { factbookFromGcudat, factbookProfiles, readGcudat, compileOds, compileStrunk, mineralsFromGcudat } = __m64;
+const { factbookFromGcudat, factbookProfiles, readGcudat, compileOds, compileStrunk, mineralsFromGcudat } = __m65;
 const { useMinerals, mineralsInfo } = __m8;
 const { useBook, bookInfo } = __m19;
-const { BINARY } = __m51;
+const { BINARY } = __m52;
 const { setRunner, onJobDone } = __m0;
-const { sessions, current, newSession, openSession, renameSession, deleteSession, searchHistory, parts, hydrate, onChange, exportSession, importSession, pinCard, branchSession } = __m58;
-const { openStore, putBlob, getBlob } = __m66;
-const { skills, PACKS, STARTERS, STARTERS_PT } = __m53;
-const { shell } = __m67;
-const { escHtml, pad, cardEl, drawCharts } = __m70;
-const { registerGcuSw } = __m71;
-const { t, plural, setUiLang, uiLang, applyStatic } = __m69;
-const { setLanguage } = __m57;
+const { sessions, current, newSession, openSession, renameSession, deleteSession, searchHistory, parts, hydrate, onChange, exportSession, importSession, pinCard, branchSession } = __m59;
+const { openStore, putBlob, getBlob } = __m67;
+const { skills, PACKS, STARTERS, STARTERS_PT } = __m54;
+const { shell } = __m68;
+const { escHtml, pad, cardEl, drawCharts } = __m71;
+const { registerGcuSw } = __m72;
+const { t, plural, setUiLang, uiLang, applyStatic } = __m70;
+const { setLanguage } = __m58;
 // The shell: wiring, tabs, the session drawer, storage, and the sleep switch. Everything that touches
 // the DOM or the browser lives here or in render.js; the engine never does.
 
