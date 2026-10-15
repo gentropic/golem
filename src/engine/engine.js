@@ -23,6 +23,7 @@ import './selftest.js';
 import './vocab.js';
 import './strata.js';
 import './tms.js';
+import './qaqc.js';
 import './timescale.js';
 import './sample.js';
 import './explain.js';

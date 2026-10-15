@@ -1984,6 +1984,43 @@
       }
     },
     {
+      "type": "decision",
+      "words": {
+        "matrix": [
+          "decision matrix",
+          "weighted decision",
+          "these options",
+          "the options",
+          "my options",
+          "options"
+        ]
+      },
+      "words_pt": {
+        "matrix": [
+          "matriz de decisão",
+          "essas opções",
+          "as opções"
+        ]
+      }
+    },
+    {
+      "type": "devtable",
+      "words": {
+        "qc": [
+          "the qc sample",
+          "qc sample",
+          "qc-sample.csv",
+          "the qc samples"
+        ]
+      },
+      "words_pt": {
+        "qc": [
+          "a amostra de qc",
+          "qc-sample.csv"
+        ]
+      }
+    },
+    {
       "type": "column",
       "words": {
         "hole": [
@@ -3260,26 +3297,6 @@
           "caderneta",
           "caderneta de campo",
           "a caderneta"
-        ]
-      }
-    },
-    {
-      "type": "decision",
-      "words": {
-        "matrix": [
-          "decision matrix",
-          "weighted decision",
-          "these options",
-          "the options",
-          "my options",
-          "options"
-        ]
-      },
-      "words_pt": {
-        "matrix": [
-          "matriz de decisão",
-          "essas opções",
-          "as opções"
         ]
       }
     },
@@ -9912,6 +9929,97 @@
       "label_pt": "Minerais com"
     },
     {
+      "name": "decide",
+      "label": "Decide",
+      "words": [
+        "decide",
+        "choose",
+        "pick",
+        "weigh up",
+        "help me decide",
+        "help me choose",
+        "help me pick"
+      ],
+      "theme": [],
+      "required": [],
+      "roles": {
+        "between": {
+          "preps": [
+            "between",
+            "among",
+            "from",
+            ""
+          ],
+          "types": [
+            "text"
+          ]
+        }
+      },
+      "words_pt": [
+        "decide",
+        "decidir",
+        "escolhe",
+        "escolher",
+        "me ajuda a decidir"
+      ],
+      "label_pt": "Decidir"
+    },
+    {
+      "name": "decideblank",
+      "label": "Decide",
+      "words": [
+        "compare",
+        "weigh",
+        "make a"
+      ],
+      "elidable": true,
+      "theme": [
+        "decision"
+      ],
+      "required": [
+        "theme"
+      ],
+      "roles": {},
+      "label_pt": "Decidir"
+    },
+    {
+      "name": "qaqc",
+      "label": "QA/QC",
+      "words": [
+        "check the qc",
+        "check qc",
+        "qaqc",
+        "qa/qc",
+        "check the qa/qc",
+        "check the standards",
+        "check the standards and blanks",
+        "check the control samples",
+        "run the qc checks",
+        "quality control"
+      ],
+      "theme": [],
+      "required": [],
+      "roles": {
+        "for": {
+          "preps": [
+            "for",
+            "of",
+            "on"
+          ],
+          "types": [
+            "variable"
+          ]
+        }
+      },
+      "words_pt": [
+        "confere o qa/qc",
+        "verifica o qa/qc",
+        "checa os padrões",
+        "controle de qualidade"
+      ],
+      "label_pt": "QA/QC"
+    },
+    {
       "name": "reformat",
       "label": "Convert",
       "words": [
@@ -11449,60 +11557,6 @@
         "baixa"
       ],
       "label_pt": "Salvar a caderneta"
-    },
-    {
-      "name": "decide",
-      "label": "Decide",
-      "words": [
-        "decide",
-        "choose",
-        "pick",
-        "weigh up",
-        "help me decide",
-        "help me choose",
-        "help me pick"
-      ],
-      "theme": [],
-      "required": [],
-      "roles": {
-        "between": {
-          "preps": [
-            "between",
-            "among",
-            "from",
-            ""
-          ],
-          "types": [
-            "text"
-          ]
-        }
-      },
-      "words_pt": [
-        "decide",
-        "decidir",
-        "escolhe",
-        "escolher",
-        "me ajuda a decidir"
-      ],
-      "label_pt": "Decidir"
-    },
-    {
-      "name": "decideblank",
-      "label": "Decide",
-      "words": [
-        "compare",
-        "weigh",
-        "make a"
-      ],
-      "elidable": true,
-      "theme": [
-        "decision"
-      ],
-      "required": [
-        "theme"
-      ],
-      "roles": {},
-      "label_pt": "Decidir"
     },
     {
       "name": "reckont",

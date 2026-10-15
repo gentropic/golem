@@ -5394,8 +5394,248 @@ frame({
   return { useMinerals, mineralsInfo, mineralRecords, mineralsTable, mineralsSource, CLASSES };
 })();
 
-/* ==== src/vendor/yaml.js ==== */
+/* ==== src/engine/logic.js ==== */
 const __m9 = (() => {
+// A small Datalog (SPEC 13: inference, not only computation). Facts are { rel, args }, rules are { name, head, body },
+// a term is a constant or a variable (a string starting with an upper-case letter or "_"). infer() applies the rules
+// until nothing new follows (naive evaluation: the fact sets here are a notebook's, tens to hundreds), and keeps for
+// every derived fact how it was derived, so proofOf() can say why. No negation, no arithmetic: what follows from what
+// was said, and nothing else.
+const isVar = t => typeof t === 'string' && /^[A-Z_]/.test(t);
+const keyOf = f => `${f.rel}(${f.args.join(',')})`;
+function match(pat, fact, env) {
+  if (pat.rel !== fact.rel || pat.args.length !== fact.args.length) return null;
+  const e = { ...env };
+  for (let i = 0; i < pat.args.length; i++) {
+    const p = pat.args[i], v = fact.args[i];
+    if (isVar(p)) { if (p in e) { if (e[p] !== v) return null; } else e[p] = v; } else if (p !== v) return null;
+  }
+  return e;
+}
+const ground = (pat, env) => ({ rel: pat.rel, args: pat.args.map(a => isVar(a) ? env[a] : a) });
+// → Map key → { rel, args, why: { said } | { rule, from: [keys] } }
+function infer(facts, rules, limit = 100000) {
+  const known = new Map();
+  for (const f of facts) { const k = keyOf(f); if (!known.has(k)) known.set(k, { rel: f.rel, args: f.args, why: { said: f.said ?? null } }); }
+  let changed = true, steps = 0;
+  while (changed) {
+    changed = false;
+    const all = [...known.values()];
+    for (const r of rules) {
+      let envs = [{ env: {}, from: [] }];
+      for (const b of r.body) {
+        const next = [];
+        for (const { env, from } of envs) for (const f of all) { const e = match(b, f, env); if (e) next.push({ env: e, from: [...from, keyOf(f)] }); }
+        envs = next; if (!envs.length) break;
+      }
+      for (const { env, from } of envs) {
+        const h = ground(r.head, env), k = keyOf(h);
+        if (!known.has(k)) { known.set(k, { ...h, why: { rule: r.name, from } }); changed = true; if (++steps > limit) throw new Error('too many conclusions'); }
+      }
+    }
+  }
+  return known;
+}
+// the derivation of a fact, deepest first: [{ fact, rule | said }], each step once
+function proofOf(known, key, seen = new Set()) {
+  const f = known.get(key); if (!f || seen.has(key)) return []; seen.add(key);
+  if (f.why.rule == null) return [{ fact: f, said: f.why.said }];
+  return [...f.why.from.flatMap(k => proofOf(known, k, seen)), { fact: f, rule: f.why.rule }];
+}
+  return { keyOf, infer, proofOf };
+})();
+
+/* ==== src/engine/forms.js ==== */
+const __m10 = (() => {
+const { tool, frame, amend, noun } = __m0;
+// The form card: a tool that still needs answers asks for them one at a time; each answer lands in
+// args and is an editable slot, and the result recomputes when any changes. The decision matrix is the
+// first form; the economics formulas use the same helpers.
+
+// an open question answered by a typed number (or an offered option); the whole answer must be the number
+const numberAsk = (prompt, { offer = [], min, max, unit } = {}) => ({
+  prompt: `${prompt}${offer.length ? '' : ' Type it below.'}`,
+  options: offer.map(o => ({ label: o.label, value: o.value })),
+  parse: s => { const m = /^(?:about |around |~)?(-?\d+(?:[.,]\d+)?)\s*(?:[a-zµ%°$][\w%°$/³²]*)?$/i.exec(s.trim()); if (!m) return null; const v = +m[1].replace(',', '.'); return (min != null && v < min) || (max != null && v > max) ? null : v; },
+  hint: unit || null
+});
+// an open question answered by a list: "a, b and c"
+const listAsk = prompt => ({ prompt: `${prompt} Type them below, separated by commas.`, options: [], parse: s => { const xs = listOf(s); return xs.length >= 2 ? xs : null; } });
+const listOf = s => s.split(/\s*,\s*|\s+and\s+|\s+or\s+|\s*;\s*/).map(x => x.trim().replace(/^(?:the|a|an)\s+/i, '')).filter(Boolean);
+// the first unanswered question of a list [{ key, ask }] → { key, ask with set } | null
+function firstNeed(a, qs) {
+  for (const q of qs) { if (a[q.key] != null) continue; const ask = typeof q.ask === 'function' ? q.ask(a) : q.ask; return { ...ask, set: (x, v) => { x[q.key] = v; } }; }
+  return null;
+}
+const ONE_TO_FIVE = [1, 2, 3, 4, 5].map(n => ({ label: String(n), value: n }));
+const slot = (label, key, cur) => ({ v: `${label} ${cur}`, key, alts: [1, 2, 3, 4, 5], cur });
+
+/* ── the decision matrix ────────────────────────────────────── */
+tool({
+  name: 'decide',
+  skill: { group: 'Compute', title: 'Decision matrix', on: 'form card', about: 'Options, criteria, a weight for each criterion and a score for each option on each, asked one at a time; weighted totals, bars, and the smallest single weight change that would change the top option. It reports the highest score and does not say what to do.', examples: ['help me decide between perth, vancouver and santiago', 'compare these options'] },
+  topic: a => ['Decision matrix', 1],
+  run: a => {
+    if (a._set) { a[a._set.key] = a._set.v; delete a._set; }
+    const read = ['decide between', { v: a.options ? a.options.join(', ') : '…' }];
+    const qs = [{ key: 'options', ask: listAsk('Which options?') }, { key: 'criteria', ask: listAsk('Which criteria matter?') }];
+    for (const c of a.criteria || []) qs.push({ key: 'w:' + c, ask: numberAsk(`How much does ${c} weigh, 1 (least) to 5 (most)?`, { offer: ONE_TO_FIVE, min: 1, max: 5 }) });
+    for (const o of a.options || []) for (const c of a.criteria || []) qs.push({ key: `s:${o}|${c}`, ask: numberAsk(`Score ${o} on ${c}, 1 (poor) to 5 (best)?`, { offer: ONE_TO_FIVE, min: 1, max: 5 }) });
+    const answered = qs.filter(q => a[q.key] != null).length, need = firstNeed(a, qs);
+    if (a.criteria) read.push('by', ...a.criteria.map(c => slot(c, 'w:' + c, a['w:' + c] || '?')).filter(s => s.cur !== '?'));
+    if (need) return { read, body: [...(a.criteria ? [{ t: 'kv', rows: [['options', a.options.join(', ')], ['criteria', a.criteria.join(', ')], ['answered', `${answered} of ${qs.length}`]] }] : [])], ask: need, trace: [`form: ${answered} of ${qs.length} answered`, 'blocked: next question'] };
+    const W = a.criteria.map(c => a['w:' + c]), totals = a.options.map(o => a.criteria.reduce((s, c, i) => s + W[i] * a[`s:${o}|${c}`], 0));
+    const best = Math.max(...totals), top = a.options.filter((o, i) => totals[i] === best);
+    const argmax = ws => { const t = a.options.map(o => a.criteria.reduce((s, c, i) => s + ws[i] * a[`s:${o}|${c}`], 0)); const m = Math.max(...t); return a.options.filter((o, i) => t[i] === m).join(' & '); };
+    let flip = null;
+    a.criteria.forEach((c, i) => { for (const w of [1, 2, 3, 4, 5]) { if (w === W[i]) continue; const ws = W.slice(); ws[i] = w; const who = argmax(ws); if (who !== top.join(' & ') && (!flip || Math.abs(w - W[i]) < flip.d)) flip = { c, from: W[i], to: w, who, d: Math.abs(w - W[i]) }; } });
+    const rows = a.options.map((o, i) => [o, ...a.criteria.map(c => `${a[`s:${o}|${c}`]}`), String(totals[i])]);
+    return {
+      read, value: top.join(' & '),
+      body: [
+        { t: 'big', v: top.length > 1 ? `Tie: ${top.join(', ')}` : `Highest score: ${top[0]}`, unit: `${best} of ${5 * W.reduce((x, y) => x + y, 0)}` },
+        { t: 'table', head: ['Option', ...a.criteria.map((c, i) => `${c} ×${W[i]}`), 'Total'], num: [false, ...a.criteria.map(() => true), true], rows },
+        { t: 'hbars', rows: a.options.map((o, i) => [o, totals[i], String(totals[i])]) },
+        { t: 'sub', text: flip ? `Sensitivity: if ${flip.c} weighed ${flip.to} instead of ${flip.from}, the highest score would be ${flip.who}. No smaller single weight change does that.` : 'Sensitivity: no single weight change (1 to 5) changes which option scores highest.' },
+        { t: 'sub', text: 'Weights and scores are yours; tap one in the reading to change it, or say "cost is 3" or "perth on cost is 4".' }
+      ],
+      trace: [`weights: ${a.criteria.map((c, i) => `${c} ${W[i]}`).join(', ')}`, ...a.options.map((o, i) => `${o}: ${a.criteria.map((c, j) => `${W[j]}×${a[`s:${o}|${c}`]}`).join(' + ')} = ${totals[i]}`), flip ? `sensitivity: ${flip.c} ${flip.from}→${flip.to} gives ${flip.who}` : 'sensitivity: none'],
+      py: `decide.matrix(options=${JSON.stringify(a.options)}, criteria=${JSON.stringify(a.criteria)}, weights=${JSON.stringify(W)}, scores=${JSON.stringify(a.options.map(o => a.criteria.map(c => a[`s:${o}|${c}`])))})`
+    };
+  }
+});
+// "help me decide between perth, vancouver and santiago", "compare these options", "decision matrix"
+frame({
+  name: 'decide', label: 'Decide', words: ['decide', 'choose', 'pick', 'weigh up', 'help me decide', 'help me choose', 'help me pick'], theme: [], required: [],
+  roles: { between: { preps: ['between', 'among', 'from', ''], types: ['text'] } }, words_pt: ['decide', 'decidir', 'escolhe', 'escolher', 'me ajuda a decidir'], label_pt: 'Decidir',
+  bind: c => { const t = c.roles.between && c.roles.between[0]; if (!t) return { tool: 'decide', args: {} }; const xs = listOf(t.value); return xs.length >= 2 ? { tool: 'decide', args: { options: xs } } : null; }
+});
+noun({ type: 'decision', words: { matrix: ['decision matrix', 'weighted decision', 'these options', 'the options', 'my options', 'options'] }, words_pt: { matrix: ['matriz de decisão', 'essas opções', 'as opções'] } });
+frame({ name: 'decideblank', label: 'Decide', words: ['compare', 'weigh', 'make a'], elidable: true, theme: ['decision'], required: ['theme'], roles: {}, label_pt: 'Decidir', bind: () => ({ tool: 'decide', args: {} }) });
+// "price weighs 3", "perth on price is 4": the names are the matrix's own
+const named = (xs, w) => (xs || []).find(x => x.toLowerCase() === w.trim().toLowerCase());
+amend({ tools: ['decide'], name: 'weigh', label: 'Weight', words: ['weighs', 'weight', 'has weight', 'is weighted'], subject: ['text'], theme: ['quantity:bare'], required: ['theme', 'subject'], roles: {},
+  bind: (c, a) => { const crit = named(a.criteria, c.roles.subject[0].value.replace(/^(?:the )?weight (?:of |for )?/i, '')), v = c.theme[0].n; return crit && v >= 1 && v <= 5 ? { args: { ...a, _set: { key: 'w:' + crit, v } } } : null; } });
+amend({ tools: ['decide'], name: 'score', label: 'Score', words: ['is', 'scores', 'gets', '='], subject: ['text'], theme: ['quantity:bare'], required: ['theme', 'subject'], roles: {},
+  bind: (c, a) => { const m = /^(.+?)\s+(?:on|for)\s+(.+)$/i.exec(c.roles.subject[0].value.trim()), v = c.theme[0].n; if (!m || v < 1 || v > 5) return null;
+    const o = named(a.options, m[1]), k = named(a.criteria, m[2]); return o && k ? { args: { ...a, _set: { key: `s:${o}|${k}`, v } } } : null; } });
+  return { numberAsk, listAsk, listOf, firstNeed };
+})();
+
+/* ==== src/engine/qaqc.js ==== */
+const __m11 = (() => {
+const { S, tool, frame, noun, fmt } = __m0;
+const { infer, proofOf } = __m9;
+const { numberAsk } = __m10;
+// Assay quality control as rules (SPEC 13: golem's first expert system). From the open table's control samples: a
+// certified standard more than 3 SD from its certified value fails (1-3s), and two results in a batch beyond 2 SD on the
+// same side fail together (2-2s, Westgard); a blank above its limit is contamination; a duplicate pair whose half
+// absolute relative difference (HARD) is above the threshold is poor precision. Those facts chain (logic.js) to a verdict
+// per batch — suspect, to review, passing, or unchecked when it holds no standard — each with the rules that led to it.
+// The certified values, the blank limit and the duplicate threshold are read from the table when it has them
+// ("expected", "sd" columns) and asked for when it does not; nothing is assumed. A synthetic QC table ships to try it.
+
+/* ── the sample: six synthetic batches, labelled as such ─────── */
+function rng(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function qcSample() {
+  const r = rng(20261015), n = () => Math.sqrt(-2 * Math.log(1 - r())) * Math.cos(2 * Math.PI * r()), rows = [];
+  for (let b = 1; b <= 6; b++) {
+    const batch = `B${String(b).padStart(2, '0')}`;
+    for (let i = 1; i <= 12; i++) rows.push({ sample: `${batch}-${String(i).padStart(3, '0')}`, batch, type: 'sample', standard: null, cu: +(Math.exp(Math.log(0.4) + 0.6 * n())).toFixed(3), expected: null, sd: null, original: null });
+    // the certified standard (STD-A: 0.500 % Cu, SD 0.020, as this synthetic sample declares it): B03 is planted 4 SD high
+    rows.push({ sample: `${batch}-STD`, batch, type: 'standard', standard: 'STD-A', cu: +(b === 3 ? 0.5 + 4 * 0.02 : 0.5 + 0.02 * 0.8 * n()).toFixed(3), expected: 0.5, sd: 0.02, original: null });
+    // a blank: B05 is planted contaminated
+    rows.push({ sample: `${batch}-BLK`, batch, type: 'blank', standard: null, cu: b === 5 ? 0.031 : +(0.001 + 0.001 * r()).toFixed(4), expected: null, sd: null, original: null });
+    // a duplicate of sample 4: B02 is planted imprecise
+    const orig = rows.find(x => x.sample === `${batch}-004`);
+    rows.push({ sample: `${batch}-DUP`, batch, type: 'duplicate', standard: null, cu: +(b === 2 ? orig.cu * 1.6 : orig.cu * (1 + 0.04 * n())).toFixed(3), expected: null, sd: null, original: orig.sample });
+  }
+  return { name: 'qc-sample.csv', source: 'sample', hash: 'qc-sample', rows, roles: {},
+    cols: [{ name: 'sample', type: 'categorical' }, { name: 'batch', type: 'categorical' }, { name: 'type', type: 'categorical' }, { name: 'standard', type: 'categorical' }, { name: 'cu', type: 'numeric', unit: '%', analyte: 'Cu' }, { name: 'expected', type: 'numeric', unit: '%' }, { name: 'sd', type: 'numeric', unit: '%' }, { name: 'original', type: 'categorical' }] };
+}
+
+/* ── reading the table: which columns say what ──────────────── */
+const KIND = [['standard', /^(?:std|standard|crm|srm|certified|ref|reference)s?$/i], ['blank', /^(?:blk|blank|field blank|pulp blank|coarse blank)s?$/i], ['duplicate', /^(?:dup|duplicate|field dup(?:licate)?|pulp dup(?:licate)?|coarse dup(?:licate)?|repeat|replicate)s?$/i]];
+const kindOf = v => { if (v == null) return null; const s = String(v).trim(); for (const [k, re] of KIND) if (re.test(s)) return k; return null; };
+const colBy = (t, re, not = []) => t.cols.find(c => re.test(c.name) && !not.includes(c.name));
+function qcColumns(t) {
+  const type = t.cols.find(c => c.type !== 'numeric' && t.rows.some(r => kindOf(r[c.name])));
+  const batch = colBy(t, /^(?:batch|job|lab_?job|certificate|cert(?:_no|ificate_no)?|work_?order|despatch|dispatch)$/i);
+  const std = colBy(t, /^(?:standard|std_?id|std|crm|crm_?id|reference|ref_?id|standard_?id)$/i, [type && type.name]);
+  const id = colBy(t, /^(?:sample|sample_?id|id|sample_?no|sample_?number)$/i);
+  const orig = colBy(t, /^(?:original|parent|dup_?of|duplicate_?of|primary|primary_?id|pair|original_?id)$/i);
+  const analytes = t.cols.filter(c => c.type === 'numeric' && (c.analyte || /^[a-z]{1,2}(?:_ppm|_pct|_ppb|_gpt)?$/i.test(c.name)) && !/^(?:expected|sd|from|to)$/i.test(c.name));
+  return { type, batch, std, id, orig, analytes };
+}
+const expCol = (t, el) => colBy(t, new RegExp(`^(?:${el}_)?(?:expected|certified|cert|target|cert_?val(?:ue)?)$`, 'i'));
+const sdCol = (t, el) => colBy(t, new RegExp(`^(?:${el}_)?(?:sd|std_?dev|stdev|sigma|1sd)$`, 'i'));
+
+/* ── the rules ───────────────────────────────────────────────── */
+const RULES = [
+  { name: '1-3s: a standard more than 3 SD from its certified value fails', head: { rel: 'std_fail', args: ['B'] }, body: [{ rel: 'over3', args: ['B', 'R'] }] },
+  { name: '2-2s: two standards beyond 2 SD on the same side in a batch fail', head: { rel: 'std_fail', args: ['B'] }, body: [{ rel: 'pair2s', args: ['B', 'R'] }] },
+  { name: 'a blank above its limit means contamination', head: { rel: 'contaminated', args: ['B'] }, body: [{ rel: 'blank_high', args: ['B', 'R'] }] },
+  { name: 'a duplicate pair above the threshold means poor precision', head: { rel: 'imprecise', args: ['B'] }, body: [{ rel: 'dup_far', args: ['B', 'R'] }] },
+  { name: 'a failed standard makes the batch suspect', head: { rel: 'suspect', args: ['B'] }, body: [{ rel: 'std_fail', args: ['B'] }] },
+  { name: 'contamination makes the batch suspect', head: { rel: 'suspect', args: ['B'] }, body: [{ rel: 'contaminated', args: ['B'] }] },
+  { name: 'poor precision puts the batch to review', head: { rel: 'review', args: ['B'] }, body: [{ rel: 'imprecise', args: ['B'] }] }
+];
+const SAID = { over3: 'standard', pair2s: 'standards', blank_high: 'blank', dup_far: 'duplicate' };
+
+tool({
+  name: 'qaqc', pre: ['table'],
+  skill: { group: 'Table', title: 'Assay quality control', on: 'rules · logic.js', about: 'The open table\'s standards, blanks and duplicates checked by rules (1-3s and 2-2s on certified standards, blank limits, duplicate HARD) chained to a verdict per batch, each with its reasons. Certified values, limits and thresholds come from the table or are asked; nothing is assumed. "open the qc sample" has a synthetic one to try.', examples: ['open the qc sample', 'check the qc', 'check the qc for cu'] },
+  topic: () => ['QA/QC', 2],
+  run: a => {
+    const t = S.table, read = ['check the QC of', { v: t.name }, ...(a.el ? ['for', { v: a.el }] : [])];
+    const q = qcColumns(t);
+    if (!q.type) return { read, body: [{ t: 'note', kind: 'err', text: `${t.name} has no column that marks standards, blanks or duplicates (values like "std", "blank", "dup"). I check control samples only where the table says which they are.` }], trace: ['no QC type column'] };
+    if (!q.batch) return { read, body: [{ t: 'note', kind: 'err', text: `${t.name} has no batch column (batch, job, certificate), so I cannot say which results each control sample vouches for.` }], trace: ['no batch column'] };
+    const els = q.analytes.map(c => c.name); const el = a.el && els.find(e => e.toLowerCase() === a.el.toLowerCase()) || (els.length === 1 ? els[0] : null);
+    if (!el) return { read, body: [{ t: 'kv', rows: [['analytes', els.join(', ') || 'none']] }], ask: { prompt: 'Check the QC for which element?', options: els.map(e => ({ label: e, value: e })), set: (x, v) => { x.el = v; } }, trace: ['which element'] };
+    const rows = t.rows.map((r, i) => ({ r, i, k: kindOf(r[q.type.name]), b: String(r[q.batch.name]) }));
+    const stds = rows.filter(x => x.k === 'standard'), blanks = rows.filter(x => x.k === 'blank'), dups = rows.filter(x => x.k === 'duplicate');
+    const stdName = x => q.std && x.r[q.std.name] != null ? String(x.r[q.std.name]) : 'the standard';
+    // certified values: from the table's columns, else asked, one standard at a time
+    const ec = expCol(t, el), sc = sdCol(t, el), certOf = s => { const row = stds.find(x => stdName(x) === s && ec && sc && x.r[ec.name] != null && x.r[sc.name] != null); return row ? [row.r[ec.name], row.r[sc.name], 'the table'] : a.cert && a.cert[s] ? [...a.cert[s], 'given'] : null; };
+    for (const s of [...new Set(stds.map(stdName))]) if (!certOf(s)) return { read, body: [{ t: 'kv', rows: [['standards', [...new Set(stds.map(stdName))].join(', ')]] }],
+      ask: { prompt: `Certified ${el} value of ${s}, and its SD, as on its certificate (as "0.5 ± 0.02")?`, options: [], parse: v => { const m = /^\s*(-?\d+(?:[.,]\d+)?)\s*(?:±|\+\/-|\+-|sd|,)\s*(\d+(?:[.,]\d+)?)\s*$/i.exec(v); return m ? [+m[1].replace(',', '.'), +m[2].replace(',', '.')] : null; }, set: (x, v) => { x.cert = { ...(x.cert || {}), [s]: v }; } }, trace: [`certified value of ${s}: not in the table`] };
+    if (blanks.length && a.blankLimit == null) return { read, body: [{ t: 'sub', text: `${blanks.length} blanks. The limit depends on the method's detection limit; it is yours to set.` }], ask: { ...numberAsk(`Blank limit for ${el}, in the column's unit (above it, a blank is contaminated)?`, { min: 0 }), set: (x, v) => { x.blankLimit = v; } }, trace: ['blank limit: asked'] };
+    if (dups.length && q.orig && q.id && a.hard == null) return { read, body: [{ t: 'sub', text: `${dups.length} duplicates. Usual HARD limits are about 10 % for pulp and 20 % for field duplicates.` }], ask: { ...numberAsk('Duplicate threshold: the HARD, in percent, above which a pair is poor?', { offer: [{ label: '10 (pulp duplicates)', value: 10 }, { label: '20 (field duplicates)', value: 20 }], min: 0, max: 100 }), set: (x, v) => { x.hard = v; } }, trace: ['duplicate threshold: asked'] };
+    // the facts, numerically, then the rules
+    const facts = [], notes = {}, say = (rel, b, i, text) => { facts.push({ rel, args: [b, String(i)], said: i }); notes[i] = text; };
+    const zs = stds.map(x => { const [e, sd] = certOf(stdName(x)), v = x.r[el]; return { ...x, z: v == null ? null : (v - e) / sd, e, sd, v }; });
+    for (const x of zs) if (x.z != null && Math.abs(x.z) > 3) say('over3', x.b, x.i, `${stdName(x)} in ${x.b}: ${fmt(x.v, 4)} against ${fmt(x.e, 4)} ± ${fmt(x.sd, 3)}, z = ${fmt(x.z, 3)}`);
+    const byBatch = {}; for (const x of zs) (byBatch[x.b] = byBatch[x.b] || []).push(x);
+    for (const [b, xs] of Object.entries(byBatch)) for (let j = 1; j < xs.length; j++) { const p = xs[j - 1], c = xs[j]; if (p.z != null && c.z != null && Math.abs(p.z) > 2 && Math.abs(c.z) > 2 && Math.sign(p.z) === Math.sign(c.z) && Math.abs(c.z) <= 3) say('pair2s', b, c.i, `two ${stdName(c)} results in ${b} beyond 2 SD, the same side: z = ${fmt(p.z, 3)} and ${fmt(c.z, 3)}`); }
+    for (const x of blanks) if (x.r[el] != null && x.r[el] > a.blankLimit) say('blank_high', x.b, x.i, `blank ${q.id ? x.r[q.id.name] : `row ${x.i + 1}`} in ${x.b}: ${fmt(x.r[el], 4)}, above the limit of ${fmt(a.blankLimit, 4)}`);
+    const hards = [];
+    if (q.orig && q.id) for (const x of dups) { const o = t.rows.find(r => r[q.id.name] === x.r[q.orig.name]); if (!o || o[el] == null || x.r[el] == null || o[el] + x.r[el] === 0) continue; const h = 100 * Math.abs(x.r[el] - o[el]) / (o[el] + x.r[el]); hards.push(h); if (h > a.hard) say('dup_far', x.b, x.i, `duplicate ${x.r[q.id.name]} of ${o[q.id.name]} in ${x.b}: ${fmt(o[el], 4)} and ${fmt(x.r[el], 4)}, HARD ${fmt(h, 3)} %`); }
+    const known = infer(facts, RULES), batches = [...new Set(rows.map(x => x.b))];
+    const verdict = b => known.has(`suspect(${b})`) ? 'suspect' : known.has(`review(${b})`) ? 'to review' : !zs.some(x => x.b === b) ? 'unchecked: no standard' : 'passing';
+    const why = b => { const k = known.has(`suspect(${b})`) ? `suspect(${b})` : known.has(`review(${b})`) ? `review(${b})` : null; if (!k) return []; return proofOf(known, k).map(s => s.rule ? s.rule : notes[s.said]).filter(Boolean); };
+    const counts = { suspect: 0, 'to review': 0, passing: 0, unchecked: 0 }; batches.forEach(b => { const v = verdict(b); counts[v.startsWith('unchecked') ? 'unchecked' : v]++; });
+    const body = [{ t: 'big', v: `${counts.suspect} suspect`, unit: `of ${batches.length} batches · ${counts['to review']} to review · ${counts.passing} passing${counts.unchecked ? ` · ${counts.unchecked} unchecked` : ''}` },
+      { t: 'table', head: ['batch', 'verdict', 'because'], rows: batches.map(b => [b, verdict(b), why(b).filter((_, i, a) => i < a.length - 1 || !/makes the batch|puts the batch/.test(_)).join('; ') || (verdict(b) === 'passing' ? 'standards within 2 SD, blanks under the limit, duplicates within the threshold' : '')]) },
+      { t: 'kv', rows: [['standards', zs.length ? `${zs.length}, mean z ${fmt(zs.reduce((s, x) => s + (x.z || 0), 0) / zs.length, 3)} (bias ${fmt(100 * zs.reduce((s, x) => s + (x.v - x.e) / x.e, 0) / zs.length, 3)} %)` : 'none'], ['blanks', blanks.length ? `${blanks.length}, limit ${fmt(a.blankLimit, 4)}` : 'none'], ['duplicates', hards.length ? `${hards.length} pairs, median HARD ${fmt([...hards].sort((x, y) => x - y)[Math.floor(hards.length / 2)], 3)} %, limit ${fmt(a.hard, 3)} %` : dups.length ? `${dups.length}, but no column links them to their originals` : 'none'], ['certified values', [...new Set(stds.map(stdName))].map(s => { const c = certOf(s); return `${s}: ${fmt(c[0], 4)} ± ${fmt(c[1], 3)} (${c[2]})`; }).join('; ') || 'none']] },
+      ...(t.source === 'sample' ? [{ t: 'note', text: 'This is the synthetic QC sample: its batches, values and certified standard are generated, with failures planted to show the rules.' }] : []),
+      { t: 'src', text: `${RULES.length} rules (Westgard 1-3s and 2-2s, blank limit, duplicate HARD), chained by logic.js` }];
+    return { read, value: counts.suspect, body, trace: [`columns: type ${q.type.name}, batch ${q.batch.name}${q.std ? `, standard ${q.std.name}` : ''}${q.orig ? `, original ${q.orig.name}` : ''}`, `${facts.length} findings → ${known.size} facts by ${RULES.length} rules`] };
+  }
+});
+// "check the qc", "check the qc for cu", "qaqc", "check the standards and blanks"
+noun({ type: 'devtable', words: { qc: ['the qc sample', 'qc sample', 'qc-sample.csv', 'the qc samples'] }, words_pt: { qc: ['a amostra de qc', 'qc-sample.csv'] } });
+frame({
+  name: 'qaqc', label: 'QA/QC', words: ['check the qc', 'check qc', 'qaqc', 'qa/qc', 'check the qa/qc', 'check the standards', 'check the standards and blanks', 'check the control samples', 'run the qc checks', 'quality control'], theme: [], required: [],
+  roles: { for: { preps: ['for', 'of', 'on'], types: ['variable'] } },
+  words_pt: ['confere o qa/qc', 'verifica o qa/qc', 'checa os padrões', 'controle de qualidade'], label_pt: 'QA/QC',
+  bind: c => ({ tool: 'qaqc', args: c.roles.for && c.roles.for[0] && c.roles.for[0].value ? { el: String(c.roles.for[0].value) } : {} })
+});
+  return { qcSample, qcColumns };
+})();
+
+/* ==== src/vendor/yaml.js ==== */
+const __m12 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/yaml, the strict YAML subset (parse to a typed tree, emit canonical text), copied from ../auditable/ext/yaml/index.js at auditable 5fa5f72e (MIT).
 // Re-vendor by copying that file here.
 
@@ -7023,7 +7263,7 @@ function format(text) {
 })();
 
 /* ==== src/vendor/wkt.js ==== */
-const __m10 = (() => {
+const __m13 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/wkt, Well-Known Text to and from GeoJSON geometry, copied from ../auditable/ext/wkt/index.js at auditable 5fa5f72e (MIT).
 // Re-vendor by copying that file here.
 
@@ -7150,7 +7390,7 @@ function stringify(geom, opts = {}) {
 })();
 
 /* ==== src/vendor/dxf.js ==== */
-const __m11 = (() => {
+const __m14 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/dxf, the DXF reader and writer (R2000 ASCII), copied from ../auditable/ext/dxf/index.js at auditable 5fa5f72e (MIT).
 // Re-vendor by copying that file here.
 
@@ -8358,11 +8598,11 @@ function extractScene(doc) {
 })();
 
 /* ==== src/engine/interchange.js ==== */
-const __m12 = (() => {
+const __m15 = (() => {
 const { S, tool, frame, fmt } = __m0;
-const { parse: parseYaml, emit, scalar, mapNode, seqNode, mapEntry } = __m9;
-const { parse: parseWkt, stringify: toWkt } = __m10;
-const { read: readDxf, explode, arcFromBulge } = __m11;
+const { parse: parseYaml, emit, scalar, mapNode, seqNode, mapEntry } = __m12;
+const { parse: parseWkt, stringify: toWkt } = __m13;
+const { read: readDxf, explode, arcFromBulge } = __m14;
 // Formats that are not tables: YAML and JSON both ways (within the strict subset @gcu/yaml reads), WKT and
 // GeoJSON both ways (@gcu/wkt), and DXF to GeoJSON or WKT one way (@gcu/dxf). Pasted after a colon, or a
 // file from the picker kept on the device. What does not carry over is said on the card.
@@ -8538,7 +8778,7 @@ frame({
 })();
 
 /* ==== src/vendor/sadpan.js ==== */
-const __m13 = (() => {
+const __m16 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sadpan, DataFrame-style tables and series, copied from
 // ../auditable/ext/sadpan/index.js (built from its src/ by @gcu/build). Re-vendor by copying that file here.
 // golem uses series() for summary statistics.
@@ -10667,7 +10907,7 @@ if (typeof window !== 'undefined') {
 })();
 
 /* ==== src/vendor/recon.js ==== */
-const __m14 = (() => {
+const __m17 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/recon, copied from ../auditable/ext/recon/index.js (built from its src/ by @gcu/build).
 // Re-vendor by copying that file here.
 
@@ -11178,7 +11418,7 @@ function assemble(ctx) {
 })();
 
 /* ==== src/vendor/sift.js ==== */
-const __m15 = (() => {
+const __m18 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sift, copied from ../auditable/ext/sift/index.js (built from its src/ by @gcu/build).
 // Re-vendor by copying that file here.
 
@@ -11445,13 +11685,14 @@ function _wrap(n) { return n && PARENS.has(n.op) ? '(' + _str(n) + ')' : _str(n)
 })();
 
 /* ==== src/engine/table.js ==== */
-const __m16 = (() => {
+const __m19 = (() => {
 const { S, T, tool, frame, amend, noun, shape, postmod, qmod, compound, condition, fmt, checksOf } = __m0;
 const { mineralsTable } = __m8;
-const { DOCUMENT } = __m12;
-const { series } = __m13;
-const { sniff, detectAnalyte, NULL_SENTINELS } = __m14;
-const { parsePredicate, evaluatePredicate, predicateToString } = __m15;
+const { qcSample } = __m11;
+const { DOCUMENT } = __m15;
+const { series } = __m16;
+const { sniff, detectAnalyte, NULL_SENTINELS } = __m17;
+const { parsePredicate, evaluatePredicate, predicateToString } = __m18;
 const { parseUnit } = __m2;
 // The open table: a real delimited file typed by @gcu/recon, or the synthetic sample; a histogram; and
 // table questions in controlled English answered through @gcu/sadpan and @gcu/sift (all vendored).
@@ -11525,7 +11766,7 @@ function colOf(word, table = S.table) {
 }
 const colNames = t => t.cols.map(c => c.name).join(', ');
 const shown = w => { const c = colOf(w, S.table || { cols: SAMPLE_COLS }); return c ? (c.analyte || c.name) : w; };
-const srcLine = t => t.source === 'sample' ? 'assays.csv · synthetic sample data, generated, not from a real deposit' : t.source === 'device' ? `the ${t.name} · ${t.rows.length} rows · a table on this device` : `${t.name}${t.sheet && t.from === 'xlsx' ? ' · sheet ' + t.sheet : ''} · ${t.rows.length} rows · ${t.from === 'xlsx' ? 'read by @gcu/sheet, ' : t.from === 'dm' ? 'read by @gcu/dm, ' : t.from === 'parquet' ? 'read by @gcu/parquet, ' : ''}typed by @gcu/recon`;
+const srcLine = t => t.source === 'sample' ? `${t.name} · synthetic sample data, generated, not from a real deposit` : t.source === 'device' ? `the ${t.name} · ${t.rows.length} rows · a table on this device` : `${t.name}${t.sheet && t.from === 'xlsx' ? ' · sheet ' + t.sheet : ''} · ${t.rows.length} rows · ${t.from === 'xlsx' ? 'read by @gcu/sheet, ' : t.from === 'dm' ? 'read by @gcu/dm, ' : t.from === 'parquet' ? 'read by @gcu/parquet, ' : ''}typed by @gcu/recon`;
 
 /* ── statistics, weighted or not ───────────────────────────── */
 function stats(v) {
@@ -11557,7 +11798,8 @@ tool({
   topic: () => null,
   run: a => {
     let t;
-    if (a.device === 'minerals') t = mineralsTable();   // a pack, not device state: the minerals as a table (minerals.js)
+    if (a.device === 'minerals') t = mineralsTable();
+    else if (a.device === 'qc') t = qcSample();   // the synthetic QC sample (qaqc.js)   // a pack, not device state: the minerals as a table (minerals.js)
     else if (a.device) {
       const d = S.tables[a.device]; if (!d || !d.rows.length) return { read: ['open table', { v: a.device }], body: [{ t: 'note', kind: 'err', text: `The ${a.device} is empty. Say "log 5 km run" first.` }], trace: ['device table: empty'] };
       t = { name: a.device, source: 'device', hash: a.device, rows: d.rows.map(r => ({ ...r })), cols: d.cols.map(c => ({ ...c })), roles: {} };
@@ -11876,7 +12118,7 @@ amend({ tools: ['query'], name: 'addagg', label: 'And', words: [], elidable: tru
 })();
 
 /* ==== src/engine/knowledge.js ==== */
-const __m17 = (() => {
+const __m20 = (() => {
 const { unit } = __m0;
 // Words for knowledge the packs carry: the units areas are asked in. The Factbook is factbook.js; definitions and the
 // style check are books.js.
@@ -11887,7 +12129,7 @@ for (const [u, words] of [['mi2', ['square miles', 'square mile', 'sq mi', 'mi2'
 })();
 
 /* ==== src/engine/factbook.js ==== */
-const __m18 = (() => {
+const __m21 = (() => {
 const { tool, frame, noun, compound, qmod, fmt, bump } = __m0;
 const { parseUnit } = __m2;
 // The Factbook (SPEC 13.8): the rounded 14-country sample that ships with golem, or gcu-library's factbook pack once it is
@@ -12090,7 +12332,7 @@ frame({
 })();
 
 /* ==== src/engine/books.js ==== */
-const __m19 = (() => {
+const __m22 = (() => {
 const { tool, frame, noun, bump } = __m0;
 // Books from packs (SPEC 13.8): definitions from Open Data Structures, a style check from The Elements of Style (1918).
 // Each works from a small sample that ships with golem, or from the gcu-library pack once the shell has installed it and
@@ -12196,7 +12438,7 @@ const bookInfo = slug => { const b = slug === 'ods' ? ODS : slug === 'elements-o
 })();
 
 /* ==== src/engine/device.js ==== */
-const __m20 = (() => {
+const __m23 = (() => {
 const { tool, frame, noun, postmod, fmt, iso } = __m0;
 const { findDate, findTime, today, fmtDate, dateWords } = __m4;
 const { parseUnit } = __m2;
@@ -12301,7 +12543,7 @@ postmod({ prep: '', heads: ['timer'], attr: 'duration', quantity: true });   // 
 })();
 
 /* ==== src/engine/structure.js ==== */
-const __m21 = (() => {
+const __m24 = (() => {
 const { frame, noun, postmod, qmod, tool, fmt, rad, deg, p3, p2 } = __m0;
 const { conversions, vec3, statistics } = __m5;
 const { oriOf } = __m6;
@@ -12477,7 +12719,7 @@ frame({
 })();
 
 /* ==== src/vendor/wmm.js ==== */
-const __m22 = (() => {
+const __m25 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/wmm, the World Magnetic Model (WMM2025) evaluated from NOAA's coefficients,
 // copied from ../auditable/ext/wmm/index.js. Re-vendor by copying that file here when the model is reissued.
 
@@ -12728,9 +12970,9 @@ function declination(lat, lon, date = new Date(), height = 0) {
 })();
 
 /* ==== src/engine/geo.js ==== */
-const __m23 = (() => {
+const __m26 = (() => {
 const { tool, frame, noun, qmod, clock, fmt, iso, p3 } = __m0;
-const { field, MODEL, VALID_FROM, VALID_TO } = __m22;
+const { field, MODEL, VALID_FROM, VALID_TO } = __m25;
 const { findDate, fmtDate, dateWords } = __m4;
 // Magnetic declination from @gcu/wmm (vendored WMM2025), and bearings between magnetic and true north.
 // A place is coordinates in the request; device location stays off (SPEC-skills 0.7).
@@ -12799,10 +13041,10 @@ frame({
 })();
 
 /* ==== src/engine/field.js ==== */
-const __m24 = (() => {
+const __m27 = (() => {
 const { tool, frame, noun, fmt, p3, p2, S, clock } = __m0;
 const { compass } = __m5;
-const { field } = __m22;
+const { field } = __m25;
 const { fmtDate } = __m4;
 // Field capture (SPEC 13, the field skills): a plane or a line measured with the phone, as a compass-clinometer is
 // used. The card asks for a reading (res.capture); the shell streams the phone's orientation (in the lead-acid app the
@@ -12878,11 +13120,11 @@ frame({
 })();
 
 /* ==== src/engine/notebook.js ==== */
-const __m25 = (() => {
+const __m28 = (() => {
 const { S, tool, frame, noun, shape, postmod, condition, fmt, iso, p3, p2, clock, checksOf } = __m0;
 const { conversions, statistics } = __m5;
-const { field: wmm } = __m22;
-const { fromDevice } = __m24;
+const { field: wmm } = __m25;
+const { fromDevice } = __m27;
 const { oriOf } = __m6;
 // The field notebook: stations, the planes and lines measured at them, and samples, as a device table ("field") that
 // every table question can open. "station 14" starts a station where you stand (one fix on a tap) or at coordinates;
@@ -13093,89 +13335,12 @@ frame({
   return { FIELD_COLS, fieldTable, stationNow };
 })();
 
-/* ==== src/engine/forms.js ==== */
-const __m26 = (() => {
-const { tool, frame, amend, noun } = __m0;
-// The form card: a tool that still needs answers asks for them one at a time; each answer lands in
-// args and is an editable slot, and the result recomputes when any changes. The decision matrix is the
-// first form; the economics formulas use the same helpers.
-
-// an open question answered by a typed number (or an offered option); the whole answer must be the number
-const numberAsk = (prompt, { offer = [], min, max, unit } = {}) => ({
-  prompt: `${prompt}${offer.length ? '' : ' Type it below.'}`,
-  options: offer.map(o => ({ label: o.label, value: o.value })),
-  parse: s => { const m = /^(?:about |around |~)?(-?\d+(?:[.,]\d+)?)\s*(?:[a-zµ%°$][\w%°$/³²]*)?$/i.exec(s.trim()); if (!m) return null; const v = +m[1].replace(',', '.'); return (min != null && v < min) || (max != null && v > max) ? null : v; },
-  hint: unit || null
-});
-// an open question answered by a list: "a, b and c"
-const listAsk = prompt => ({ prompt: `${prompt} Type them below, separated by commas.`, options: [], parse: s => { const xs = listOf(s); return xs.length >= 2 ? xs : null; } });
-const listOf = s => s.split(/\s*,\s*|\s+and\s+|\s+or\s+|\s*;\s*/).map(x => x.trim().replace(/^(?:the|a|an)\s+/i, '')).filter(Boolean);
-// the first unanswered question of a list [{ key, ask }] → { key, ask with set } | null
-function firstNeed(a, qs) {
-  for (const q of qs) { if (a[q.key] != null) continue; const ask = typeof q.ask === 'function' ? q.ask(a) : q.ask; return { ...ask, set: (x, v) => { x[q.key] = v; } }; }
-  return null;
-}
-const ONE_TO_FIVE = [1, 2, 3, 4, 5].map(n => ({ label: String(n), value: n }));
-const slot = (label, key, cur) => ({ v: `${label} ${cur}`, key, alts: [1, 2, 3, 4, 5], cur });
-
-/* ── the decision matrix ────────────────────────────────────── */
-tool({
-  name: 'decide',
-  skill: { group: 'Compute', title: 'Decision matrix', on: 'form card', about: 'Options, criteria, a weight for each criterion and a score for each option on each, asked one at a time; weighted totals, bars, and the smallest single weight change that would change the top option. It reports the highest score and does not say what to do.', examples: ['help me decide between perth, vancouver and santiago', 'compare these options'] },
-  topic: a => ['Decision matrix', 1],
-  run: a => {
-    if (a._set) { a[a._set.key] = a._set.v; delete a._set; }
-    const read = ['decide between', { v: a.options ? a.options.join(', ') : '…' }];
-    const qs = [{ key: 'options', ask: listAsk('Which options?') }, { key: 'criteria', ask: listAsk('Which criteria matter?') }];
-    for (const c of a.criteria || []) qs.push({ key: 'w:' + c, ask: numberAsk(`How much does ${c} weigh, 1 (least) to 5 (most)?`, { offer: ONE_TO_FIVE, min: 1, max: 5 }) });
-    for (const o of a.options || []) for (const c of a.criteria || []) qs.push({ key: `s:${o}|${c}`, ask: numberAsk(`Score ${o} on ${c}, 1 (poor) to 5 (best)?`, { offer: ONE_TO_FIVE, min: 1, max: 5 }) });
-    const answered = qs.filter(q => a[q.key] != null).length, need = firstNeed(a, qs);
-    if (a.criteria) read.push('by', ...a.criteria.map(c => slot(c, 'w:' + c, a['w:' + c] || '?')).filter(s => s.cur !== '?'));
-    if (need) return { read, body: [...(a.criteria ? [{ t: 'kv', rows: [['options', a.options.join(', ')], ['criteria', a.criteria.join(', ')], ['answered', `${answered} of ${qs.length}`]] }] : [])], ask: need, trace: [`form: ${answered} of ${qs.length} answered`, 'blocked: next question'] };
-    const W = a.criteria.map(c => a['w:' + c]), totals = a.options.map(o => a.criteria.reduce((s, c, i) => s + W[i] * a[`s:${o}|${c}`], 0));
-    const best = Math.max(...totals), top = a.options.filter((o, i) => totals[i] === best);
-    const argmax = ws => { const t = a.options.map(o => a.criteria.reduce((s, c, i) => s + ws[i] * a[`s:${o}|${c}`], 0)); const m = Math.max(...t); return a.options.filter((o, i) => t[i] === m).join(' & '); };
-    let flip = null;
-    a.criteria.forEach((c, i) => { for (const w of [1, 2, 3, 4, 5]) { if (w === W[i]) continue; const ws = W.slice(); ws[i] = w; const who = argmax(ws); if (who !== top.join(' & ') && (!flip || Math.abs(w - W[i]) < flip.d)) flip = { c, from: W[i], to: w, who, d: Math.abs(w - W[i]) }; } });
-    const rows = a.options.map((o, i) => [o, ...a.criteria.map(c => `${a[`s:${o}|${c}`]}`), String(totals[i])]);
-    return {
-      read, value: top.join(' & '),
-      body: [
-        { t: 'big', v: top.length > 1 ? `Tie: ${top.join(', ')}` : `Highest score: ${top[0]}`, unit: `${best} of ${5 * W.reduce((x, y) => x + y, 0)}` },
-        { t: 'table', head: ['Option', ...a.criteria.map((c, i) => `${c} ×${W[i]}`), 'Total'], num: [false, ...a.criteria.map(() => true), true], rows },
-        { t: 'hbars', rows: a.options.map((o, i) => [o, totals[i], String(totals[i])]) },
-        { t: 'sub', text: flip ? `Sensitivity: if ${flip.c} weighed ${flip.to} instead of ${flip.from}, the highest score would be ${flip.who}. No smaller single weight change does that.` : 'Sensitivity: no single weight change (1 to 5) changes which option scores highest.' },
-        { t: 'sub', text: 'Weights and scores are yours; tap one in the reading to change it, or say "cost is 3" or "perth on cost is 4".' }
-      ],
-      trace: [`weights: ${a.criteria.map((c, i) => `${c} ${W[i]}`).join(', ')}`, ...a.options.map((o, i) => `${o}: ${a.criteria.map((c, j) => `${W[j]}×${a[`s:${o}|${c}`]}`).join(' + ')} = ${totals[i]}`), flip ? `sensitivity: ${flip.c} ${flip.from}→${flip.to} gives ${flip.who}` : 'sensitivity: none'],
-      py: `decide.matrix(options=${JSON.stringify(a.options)}, criteria=${JSON.stringify(a.criteria)}, weights=${JSON.stringify(W)}, scores=${JSON.stringify(a.options.map(o => a.criteria.map(c => a[`s:${o}|${c}`])))})`
-    };
-  }
-});
-// "help me decide between perth, vancouver and santiago", "compare these options", "decision matrix"
-frame({
-  name: 'decide', label: 'Decide', words: ['decide', 'choose', 'pick', 'weigh up', 'help me decide', 'help me choose', 'help me pick'], theme: [], required: [],
-  roles: { between: { preps: ['between', 'among', 'from', ''], types: ['text'] } }, words_pt: ['decide', 'decidir', 'escolhe', 'escolher', 'me ajuda a decidir'], label_pt: 'Decidir',
-  bind: c => { const t = c.roles.between && c.roles.between[0]; if (!t) return { tool: 'decide', args: {} }; const xs = listOf(t.value); return xs.length >= 2 ? { tool: 'decide', args: { options: xs } } : null; }
-});
-noun({ type: 'decision', words: { matrix: ['decision matrix', 'weighted decision', 'these options', 'the options', 'my options', 'options'] }, words_pt: { matrix: ['matriz de decisão', 'essas opções', 'as opções'] } });
-frame({ name: 'decideblank', label: 'Decide', words: ['compare', 'weigh', 'make a'], elidable: true, theme: ['decision'], required: ['theme'], roles: {}, label_pt: 'Decidir', bind: () => ({ tool: 'decide', args: {} }) });
-// "price weighs 3", "perth on price is 4": the names are the matrix's own
-const named = (xs, w) => (xs || []).find(x => x.toLowerCase() === w.trim().toLowerCase());
-amend({ tools: ['decide'], name: 'weigh', label: 'Weight', words: ['weighs', 'weight', 'has weight', 'is weighted'], subject: ['text'], theme: ['quantity:bare'], required: ['theme', 'subject'], roles: {},
-  bind: (c, a) => { const crit = named(a.criteria, c.roles.subject[0].value.replace(/^(?:the )?weight (?:of |for )?/i, '')), v = c.theme[0].n; return crit && v >= 1 && v <= 5 ? { args: { ...a, _set: { key: 'w:' + crit, v } } } : null; } });
-amend({ tools: ['decide'], name: 'score', label: 'Score', words: ['is', 'scores', 'gets', '='], subject: ['text'], theme: ['quantity:bare'], required: ['theme', 'subject'], roles: {},
-  bind: (c, a) => { const m = /^(.+?)\s+(?:on|for)\s+(.+)$/i.exec(c.roles.subject[0].value.trim()), v = c.theme[0].n; if (!m || v < 1 || v > 5) return null;
-    const o = named(a.options, m[1]), k = named(a.criteria, m[2]); return o && k ? { args: { ...a, _set: { key: `s:${o}|${k}`, v } } } : null; } });
-  return { numberAsk, listAsk, listOf, firstNeed };
-})();
-
 /* ==== src/engine/reckon.js ==== */
-const __m27 = (() => {
+const __m29 = (() => {
 const { S, tool, frame, noun, fmt } = __m0;
 const { calc } = __m3;
 const { parseUnit } = __m2;
-const { numberAsk, firstNeed } = __m26;
+const { numberAsk, firstNeed } = __m10;
 // Reckoning, the old-fashioned way (SPEC 13: reasoning without a model). Two pieces:
 //
 // Dimensional search: "how long to drill 300 m at 25 m/h", "how heavy is 1000 m3 at 2.7 t/m3", "how far in 3 h at
@@ -13367,7 +13532,7 @@ frame({
 })();
 
 /* ==== src/engine/sessions.js ==== */
-const __m28 = (() => {
+const __m30 = (() => {
 const { S, toolByName, runTool, startJobs, clearResults, bump } = __m0;
 // Sessions: stored as plans (card specs), replayed on open, named from the tools that ran.
 // The shell persists whatever `serialize()` returns and feeds it back through `hydrate()`.
@@ -13486,9 +13651,9 @@ function reset() {
 })();
 
 /* ==== src/engine/share.js ==== */
-const __m29 = (() => {
+const __m31 = (() => {
 const { S, tool, iso, clock } = __m0;
-const { current, exportSession } = __m28;
+const { current, exportSession } = __m30;
 // Sharing a session so it can be checked (SPEC 13: things you can trust). Two pieces the shell builds on:
 //
 // canonical(v): the session file as bytes that do not depend on key order, which is what a signature covers. The shell
@@ -13556,9 +13721,9 @@ tool({
 })();
 
 /* ==== src/engine/tms.js ==== */
-const __m30 = (() => {
+const __m32 = (() => {
 const { S, tool, frame } = __m0;
-const { sessions } = __m28;
+const { sessions } = __m30;
 // Truth maintenance (SPEC 13: what depends on what). A card that read through device state — a taught word's meaning
 // ("granite" read as 2.7 t/m3), a taught formula — keeps what it used (card.uses, saved with the card). When that state
 // changes, the card's answer is still true of what it was given, so it is not rewritten; it is marked: "read with
@@ -13605,11 +13770,11 @@ frame({
 })();
 
 /* ==== src/engine/lore.js ==== */
-const __m31 = (() => {
+const __m33 = (() => {
 const { S, tool, frame, noun, fmt } = __m0;
 const { parseUnit } = __m2;
 const { calc, namesIn } = __m3;
-const { staleBlocks } = __m30;
+const { staleBlocks } = __m32;
 // What golem is told, kept (SPEC 13: shaped by words). Two kinds beside the taught words of notes.js:
 //   a value: "granite is 2.7 t/m3" — a taught word whose meaning is a quantity, so "granite in lb/ft3" and "how heavy is
 //     1000 m3 of granite" read with the quantity in its place (the taught rung's rewrite, the quantity checked first);
@@ -13701,10 +13866,10 @@ frame({
 })();
 
 /* ==== src/engine/orders.js ==== */
-const __m32 = (() => {
+const __m34 = (() => {
 const { S, tool, frame, noun, CHECKS } = __m0;
-const { whereOf } = __m16;
-const { evaluatePredicate } = __m15;
+const { whereOf } = __m19;
+const { evaluatePredicate } = __m18;
 // Standing orders (SPEC 13: a golem keeps to what it was told). "warn me when cu > 30", "every row needs from < to":
 // a condition in the grammar's own terms, kept on the device (S.orders), checked every time a table opens and every
 // time a row is written to a device table (the log, the field notebook), against any table that has its columns. What
@@ -13805,7 +13970,7 @@ frame({
 })();
 
 /* ==== src/vendor/parquet.js ==== */
-const __m33 = (() => {
+const __m35 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/parquet, Parquet read and write over vendored hyparquet and hyparquet-writer, pure JS, minified by its own build, copied from ../auditable/ext/parquet/index.js at auditable 5fa5f72e (MIT; hyparquet MIT).
 // Re-vendor by copying that file here.
 
@@ -13814,9 +13979,9 @@ const e=["BOOLEAN","INT32","INT64","INT96","FLOAT","DOUBLE","BYTE_ARRAY","FIXED_
 })();
 
 /* ==== src/engine/convert.js ==== */
-const __m34 = (() => {
+const __m36 = (() => {
 const { S, tool, frame, amend, noun, fmt } = __m0;
-const { writeParquet } = __m33;
+const { writeParquet } = __m35;
 // Conversions that need no file format reader: hashes, text encodings both ways, and the open table
 // as CSV, TSV or JSON with a save action. Format readers (xlsx, dm, parquet) are the second pass.
 
@@ -13973,7 +14138,7 @@ for (const op of ['encode', 'decode']) amend({ tools: ['encode'], name: `op${op}
 })();
 
 /* ==== src/engine/data/elements.js ==== */
-const __m35 = (() => {
+const __m37 = (() => {
 // The elements with their standard atomic weights, abridged to five significant figures.
 // Source: IUPAC Commission on Isotopic Abundances and Atomic Weights (CIAAW), Standard Atomic Weights 2024
 // (ciaaw.org/atomic-weights.htm, the 2021 report with Gd, Lu and Zr revised in 2024), cross-checked against
@@ -14018,9 +14183,9 @@ const ELEMENTS = [
 })();
 
 /* ==== src/engine/chem.js ==== */
-const __m36 = (() => {
+const __m38 = (() => {
 const { tool, frame, noun, shape, postmod, fmt } = __m0;
-const { ELEMENTS, ELEMENTS_SOURCE } = __m35;
+const { ELEMENTS, ELEMENTS_SOURCE } = __m37;
 const { UNIT_TABLE } = __m2;
 // Molar mass, conversion factors and element fractions from a parsed formula over the IUPAC weights;
 // the periodic table lookup. No mineral names: the minerals pack is not here, so a formula is required.
@@ -14184,7 +14349,7 @@ frame({
 })();
 
 /* ==== src/engine/places.js ==== */
-const __m37 = (() => {
+const __m39 = (() => {
 const { S, tool, frame, amend, noun, shape, postmod, fmt, rad, deg } = __m0;
 // Places, distance and UTM. A place is coordinates in the request or a name saved on this device
 // ("home is -19.92, -43.94"); there is no gazetteer and device location is off, so an unknown name is
@@ -14350,7 +14515,7 @@ amend({ tools: ['utm'], name: 'utmband', label: 'Band', words: [], elidable: tru
 })();
 
 /* ==== src/engine/skills.js ==== */
-const __m38 = (() => {
+const __m40 = (() => {
 const { TOOLS, tool, frame } = __m0;
 // The catalog: skills derived from the declarations, planned skills named here, and the packs golem
 // knows about. Examples feed the Skills tab, the "nearest skills" suggestions and the teach vocabulary.
@@ -14422,9 +14587,9 @@ const SUGGESTIONS = ['pop means population', 'histogram of cu', 'log scale', 'po
 })();
 
 /* ==== src/engine/learn.js ==== */
-const __m39 = (() => {
+const __m41 = (() => {
 const { S, tool, frame, noun } = __m0;
-const { vocab } = __m38;
+const { vocab } = __m40;
 // Learning from the person, on the device (SPEC 13: the language that grows). Nothing is learned silently, and nothing
 // is sent: what did not read is kept in a list the person can see and teach from ("what couldn't you read"); a request
 // that did not read, followed by one that did and differs in a short stretch, offers to remember that stretch as a word
@@ -14524,7 +14689,7 @@ frame({
 })();
 
 /* ==== src/engine/data/timescale.js ==== */
-const __m40 = (() => {
+const __m42 = (() => {
 // The International Chronostratigraphic Chart as a records pack: one row per unit, five ranks.
 // Source: ICS (Cohen, Finney, Gibbard & Fan 2013; updated chart) as served by Macrostrat
 // (macrostrat.org/api/v2/defs/intervals?timescale_id=11, CC BY 4.0), fetched 8 Oct 2026. The Hadean is
@@ -14709,11 +14874,11 @@ const TIMESCALE = [
 })();
 
 /* ==== src/engine/ontology.js ==== */
-const __m41 = (() => {
+const __m43 = (() => {
 const { FRAMES, LEXICON, S } = __m0;
 const { UNIT_TABLE, COMPOUNDS, DIM, parseUnit, dimName } = __m2;
-const { ELEMENT } = __m16;
-const { TIMESCALE } = __m40;
+const { ELEMENT } = __m19;
+const { TIMESCALE } = __m42;
 // The clause ontology, assembled from what golem knows: units from the conversion table, nouns from the
 // sample packs, verb frames from the declarations. Inert data; the build writes it to dist/golem.json.
 // Portuguese synonyms are listed here by hand until packs carry them in their golem facet.
@@ -14790,7 +14955,7 @@ function ontology(only) {
 })();
 
 /* ==== src/engine/estimate.js ==== */
-const __m42 = (() => {
+const __m44 = (() => {
 const { amend, noun, tool, fmt } = __m0;
 const { U } = __m2;
 // Estimates with ranges: arithmetic over intervals by simulation, units carried through, the seed kept
@@ -14965,7 +15130,7 @@ amend({ tools: ['estimate'], name: 'estdist', label: 'Distribution', words: ['as
 })();
 
 /* ==== src/vendor/dispatch.js ==== */
-const __m43 = (() => {
+const __m45 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/dispatch, built from ../auditable/ext/dispatch/src/ by its own build.
 // Source of truth: gentropic/auditable ext/dispatch (local clone: ../auditable). Re-vendor by copying
 // ext/dispatch/index.js here after 'node ext/dispatch/build.js'. golem uses the grammar rung only:
@@ -17118,14 +17283,14 @@ const PORTUGUESE = {
 })();
 
 /* ==== src/engine/reading.js ==== */
-const __m44 = (() => {
+const __m46 = (() => {
 const { S, T, TOOLS, FRAMES, tool, frame, amend, session, noun, toolByName, runTool, iso, STATE } = __m0;
-const { examples, vocab } = __m38;
-const { rankByPicks } = __m39;
-const { ontology } = __m41;
+const { examples, vocab } = __m40;
+const { rankByPicks } = __m41;
+const { ontology } = __m43;
 const { calcOf } = __m3;
-const { estimateOf } = __m42;
-const { createEngine, makeSession, ENGLISH, PORTUGUESE } = __m43;
+const { estimateOf } = __m44;
+const { createEngine, makeSession, ENGLISH, PORTUGUESE } = __m45;
 // The reading ladder: context (amendments, meta-intents), grammar (the clause parser, then the regex
 // rules the declarations carry), taught words (device lexicon rewrites, then grammar again). Plus the
 // tools that talk about the session itself: none, why, export.
@@ -17437,21 +17602,21 @@ function sessionRead(raw) {
 })();
 
 /* ==== src/engine/selftest.js ==== */
-const __m45 = (() => {
+const __m47 = (() => {
 const { tool, frame, fmt } = __m0;
 const { parseUnit } = __m2;
-const { sha256 } = __m34;
-const { parseFormula, molarMass } = __m36;
-const { vincenty } = __m37;
-const { fromDevice } = __m24;
-const { quantitiesOf, combos, roots, FORMULAS } = __m27;
+const { sha256 } = __m36;
+const { parseFormula, molarMass } = __m38;
+const { vincenty } = __m39;
+const { fromDevice } = __m27;
+const { quantitiesOf, combos, roots, FORMULAS } = __m29;
 const { conversions, statistics } = __m5;
-const { field: wmm, MODEL } = __m22;
-const { STARTERS, STARTERS_PT } = __m38;
-const { readingOf, setLanguage, language } = __m44;
-const { factbookInfo } = __m18;
+const { field: wmm, MODEL } = __m25;
+const { STARTERS, STARTERS_PT } = __m40;
+const { readingOf, setLanguage, language } = __m46;
+const { factbookInfo } = __m21;
 const { mineralsInfo } = __m8;
-const { bookInfo } = __m19;
+const { bookInfo } = __m22;
 // "check yourself" (SPEC 13: things you can trust). A battery of answers known from outside golem's code, run on this
 // device without touching the session: exact unit factors by definition, SHA-256's published test vector, NOAA's own
 // test point for the World Magnetic Model, a degree of longitude on the WGS84 equator, a molar mass summed by hand from
@@ -17522,10 +17687,10 @@ frame({
 })();
 
 /* ==== src/engine/vocab.js ==== */
-const __m46 = (() => {
+const __m48 = (() => {
 const { S, tool, frame, FRAMES } = __m0;
-const { ontology } = __m41;
-const { examples } = __m38;
+const { ontology } = __m43;
+const { examples } = __m40;
 // The words golem obeys, shown (SPEC 13: nothing hidden). "what words do you know for density": every command whose
 // words carry it, every thing (noun) and unit it names, and what was taught on this device, from the live ontology —
 // the same one the parser reads with, so what is listed is what reads (the open table's columns and an installed
@@ -17583,61 +17748,10 @@ const frameCount = () => FRAMES.length;
   return { frameCount };
 })();
 
-/* ==== src/engine/logic.js ==== */
-const __m47 = (() => {
-// A small Datalog (SPEC 13: inference, not only computation). Facts are { rel, args }, rules are { name, head, body },
-// a term is a constant or a variable (a string starting with an upper-case letter or "_"). infer() applies the rules
-// until nothing new follows (naive evaluation: the fact sets here are a notebook's, tens to hundreds), and keeps for
-// every derived fact how it was derived, so proofOf() can say why. No negation, no arithmetic: what follows from what
-// was said, and nothing else.
-const isVar = t => typeof t === 'string' && /^[A-Z_]/.test(t);
-const keyOf = f => `${f.rel}(${f.args.join(',')})`;
-function match(pat, fact, env) {
-  if (pat.rel !== fact.rel || pat.args.length !== fact.args.length) return null;
-  const e = { ...env };
-  for (let i = 0; i < pat.args.length; i++) {
-    const p = pat.args[i], v = fact.args[i];
-    if (isVar(p)) { if (p in e) { if (e[p] !== v) return null; } else e[p] = v; } else if (p !== v) return null;
-  }
-  return e;
-}
-const ground = (pat, env) => ({ rel: pat.rel, args: pat.args.map(a => isVar(a) ? env[a] : a) });
-// → Map key → { rel, args, why: { said } | { rule, from: [keys] } }
-function infer(facts, rules, limit = 100000) {
-  const known = new Map();
-  for (const f of facts) { const k = keyOf(f); if (!known.has(k)) known.set(k, { rel: f.rel, args: f.args, why: { said: f.said ?? null } }); }
-  let changed = true, steps = 0;
-  while (changed) {
-    changed = false;
-    const all = [...known.values()];
-    for (const r of rules) {
-      let envs = [{ env: {}, from: [] }];
-      for (const b of r.body) {
-        const next = [];
-        for (const { env, from } of envs) for (const f of all) { const e = match(b, f, env); if (e) next.push({ env: e, from: [...from, keyOf(f)] }); }
-        envs = next; if (!envs.length) break;
-      }
-      for (const { env, from } of envs) {
-        const h = ground(r.head, env), k = keyOf(h);
-        if (!known.has(k)) { known.set(k, { ...h, why: { rule: r.name, from } }); changed = true; if (++steps > limit) throw new Error('too many conclusions'); }
-      }
-    }
-  }
-  return known;
-}
-// the derivation of a fact, deepest first: [{ fact, rule | said }], each step once
-function proofOf(known, key, seen = new Set()) {
-  const f = known.get(key); if (!f || seen.has(key)) return []; seen.add(key);
-  if (f.why.rule == null) return [{ fact: f, said: f.why.said }];
-  return [...f.why.from.flatMap(k => proofOf(known, k, seen)), { fact: f, rule: f.why.rule }];
-}
-  return { keyOf, infer, proofOf };
-})();
-
 /* ==== src/engine/strata.js ==== */
-const __m48 = (() => {
+const __m49 = (() => {
 const { S, tool, frame, noun } = __m0;
-const { infer, proofOf, keyOf } = __m47;
+const { infer, proofOf, keyOf } = __m9;
 // Relative ages by Steno's principles (SPEC 13: inference). What you say of the units — "the sandstone overlies the
 // granite", "the dyke cuts the sandstone", "the conglomerate contains clasts of the granite", "the basalt is younger than
 // the dyke" — is kept on the device (S.strata) as facts; the principles are Datalog rules (logic.js): superposition
@@ -17767,9 +17881,9 @@ frame({ name: 'strataWhy', label: 'Relative ages', words: ['why is', 'how do you
 })();
 
 /* ==== src/engine/timescale.js ==== */
-const __m49 = (() => {
+const __m50 = (() => {
 const { tool, frame, noun, unit, fmt } = __m0;
-const { TIMESCALE, TIMESCALE_SOURCE } = __m40;
+const { TIMESCALE, TIMESCALE_SOURCE } = __m42;
 // The geologic timescale: the ICS chart as a records pack (data/timescale.js). Ages, bounds, ranks,
 // what a unit sits in, what came before and after, what it is subdivided into, and which unit an age
 // in Ma falls in. Lookups only; the chart is the answer.
@@ -17869,7 +17983,7 @@ noun({ type: 'chron', words: Object.fromEntries(Object.keys(RETIRED).map(k => [k
 })();
 
 /* ==== src/engine/sample.js ==== */
-const __m50 = (() => {
+const __m51 = (() => {
 const { tool, frame, noun, compound, qmod, postmod, unit, fmt } = __m0;
 const { parseUnit } = __m2;
 const { core, sieve } = __m1;
@@ -18009,7 +18123,7 @@ frame({
 })();
 
 /* ==== src/engine/explain.js ==== */
-const __m51 = (() => {
+const __m52 = (() => {
 const { tool, frame, amend, noun, shape, clock, fmt } = __m0;
 // Explainers: formal notation parsed and described, one row per piece. Cron schedules, epoch times,
 // chmod modes, URLs and ECMAScript regular expressions. Each member has a recogniser so a bare
@@ -18384,7 +18498,7 @@ amend({ tools: ['explain'], name: 'explainas', label: 'Explain as', words: [], e
 })();
 
 /* ==== src/vendor/plan-calendar.js ==== */
-const __m52 = (() => {
+const __m53 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/plan's calendar engine and Brazilian holidays, copied from
 // ../auditable/ext/plan/src/calendar.js and src/holidays-br.js (MIT). The scheduling half of the package is not here.
 // Re-vendor by copying those two files here again and keeping the single export block at the end.
@@ -18741,10 +18855,10 @@ function brazilMunicipalities() {
 })();
 
 /* ==== src/engine/calendar.js ==== */
-const __m53 = (() => {
+const __m54 = (() => {
 const { S, tool, frame, amend, noun, shape, postmod, unit, clock, iso } = __m0;
 const { findDate, findTime, today, day0, fmtDate, dateWords } = __m4;
-const { isWorkingDay, addWorkingDays, brazilCalendar, federalHolidays } = __m52;
+const { isWorkingDay, addWorkingDays, brazilCalendar, federalHolidays } = __m53;
 // Working days and rosters over @gcu/plan's calendar engine (vendored), and time zones through Intl.
 // The calendar is a slot and is always shown: Brazil's federal holidays, or weekdays only.
 
@@ -18977,7 +19091,7 @@ amend({ tools: ['workdays'], name: 'workcal', label: 'Calendar', words: [], elid
 })();
 
 /* ==== src/engine/text.js ==== */
-const __m54 = (() => {
+const __m55 = (() => {
 const { tool, frame, amend, noun, qmod, fmt } = __m0;
 // Text tools over a pasted payload: counts and readability, extracted key sentences, and a diff.
 // The payload is what follows the first colon, or every line after the first of a multi-line input;
@@ -19123,10 +19237,10 @@ amend({ tools: ['diff'], name: 'diffunit', label: 'Diff by', words: [], elidable
 })();
 
 /* ==== src/engine/econ.js ==== */
-const __m55 = (() => {
+const __m56 = (() => {
 const { tool, frame, noun, shape, postmod, qmod, fmt } = __m0;
-const { ELEMENTS } = __m35;
-const { numberAsk, firstNeed } = __m26;
+const { ELEMENTS } = __m37;
+const { numberAsk, firstNeed } = __m10;
 // Sampling theory and mine economics as declared formulas. Every term is a slot; a term the person did
 // not give is asked for, with the conventional value offered first and never applied on its own. Prices
 // are always the person's input. No geostatistics here: these are formulas over given numbers.
@@ -19290,7 +19404,7 @@ frame({
 })();
 
 /* ==== src/engine/log.js ==== */
-const __m56 = (() => {
+const __m57 = (() => {
 const { S, tool, frame, amend, noun, fmt, iso, checksOf } = __m0;
 const { parseUnit, dimName } = __m2;
 const { findDate, today, fmtDate, dateWords } = __m4;
@@ -19438,11 +19552,11 @@ amend({ tools: ['logAdd'], name: 'logfix', label: 'Correct', words: ['that was',
 })();
 
 /* ==== src/engine/sky.js ==== */
-const __m57 = (() => {
+const __m58 = (() => {
 const { tool, frame, amend, noun, compound, fmt, rad, deg, iso } = __m0;
 const { findDate, today, fmtDate, dateWords } = __m4;
-const { zonesOf, offsetOf } = __m53;
-const { placeOf } = __m37;
+const { zonesOf, offsetOf } = __m54;
+const { placeOf } = __m39;
 // The sun by NOAA's solar position equations (after Meeus), and the moon's phase from the mean
 // synodic cycle, labelled with its accuracy. Times are given in the place's zone when the place name
 // has one, else in UTC and the card says so.
@@ -19524,10 +19638,10 @@ amend({ tools: ['sun'], name: 'sunzone', label: 'Zone', words: [], elidable: tru
 })();
 
 /* ==== src/engine/apply.js ==== */
-const __m58 = (() => {
+const __m59 = (() => {
 const { S, tool, fmt, rad, deg, p3, p2 } = __m0;
-const { whereOf } = __m16;
-const { evaluatePredicate, predicateToString } = __m15;
+const { whereOf } = __m19;
+const { evaluatePredicate, predicateToString } = __m18;
 const { conversions, vec3 } = __m5;
 // Field compute over a table: a single-value skill applied to every row the filter selects, the row's
 // columns bound to the skill's arguments through their names, constants filling what no column holds.
@@ -19591,7 +19705,7 @@ tool({
 })();
 
 /* ==== src/vendor/ipynb.js ==== */
-const __m59 = (() => {
+const __m60 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/ipynb, copied from ../auditable/ext/ipynb/index.js (MIT). golem uses importNotebook
 // for its import-substitution table only (numpy → natra, pandas → sadpan, …). Re-vendor by copying that file here.
 
@@ -20140,9 +20254,9 @@ function exportNotebook(cells, opts = {}) {
 })();
 
 /* ==== src/engine/python.js ==== */
-const __m60 = (() => {
+const __m61 = (() => {
 const { tool, frame, amend, result, fmt } = __m0;
-const { importNotebook } = __m59;
+const { importNotebook } = __m60;
 // Run and trace Python with adder, on the device. The tool itself stays synchronous: a first run returns a
 // "running" card carrying a job, the runner (a Web Worker in the page, adder in-process in the tests)
 // answers later, and the card is recomputed from the kept result. Replay reruns the code, which is
@@ -20212,7 +20326,7 @@ amend({ tools: ['python'], name: 'pytraceoff', label: 'Run', words: ['no trace',
 })();
 
 /* ==== src/vendor/librarian.js ==== */
-const __m61 = (() => {
+const __m62 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/librarian, the in-process text search (BM25F, fuzzy expansion, snippets, did-you-mean), copied from ../auditable/ext/librarian/index.js at auditable 5fa5f72e (MIT).
 // Re-vendor by copying that file here.
 
@@ -21488,9 +21602,9 @@ const Librarian = {
 })();
 
 /* ==== src/engine/docs.js ==== */
-const __m62 = (() => {
+const __m63 = (() => {
 const { S, tool, frame, amend, noun, postmod } = __m0;
-const { Librarian } = __m61;
+const { Librarian } = __m62;
 // Search my documents (A7). Markdown, plain text and HTML opened with the paperclip are kept on the device,
 // cut into passages (by heading, then by paragraph) and indexed by @gcu/librarian. A search returns
 // passages verbatim with the matched words marked; golem never rewrites them. The index is derived
@@ -21643,9 +21757,9 @@ amend({ tools: ['docPassage'], name: 'docstep', label: 'Passage', words: [], eli
 })();
 
 /* ==== src/engine/recipes.js ==== */
-const __m63 = (() => {
+const __m64 = (() => {
 const { S, tool, frame, noun, session, runTool } = __m0;
-const { listOf } = __m26;
+const { listOf } = __m10;
 // Recipes (A9): a session's plan saved under a name, with the subjects that may change between runs.
 // A recipe is stored as card specs, plain JSON like a session; running it replays every step with the
 // new subjects into a new session, and stops at the first step that no longer reads. Nothing is skipped
@@ -21839,7 +21953,7 @@ session({
 })();
 
 /* ==== src/vendor/sheet.js ==== */
-const __m64 = (() => {
+const __m65 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sheet, copied from ../auditable/ext/sheet/index.js (built from its src/ by @gcu/build, MIT).
 // Re-vendor by copying that file here. Reading is asynchronous (DecompressionStream), so golem converts at open time, not in a tool.
 
@@ -23071,7 +23185,7 @@ const sheet = {
 })();
 
 /* ==== src/vendor/dm.js ==== */
-const __m65 = (() => {
+const __m66 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/dm, the read-only Datamine .dm reader, copied from ../auditable/ext/dm/index.js (MIT).
 // Re-vendor by copying that file here.
 
@@ -23347,10 +23461,10 @@ function readDM(buffer) {
 })();
 
 /* ==== src/engine/formats.js ==== */
-const __m66 = (() => {
-const { sheet } = __m64;
-const { readDM } = __m65;
-const { readParquet, parquetInfo } = __m33;
+const __m67 = (() => {
+const { sheet } = __m65;
+const { readDM } = __m66;
+const { readParquet, parquetInfo } = __m35;
 // Binary table formats, converted to text when a file is opened: xlsx through @gcu/sheet (one text per
 // sheet), Datamine .dm through @gcu/dm, Parquet through @gcu/parquet. Tools stay synchronous and the device keeps the converted text,
 // so a session replays from it. What did not carry over is said on the card.
@@ -23401,7 +23515,7 @@ async function convertBinary(name, buffer) {
 })();
 
 /* ==== src/engine/notes.js ==== */
-const __m67 = (() => {
+const __m68 = (() => {
 const { S, tool, frame } = __m0;
 // Notes and taught words. Both belong to the device and are shared by every session.
 const textOf = c => c.theme[0] && c.theme[0].type === 'text' ? c.theme[0].value : null;
@@ -23452,7 +23566,7 @@ frame({
 })();
 
 /* ==== src/vendor/sluice/accumulator.js ==== */
-const __m68 = (() => {
+const __m69 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sluice src/accumulator.js, copied from ../auditable/ext/sluice/src/accumulator.js at auditable 3a7b253c.
 // golem vendors sluice's accumulator modules only (src/engine/stream.js): its runner builds expressions with new Function,
 // which golem does not ship outside the Python worker.
@@ -23620,7 +23734,7 @@ function weightedStats() {
 })();
 
 /* ==== src/vendor/sluice/tdigest.js ==== */
-const __m69 = (() => {
+const __m70 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sluice src/tdigest.js, copied from ../auditable/ext/sluice/src/tdigest.js at auditable 3a7b253c.
 // golem vendors sluice's accumulator modules only (src/engine/stream.js): its runner builds expressions with new Function,
 // which golem does not ship outside the Python worker.
@@ -23735,7 +23849,7 @@ function quantile(state, q) {
 })();
 
 /* ==== src/vendor/sluice/histogram.js ==== */
-const __m70 = (() => {
+const __m71 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sluice src/histogram.js, copied from ../auditable/ext/sluice/src/histogram.js at auditable 3a7b253c.
 // golem vendors sluice's accumulator modules only (src/engine/stream.js): its runner builds expressions with new Function,
 // which golem does not ship outside the Python worker.
@@ -23787,14 +23901,14 @@ function cumulativeFromTop(counts) {
 })();
 
 /* ==== src/engine/stream.js ==== */
-const __m71 = (() => {
+const __m72 = (() => {
 const { S, T, fmt, result } = __m0;
-const { colOf, whereSrc, tableFromText, openTable } = __m16;
-const { parsePredicate, evaluatePredicate, predicateToString } = __m15;
-const { NULL_SENTINELS } = __m14;
-const { weightedStats } = __m68;
-const { tdigest, quantile } = __m69;
-const { histogram } = __m70;
+const { colOf, whereSrc, tableFromText, openTable } = __m19;
+const { parsePredicate, evaluatePredicate, predicateToString } = __m18;
+const { NULL_SENTINELS } = __m17;
+const { weightedStats } = __m69;
+const { tdigest, quantile } = __m70;
+const { histogram } = __m71;
 // Tables too large to hold (SPEC 13.7): a CSV or TSV over 20 MB is typed from its first megabyte by recon, like any
 // table, and its questions are answered by scanning the whole file as a job, through @gcu/sluice's accumulators
 // (mergeable, never holding the rows): Welford and weighted moments, t-digest quantiles, histograms. The shell runs the
@@ -23955,18 +24069,18 @@ for (const k of ['apply', 'tableExport']) T[k] = a => S.table && S.table.streame
 })();
 
 /* ==== src/engine/engine.js ==== */
-const __m72 = (() => {
+const __m73 = (() => {
 const { S, T, runTool, toolByName, startJobs, tool, CONDITIONS, EFFECTS, clock, iso } = __m0;
-const { DOCUMENT } = __m12;
-const { DOCTEXT } = __m62;
-const { bindingsOf, runSteps } = __m63;
-const { tableFromText } = __m16;
-const { convertBinary } = __m66;
-const { noteMiss, clearMiss, correctionOf, teachOfPick, notePick, setReader } = __m39;
-const { norm, grammar, context, taught, sessionRead, readingOf, guessRead, clauseEngine } = __m44;
-const { makeSession } = __m43;
-const { current, newSession, renameSession, touch } = __m28;
-const { streamedTable } = __m71;
+const { DOCUMENT } = __m15;
+const { DOCTEXT } = __m63;
+const { bindingsOf, runSteps } = __m64;
+const { tableFromText } = __m19;
+const { convertBinary } = __m67;
+const { noteMiss, clearMiss, correctionOf, teachOfPick, notePick, setReader } = __m41;
+const { norm, grammar, context, taught, sessionRead, readingOf, guessRead, clauseEngine } = __m46;
+const { makeSession } = __m45;
+const { current, newSession, renameSession, touch } = __m30;
+const { streamedTable } = __m72;
 // The entry point: submit(raw) reads a request and returns what happened. Cards are recomputed in
 // place by rerun(); answers and slot flips go through it, so args stay the only state that matters.
 function addCard(raw, r, ms) {
@@ -24233,8 +24347,8 @@ function seedExamples() {
 })();
 
 /* ==== src/engine/packs.js ==== */
-const __m73 = (() => {
-const { profilesOf } = __m18;
+const __m74 = (() => {
+const { profilesOf } = __m21;
 // Packs as gcu-library ships them: a .gcudat is a gzipped tar holding gcudat.json (the manifest) and the data files
 // (gcu-library tools/build-gcudat.mjs). Read here with the platform's own gunzip (DecompressionStream, in browsers and
 // in Node) and a small ustar reader; @gcu/archive reads every container, but golem needs only this one.
@@ -24348,7 +24462,7 @@ async function compileStrunk(bytes) {
 })();
 
 /* ==== src/vendor/vfs.js ==== */
-const __m74 = (() => {
+const __m75 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/vfs, copied from ../auditable/ext/vfs/index.js (built from its src/ by node ext/vfs/build.js), at
 // auditable 8837da6e. golem's shell keeps sessions, device state, files and packs in it over IndexedDB (src/shell/store.js).
 // golem constructs only IDBBackend and MemoryBackend; the network backends in this bundle (fetch, REST, Dropbox) are
@@ -28159,8 +28273,8 @@ function fromPicker(vfs, destPath, opts) {
 })();
 
 /* ==== src/shell/store.js ==== */
-const __m75 = (() => {
-const { VFS } = __m74;
+const __m76 = (() => {
+const { VFS } = __m75;
 // Where the device keeps golem (SPEC 13.9): @gcu/vfs over IndexedDB, one file per session, one per opened file, the
 // device state and a small meta file, so a session can be exported as itself and nothing has a size cap but the
 // browser's. Only what changed is written. When IndexedDB is not there, the whole state goes to localStorage as before;
@@ -28274,7 +28388,7 @@ function noStore() {
 })();
 
 /* ==== src/vendor/leadacid.js ==== */
-const __m76 = (() => {
+const __m77 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. The lead-acid shell shim, copied from ../auditable/ext/leadacid/index.js
 // (itself vendored from gentropic/lead-acid, lead-acid.js). Re-vendor by copying that file here.
 
@@ -28978,7 +29092,7 @@ function orientationFromRotationVector(v) {
 })();
 
 /* ==== src/vendor/plot.js ==== */
-const __m77 = (() => {
+const __m78 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/plot (matplotlib-shaped plotting; figures leave the worker as draw lists), copied from ../auditable/ext/plot/index.js at auditable 774234c3 (9 Oct 2026, MIT).
 // Loaded only inside the Python worker. Re-vendor by copying that file here.
 
@@ -31012,7 +31126,7 @@ if (typeof window !== 'undefined') {
 })();
 
 /* ==== src/shell/i18n.js ==== */
-const __m78 = (() => {
+const __m79 = (() => {
 // The interface in English or Brazilian Portuguese. golem's own words (the page, the sidebar, the composer, the cards'
 // frame, the messages) go through t(); the English is the key, so a sentence not translated yet shows in English and a
 // placeholder ({name}) is filled in after the lookup. What a tool answers is the tool's, in English for now.
@@ -31125,13 +31239,13 @@ const PT = {
 })();
 
 /* ==== src/shell/render.js ==== */
-const __m79 = (() => {
+const __m80 = (() => {
 const { fmt } = __m0;
 const { conversions, equalArea } = __m5;
-const { Figure } = __m77;
-const { t } = __m78;
-const { stationNow } = __m25;
-const { staleOf, staleText } = __m30;
+const { Figure } = __m78;
+const { t } = __m79;
+const { stationNow } = __m28;
+const { staleOf, staleText } = __m32;
 // Rendering. The engine hands over plain blocks; this is the only file that turns them into markup.
 // a card read with a taught value or formula that has changed since (tms.js): said under its reading, with its question
 // to run again; the answer itself stays what it was
@@ -31282,7 +31396,7 @@ function figImage(ctx, x, y, w, h, cols, rows, b64) {
 })();
 
 /* ==== src/vendor/sw-register.js ==== */
-const __m80 = (() => {
+const __m81 = (() => {
 // ⚠ VENDORED — DO NOT EDIT. @gcu/sw's page-side companion, copied from ../auditable/ext/sw/register.js (at auditable 8837da6e).
 
 // @gcu/sw — the page-side companion (ES module). Registration + persistent
@@ -31360,8 +31474,8 @@ function registerGcuSw(opts = {}) {
 })();
 
 /* ==== src/shell/sign.js ==== */
-const __m81 = (() => {
-const { shell } = __m76;
+const __m82 = (() => {
+const { shell } = __m77;
 // Signing what golem exports, and checking what it opens (SPEC 13: things you can trust). One signature format for both
 // homes, ECDSA P-256 over SHA-256, the signature raw (r‖s) and the public key as SPKI, both base64: inside the lead-acid
 // app the phone's hardware key signs (lead-acid's attest plugin: StrongBox, else the TEE); in a browser, a WebCrypto key
@@ -31412,30 +31526,30 @@ async function fingerprint(pubB64) {
 })();
 
 /* ==== src/shell/main.js ==== */
-const __m82 = (() => {
+const __m83 = (() => {
 const { S } = __m0;
-const { submit, flipSlot, answer, capture, seedExamples, openFile, openBinary, openStreamed, preview } = __m72;
-const { scanTable, STREAM_OVER } = __m71;
-const { completions } = __m44;
-const { fromDevice } = __m24;
+const { submit, flipSlot, answer, capture, seedExamples, openFile, openBinary, openStreamed, preview } = __m73;
+const { scanTable, STREAM_OVER } = __m72;
+const { completions } = __m46;
+const { fromDevice } = __m27;
 const { conversions } = __m5;
-const { useFactbook, factbookInfo } = __m18;
-const { factbookFromGcudat, factbookProfiles, readGcudat, compileOds, compileStrunk, mineralsFromGcudat } = __m73;
+const { useFactbook, factbookInfo } = __m21;
+const { factbookFromGcudat, factbookProfiles, readGcudat, compileOds, compileStrunk, mineralsFromGcudat } = __m74;
 const { useMinerals, mineralsInfo } = __m8;
-const { useBook, bookInfo } = __m19;
-const { BINARY } = __m66;
+const { useBook, bookInfo } = __m22;
+const { BINARY } = __m67;
 const { setRunner, onJobDone } = __m0;
-const { sessions, current, newSession, openSession, renameSession, deleteSession, searchHistory, parts, hydrate, onChange, exportSession, importSession, pinCard, branchSession } = __m28;
-const { openStore, putBlob, getBlob } = __m75;
-const { skills, PACKS, STARTERS, STARTERS_PT } = __m38;
-const { shell } = __m76;
-const { escHtml, pad, cardEl, drawCharts } = __m79;
-const { registerGcuSw } = __m80;
-const { sign, verify, fingerprint, deviceKey, canSign } = __m81;
-const { canonical, unsigned } = __m29;
-const { staleOf } = __m30;
-const { t, plural, setUiLang, uiLang, applyStatic } = __m78;
-const { setLanguage } = __m44;
+const { sessions, current, newSession, openSession, renameSession, deleteSession, searchHistory, parts, hydrate, onChange, exportSession, importSession, pinCard, branchSession } = __m30;
+const { openStore, putBlob, getBlob } = __m76;
+const { skills, PACKS, STARTERS, STARTERS_PT } = __m40;
+const { shell } = __m77;
+const { escHtml, pad, cardEl, drawCharts } = __m80;
+const { registerGcuSw } = __m81;
+const { sign, verify, fingerprint, deviceKey, canSign } = __m82;
+const { canonical, unsigned } = __m31;
+const { staleOf } = __m32;
+const { t, plural, setUiLang, uiLang, applyStatic } = __m79;
+const { setLanguage } = __m46;
 // The shell: wiring, tabs, the session drawer, storage, and the sleep switch. Everything that touches
 // the DOM or the browser lives here or in render.js; the engine never does.
 const $ = id => document.getElementById(id);

@@ -198,6 +198,7 @@ Status: **live** = works in `src/` today; **planned** = named, not built.
 | Table | Histogram and summary | `@gcu/sadpan` vendored (statistics); drawn by `@gcu/plot` (14 Oct 2026: real axes, labels, a log axis, the theme's colours; estimates mark their percentiles) | `@gcu/sadpan`, `@gcu/plot` |
 | Table | Transform by example | planned | new package |
 | Table | Report paragraph from plan parameters | planned | templates; see [Open decisions](#14-open-decisions) on output English |
+| Table | Assay quality control as rules: certified standards (Westgard 1-3s and 2-2s), blanks against a limit, duplicate pairs by HARD, chained (logic.js) to a verdict per batch (suspect, to review, passing, unchecked when it has no standard) with its reasons; certified values, the blank limit and the HARD threshold read from the table or asked, never assumed; a synthetic QC sample ("open the qc sample") with planted failures | live (15 Oct 2026), `qaqc.js` | own rules over `logic.js` |
 | Knowledge | Record lookup, conversion, filter, rank | live (14-row sample) | factbook pack, `@gcu/sift` |
 | Knowledge | Term definitions with reader hand-off | live (locator only) | `@gcu/librarian`, `@gcu/reader-core` |
 | Knowledge | Geologic timescale: bounds, ranks, parents, neighbours, subdivisions, the unit at an age | built in (8 Oct 2026) from the ICS chart via Macrostrat, CC BY 4.0, 171 units | the first real records pack; the `golem` facet is this file |

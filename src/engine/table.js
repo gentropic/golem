@@ -3,6 +3,7 @@
 // Sample data stays labelled as sample data; a file is named on every card that reads it.
 import { S, T, tool, frame, amend, noun, shape, postmod, qmod, compound, condition, fmt, checksOf } from './core.js';
 import { mineralsTable } from './minerals.js';
+import { qcSample } from './qaqc.js';
 import { DOCUMENT } from './interchange.js';
 import { series } from '../vendor/sadpan.js';
 import { sniff, detectAnalyte, NULL_SENTINELS } from '../vendor/recon.js';
@@ -78,7 +79,7 @@ export function colOf(word, table = S.table) {
 }
 const colNames = t => t.cols.map(c => c.name).join(', ');
 const shown = w => { const c = colOf(w, S.table || { cols: SAMPLE_COLS }); return c ? (c.analyte || c.name) : w; };
-const srcLine = t => t.source === 'sample' ? 'assays.csv · synthetic sample data, generated, not from a real deposit' : t.source === 'device' ? `the ${t.name} · ${t.rows.length} rows · a table on this device` : `${t.name}${t.sheet && t.from === 'xlsx' ? ' · sheet ' + t.sheet : ''} · ${t.rows.length} rows · ${t.from === 'xlsx' ? 'read by @gcu/sheet, ' : t.from === 'dm' ? 'read by @gcu/dm, ' : t.from === 'parquet' ? 'read by @gcu/parquet, ' : ''}typed by @gcu/recon`;
+const srcLine = t => t.source === 'sample' ? `${t.name} · synthetic sample data, generated, not from a real deposit` : t.source === 'device' ? `the ${t.name} · ${t.rows.length} rows · a table on this device` : `${t.name}${t.sheet && t.from === 'xlsx' ? ' · sheet ' + t.sheet : ''} · ${t.rows.length} rows · ${t.from === 'xlsx' ? 'read by @gcu/sheet, ' : t.from === 'dm' ? 'read by @gcu/dm, ' : t.from === 'parquet' ? 'read by @gcu/parquet, ' : ''}typed by @gcu/recon`;
 
 /* ── statistics, weighted or not ───────────────────────────── */
 export function stats(v) {
@@ -110,7 +111,8 @@ tool({
   topic: () => null,
   run: a => {
     let t;
-    if (a.device === 'minerals') t = mineralsTable();   // a pack, not device state: the minerals as a table (minerals.js)
+    if (a.device === 'minerals') t = mineralsTable();
+    else if (a.device === 'qc') t = qcSample();   // the synthetic QC sample (qaqc.js)   // a pack, not device state: the minerals as a table (minerals.js)
     else if (a.device) {
       const d = S.tables[a.device]; if (!d || !d.rows.length) return { read: ['open table', { v: a.device }], body: [{ t: 'note', kind: 'err', text: `The ${a.device} is empty. Say "log 5 km run" first.` }], trace: ['device table: empty'] };
       t = { name: a.device, source: 'device', hash: a.device, rows: d.rows.map(r => ({ ...r })), cols: d.cols.map(c => ({ ...c })), roles: {} };
