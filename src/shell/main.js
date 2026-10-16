@@ -427,12 +427,11 @@ function factbookItem() {
   return `<p>${state}${inApp ? '' : t(' Installing makes one request to the library for its list and one per pack; a .gcudat file opened with the paperclip installs with none.')}</p><div class="opts">${store && store.kind === 'idb' ? acts : `<span class="sub">${t('This browser gives golem no IndexedDB, so a pack cannot be kept.')}</span>`}${packNote ? `<span class="sub">${escHtml(packNote)}</span>` : ''}</div>`;
 }
 function renderPacks() {
-  const lab = { live: t('installed'), samp: t('sample'), plan: t('not wired') };
-  let h = `<h1 class="vhead">${t('Packs')}</h1><div class="sub">${t('golem knows what its installed packs hold. These are the gcu-library entries plus packs worth adding.')}</div><div class="lbl">${t('Library')}</div>`;
+  const lab = { built: t('built in'), live: t('installed'), samp: t('sample') };
+  let h = `<h1 class="vhead">${t('Packs')}</h1><div class="sub">${t('The packs golem uses: built into the page, or a sample until the pack is installed from gcu-library or from a .gcudat file.')}</div><div class="lbl">${t('Library')}</div>`;
   const fbi = factbookInfo();
   PACKS.forEach(([id, name, meta, st, d]) => {
     if (id === 'factbook') st = fbi.kind === 'sample' ? 'samp' : 'live';
-    if (id === 'factbook-full') st = fbi.kind === 'pack' && fbi.profiles ? 'live' : 'plan';
     if (BOOKS[id]) st = infoOf(id).kind === 'pack' ? 'live' : 'samp';
     h += `<div class="item"><h3>${escHtml(name)} <span class="tag ${st}">${lab[st]}</span></h3><p>${escHtml(d)}</p>${id === 'factbook' ? factbookItem() : BOOKS[id] ? bookItem(id) : ''}<div class="from">${escHtml(id)} · ${escHtml(meta)}</div></div>`;
   });

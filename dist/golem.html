@@ -271,7 +271,7 @@ html[data-drop] .composer::after{content:"Drop to open";font:12px var(--mono);co
 .item{background:var(--au-surface-raised);border:1px solid var(--au-border);border-radius:8px;padding:10px 12px;display:grid;gap:5px;min-width:0}
 .item h3{margin:0;font:600 15px var(--sans);display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .tag{font:700 9.5px var(--mono);letter-spacing:.07em;text-transform:uppercase;padding:1px 5px;border-radius:2px;border:1px solid currentColor}
-.tag.live{color:var(--au-success)} .tag.plan{color:var(--au-fg-soft)} .tag.samp{color:var(--au-info)}
+.tag.live{color:var(--au-success)} .tag.plan{color:var(--au-fg-soft)} .tag.built{color:var(--au-success)} .tag.samp{color:var(--au-info)}
 .item p{margin:0;font-size:14px;color:var(--au-fg-muted)}
 .item .from{font:11px var(--mono);color:var(--au-fg-soft)}
 .view > .lbl{margin-top:10px}
@@ -14580,20 +14580,15 @@ tool({ name: 'transform', planned: true, skill: { group: 'Table', title: 'Transf
 tool({ name: 'report', planned: true, skill: { group: 'Table', title: 'Report paragraph', on: 'templates', about: 'A method paragraph written from the plan parameters.', examples: [] } });
 tool({ name: 'mapdial', planned: true, skill: { group: 'Device', title: 'Map, dial, share', on: 'lead-acid intent', about: 'Show a place, start a call, share the last result.', examples: [] } });
 
-// Row: [id, name, size · licence, status (live | samp | plan), description]
+// The packs golem uses, for the Packs view. Row: [id, name, size · licence, status (built: in the page | samp: a sample
+// until the gcu-library pack is installed; the view says when it is), description]. Packs proposed but not built are
+// listed in SPEC section 7, not here.
 const PACKS = [
-  ['timescale', 'International Chronostratigraphic Chart', 'ICS 2023 · Macrostrat · CC BY 4.0', 'live', 'Every unit of the chart: bounds, rank, parents, neighbours, subdivisions.'],
-  ['factbook', 'CIA World Factbook', '2.8 MB · CC0', 'samp', 'Records: lookup, convert, filter, rank.'],
-  ['factbook-full', 'Factbook, full profiles', '2.3 MB · CC0', 'samp', 'Installed with the factbook when asked: which countries are landlocked, and their coastlines. More fields later.'],
-  ['ods', 'Open Data Structures', '1.9 MB · CC BY 2.5', 'samp', 'Definitions: where a term is defined, with the defining passage once installed. Listings can run in adder later.'],
+  ['timescale', 'International Chronostratigraphic Chart', 'ICS 2023 · Macrostrat · CC BY 4.0', 'built', 'Every unit of the chart: bounds, rank, parents, neighbours, subdivisions.'],
+  ['factbook', 'CIA World Factbook', '2.8 MB, 5.1 MB with the full profiles · CC0', 'samp', 'Records: lookup, convert, filter, rank. The full profiles add which countries are landlocked, and their coastlines.'],
   ['minerals', 'Mineral species (Wikidata)', '254 kB · CC0', 'samp', 'Every mineral species Wikidata lists: formula, elements, class, crystal system; hardness and density where Wikidata has them. Lookups, searches by element, and a table to ask.'],
+  ['ods', 'Open Data Structures', '1.9 MB · CC BY 2.5', 'samp', 'Definitions: where a term is defined, with the defining passage once installed.'],
   ['elements-of-style', 'The Elements of Style (1918)', '36 kB · public domain', 'samp', 'Its rules and the expressions of chapter V, compiled into a text checker that cites them.'],
-  ['rtow · rtnw · rtrol', 'Ray Tracing series', '11.5 MB · CC0', 'plan', 'Reader only until a term index is built.'],
-  ['arcr', 'arcr / gewgaw manual', '26 kB · CC0', 'plan', 'Reader only.'],
-  ['geonames', 'Gazetteer', 'proposed · check licence', 'plan', 'Places, coordinates, distances.'],
-  ['wikidata-core', 'Wikidata subset', 'proposed · check licence', 'plan', 'Who, what, when and where as structured facts.'],
-  ['usgs-mcs', 'USGS commodity summaries', 'proposed · check licence', 'plan', 'Production and reserves by country.'],
-  ['wordnet', 'WordNet', 'proposed · check licence', 'plan', 'Synonyms for the parser, so fewer words need teaching.']
 ];
 const GROUPS = ['Compute', 'Field', 'Table', 'Knowledge', 'Device', 'Session'];
 // the Skills tab, grouped, in declaration order; computed on demand so every module has registered
@@ -31671,8 +31666,8 @@ const PT = {
   'live': 'pronta', 'planned': 'planejada', 'Compute': 'Cálculo', 'Field': 'Campo', 'Table': 'Tabela', 'Knowledge': 'Conhecimento', 'Device': 'Aparelho', 'Session': 'Sessão',
   'Skill descriptions and answers are in English for now.': 'As descrições das habilidades e as respostas ainda estão em inglês.',
   // Packs and this device
-  'golem knows what its installed packs hold. These are the gcu-library entries plus packs worth adding.': 'O golem sabe o que os pacotes instalados contêm. Estes são os itens da gcu-library, mais pacotes que valem acrescentar.',
-  'Library': 'Biblioteca', 'installed': 'instalado', 'sample': 'amostra', 'not wired': 'não ligado', 'On this device': 'Neste aparelho', 'Taught words': 'Palavras ensinadas', 'Notes': 'Notas', 'Open table': 'Tabela aberta', 'Files on this device': 'Arquivos neste aparelho',
+  'The packs golem uses: built into the page, or a sample until the pack is installed from gcu-library or from a .gcudat file.': 'Os pacotes que o golem usa: embutidos na página, ou uma amostra até o pacote ser instalado da gcu-library ou de um arquivo .gcudat.',
+  'Library': 'Biblioteca', 'installed': 'instalado', 'sample': 'amostra', 'built in': 'embutido', 'On this device': 'Neste aparelho', 'Taught words': 'Palavras ensinadas', 'Notes': 'Notas', 'Open table': 'Tabela aberta', 'Files on this device': 'Arquivos neste aparelho',
   'None yet. Try “pop means population”.': 'Nenhuma ainda. Experimente “pop means population”.', 'None yet. Try “remember that …”.': 'Nenhuma ainda. Experimente “lembra que …”.', 'None.': 'Nenhuma.', 'None yet. Tap the paperclip to open a CSV.': 'Nenhum ainda. Toque no clipe para abrir um CSV.',
   '{name} · {n} rows · {source}': '{name} · {n} linhas · {source}', 'sample data': 'dados de amostra', 'from your files': 'dos seus arquivos',
   'This app': 'Este app', 'Installed as an Android app through lead-acid. It has no network permission and checks for nothing: a new version comes as a new APK.': 'Instalado como app Android pelo lead-acid. Não tem permissão de rede e não verifica nada: uma versão nova vem como um APK novo.',
@@ -32527,12 +32522,11 @@ function factbookItem() {
   return `<p>${state}${inApp ? '' : t(' Installing makes one request to the library for its list and one per pack; a .gcudat file opened with the paperclip installs with none.')}</p><div class="opts">${store && store.kind === 'idb' ? acts : `<span class="sub">${t('This browser gives golem no IndexedDB, so a pack cannot be kept.')}</span>`}${packNote ? `<span class="sub">${escHtml(packNote)}</span>` : ''}</div>`;
 }
 function renderPacks() {
-  const lab = { live: t('installed'), samp: t('sample'), plan: t('not wired') };
-  let h = `<h1 class="vhead">${t('Packs')}</h1><div class="sub">${t('golem knows what its installed packs hold. These are the gcu-library entries plus packs worth adding.')}</div><div class="lbl">${t('Library')}</div>`;
+  const lab = { built: t('built in'), live: t('installed'), samp: t('sample') };
+  let h = `<h1 class="vhead">${t('Packs')}</h1><div class="sub">${t('The packs golem uses: built into the page, or a sample until the pack is installed from gcu-library or from a .gcudat file.')}</div><div class="lbl">${t('Library')}</div>`;
   const fbi = factbookInfo();
   PACKS.forEach(([id, name, meta, st, d]) => {
     if (id === 'factbook') st = fbi.kind === 'sample' ? 'samp' : 'live';
-    if (id === 'factbook-full') st = fbi.kind === 'pack' && fbi.profiles ? 'live' : 'plan';
     if (BOOKS[id]) st = infoOf(id).kind === 'pack' ? 'live' : 'samp';
     h += `<div class="item"><h3>${escHtml(name)} <span class="tag ${st}">${lab[st]}</span></h3><p>${escHtml(d)}</p>${id === 'factbook' ? factbookItem() : BOOKS[id] ? bookItem(id) : ''}<div class="from">${escHtml(id)} · ${escHtml(meta)}</div></div>`;
   });

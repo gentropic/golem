@@ -10,20 +10,15 @@ tool({ name: 'transform', planned: true, skill: { group: 'Table', title: 'Transf
 tool({ name: 'report', planned: true, skill: { group: 'Table', title: 'Report paragraph', on: 'templates', about: 'A method paragraph written from the plan parameters.', examples: [] } });
 tool({ name: 'mapdial', planned: true, skill: { group: 'Device', title: 'Map, dial, share', on: 'lead-acid intent', about: 'Show a place, start a call, share the last result.', examples: [] } });
 
-// Row: [id, name, size · licence, status (live | samp | plan), description]
+// The packs golem uses, for the Packs view. Row: [id, name, size · licence, status (built: in the page | samp: a sample
+// until the gcu-library pack is installed; the view says when it is), description]. Packs proposed but not built are
+// listed in SPEC section 7, not here.
 export const PACKS = [
-  ['timescale', 'International Chronostratigraphic Chart', 'ICS 2023 · Macrostrat · CC BY 4.0', 'live', 'Every unit of the chart: bounds, rank, parents, neighbours, subdivisions.'],
-  ['factbook', 'CIA World Factbook', '2.8 MB · CC0', 'samp', 'Records: lookup, convert, filter, rank.'],
-  ['factbook-full', 'Factbook, full profiles', '2.3 MB · CC0', 'samp', 'Installed with the factbook when asked: which countries are landlocked, and their coastlines. More fields later.'],
-  ['ods', 'Open Data Structures', '1.9 MB · CC BY 2.5', 'samp', 'Definitions: where a term is defined, with the defining passage once installed. Listings can run in adder later.'],
+  ['timescale', 'International Chronostratigraphic Chart', 'ICS 2023 · Macrostrat · CC BY 4.0', 'built', 'Every unit of the chart: bounds, rank, parents, neighbours, subdivisions.'],
+  ['factbook', 'CIA World Factbook', '2.8 MB, 5.1 MB with the full profiles · CC0', 'samp', 'Records: lookup, convert, filter, rank. The full profiles add which countries are landlocked, and their coastlines.'],
   ['minerals', 'Mineral species (Wikidata)', '254 kB · CC0', 'samp', 'Every mineral species Wikidata lists: formula, elements, class, crystal system; hardness and density where Wikidata has them. Lookups, searches by element, and a table to ask.'],
+  ['ods', 'Open Data Structures', '1.9 MB · CC BY 2.5', 'samp', 'Definitions: where a term is defined, with the defining passage once installed.'],
   ['elements-of-style', 'The Elements of Style (1918)', '36 kB · public domain', 'samp', 'Its rules and the expressions of chapter V, compiled into a text checker that cites them.'],
-  ['rtow · rtnw · rtrol', 'Ray Tracing series', '11.5 MB · CC0', 'plan', 'Reader only until a term index is built.'],
-  ['arcr', 'arcr / gewgaw manual', '26 kB · CC0', 'plan', 'Reader only.'],
-  ['geonames', 'Gazetteer', 'proposed · check licence', 'plan', 'Places, coordinates, distances.'],
-  ['wikidata-core', 'Wikidata subset', 'proposed · check licence', 'plan', 'Who, what, when and where as structured facts.'],
-  ['usgs-mcs', 'USGS commodity summaries', 'proposed · check licence', 'plan', 'Production and reserves by country.'],
-  ['wordnet', 'WordNet', 'proposed · check licence', 'plan', 'Synonyms for the parser, so fewer words need teaching.']
 ];
 const GROUPS = ['Compute', 'Field', 'Table', 'Knowledge', 'Device', 'Session'];
 // the Skills tab, grouped, in declaration order; computed on demand so every module has registered

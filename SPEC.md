@@ -231,7 +231,7 @@ golem reads the same `.gcudat` packs as the Auditable Works reader, from the sam
 | Kind | Example | What golem does with it |
 |---|---|---|
 | Records | `factbook` (+ `factbook-full`), the ICS timescale | Lookup, unit conversion, filter, rank, compute across records |
-| Text | `ods`, the ray-tracing books, `arcr` | Find where a term is defined, show the passage, open the reader there; run listings in adder |
+| Text | `ods` (the library's ray-tracing books and `arcr` are not geology, and golem leaves them to the reader) | Find where a term is defined, show the passage, open the reader there; run listings in adder |
 | Rules | `elements-of-style` (1918, public domain) | Compile rules into a checker that cites the rule |
 
 ### The `golem` facet
@@ -247,7 +247,7 @@ The facet is inert data: reviewable, versioned, and covered by the pack's SRI ha
 
 ### Proposed packs
 
-The geologic timescale (ICS chart, attribution carried in the pack; accepted 8 Oct 2026), `minerals` (properties and a key; the hand-typed sample was removed 8 Oct 2026, a licensed source is still to be chosen), a gazetteer (GeoNames), a Wikidata subset, USGS commodity summaries, WordNet for parser synonyms. Licences must be verified before any of these enters the registry; none has been checked.
+Built: the geologic timescale (in the page, accepted 8 Oct 2026) and `minerals` (Wikidata, CC0, 15 Oct 2026). The Packs view lists only what golem uses (16 Oct 2026); what follows is not shown there. Worth building, by their published terms (to be confirmed when the pack is made): **USGS Mineral Commodity Summaries** (production and reserves by country, about 90 commodities, yearly; a US government work, public domain), the best fit for golem; and a **gazetteer** from GeoNames (CC BY 4.0), as a subset (populated places over 1,000 people, or Brazil in full), so places read without being taught. Set aside: WordNet (its licence allows it, but general English synonyms would make the parser more ambiguous, and learning from misses covers the gap) and a general Wikidata subset (too broad; Wikidata serves golem as narrow curated packs, as `minerals` does). Still wanted, with a source to find: a lithology dictionary, a glossary of geological terms in English and Portuguese, a stratigraphic lexicon.
 
 ---
 
@@ -409,7 +409,7 @@ In order. Each step leaves something that runs.
 6. **Calendar default.** User-confirms (no permission) is specified. Decide whether silent insert is ever offered.
 7. **Statistical-rung badge and threshold.** Decided 14 Oct 2026: a reading golem was not sure of is marked `guess` in `warn` and runs only when picked; the threshold question went away with the statistical model (the repair pass's budget, 3, is the gate).
 8. **First-release scope.** Which groups from section 6 ship first. The Compute, Field and Device groups work without any file handling.
-9. **Pack licences.** Every proposed pack in section 7.
+9. **Pack licences.** Every proposed pack in section 7 (16 Oct 2026: USGS MCS public domain, GeoNames CC BY 4.0, by their published terms; confirm when each is built).
 10. **Update checks in the PWA.** Decided 14 Oct 2026: manual only. "Check for updates" (Settings) is one request, counted in the header; a new golem waits for "Reload to the new golem". The browser's own daily re-read of `sw.js` is the one request golem cannot switch off; it carries nothing of the person's and, since `sw.js` does not change between builds, changes nothing.
 11. **The Factbook in the build.** Decided 14 Oct 2026: installed on request, not bundled. The page stays as it is; the pack is one user-initiated download (or a `.gcudat` file picked on the device), kept on the device; until then the sample answers and says so.
 

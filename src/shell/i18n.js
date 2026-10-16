@@ -86,8 +86,8 @@ const PT = {
   'live': 'pronta', 'planned': 'planejada', 'Compute': 'Cálculo', 'Field': 'Campo', 'Table': 'Tabela', 'Knowledge': 'Conhecimento', 'Device': 'Aparelho', 'Session': 'Sessão',
   'Skill descriptions and answers are in English for now.': 'As descrições das habilidades e as respostas ainda estão em inglês.',
   // Packs and this device
-  'golem knows what its installed packs hold. These are the gcu-library entries plus packs worth adding.': 'O golem sabe o que os pacotes instalados contêm. Estes são os itens da gcu-library, mais pacotes que valem acrescentar.',
-  'Library': 'Biblioteca', 'installed': 'instalado', 'sample': 'amostra', 'not wired': 'não ligado', 'On this device': 'Neste aparelho', 'Taught words': 'Palavras ensinadas', 'Notes': 'Notas', 'Open table': 'Tabela aberta', 'Files on this device': 'Arquivos neste aparelho',
+  'The packs golem uses: built into the page, or a sample until the pack is installed from gcu-library or from a .gcudat file.': 'Os pacotes que o golem usa: embutidos na página, ou uma amostra até o pacote ser instalado da gcu-library ou de um arquivo .gcudat.',
+  'Library': 'Biblioteca', 'installed': 'instalado', 'sample': 'amostra', 'built in': 'embutido', 'On this device': 'Neste aparelho', 'Taught words': 'Palavras ensinadas', 'Notes': 'Notas', 'Open table': 'Tabela aberta', 'Files on this device': 'Arquivos neste aparelho',
   'None yet. Try “pop means population”.': 'Nenhuma ainda. Experimente “pop means population”.', 'None yet. Try “remember that …”.': 'Nenhuma ainda. Experimente “lembra que …”.', 'None.': 'Nenhuma.', 'None yet. Tap the paperclip to open a CSV.': 'Nenhum ainda. Toque no clipe para abrir um CSV.',
   '{name} · {n} rows · {source}': '{name} · {n} linhas · {source}', 'sample data': 'dados de amostra', 'from your files': 'dos seus arquivos',
   'This app': 'Este app', 'Installed as an Android app through lead-acid. It has no network permission and checks for nothing: a new version comes as a new APK.': 'Instalado como app Android pelo lead-acid. Não tem permissão de rede e não verifica nada: uma versão nova vem como um APK novo.',
